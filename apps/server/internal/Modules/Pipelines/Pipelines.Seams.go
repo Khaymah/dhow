@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	OutputFound  = "dhow_found"
-	OutputDigest = "dhow_sha256"
+	OutputFound = "dhow_found"
 
 	discoveryKey      = "dhow.discovery"
 	discoveryName     = "Read the pipeline file"

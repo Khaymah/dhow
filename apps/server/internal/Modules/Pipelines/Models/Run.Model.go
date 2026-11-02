@@ -39,6 +39,7 @@ const (
 	ReasonDefinitionTimeout     = "DEFINITION_TIMEOUT"
 	ReasonDefinitionChanged     = "DEFINITION_CHANGED"
 	ReasonDiscoveryFailed       = "DISCOVERY_FAILED"
+	ReasonDefinitionUnverified  = "DEFINITION_UNVERIFIED"
 	ReasonTriggerNotEnabled     = "TRIGGER_NOT_ENABLED"
 	ReasonInputsInvalid         = "INPUTS_INVALID"
 	ReasonImagePinFailed        = "IMAGE_PIN_FAILED"

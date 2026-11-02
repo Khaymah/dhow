@@ -33,15 +33,17 @@ func (r *RunJob) Build(ctx context.Context, c Context) (*runnerv1.JobSpec, error
 	kept := make([]*runnerv1.Step, 0, len(spec.GetSteps()))
 	origin := make([]int, 0, len(spec.GetSteps()))
 	moved := make(map[int32]int32, len(spec.GetSteps()))
-	for i, st := range spec.GetSteps() {
-		keep, err := r.EvalStepIf(ctx, i, c)
+	next := int32(0)
+	for i := int32(0); int(i) < len(spec.GetSteps()); i++ {
+		keep, err := r.EvalStepIf(ctx, int(i), c)
 		if err != nil {
 			return nil, err
 		}
 		if keep {
-			moved[int32(i)] = int32(len(kept))
-			origin = append(origin, i)
-			kept = append(kept, st)
+			moved[i] = next
+			next++
+			origin = append(origin, int(i))
+			kept = append(kept, spec.GetSteps()[i])
 		}
 	}
 	spec.Steps = kept
