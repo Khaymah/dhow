@@ -3,7 +3,8 @@ package pipelinespec
 import (
 	"context"
 	"errors"
-	"strconv"
+	"math"
+	"slices"
 	"strings"
 
 	"google.golang.org/protobuf/proto"
@@ -22,12 +23,15 @@ func (r *RunJob) Build(ctx context.Context, c Context) (*runnerv1.JobSpec, error
 	if spec.Env == nil {
 		spec.Env = map[string]string{}
 	}
+	derived := make([]jobspec.DerivedPath, 0, len(r.Expressions))
 	for ref := range r.Expressions {
 		v, err := r.EvalValue(ctx, ref, c)
 		if err != nil {
 			return nil, err
 		}
-		placeValue(spec, ref, v)
+		if d, ok := placeValue(spec, ref, v); ok {
+			derived = append(derived, d)
+		}
 	}
 	c.Env = spec.GetEnv()
 	kept := make([]*runnerv1.Step, 0, len(spec.GetSteps()))
@@ -48,6 +52,7 @@ func (r *RunJob) Build(ctx context.Context, c Context) (*runnerv1.JobSpec, error
 	}
 	spec.Steps = kept
 	spec.Secrets = remapSecrets(spec.GetSecrets(), moved)
+	spec.DerivedValues = remapDerived(derived, moved)
 	if err := r.checkStepSecrets(spec, origin); err != nil {
 		return nil, err
 	}
@@ -76,6 +81,25 @@ func remapSecrets(refs []*runnerv1.SecretRef, moved map[int32]int32) []*runnerv1
 	return out
 }
 
+func remapDerived(paths []jobspec.DerivedPath, moved map[int32]int32) []string {
+	out := make([]string, 0, len(paths))
+	for _, d := range paths {
+		if d.Step > math.MaxInt32 {
+			continue
+		}
+		if d.Step >= 0 {
+			n, ok := moved[int32(d.Step)]
+			if !ok {
+				continue
+			}
+			d.Step = int(n)
+		}
+		out = append(out, d.String())
+	}
+	slices.Sort(out)
+	return out
+}
+
 func (r *RunJob) checkStepSecrets(spec *runnerv1.JobSpec, origin []int) error {
 	for _, ref := range spec.GetSecrets() {
 		for _, n := range ref.GetStepIndexes() {
@@ -99,32 +123,32 @@ func (p StepPlan) declares(ref *runnerv1.SecretRef) bool {
 	return p.Secrets[target.AsEnv] == ref.GetName()
 }
 
-func placeValue(spec *runnerv1.JobSpec, ref, v string) {
-	if name, found := strings.CutPrefix(ref, "Env."); found {
-		spec.Env[name] = v
-		return
+func placeValue(spec *runnerv1.JobSpec, ref, v string) (jobspec.DerivedPath, bool) {
+	d, ok := jobspec.ParseDerived(ref)
+	if !ok {
+		return d, false
 	}
-	rest, found := strings.CutPrefix(ref, "Steps[")
-	if !found {
-		return
+	if d.Step < 0 {
+		spec.Env[d.Name] = v
+		return d, true
 	}
-	index, field, found := strings.Cut(rest, "].")
-	i, err := strconv.Atoi(index)
-	if !found || err != nil || i < 0 || i >= len(spec.GetSteps()) {
-		return
+	if d.Step >= len(spec.GetSteps()) {
+		return d, false
 	}
-	step := spec.GetSteps()[i]
-	if name, ok := strings.CutPrefix(field, "Env."); ok {
+	step := spec.GetSteps()[d.Step]
+	if d.Field == "Env" {
 		if step.Env == nil {
 			step.Env = map[string]string{}
 		}
-		step.Env[name] = v
-		return
+		step.Env[d.Name] = v
+		return d, true
 	}
-	if name, ok := strings.CutPrefix(field, "With."); ok && step.GetPlugin() != nil {
-		if step.Plugin.Inputs == nil {
-			step.Plugin.Inputs = map[string]string{}
-		}
-		step.Plugin.Inputs[name] = v
+	if step.GetPlugin() == nil {
+		return d, false
 	}
+	if step.Plugin.Inputs == nil {
+		step.Plugin.Inputs = map[string]string{}
+	}
+	step.Plugin.Inputs[d.Name] = v
+	return d, true
 }

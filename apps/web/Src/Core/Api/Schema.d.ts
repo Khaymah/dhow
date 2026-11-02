@@ -3056,7 +3056,7 @@ export interface components {
             /** @description An image reference pinned by digest (`name@sha256:...`). A name without a registry host is completed the way Docker does it, so `node:22@sha256:...` becomes `docker.io/library/node:22@sha256:...`. */
             Image: string;
             Steps: components["schemas"]["JobStep"][];
-            /** @description Plain environment for every step. Names that start with `DHOW_` are reserved. Every member who can read the job sees these values, viewers included, so never put a credential here: reference it from Secrets. */
+            /** @description Plain environment for every step. Names that start with `DHOW_` are reserved. Every member who can read the job sees these values, viewers included, so never put a credential here: reference it from Secrets. In a job of a pipeline run, a value that an expression made (a `needs` output, a `git` value) reads `[REDACTED]` here and in step environments; the runner still gets the value. */
             Env?: {
                 [key: string]: string;
             };

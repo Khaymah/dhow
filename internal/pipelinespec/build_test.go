@@ -94,3 +94,16 @@ func TestBuildRefusesAPluginStepHoldingASecretItDidNotDeclare(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildMarksEveryValueAnExpressionMadeAfterSkippedSteps(t *testing.T) {
+	plan := compileSource(t, []byte(job("    env:\n      V: ${{ git.branch }}\n      LITERAL: plain\n    steps:\n"+
+		"      - run: echo skipped\n        if: ${{ git.branch == 'nope' }}\n        env:\n          GONE: ${{ git.branch }}\n"+
+		"      - run: make\n        env:\n          TAG: ${{ git.branch }}\n          PLAIN: plain\n"+
+		"      - uses: ghcr.io/thirdparty/notify@sha256:"+digest+"\n        with:\n          channel: ${{ git.branch }}\n          size: small\n")))
+	spec, err := plan.Jobs[0].Build(context.Background(), onMain)
+	require.NoError(t, err)
+	require.NoError(t, jobspec.Validate(spec))
+	assert.Equal(t, []string{"Env.V", "Steps[0].Env.TAG", "Steps[1].With.channel"}, spec.GetDerivedValues())
+	assert.Equal(t, "main", spec.GetEnv()["V"])
+	assert.Equal(t, "main", spec.GetSteps()[1].GetPlugin().GetInputs()["channel"])
+}

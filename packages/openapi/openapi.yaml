@@ -5518,7 +5518,9 @@ components:
             type: string
           description: >-
             Plain environment for every step. Names that start with `DHOW_` are reserved. Every member who can read the job
-            sees these values, viewers included, so never put a credential here: reference it from Secrets.
+            sees these values, viewers included, so never put a credential here: reference it from Secrets. In a job of a
+            pipeline run, a value that an expression made (a `needs` output, a `git` value) reads `[REDACTED]` here and in
+            step environments; the runner still gets the value.
         Secrets:
           type: array
           maxItems: 50
