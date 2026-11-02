@@ -14,6 +14,7 @@ import (
 	config "github.com/Khaymah/dhow/apps/runner/internal/Config"
 	identity "github.com/Khaymah/dhow/apps/runner/internal/Identity"
 	installer "github.com/Khaymah/dhow/apps/runner/internal/Installer"
+	podman "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Podman"
 	"github.com/Khaymah/dhow/internal/buildinfo"
 	"github.com/Khaymah/dhow/internal/logging"
 )
@@ -71,6 +72,8 @@ func Main(ctx context.Context, args []string, env Env) error {
 		return runGitSSH(ctx, args[1:], env)
 	case CommandGitAskpass:
 		return runGitAskpass(args[1:], env)
+	case podman.CommandMountWorkspace, podman.CommandUnmountWorkspace:
+		return podman.RunWorkspaceMount(args[0], args[1:])
 	case CommandRegister:
 		return runRegister(ctx, args[1:], env)
 	case CommandRun:

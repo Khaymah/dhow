@@ -90,6 +90,8 @@ type workspace struct {
 	slot      int64
 	mounted   bool
 	diskBytes int64
+	root      string
+	real      string
 }
 
 func (d *Driver) Workspace(ctx context.Context, spec sandbox.WorkspaceSpec) (sandbox.Workspace, error) {
@@ -121,9 +123,14 @@ func (w *workspace) create(ctx context.Context, spec sandbox.WorkspaceSpec, inne
 	}
 	id := strconv.FormatInt(inner, 10)
 	r := w.d.runner()
+	root, real, err := resolveWorkspace(w.d.attemptsDir, w.dir)
+	if err != nil {
+		return err
+	}
+	w.root, w.real = root, real
 	if spec.DiskMode == config.DiskModeTmpfs {
-		opts := fmt.Sprintf("size=%d,nosuid,nodev,mode=0755,uid=%s,gid=%s", spec.DiskBytes, id, id)
-		if _, err := r.run(ctx, "unshare", "mount", "-t", "tmpfs", "-o", opts, "tmpfs", w.dir); err != nil {
+		size := strconv.FormatInt(spec.DiskBytes, 10)
+		if _, err := r.run(ctx, "unshare", w.d.agentPath, CommandMountWorkspace, root, real, size, id); err != nil {
 			return fmt.Errorf("mount the workspace tmpfs: %w", err)
 		}
 		w.mounted = true
@@ -155,7 +162,7 @@ func (w *workspace) Destroy(ctx context.Context) error {
 	}
 	var errs []error
 	if w.mounted {
-		if _, err := w.d.runner().run(ctx, "unshare", "umount", "--", w.dir); err != nil {
+		if _, err := w.d.runner().run(ctx, "unshare", w.d.agentPath, CommandUnmountWorkspace, w.root, w.real); err != nil {
 			errs = append(errs, fmt.Errorf("unmount the workspace: %w", err))
 		} else {
 			w.mounted = false
@@ -174,6 +181,18 @@ func (w *workspace) Destroy(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+func resolveWorkspace(root, dir string) (string, string, error) {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve the attempts directory: %w", err)
+	}
+	real, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve the workspace: %w", err)
+	}
+	return realRoot, real, nil
+}
+
 func (d *Driver) slotOf(ws sandbox.Workspace) (*workspace, bool) {
 	w, ok := ws.(*workspace)
 	return w, ok && w.d == d
@@ -189,7 +208,11 @@ func (d *Driver) unmountLeftovers(ctx context.Context) {
 		if _, err := os.Lstat(dir); err != nil {
 			continue
 		}
-		if _, err := d.runner().run(ctx, "unshare", "umount", "--lazy", "--", dir); err != nil {
+		root, real, err := resolveWorkspace(d.attemptsDir, dir)
+		if err != nil {
+			continue
+		}
+		if _, err := d.runner().run(ctx, "unshare", d.agentPath, CommandUnmountWorkspace, root, real); err != nil {
 			d.log.Debug("no workspace mount to remove", "error", err.Error())
 		}
 	}
@@ -205,7 +228,7 @@ func (w *workspace) Check(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", sandbox.ErrWorkspace, err)
 	}
-	return checkWorkspaceMount(string(out), w.dir, w.diskBytes)
+	return checkWorkspaceMount(string(out), w.real, w.diskBytes)
 }
 
 func checkWorkspaceMount(mountinfo, dir string, diskBytes int64) error {
