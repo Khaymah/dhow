@@ -34,6 +34,7 @@
 | Deployment | نشر |
 | Environment | بيئة |
 | Pipeline | خطوات النشر (pipeline) |
+| Run (pipeline run) | تنفيذ (الجمع: التنفيذات). التنفيذ الواحد لخطوات النشر، وكل job جواه «تشغيل» |
 | Repository | مستودع |
 | Deploy key | مفتاح المستودع |
 | Host key | مفتاح سيرفر المستودع (البصمة: fingerprint) |
