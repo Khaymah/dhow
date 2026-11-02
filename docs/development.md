@@ -5,7 +5,7 @@
 تأخذك هذه الصفحة من نسخة جديدة من المستودع إلى سيرفر يعمل، وواجهة مع إعادة التحميل المباشر، ومجموعة الاختبارات الكاملة. هناك طريقان:
 
 - **[Docker فقط](#أسرع-بداية-docker-فقط):** أمر واحد، ولا تثبّت شيئًا غير Git وDocker. ابدأ من هنا.
-- **[الأدوات المباشرة](#سكربت-الإعداد):** Go وNode.js وpnpm وPostgreSQL على جهازك (عبر WSL2 على Windows)، لأجل `make check`، والبيئة المعزولة لجهاز التشغيل، وأدوات Go وTypeScript في محررك.
+- **[الأدوات المباشرة](#سكربت-الإعداد):** Go وNode.js وpnpm وPostgreSQL على جهازك (عبر WSL2 على Windows)، لأجل `make check`، ومجموعات اختبار العزل لجهاز التشغيل، وأدوات Go وTypeScript في محررك.
 
 لتجربة الصورة المنشورة بدلًا من ذلك، راجع [شغّل داو على جهازك](install/local.md#حزمة-compose).
 
@@ -22,7 +22,7 @@ cd dhow
 docker compose -f deploy/dev/compose.yaml up
 ```
 
-التشغيل الأول ينزّل الصور (حوالي 600 MB) واعتماديات Go والواجهة، فيأخذ بضع دقائق. التشغيلات التالية تأخذ ثوانٍ. عندما يعمل كل شيء، يعرض السجل إطارًا مثل هذا:
+التشغيل الأول ينزّل الصور (حوالي 1 GB مع صورة جهاز التشغيل) واعتماديات Go والواجهة، ويبني صورة جهاز التشغيل، فيأخذ بضع دقائق. التشغيلات التالية تأخذ ثوانٍ. عندما يعمل كل شيء، يعرض السجل إطارًا مثل هذا:
 
 ```text
 ==================================================================
@@ -35,6 +35,7 @@ docker compose -f deploy/dev/compose.yaml up
 
 - **Go:** احفظ أي ملف تحت `apps/server` أو `internal` أو `packages/proto/gen/go`، فيعيد السيرفر البناء والتشغيل خلال ثوانٍ. إذا فشل البناء، يظهر الخطأ في السجل، ويستمر السيرفر القديم في العمل، والحفظ التالي يحاول مرة أخرى.
 - **الواجهة:** احفظ أي ملف تحت `apps/web` فيتحدث المتصفح في مكانه.
+- **جهاز التشغيل:** احفظ أي ملف تحت `apps/runner` أو `internal`، فيعيد جهاز التشغيل البناء والتشغيل بالطريقة نفسها، 3 مرات على الأكثر في 10 دقائق: السيرفر يعطّل جهاز التشغيل الذي يفتح أكثر من 3 جلسات جديدة في 10 دقائق، لأن هذا يبدو كهوية منسوخة. الحفظ بعد ذلك ينتظر، ويذكر السجل متى يعود جهاز التشغيل للعمل. لتشغيل التشغيلات، [سجّله](#التشغيلات-داخل-الحزمة) مرة واحدة.
 
 | الخدمة | ماذا تفعل | على جهازك |
 |---|---|---|
@@ -42,6 +43,8 @@ docker compose -f deploy/dev/compose.yaml up
 | `init` | تكتب `.env.dev` بمفتاح سري جديد في المرة الأولى، ثم تخرج | |
 | `server` | تبني السيرفر من نسختك وتشغّله، وتراقب ملفات Go (تفحص كل ثانية، وهذا يعمل على Windows وmacOS أيضًا) | `http://localhost:8080` (الـ API فقط) |
 | `web` | Vite مع إعادة التحميل المباشر، وتوجّه `/api` إلى `server` | `http://localhost:5173` |
+| `runner` | تبني جهاز التشغيل من نسختك وتشغّله بالمستخدم `dhow-runner` بلا صلاحيات، مع تشغيلات حقيقية في Podman بلا root، داخل حاوية privileged للتطوير فقط (راجع [ما يلي](#التشغيلات-داخل-الحزمة)) | |
+| `fake-runner` | مع `--profile fake-runner` فقط: جهاز التشغيل مع المشغّل الوهمي، الذي لا يشغّل أي عملية، في حاوية عادية | |
 
 الأوامر اليومية، من جذر المستودع:
 
@@ -53,8 +56,10 @@ docker compose -f deploy/dev/compose.yaml up
 | `docker compose -f deploy/dev/compose.yaml restart web` | يعيد تثبيت اعتماديات الواجهة بعد تغيّر `package.json` أو ملف القفل (بعد `git pull` مثلًا) |
 | `docker compose -f deploy/dev/compose.yaml exec server go test ./apps/server/...` | يشغّل اختبارات Go على `dhow_test` |
 | `docker compose -f deploy/dev/compose.yaml exec web pnpm test` | يشغّل اختبارات الواجهة |
+| `docker compose -f deploy/dev/compose.yaml exec runner dhow-dev-register` | يسجّل جهاز التشغيل برمز تلصقه |
+| `docker compose -f deploy/dev/compose.yaml logs -f runner` | يتابع سجل جهاز التشغيل |
 | `docker compose -f deploy/dev/compose.yaml down` | يوقف الحاويات ويحذفها، ويحتفظ بقاعدة البيانات |
-| `docker compose -f deploy/dev/compose.yaml down --volumes` | يحذف أيضًا قاعدة البيانات وcaches الاعتماديات |
+| `docker compose -f deploy/dev/compose.yaml down --volumes` | يحذف أيضًا قاعدة البيانات وcaches الاعتماديات وحالة جهاز التشغيل |
 
 `Ctrl+C` يوقف الحزمة التي بدأت بدون `-d`.
 
@@ -67,10 +72,68 @@ docker compose -f deploy/dev/compose.yaml up
 | `DHOW_DEV_WEB_PORT` | `5173` | الواجهة، والعنوان الذي يستخدمه رابط الإعداد |
 | `DHOW_DEV_HTTP_PORT` | `8080` | السيرفر، لـ `curl` وعملاء الـ API |
 | `DHOW_DEV_DB_PORT` | `55432` | PostgreSQL، لـ `psql` أو الأدوات المباشرة. ليس 5432، حتى لا يمنعه PostgreSQL مثبّت على الجهاز. يحتفظ `.env.dev` بمنفذ أول تشغيل |
-| `DHOW_DEV_POLL_SECONDS` | `1` | كم مرة يفحص السيرفر ملفات Go |
+| `DHOW_DEV_POLL_SECONDS` | `1` | كم مرة يفحص السيرفر وجهاز التشغيل ملفات Go |
+| `DHOW_DEV_RUNNER_MAX_MEMORY`، `DHOW_DEV_RUNNER_MAX_DISK` | `2GiB`، `4GiB` | أكبر ذاكرة وقرص يطلبهما تشغيل واحد (`DHOW_RUNNER_MAX_MEMORY` و`DHOW_RUNNER_MAX_DISK`). اخفضهما على جهاز صغير، ولا تطلب أكثر منهما في `Resources` الخاصة بالتشغيل |
 | `DHOW_DEV_POSTGRES_IMAGE`، `DHOW_DEV_GO_IMAGE`، `DHOW_DEV_NODE_IMAGE` | `postgres:18`، `golang:1.27.3-bookworm`، `node:26-bookworm-slim` | سجل صور أو مرآة أخرى، مثل `mirror.gcr.io/library/postgres:18` |
 
 على Linux وmacOS: `DHOW_DEV_DB_PORT=55433 docker compose -f deploy/dev/compose.yaml up`. وفي PowerShell: `$env:DHOW_DEV_DB_PORT = "55433"` أولًا.
+
+### التشغيلات داخل الحزمة
+
+الخدمة `runner` جهاز تشغيل حقيقي: تشغّل كل تشغيل في Podman بلا root، مع الفحوص نفسها التي يجريها جهاز تشغيل الإنتاج، على Windows وmacOS أيضًا. تنتظر حتى تسجّلها:
+
+1. في التطبيق، افتح **أجهزة التشغيل** وأنشئ رمز تسجيل. انسخه.
+2. من جذر المستودع، شغّل هذا الأمر، والصق الرمز عندما يطلبه:
+
+   ```sh
+   docker compose -f deploy/dev/compose.yaml exec runner dhow-dev-register
+   ```
+
+   لا يظهر الرمز في سطر الأوامر أبدًا. لقراءته من ملف بدلًا من ذلك، شغّل `docker compose -f deploy/dev/compose.yaml exec -T runner dhow-dev-register < token.txt`.
+3. خلال ثوانٍ يظهر جهاز التشغيل **متصلًا** في صفحة أجهزة التشغيل. التشغيلات التي لا تحتاج إلى checkout، مثل التي تنشئها بـ `POST /api/v1/organizations/{id}/jobs`، تعمل عليه الآن. تابعها بـ `docker compose -f deploy/dev/compose.yaml logs -f runner`.
+
+> [!WARNING]
+> الحاوية `runner` **privileged**، لأن Podman بلا root داخلها يحتاج إلى إنشاء user namespaces وmounts وcgroups. هذا للتطوير على جهازك أنت فقط. جهاز تشغيل الإنتاج لا يعمل بهذه الطريقة أبدًا: يعمل تحت وحدة systemd، كما يشرح [تثبيت جهاز تشغيل](runner/install.md).
+
+كيف يعمل:
+
+- **المستخدم.** تضيف الصورة المستخدم `dhow-runner` مع 1,048,576 sub-id في `/etc/subuid` و`/etc/subgid`، وهذا يكفي 16 تشغيلًا في الوقت نفسه. سكربت صغير يبدأ بصلاحيات root، ويجهّز الـ cgroup، ثم يشغّل جهاز التشغيل بالمستخدم `dhow-runner` مع حدود الصلاحيات (capability bounding set) نفسها التي في وحدة systemd.
+- **الـ cgroup.** للحاوية cgroup namespace خاص بها (`cgroup: private`). ينقل السكربت عملياته إلى cgroup فرعي، ويفعّل المتحكمات `cpu` و`io` و`memory` و`pids`، ويعطي جهاز التشغيل cgroup خاصًا به يملكه `dhow-runner`، بلا swap. هذا ما يعطيه `Delegate=yes` و`MemorySwapMax=0` لجهاز التشغيل تحت systemd، فتنجح فحوص جهاز التشغيل كما هي، ويفرض كل حدود التشغيل.
+- **عنوان السيرفر.** `--dev` يسمح بـ `http://` العادي إلى عنوان loopback فقط. داخل الحاوية، يمرّر forwarder على `127.0.0.1:8080` كل اتصال إلى `server:8080`، فيسجّل جهاز التشغيل بـ `--dev --url http://127.0.0.1:8080`، ويبقى `--dev` محصورًا في loopback.
+- **الحالة.** الهوية ومخزن الصور في مساحة التخزين `runner-state`، فيبقى جهاز التشغيل مسجلًا بعد `down` ثم `up`.
+
+**جهاز التشغيل الوهمي.** على جهاز لا يستطيع تشغيل جهاز التشغيل مع Podman، شغّل الوهمي بدلًا منه. هو مبني مع الوسم `dhowtest` والمشغّل الوهمي، ولا يشغّل أي عملية (كل خطوة تطبع سطرًا واحدًا وتنجح)، ولا يحتاج إلى حاوية privileged:
+
+```sh
+docker compose -f deploy/dev/compose.yaml --profile fake-runner up --scale runner=0
+docker compose -f deploy/dev/compose.yaml exec fake-runner dhow-dev-register
+```
+
+`--scale runner=0` يُبقي جهاز التشغيل مع Podman متوقفًا. لكل منهما مساحة تخزين منفصلة (`runner-state` و`fake-runner-state`)، فكل واحد جهاز تشغيل مستقل بتسجيله الخاص، ولا يأخذ أحدهما هوية الآخر أبدًا.
+
+**إعادة ضبط جهاز التشغيل.** احذف حاويته ومساحة تخزينه، ثم شغّله مرة أخرى وسجّله برمز جديد. واحذف جهاز التشغيل القديم من صفحة أجهزة التشغيل أيضًا.
+
+```sh
+docker compose -f deploy/dev/compose.yaml rm --stop --force runner
+docker volume rm dhow-dev_runner-state
+docker compose -f deploy/dev/compose.yaml up -d runner
+```
+
+لجهاز التشغيل الوهمي، استخدم `fake-runner` و`dhow-dev_fake-runner-state`. بعد تغيير `deploy/dev/runner/Dockerfile`، أعد بناء الصورة بـ `docker compose -f deploy/dev/compose.yaml build runner`.
+
+### عندما لا يبدأ جهاز التشغيل
+
+اقرأ سجله أولًا: `docker compose -f deploy/dev/compose.yaml logs runner`.
+
+| العَرَض | السبب والإصلاح |
+|---|---|
+| `Docker gives this container cgroup v1` | يعمل Docker مع cgroup v1. يستخدم Docker Desktop الإصدار cgroup v2 على macOS، ومع محرك WSL2 على Windows: في Docker Desktop، افتح Settings، ثم General، وفعّل "Use the WSL 2 based engine". على Linux، كل توزيعة حالية تبدأ مع cgroup v2. وإلا استخدم جهاز التشغيل الوهمي. |
+| `did not give this container the cgroup controllers` | محرك Docker لا يعطي الحاويات `cpu` أو `io` أو `memory` أو `pids`. حدّث Docker Desktop، أو على Linux شغّل Docker مع مشغّل cgroup الخاص بـ systemd. |
+| `AppArmor restrict unprivileged user namespaces` | الجهاز يعمل بـ Ubuntu 24.04 أو أحدث. شغّل `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` على الجهاز، ثم `docker compose -f deploy/dev/compose.yaml restart runner`. |
+| `is more than this machine has` مع `DHOW_RUNNER_MAX_MEMORY` | التشغيل الواحد قد يستخدم 2 GiB من الذاكرة وقرصًا بحجم 4 GiB في الذاكرة، فيحتاج جهاز التشغيل إلى 6 GiB. أعطِ Docker Desktop ذاكرة أكبر (Settings، ثم Resources، ومع WSL2 القيمة `memory=` في `%UserProfile%\.wslconfig`)، أو اخفض `DHOW_DEV_RUNNER_MAX_MEMORY` و`DHOW_DEV_RUNNER_MAX_DISK`. |
+| تتوقف الحاوية فورًا مع رسالة عن الحاويات privileged | ميزة Enhanced Container Isolation في Docker Desktop تمنع الحاويات privileged. أوقفها لهذا المشروع، أو استخدم جهاز التشغيل الوهمي. |
+| `this runner is already registered` | أعد ضبطه كما سبق. |
+| جهاز التشغيل يعرض `RUNNER_DISABLED` | عطّله أحد من صفحة أجهزة التشغيل، أو عطّله السيرفر بعد أكثر من 3 جلسات جديدة في 10 دقائق. فعّله من هناك، أو أعد ضبطه. |
 
 ### عندما يحدث خطأ
 
@@ -262,7 +325,8 @@ pnpm -C apps/web size
 |---|---|---|
 | اختبارات جهاز التشغيل مع المشغّل الوهمي (`make test-runner`) | ✅ | ✅ (Windows في WSL2) |
 | التسجيل على السيرفر المحلي | ✅ | ✅ |
-| تشغيل التشغيلات في بيئة Podman المعزولة بلا root، و`make runner-isolation` | ✅ مع المتطلبات التالية | في آلة Linux افتراضية فقط |
+| تشغيل تشغيلات حقيقية في Podman بلا root داخل [حزمة Docker](#التشغيلات-داخل-الحزمة) | ✅ | ✅ مع Docker Desktop |
+| تشغيل جهاز التشغيل مباشرة، و`make runner-isolation` | ✅ مع المتطلبات التالية | في آلة Linux افتراضية فقط |
 
 - **الاختبارات.** `make test-runner` يبني جهاز التشغيل مع الوسم `dhowtest`، الذي يضيف مشغّل بيئة معزولة وهميًا يعيد مخرجات مسجّلة ولا يشغّل أي عملية. أغلب العمل على جهاز التشغيل تغطيه هذه الاختبارات.
 - **التسجيل.** أنشئ رمز تسجيل كما في [تسجيل جهاز تشغيل](runner/register.md)، ثم سجّل مع `--dev`، الذي يسمح بـ `http://` على `localhost` فقط، ومع مجلد حالة خاص بك:
@@ -272,7 +336,7 @@ pnpm -C apps/web size
     go run ./apps/runner/cmd/dhow-runner register --dev --url http://localhost:8080 --token-file -
   ```
 
-- **البيئة المعزولة.** التشغيلات تعمل في Podman بلا root. يحتاج إلى Linux مع Podman 5.4 أو أحدث، و`crun`، و`uidmap`، وcgroup v2 مع تفويض المتحكمات `cpu` و`io` و`memory` و`pids` إلى جهاز التشغيل (شغّله تحت systemd مع `Delegate=yes`)، و65536 sub-id على الأقل لكل تشغيل في `/etc/subuid` و`/etc/subgid`، وuser namespaces (على Ubuntu 24.04 وأحدث، `kernel.apparmor_restrict_unprivileged_userns=0`). راجع [تثبيت جهاز تشغيل](runner/install.md). على macOS وWindows، استخدم آلة Linux افتراضية مع systemd، مثل [Lima](https://lima-vm.io/) أو Multipass على macOS، أو WSL2 مع تفعيل systemd، وشغّل جهاز التشغيل هناك مع السيرفر الذي على جهازك.
+- **البيئة المعزولة.** التشغيلات تعمل في Podman بلا root. يحتاج إلى Linux مع Podman 5.4 أو أحدث، و`crun`، و`uidmap`، وcgroup v2 مع تفويض المتحكمات `cpu` و`io` و`memory` و`pids` إلى جهاز التشغيل (شغّله تحت systemd مع `Delegate=yes`)، و65536 sub-id على الأقل لكل تشغيل في `/etc/subuid` و`/etc/subgid`، وuser namespaces (على Ubuntu 24.04 وأحدث، `kernel.apparmor_restrict_unprivileged_userns=0`). راجع [تثبيت جهاز تشغيل](runner/install.md). على macOS وWindows، تشغّل [حزمة Docker](#التشغيلات-داخل-الحزمة) تشغيلات حقيقية بلا أي تثبيت آخر. ولتشغيل جهاز التشغيل مباشرة هناك، استخدم آلة Linux افتراضية مع systemd، مثل [Lima](https://lima-vm.io/) أو Multipass على macOS، أو WSL2 مع تفعيل systemd، وشغّل جهاز التشغيل هناك مع السيرفر الذي على جهازك.
 - **مجموعات اختبار العزل.** `make runner-isolation` يبني جهاز التشغيل وأداة فحص للهروب، ويشغّلهما في حاويات حقيقية بلا root، ويفشل إذا نجحت أي طريقة هروب أو لم يُفرض حد. يحتاج إلى متطلبات البيئة المعزولة السابقة و`busybox-static`. يشغّله CI على `ubuntu-26.04` كمستخدم مخصص تحت `systemd-run -p Delegate=yes` (راجع الـ job المسمى `isolation` في `.github/workflows/ci.yml`). كرّر هذا الإعداد على جهازك بـ `make runner-isolation ISOLATION_RUN="sudo systemd-run --uid=$USER --pipe --wait --collect -p Delegate=yes --"`.
 
 ## مشكلات شائعة

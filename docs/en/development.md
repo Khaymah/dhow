@@ -5,7 +5,7 @@
 This page gets you from a fresh clone to a running server, the web app with live reload, and the full test suite. There are two ways in:
 
 - **[Docker only](#quickest-start-docker-only):** one command, and nothing to install but Git and Docker. Start here.
-- **[Native tools](#the-setup-script):** Go, Node.js, pnpm and PostgreSQL on your machine (through WSL2 on Windows), for `make check`, the runner sandbox and your editor's Go and TypeScript tooling.
+- **[Native tools](#the-setup-script):** Go, Node.js, pnpm and PostgreSQL on your machine (through WSL2 on Windows), for `make check`, the runner isolation suites and your editor's Go and TypeScript tooling.
 
 To try the released image instead, see [Run Dhow locally](install/local.md#the-compose-stack).
 
@@ -22,7 +22,7 @@ cd dhow
 docker compose -f deploy/dev/compose.yaml up
 ```
 
-The first start downloads the images (about 600 MB) and the Go and web dependencies, so it takes a few minutes. Later starts take seconds. When everything is up, the log shows a box like this:
+The first start downloads the images (about 1 GB with the runner's) and the Go and web dependencies, and builds the runner image, so it takes a few minutes. Later starts take seconds. When everything is up, the log shows a box like this:
 
 ```text
 ==================================================================
@@ -35,6 +35,7 @@ Open that link in Chrome or Firefox to create the owner account. From then on, u
 
 - **Go:** save any file under `apps/server`, `internal` or `packages/proto/gen/go`, and the server rebuilds and restarts within a few seconds. If the build fails, the error appears in the log, the old server keeps running, and the next save tries again.
 - **Web:** save any file under `apps/web` and the browser updates in place.
+- **Runner:** save any file under `apps/runner` or `internal`, and the runner rebuilds and restarts the same way, at most 3 times in 10 minutes: the server disables a runner that opens more than 3 new sessions in 10 minutes, because that looks like a copied identity. A later save waits, and the log says when the runner restarts. To run jobs, [register it](#run-jobs-in-the-stack) once.
 
 | Service | What it does | On your machine |
 |---|---|---|
@@ -42,6 +43,8 @@ Open that link in Chrome or Firefox to create the owner account. From then on, u
 | `init` | Writes `.env.dev` with a new secret key the first time, then exits | |
 | `server` | Builds and runs the server from your clone, and watches the Go files (it checks every second, which works on Windows and macOS too) | `http://localhost:8080` (the API only) |
 | `web` | Vite with live reload, forwarding `/api` to `server` | `http://localhost:5173` |
+| `runner` | Builds and runs the runner from your clone, as the unprivileged `dhow-runner` user with real rootless Podman jobs, in a privileged container for development only (see [below](#run-jobs-in-the-stack)) | |
+| `fake-runner` | Only with `--profile fake-runner`: the runner with the fake driver, which runs no process, in an ordinary container | |
 
 Everyday commands, from the root of the clone:
 
@@ -53,8 +56,10 @@ Everyday commands, from the root of the clone:
 | `docker compose -f deploy/dev/compose.yaml restart web` | Reinstalls the web dependencies after `package.json` or the lockfile changed (a `git pull`, for example) |
 | `docker compose -f deploy/dev/compose.yaml exec server go test ./apps/server/...` | Runs Go tests against `dhow_test` |
 | `docker compose -f deploy/dev/compose.yaml exec web pnpm test` | Runs the web tests |
+| `docker compose -f deploy/dev/compose.yaml exec runner dhow-dev-register` | Registers the runner with a token you paste |
+| `docker compose -f deploy/dev/compose.yaml logs -f runner` | Follows the runner log |
 | `docker compose -f deploy/dev/compose.yaml down` | Stops and removes the containers, keeping the database |
-| `docker compose -f deploy/dev/compose.yaml down --volumes` | Also deletes the database and the dependency caches |
+| `docker compose -f deploy/dev/compose.yaml down --volumes` | Also deletes the database, the dependency caches and the runner state |
 
 `Ctrl+C` stops a stack started without `-d`.
 
@@ -67,10 +72,68 @@ Everyday commands, from the root of the clone:
 | `DHOW_DEV_WEB_PORT` | `5173` | The web app, and the address the setup link uses |
 | `DHOW_DEV_HTTP_PORT` | `8080` | The server, for `curl` and API clients |
 | `DHOW_DEV_DB_PORT` | `55432` | PostgreSQL, for `psql` or the native tools. It is not 5432, so a PostgreSQL already installed on the machine does not block it. `.env.dev` keeps the port of the first start |
-| `DHOW_DEV_POLL_SECONDS` | `1` | How often the server checks the Go files |
+| `DHOW_DEV_POLL_SECONDS` | `1` | How often the server and the runner check the Go files |
+| `DHOW_DEV_RUNNER_MAX_MEMORY`, `DHOW_DEV_RUNNER_MAX_DISK` | `2GiB`, `4GiB` | The most memory and disk one job may ask for (`DHOW_RUNNER_MAX_MEMORY` and `DHOW_RUNNER_MAX_DISK`). Lower them on a small machine, and ask for no more in the job's `Resources` |
 | `DHOW_DEV_POSTGRES_IMAGE`, `DHOW_DEV_GO_IMAGE`, `DHOW_DEV_NODE_IMAGE` | `postgres:18`, `golang:1.27.3-bookworm`, `node:26-bookworm-slim` | Another registry or mirror, such as `mirror.gcr.io/library/postgres:18` |
 
 On Linux and macOS, `DHOW_DEV_DB_PORT=55433 docker compose -f deploy/dev/compose.yaml up`. In PowerShell, `$env:DHOW_DEV_DB_PORT = "55433"` first.
+
+### Run jobs in the stack
+
+The `runner` service is a real runner: it runs each job in rootless Podman, with the same checks as a production runner, on Windows and macOS too. It waits until you register it:
+
+1. In the app, open **Runners** and create a registration token. Copy it.
+2. From the root of the clone, run this and paste the token when it asks:
+
+   ```sh
+   docker compose -f deploy/dev/compose.yaml exec runner dhow-dev-register
+   ```
+
+   The token never goes on the command line. To read it from a file instead, run `docker compose -f deploy/dev/compose.yaml exec -T runner dhow-dev-register < token.txt`.
+3. Within a few seconds the runner shows as **online** on the Runners page. Jobs that need no checkout, such as those from `POST /api/v1/organizations/{id}/jobs`, now run on it. Watch them with `docker compose -f deploy/dev/compose.yaml logs -f runner`.
+
+> [!WARNING]
+> The `runner` container is **privileged**, because rootless Podman inside it needs to make user namespaces, mounts and cgroups. That is for development on your own machine only. A production runner never runs this way: it runs under the systemd unit, as [Install a runner](runner/install.md) describes.
+
+How it works:
+
+- **The user.** The image adds a `dhow-runner` user with 1,048,576 sub-ids in `/etc/subuid` and `/etc/subgid`, enough for 16 jobs at once. A small script starts as root, prepares the cgroup, then runs the runner as `dhow-runner` with the same capability bounding set as the systemd unit.
+- **The cgroup.** The container has its own cgroup namespace (`cgroup: private`). The script moves its own processes into a leaf cgroup, turns on the `cpu`, `io`, `memory` and `pids` controllers, and gives the runner a cgroup of its own, owned by `dhow-runner`, with swap off. That is what `Delegate=yes` and `MemorySwapMax=0` give the runner under systemd, so the runner's checks pass as they are and it enforces every job limit.
+- **The server address.** `--dev` allows plain `http://` to a loopback address only. Inside the container, a forwarder on `127.0.0.1:8080` passes each connection to `server:8080`, so the runner registers with `--dev --url http://127.0.0.1:8080` and `--dev` stays limited to loopback.
+- **The state.** The identity and the image store live in the `runner-state` volume, so the runner stays registered across `down` and `up`.
+
+**The fake runner.** On a machine that cannot run the Podman runner, start the fake one instead. It is built with the `dhowtest` tag and the fake driver, runs no process (every step prints one line and succeeds), and needs no privileged container:
+
+```sh
+docker compose -f deploy/dev/compose.yaml --profile fake-runner up --scale runner=0
+docker compose -f deploy/dev/compose.yaml exec fake-runner dhow-dev-register
+```
+
+`--scale runner=0` keeps the Podman runner stopped. The two use separate volumes (`runner-state` and `fake-runner-state`), so each is a runner of its own with its own registration, and one never takes over the other's identity.
+
+**Reset the runner.** Remove its container and its volume, then start it again and register it with a new token. Delete the old runner on the Runners page too.
+
+```sh
+docker compose -f deploy/dev/compose.yaml rm --stop --force runner
+docker volume rm dhow-dev_runner-state
+docker compose -f deploy/dev/compose.yaml up -d runner
+```
+
+For the fake runner, use `fake-runner` and `dhow-dev_fake-runner-state`. After a change to `deploy/dev/runner/Dockerfile`, rebuild the image with `docker compose -f deploy/dev/compose.yaml build runner`.
+
+### When the runner does not start
+
+Read its log first: `docker compose -f deploy/dev/compose.yaml logs runner`.
+
+| Symptom | Cause and fix |
+|---|---|
+| `Docker gives this container cgroup v1` | Docker runs with cgroup v1. Docker Desktop uses cgroup v2 on macOS and with the WSL2 backend on Windows: in Docker Desktop, open Settings, then General, and turn on "Use the WSL 2 based engine". On Linux, every current distribution boots with cgroup v2. Otherwise use the fake runner. |
+| `did not give this container the cgroup controllers` | The Docker engine does not pass `cpu`, `io`, `memory` or `pids` to containers. Update Docker Desktop, or on Linux run Docker with the systemd cgroup driver. |
+| `AppArmor restrict unprivileged user namespaces` | The host is Ubuntu 24.04 or newer. Run `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` on the host, then `docker compose -f deploy/dev/compose.yaml restart runner`. |
+| `is more than this machine has` for `DHOW_RUNNER_MAX_MEMORY` | A job may use 2 GiB of memory and a 4 GiB disk in memory, so the runner needs 6 GiB. Give Docker Desktop more memory (Settings, then Resources; with WSL2, `memory=` in `%UserProfile%\.wslconfig`), or lower `DHOW_DEV_RUNNER_MAX_MEMORY` and `DHOW_DEV_RUNNER_MAX_DISK`. |
+| The container stops at once with a message about privileged containers | Docker Desktop's Enhanced Container Isolation blocks privileged containers. Turn it off for this project, or use the fake runner. |
+| `this runner is already registered` | Reset it as above. |
+| The runner shows `RUNNER_DISABLED` | Someone disabled it on the Runners page, or the server did after more than 3 new sessions in 10 minutes. Enable it there, or reset it. |
 
 ### When something goes wrong
 
@@ -262,7 +325,8 @@ What you can do depends on your system:
 |---|---|---|
 | Runner tests with the fake driver (`make test-runner`) | ✅ | ✅ (Windows in WSL2) |
 | Register against your local server | ✅ | ✅ |
-| Run jobs in the rootless Podman sandbox, and `make runner-isolation` | ✅ with the requirements below | In a Linux VM only |
+| Run real jobs in rootless Podman in the [Docker stack](#run-jobs-in-the-stack) | ✅ | ✅ with Docker Desktop |
+| Run the runner natively, and `make runner-isolation` | ✅ with the requirements below | In a Linux VM only |
 
 - **Tests.** `make test-runner` builds the runner with the `dhowtest` tag, which adds a fake sandbox driver that replays recorded output and runs no process. Most runner work is covered there.
 - **Registration.** Create a registration token as in [Register a runner](runner/register.md), then register with `--dev`, which allows `http://` on `localhost` only, and a state directory of your own:
@@ -272,7 +336,7 @@ What you can do depends on your system:
     go run ./apps/runner/cmd/dhow-runner register --dev --url http://localhost:8080 --token-file -
   ```
 
-- **The sandbox.** Jobs run in rootless Podman. It needs Linux with Podman 5.4 or newer, `crun`, `uidmap`, cgroup v2 with the `cpu`, `io`, `memory` and `pids` controllers delegated to the runner (run it under systemd with `Delegate=yes`), at least 65536 sub-ids per job in `/etc/subuid` and `/etc/subgid`, and user namespaces (on Ubuntu 24.04 and newer, `kernel.apparmor_restrict_unprivileged_userns=0`). See [Install a runner](runner/install.md). On macOS and Windows, use a Linux VM with systemd, such as [Lima](https://lima-vm.io/) or Multipass on macOS, or WSL2 with systemd turned on, and run the runner there against the server on your machine.
+- **The sandbox.** Jobs run in rootless Podman. It needs Linux with Podman 5.4 or newer, `crun`, `uidmap`, cgroup v2 with the `cpu`, `io`, `memory` and `pids` controllers delegated to the runner (run it under systemd with `Delegate=yes`), at least 65536 sub-ids per job in `/etc/subuid` and `/etc/subgid`, and user namespaces (on Ubuntu 24.04 and newer, `kernel.apparmor_restrict_unprivileged_userns=0`). See [Install a runner](runner/install.md). On macOS and Windows, the [Docker stack](#run-jobs-in-the-stack) runs real jobs with nothing else to install. To run the runner natively there, use a Linux VM with systemd, such as [Lima](https://lima-vm.io/) or Multipass on macOS, or WSL2 with systemd turned on, and run the runner there against the server on your machine.
 - **The isolation suites.** `make runner-isolation` builds the runner and an escape probe, runs them in real rootless containers, and fails if any escape works or a limit is not enforced. It needs the sandbox requirements above and `busybox-static`. CI runs it on `ubuntu-26.04` as a dedicated user under `systemd-run -p Delegate=yes` (see the `isolation` job in `.github/workflows/ci.yml`); copy that setup on your machine with `make runner-isolation ISOLATION_RUN="sudo systemd-run --uid=$USER --pipe --wait --collect -p Delegate=yes --"`.
 
 ## Common problems
