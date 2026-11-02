@@ -92,7 +92,17 @@ func (g gitWorld) assertCheckout(t *testing.T, job uuid.UUID, ref, sha string) {
 	assert.Contains(t, features, "checkout")
 }
 
-func (g gitWorld) assertNoKey(t *testing.T) {
+func keyQueries() []string {
+	return []string{
+		`SELECT count(*) FROM "Jobs" t WHERE position($1 in t::text) > 0`,
+		`SELECT count(*) FROM "LogChunks" t WHERE position(convert_to($1, 'UTF8') in t."Data") > 0`,
+		`SELECT count(*) FROM "AuditEvents" t WHERE position($1 in t::text) > 0`,
+		`SELECT count(*) FROM "PipelineRuns" t WHERE position($1 in t::text) > 0`,
+		`SELECT count(*) FROM "RunJobs" t WHERE position($1 in t::text) > 0`,
+	}
+}
+
+func (g gitWorld) keyForms(t *testing.T) []string {
 	t.Helper()
 	key := string(g.repo.PrivateKey)
 	var body []string
@@ -102,17 +112,31 @@ func (g gitWorld) assertNoKey(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, body)
-	for _, form := range append(body, key) {
-		for _, query := range []string{
-			`SELECT count(*) FROM "Jobs" t WHERE position($1 in t::text) > 0`,
-			`SELECT count(*) FROM "LogChunks" t WHERE position($1 in t::text) > 0`,
-			`SELECT count(*) FROM "AuditEvents" t WHERE position($1 in t::text) > 0`,
-			`SELECT count(*) FROM "PipelineRuns" t WHERE position($1 in t::text) > 0`,
-			`SELECT count(*) FROM "RunJobs" t WHERE position($1 in t::text) > 0`,
-		} {
+	return append(body, key)
+}
+
+func (g gitWorld) assertNoKey(t *testing.T) {
+	t.Helper()
+	for _, form := range g.keyForms(t) {
+		for _, query := range keyQueries() {
 			assert.Zero(t, g.env.CountRows(query, form), "the deploy key appears: %s", query)
 		}
 		assert.NotContains(t, g.env.Logs.String(), form, "the deploy key appears in the server log")
+	}
+}
+
+func TestTheKeyCheckFindsAKeyPlantedInALogChunk(t *testing.T) {
+	g := newGitWorld(t)
+	g.env.Deliver(g.trigger(triggers.EventPush, "refs/heads/main", shaA))
+	g.env.StartRuns()
+	lease := g.runner.MustLease(0)
+	_, err := g.runner.Start(lease)
+	require.NoError(t, err)
+	g.runner.AppendStdout(lease.Ref, "leaked: "+string(g.repo.PrivateKey))
+	query := keyQueries()[1]
+	require.Contains(t, query, `"LogChunks"`)
+	for _, form := range g.keyForms(t) {
+		assert.NotZero(t, g.env.CountRows(query, form), "a key in a log chunk is missed")
 	}
 }
 
