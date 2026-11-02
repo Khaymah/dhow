@@ -19,8 +19,12 @@ arches=${DIST_ARCHES:-amd64 arm64}
 components=${DIST_COMPONENTS:-server runner cli}
 cli_oses=${DIST_CLI_OSES:-linux darwin windows}
 module=github.com/Khaymah/dhow
+checkout_image=${CHECKOUT_IMAGE:-}
 
 [[ "$version" =~ ^[0-9A-Za-z][0-9A-Za-z.+-]*$ ]] || fail "VERSION must look like 1.2.3 or 1.2.3-rc.1, got: $version"
+if [[ -n "$checkout_image" && ! "$checkout_image" =~ ^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]]; then
+  fail "CHECKOUT_IMAGE must be registry/name@sha256:<64 hex>, got: $checkout_image"
+fi
 for component in $components; do
   case $component in
     server | runner | cli) ;;
@@ -46,11 +50,15 @@ archive() {
   esac
   local name="${binary}_${version}_linux_${arch}"
   local stage="$out/$name"
+  local baked=""
+  if [[ $component == runner ]]; then
+    baked="-X $module/internal/buildinfo.checkoutImage=$checkout_image"
+  fi
   mkdir -p -- "$stage"
   (
     cd -- "$root"
     CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false \
-      -ldflags "-s -w -buildid= -X $module/internal/buildinfo.version=$version -X $module/internal/buildinfo.commit=$commit" \
+      -ldflags "-s -w -buildid= -X $module/internal/buildinfo.version=$version -X $module/internal/buildinfo.commit=$commit $baked" \
       -o "$stage/$binary" "./apps/$component/cmd/$binary"
   )
   cp -- "$root/deploy/systemd/$unit" "$root/LICENSE" "$root/README.md" "$stage/"

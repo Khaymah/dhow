@@ -35,6 +35,7 @@ message AuthenticateRequest {
   RunnerRef runner = 1;
   IssuedChallenge challenge = 2;
   bytes signature = 3;
+  repeated RunnerFeature features = 4;
 }
 
 message AuthenticateResponse {

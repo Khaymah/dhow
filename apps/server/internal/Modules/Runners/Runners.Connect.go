@@ -40,7 +40,7 @@ func (h connectHandler) Register(ctx context.Context, req *connect.Request[runne
 	res, err := h.service.Register(ctx, models.RegisterInput{
 		Token: m.GetToken(), Name: m.GetName(), Os: m.GetOs(), Arch: m.GetArch(), Version: m.GetVersion(),
 		IsolationLevels: levels, Capacity: int(m.GetCapacity()), SigningPublicKey: m.GetSigningPublicKey(),
-		EncryptionPublicKey: m.GetEncryptionPublicKey(), Proof: m.GetProof(),
+		EncryptionPublicKey: m.GetEncryptionPublicKey(), Proof: m.GetProof(), Features: m.GetFeatures(),
 	})
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (h connectHandler) Authenticate(ctx context.Context, req *connect.Request[r
 	m := req.Msg
 	token, err := h.service.Authenticate(ctx, models.AuthenticateInput{
 		RunnerID: m.GetRunner().GetRunnerId(), ChallengeBytes: m.GetChallenge().GetChallengeBytes(),
-		ChallengeMAC: m.GetChallenge().GetMac(), Signature: m.GetSignature(),
+		ChallengeMAC: m.GetChallenge().GetMac(), Signature: m.GetSignature(), Features: m.GetFeatures(),
 	})
 	if err != nil {
 		return nil, err

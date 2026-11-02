@@ -2,15 +2,15 @@ package jobspec
 
 import (
 	"errors"
-	"net/netip"
 	"strconv"
 	"strings"
+
+	"github.com/Khaymah/dhow/internal/hostname"
 )
 
 const (
 	DefaultTLSPort  = 443
 	DefaultHTTPPort = 80
-	maxHostLength   = 253
 	wildcardPrefix  = "*."
 )
 
@@ -85,45 +85,14 @@ func NormalizeHost(host string) (string, error) {
 }
 
 func checkHostname(host string) error {
-	if host == "" || len(host) > maxHostLength {
+	switch err := hostname.Check(host); {
+	case errors.Is(err, hostname.ErrIP):
+		return ErrEgressIP
+	case err != nil:
 		return ErrEgressHostname
+	default:
+		return nil
 	}
-	if _, err := netip.ParseAddr(strings.Trim(host, "[]")); err == nil {
-		return ErrEgressIP
-	}
-	labels := strings.Split(host, ".")
-	for _, label := range labels {
-		if !validLabel(label) {
-			return ErrEgressHostname
-		}
-	}
-	last := labels[len(labels)-1]
-	if allDigits(last) || strings.HasPrefix(last, "0x") {
-		return ErrEgressIP
-	}
-	return nil
-}
-
-func validLabel(label string) bool {
-	if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
-		return false
-	}
-	for i := 0; i < len(label); i++ {
-		c := label[i]
-		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' {
-			return false
-		}
-	}
-	return true
-}
-
-func allDigits(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] < '0' || s[i] > '9' {
-			return false
-		}
-	}
-	return s != ""
 }
 
 func parsePort(text string) (int, bool) {

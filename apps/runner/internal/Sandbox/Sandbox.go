@@ -19,8 +19,25 @@ var (
 	ErrImagePull    = errors.New("the job image could not be pulled")
 	ErrSandbox      = errors.New("the sandbox could not be created")
 	ErrShellMissing = errors.New("the job image has no /bin/sh")
+	ErrOutputs      = errors.New("the step wrote an output file that is too large or not a regular file")
 	ErrDestroyed    = errors.New("the sandbox is gone")
 	ErrSurvivors    = errors.New("processes of the sandbox survived the kill")
+	ErrNoIDRange    = errors.New("every user id range of the runner is in use")
+	ErrWorkspace    = errors.New("the workspace is no longer the nosuid,nodev tmpfs of the job's disk size")
+)
+
+type Kind int
+
+const (
+	KindJob Kind = iota
+	KindCheckout
+	KindPlugin
+)
+
+const (
+	PluginManifestLabel = "io.dhow.plugin.manifest"
+	AgentPath           = "/run/dhow/agent"
+	CheckoutStepIndex   = int32(-1)
 )
 
 type Resources struct {
@@ -30,21 +47,38 @@ type Resources struct {
 	DiskBytes   int64
 }
 
+type WorkspaceSpec struct {
+	RunnerID  string
+	AttemptID string
+	Dir       string
+	DiskMode  string
+	DiskBytes int64
+}
+
+type Workspace interface {
+	Check(ctx context.Context) error
+	Destroy(ctx context.Context) error
+}
+
 type PrepareSpec struct {
 	RunnerID  string
 	AttemptID string
+	Seq       int
+	Kind      Kind
 	Image     string
 	Isolation runnerv1.Isolation
 	Resources Resources
 	Dir       string
 	DiskMode  string
 	Egress    []string
+	Workspace Workspace
 }
 
 type StepSpec struct {
 	Index   int32
 	Name    string
 	Script  string
+	Argv    []string
 	Env     map[string]string
 	Files   map[string][]byte
 	Stdout  io.Writer
@@ -56,13 +90,19 @@ type StepResult struct {
 	ExitCode int32
 	Reason   runnerv1.FailureReason
 	Signal   syscall.Signal
+	Outputs  []byte
 }
 
 type Driver interface {
 	Name() string
 	Isolation() []runnerv1.Isolation
 	Cleanup(ctx context.Context, runnerID string) error
+	Workspace(ctx context.Context, spec WorkspaceSpec) (Workspace, error)
 	Prepare(ctx context.Context, spec PrepareSpec) (Sandbox, error)
+}
+
+type Labeled interface {
+	ImageLabels() map[string]string
 }
 
 type Sandbox interface {

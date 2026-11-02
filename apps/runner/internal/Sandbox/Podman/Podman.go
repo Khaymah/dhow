@@ -3,6 +3,7 @@ package podman
 import (
 	"context"
 	"debug/elf"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -43,6 +45,7 @@ type Driver struct {
 	log         *slog.Logger
 	mu          sync.Mutex
 	live        map[string][]idRange
+	slots       *idSlots
 }
 
 type Options struct {
@@ -115,6 +118,7 @@ func (d *Driver) Cleanup(ctx context.Context, runnerID string) error {
 			d.log.Warn("could not remove a sandbox left by an earlier run", "error", err.Error())
 		}
 	}
+	d.unmountLeftovers(ctx)
 	return d.removeOwned(ctx, d.attemptsDir)
 }
 
@@ -128,23 +132,32 @@ func (d *Driver) removeOwned(ctx context.Context, dir string) error {
 	return nil
 }
 
+func sandboxName(spec sandbox.PrepareSpec) (string, string) {
+	if spec.Seq == 0 {
+		return "dhow-" + spec.AttemptID, controlDirName
+	}
+	seq := strconv.Itoa(spec.Seq)
+	return "dhow-" + spec.AttemptID + "-" + seq, controlDirName + "-" + seq
+}
+
 func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox.Sandbox, error) {
 	r := d.runner()
+	ws, ok := d.slotOf(spec.Workspace)
+	if !ok {
+		return nil, fmt.Errorf("%w: the sandbox has no workspace from this driver", sandbox.ErrSandbox)
+	}
+	d.mu.Lock()
+	inner, host := d.slots.innerStart(ws.slot), d.slots.hostStart(ws.slot)
+	d.mu.Unlock()
+	name, control := sandboxName(spec)
 	l := layout{
-		name:       "dhow-" + spec.AttemptID,
-		agentPath:  d.agentPath,
-		controlDir: filepath.Join(spec.Dir, controlDirName),
-		workDir:    filepath.Join(spec.Dir, workspaceDirName),
+		name: name, kind: spec.Kind, agentPath: d.agentPath, controlDir: filepath.Join(spec.Dir, control),
+		workDir: ws.dir, idStart: inner, hostStart: host,
 	}
 	if err := config.EnsurePrivateDir(l.controlDir); err != nil {
 		return nil, err
 	}
-	if spec.DiskMode == config.DiskModeDirectory {
-		if err := config.EnsurePrivateDir(l.workDir); err != nil {
-			return nil, err
-		}
-	}
-	imageID, err := d.pull(ctx, spec.Image)
+	imageID, labels, err := d.pull(ctx, spec.Image)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", sandbox.ErrImagePull, err)
 	}
@@ -161,6 +174,9 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 		return nil, fmt.Errorf("%w: %w", sandbox.ErrSandbox, err)
 	}
 	box, err := newBox(ctx, d, l, spec)
+	if err == nil {
+		box.labels = labels
+	}
 	if err != nil {
 		d.remove(ctx, l.name)
 		return nil, fmt.Errorf("%w: %w", sandbox.ErrSandbox, err)
@@ -168,9 +184,9 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 	return box, nil
 }
 
-func (d *Driver) pull(ctx context.Context, image string) (string, error) {
+func (d *Driver) pull(ctx context.Context, image string) (string, map[string]string, error) {
 	if !qualified(image) {
-		return "", ErrShortImageName
+		return "", nil, ErrShortImageName
 	}
 	r := d.runner()
 	var out []byte
@@ -181,13 +197,22 @@ func (d *Driver) pull(ctx context.Context, image string) (string, error) {
 		out, err = r.run(ctx, "pull", "--quiet", "--", dockerTransport+image)
 	}
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	lines := strings.Fields(string(out))
 	if len(lines) == 0 || !imageIDPattern.MatchString(lines[len(lines)-1]) {
-		return "", fmt.Errorf("%w: %q", ErrImageID, trim(out))
+		return "", nil, fmt.Errorf("%w: %q", ErrImageID, trim(out))
 	}
-	return lines[len(lines)-1], nil
+	id := lines[len(lines)-1]
+	raw, err := r.run(ctx, "image", "inspect", "--format", "{{json .Labels}}", "--", id)
+	if err != nil {
+		return "", nil, err
+	}
+	labels := map[string]string{}
+	if err := json.Unmarshal(raw, &labels); err != nil {
+		return "", nil, fmt.Errorf("decode the image labels: %w", err)
+	}
+	return id, labels, nil
 }
 
 func staticAgent(path string) error {

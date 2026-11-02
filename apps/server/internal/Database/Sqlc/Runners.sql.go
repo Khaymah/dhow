@@ -172,7 +172,7 @@ func (q *Queries) GetRegistrationToken(ctx context.Context, arg GetRegistrationT
 }
 
 const getRunner = `-- name: GetRunner :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt", "Features"
 FROM "Runners"
 WHERE "Id" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
 `
@@ -209,6 +209,7 @@ func (q *Queries) GetRunner(ctx context.Context, arg GetRunnerParams) (Runner, e
 		&i.LastSeenAt,
 		&i.LastIpAddress,
 		&i.RevokedAt,
+		&i.Features,
 	)
 	return i, err
 }
@@ -295,10 +296,11 @@ func (q *Queries) InsertRegistrationToken(ctx context.Context, arg InsertRegistr
 const insertRunner = `-- name: InsertRunner :one
 INSERT INTO "Runners" ("OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version",
                        "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeysRotatedAt",
-                       "LastSeenAt", "LastIpAddress", "CreatedAt", "UpdatedAt")
+                       "LastSeenAt", "LastIpAddress", "Features", "CreatedAt", "UpdatedAt")
 VALUES ($1, $2, $3, $4::text[], $5::text[], $6, $7, $8,
-        $9::text[], $10, $11, $12, $13, $13, $14, $13, $13)
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt"
+        $9::text[], $10, $11, $12, $13, $13, $14,
+        $15::text[], $13, $13)
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt", "Features"
 `
 
 type InsertRunnerParams struct {
@@ -316,6 +318,7 @@ type InsertRunnerParams struct {
 	EncryptionPublicKey []byte
 	Now                 time.Time
 	IpAddress           string
+	Features            []string
 }
 
 func (q *Queries) InsertRunner(ctx context.Context, arg InsertRunnerParams) (Runner, error) {
@@ -334,6 +337,7 @@ func (q *Queries) InsertRunner(ctx context.Context, arg InsertRunnerParams) (Run
 		arg.EncryptionPublicKey,
 		arg.Now,
 		arg.IpAddress,
+		arg.Features,
 	)
 	var i Runner
 	err := row.Scan(
@@ -360,6 +364,7 @@ func (q *Queries) InsertRunner(ctx context.Context, arg InsertRunnerParams) (Run
 		&i.LastSeenAt,
 		&i.LastIpAddress,
 		&i.RevokedAt,
+		&i.Features,
 	)
 	return i, err
 }
@@ -451,7 +456,7 @@ func (q *Queries) ListRegistrationTokens(ctx context.Context, arg ListRegistrati
 }
 
 const listRunners = `-- name: ListRunners :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt", "Features"
 FROM "Runners"
 WHERE "OrganizationId" = $1 AND NOT "IsDeleted"
 ORDER BY "CreatedAt" DESC, "Id" DESC
@@ -497,6 +502,7 @@ func (q *Queries) ListRunners(ctx context.Context, arg ListRunnersParams) ([]Run
 			&i.LastSeenAt,
 			&i.LastIpAddress,
 			&i.RevokedAt,
+			&i.Features,
 		); err != nil {
 			return nil, err
 		}
@@ -593,7 +599,8 @@ SELECT s."Id"          AS "SessionId",
        r."EncryptionPublicKey",
        r."KeyVersion",
        r."State",
-       r."LastSeenAt"
+       r."LastSeenAt",
+       r."Features"
 FROM "RunnerSessions" s
 JOIN "Runners" r ON r."Id" = s."RunnerId" AND NOT r."IsDeleted"
 WHERE s."TokenHash" = $1 AND NOT s."IsDeleted"
@@ -616,6 +623,7 @@ type ResolveRunnerSessionRow struct {
 	KeyVersion          int32
 	State               string
 	LastSeenAt          *time.Time
+	Features            []string
 }
 
 func (q *Queries) ResolveRunnerSession(ctx context.Context, tokenHash []byte) (ResolveRunnerSessionRow, error) {
@@ -638,6 +646,7 @@ func (q *Queries) ResolveRunnerSession(ctx context.Context, tokenHash []byte) (R
 		&i.KeyVersion,
 		&i.State,
 		&i.LastSeenAt,
+		&i.Features,
 	)
 	return i, err
 }
@@ -688,7 +697,7 @@ const revokeRunner = `-- name: RevokeRunner :one
 UPDATE "Runners"
 SET "State" = 'revoked', "DisabledReason" = '', "RevokedAt" = $1::timestamptz, "UpdatedAt" = $1
 WHERE "Id" = $2 AND "OrganizationId" = $3 AND NOT "IsDeleted" AND "State" <> 'revoked'
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt", "Features"
 `
 
 type RevokeRunnerParams struct {
@@ -724,6 +733,7 @@ func (q *Queries) RevokeRunner(ctx context.Context, arg RevokeRunnerParams) (Run
 		&i.LastSeenAt,
 		&i.LastIpAddress,
 		&i.RevokedAt,
+		&i.Features,
 	)
 	return i, err
 }
@@ -792,6 +802,23 @@ func (q *Queries) RotateRunnerKeys(ctx context.Context, arg RotateRunnerKeysPara
 	return KeyVersion, err
 }
 
+const setRunnerFeatures = `-- name: SetRunnerFeatures :exec
+UPDATE "Runners"
+SET "Features" = $1::text[], "UpdatedAt" = $2
+WHERE "Id" = $3 AND "Features" IS DISTINCT FROM $1::text[] AND NOT "IsDeleted"
+`
+
+type SetRunnerFeaturesParams struct {
+	Features []string
+	Now      time.Time
+	ID       uuid.UUID
+}
+
+func (q *Queries) SetRunnerFeatures(ctx context.Context, arg SetRunnerFeaturesParams) error {
+	_, err := q.db.Exec(ctx, setRunnerFeatures, arg.Features, arg.Now, arg.ID)
+	return err
+}
+
 const touchRunner = `-- name: TouchRunner :exec
 UPDATE "Runners"
 SET "LastSeenAt" = $1::timestamptz, "LastIpAddress" = $2, "UpdatedAt" = $1
@@ -830,7 +857,7 @@ SET "Name"           = COALESCE($1::text, "Name"),
                            ELSE '' END,
     "UpdatedAt"      = $4
 WHERE "Id" = $5 AND "OrganizationId" = $6 AND NOT "IsDeleted" AND "State" <> 'revoked'
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version", "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeyVersion", "KeysRotatedAt", "State", "DisabledReason", "LastSeenAt", "LastIpAddress", "RevokedAt", "Features"
 `
 
 type UpdateRunnerParams struct {
@@ -876,6 +903,7 @@ func (q *Queries) UpdateRunner(ctx context.Context, arg UpdateRunnerParams) (Run
 		&i.LastSeenAt,
 		&i.LastIpAddress,
 		&i.RevokedAt,
+		&i.Features,
 	)
 	return i, err
 }

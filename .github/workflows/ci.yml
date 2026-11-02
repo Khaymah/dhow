@@ -182,7 +182,7 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
         run: |
-          if [ "$EVENT" != pull_request ] || ! git diff --quiet HEAD^1 HEAD -- apps/runner packages/proto internal deploy/systemd go.mod go.sum Makefile .github/workflows/ci.yml; then
+          if [ "$EVENT" != pull_request ] || ! git diff --quiet HEAD^1 HEAD -- apps/runner packages/proto internal deploy/systemd deploy/dhow-git go.mod go.sum Makefile .github/workflows/ci.yml; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -195,7 +195,7 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q podman busybox-static crun uidmap
+          sudo apt-get install -y -q podman busybox-static crun uidmap openssh-server
       - name: Require Podman 5.4 or newer
         if: steps.scope.outputs.run == 'true'
         run: |
@@ -209,14 +209,21 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          sudo useradd --create-home --shell /usr/sbin/nologin dhowci
+          sudo useradd --create-home --shell /bin/sh dhowci
           sudo sed -i '/^dhowci:/d' /etc/subuid /etc/subgid
           sudo usermod --add-subuids 200000-1199999 --add-subgids 200000-1199999 dhowci
           stat -fc %T /sys/fs/cgroup
+      - name: Build the checkout image for the end-to-end checkout over ssh
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          docker build --tag dhow-git:ci deploy/dhow-git
+          docker save --output /tmp/dhow-isolation-git.tar dhow-git:ci
+          chmod 0644 /tmp/dhow-isolation-git.tar
       - name: Escape and limits suites
         if: steps.scope.outputs.run == 'true'
         run: >-
           make runner-isolation ISOLATION_DIR=/tmp/dhow-isolation
+          ISOLATION_GIT_ARCHIVE=/tmp/dhow-isolation-git.tar ISOLATION_SSHD=/usr/sbin/sshd
           ISOLATION_RUN="sudo systemd-run --uid=dhowci --gid=dhowci --pipe --wait --collect --quiet
           -p Delegate=yes -p MemorySwapMax=0 --working-directory=/tmp --"
       - name: Escape and limits suites inside the sandbox of the shipped runner unit

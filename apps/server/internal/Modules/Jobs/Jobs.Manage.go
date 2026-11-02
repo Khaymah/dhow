@@ -93,6 +93,18 @@ func (s *Service) Create(ctx context.Context, org uuid.UUID, in models.CreateInp
 	return s.insert(ctx, p, org, in.Name, spec, priority, retries)
 }
 
+func displayImage(spec *runnerv1.JobSpec) string {
+	if spec.GetImage() != "" {
+		return spec.GetImage()
+	}
+	for _, s := range spec.GetSteps() {
+		if p := s.GetPlugin(); p != nil {
+			return p.GetImage()
+		}
+	}
+	return ""
+}
+
 type newJob struct {
 	org      uuid.UUID
 	user     uuid.UUID
@@ -130,7 +142,7 @@ func insertJob(ctx context.Context, q *sqlc.Queries, n newJob) (sqlc.Job, []byte
 		return sqlc.Job{}, nil, apperrors.JobQueueFull()
 	}
 	row, err := q.InsertJob(ctx, sqlc.InsertJobParams{
-		OrganizationID: n.org, CreatedByUserID: n.user, Name: n.name, Spec: raw, SpecDigest: digest, Image: n.spec.GetImage(),
+		OrganizationID: n.org, CreatedByUserID: n.user, Name: n.name, Spec: raw, SpecDigest: digest, Image: displayImage(n.spec),
 		Labels: n.spec.GetLabels(), Isolation: isolationOf(n.spec), Priority: int32(n.priority), //nolint:gosec // Bounded to 0..100 by the callers.
 		MaxInfraRetries: int32(n.retries), QueueTimeoutSeconds: config.JobQueueTimeout.Seconds(), //nolint:gosec // Bounded to 0..5 by the callers.
 		OriginKind: n.origin, OriginID: n.originID, RequiredFeatures: nonNil(n.features),
@@ -147,10 +159,15 @@ func insertJob(ctx context.Context, q *sqlc.Queries, n newJob) (sqlc.Job, []byte
 func (s *Service) insert(ctx context.Context, p auth.Principal, org uuid.UUID, name string, spec *runnerv1.JobSpec, priority, retries int) (models.Detail, error) {
 	var row sqlc.Job
 	var digest []byte
+	wanted, ok := features(jobspec.Features(spec))
+	if !ok {
+		return models.Detail{}, apperrors.ValidationFailed(invalid("RequiredFeatures"))
+	}
 	err := dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		var err error
 		row, digest, err = insertJob(ctx, q, newJob{
 			org: org, user: p.UserID, name: name, spec: spec, priority: priority, retries: retries, origin: jobqueue.OriginManual,
+			features: wanted,
 		})
 		return err
 	})

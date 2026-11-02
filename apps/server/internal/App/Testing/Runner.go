@@ -114,6 +114,10 @@ func (r *RunnerIdentity) RegisterRequest(token string) *runnerv1.RegisterRequest
 	}
 }
 
+func (r *RunnerIdentity) SignWithFeatures(challenge *runnerv1.IssuedChallenge, features []string) []byte {
+	return ed25519.Sign(r.Signing, runnersig.AuthFeaturesMessage(PublicOrigin, config.RunnerServerKeyVersion, challenge.GetChallengeBytes(), features))
+}
+
 func (r *RunnerIdentity) Sign(challenge *runnerv1.IssuedChallenge) []byte {
 	return ed25519.Sign(r.Signing, runnersig.AuthMessage(PublicOrigin, config.RunnerServerKeyVersion, challenge.GetChallengeBytes()))
 }

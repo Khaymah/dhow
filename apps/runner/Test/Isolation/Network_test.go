@@ -71,6 +71,7 @@ func startWithEgress(t *testing.T, allow []string, answers map[string][]string) 
 	box, err := shared.driver.Prepare(ctx, sandbox.PrepareSpec{
 		RunnerID: runnerID, AttemptID: id, Image: image, Isolation: runnerv1.Isolation_ISOLATION_CONTAINER,
 		Resources: defaultResources(), Dir: dir, DiskMode: config.DiskModeTmpfs, Egress: allow,
+		Workspace: workspaceFor(ctx, t, id, dir, defaultResources()),
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = box.Destroy(context.Background()) })

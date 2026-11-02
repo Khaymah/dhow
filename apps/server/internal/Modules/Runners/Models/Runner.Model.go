@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
 const (
@@ -93,6 +95,7 @@ type RegisterInput struct {
 	SigningPublicKey    []byte
 	EncryptionPublicKey []byte
 	Proof               []byte
+	Features            []runnerv1.RunnerFeature
 }
 
 type RegisterResult struct {
@@ -108,6 +111,7 @@ type AuthenticateInput struct {
 	ChallengeBytes []byte
 	ChallengeMAC   []byte
 	Signature      []byte
+	Features       []runnerv1.RunnerFeature
 }
 
 type RotateInput struct {

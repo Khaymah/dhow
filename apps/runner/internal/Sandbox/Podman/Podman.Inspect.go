@@ -87,9 +87,8 @@ func verify(in *inspection, spec sandbox.PrepareSpec, l layout) error {
 	add(private(in.HostConfig.PidMode), "the PID namespace is shared")
 	add(private(in.HostConfig.UTSMode), "the UTS namespace is shared")
 	add(private(in.HostConfig.CgroupMode), "the cgroup namespace is shared")
-	add(strings.HasPrefix(in.HostConfig.Annotations["io.podman.annotations.userns"], "auto"), "the user namespace is not isolated per job")
 	verifyLimits(in, spec, add)
-	verifyMounts(in, spec, l, add)
+	verifyMounts(in, l, add)
 	verifyImageInputs(in, add)
 	if len(bad) > 0 {
 		return fmt.Errorf("%w: %s", ErrPolicyMismatch, strings.Join(bad, "; "))
@@ -110,10 +109,11 @@ func verifyLimits(in *inspection, spec sandbox.PrepareSpec, add func(bool, strin
 
 const nanosPerMilliCPU = 1_000_000
 
-func verifyMounts(in *inspection, spec sandbox.PrepareSpec, l layout, add func(bool, string)) {
-	sources := map[string]string{agentMount: l.agentPath, connectMount: l.agentPath, controlMount: l.controlDir}
-	if spec.DiskMode == config.DiskModeDirectory {
-		sources[workspacePath] = l.workDir
+func verifyMounts(in *inspection, l layout, add func(bool, string)) {
+	sources := map[string]string{agentMount: l.agentPath, connectMount: l.agentPath, controlMount: l.controlDir, workspacePath: l.workDir}
+	if l.kind == sandbox.KindCheckout {
+		sources[gitSSHMount] = l.agentPath
+		sources[askpassMount] = l.agentPath
 	}
 	for _, m := range in.Mounts {
 		if m.Type == "tmpfs" {
@@ -124,11 +124,12 @@ func verifyMounts(in *inspection, spec sandbox.PrepareSpec, l layout, add func(b
 		if ok {
 			add(sameFile(m.Source, want), "the mount at "+m.Destination+" comes from an unexpected source")
 		}
-		if m.Destination == agentMount || m.Destination == connectMount || m.Destination == controlMount {
+		if m.Destination != workspacePath {
 			add(!m.RW, "a control mount is writable at "+m.Destination)
 		}
 	}
-	add(spec.DiskMode == config.DiskModeDirectory || tmpfsHas(in, workspacePath, "nosuid", "nodev"), "the workspace tmpfs is missing or allows setuid or devices")
+	_, hasWorkspace := in.HostConfig.Tmpfs[workspacePath]
+	add(!hasWorkspace, "the workspace is a tmpfs of its own, not the attempt's shared workspace")
 	add(tmpfsHas(in, tmpPath, "nosuid", "nodev"), "the /tmp tmpfs is missing or allows setuid or devices")
 	add(tmpfsHas(in, secretsMount, "noexec", "nosuid", "nodev"), "the secrets tmpfs is missing or allows exec, setuid or devices")
 }

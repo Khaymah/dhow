@@ -165,7 +165,7 @@ func (s *Service) claim(ctx context.Context, p runnerauth.Principal) (*runnerv1.
 		}
 		job, err := q.ClaimQueuedJob(ctx, sqlc.ClaimQueuedJobParams{
 			OrganizationID: p.OrganizationID, Labels: nonNil(p.Labels), IsolationLevels: nonNil(p.IsolationLevels), RunnerID: p.RunnerID,
-			Features: []string{},
+			Features: nonNil(p.Features),
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil

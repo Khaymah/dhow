@@ -227,6 +227,7 @@ type AuthenticateRequest struct {
 	Runner        *RunnerRef             `protobuf:"bytes,1,opt,name=runner,proto3" json:"runner,omitempty"`
 	Challenge     *IssuedChallenge       `protobuf:"bytes,2,opt,name=challenge,proto3" json:"challenge,omitempty"`
 	Signature     []byte                 `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
+	Features      []RunnerFeature        `protobuf:"varint,4,rep,packed,name=features,proto3,enum=dhow.runner.v1.RunnerFeature" json:"features,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -278,6 +279,13 @@ func (x *AuthenticateRequest) GetChallenge() *IssuedChallenge {
 func (x *AuthenticateRequest) GetSignature() []byte {
 	if x != nil {
 		return x.Signature
+	}
+	return nil
+}
+
+func (x *AuthenticateRequest) GetFeatures() []RunnerFeature {
+	if x != nil {
+		return x.Features
 	}
 	return nil
 }
@@ -542,11 +550,12 @@ const file_dhow_runner_v1_auth_proto_rawDesc = "" +
 	"\x10ChallengeRequest\x121\n" +
 	"\x06runner\x18\x01 \x01(\v2\x19.dhow.runner.v1.RunnerRefR\x06runner\"R\n" +
 	"\x11ChallengeResponse\x12=\n" +
-	"\tchallenge\x18\x01 \x01(\v2\x1f.dhow.runner.v1.IssuedChallengeR\tchallenge\"\xa5\x01\n" +
+	"\tchallenge\x18\x01 \x01(\v2\x1f.dhow.runner.v1.IssuedChallengeR\tchallenge\"\xe0\x01\n" +
 	"\x13AuthenticateRequest\x121\n" +
 	"\x06runner\x18\x01 \x01(\v2\x19.dhow.runner.v1.RunnerRefR\x06runner\x12=\n" +
 	"\tchallenge\x18\x02 \x01(\v2\x1f.dhow.runner.v1.IssuedChallengeR\tchallenge\x12\x1c\n" +
-	"\tsignature\x18\x03 \x01(\fR\tsignature\"g\n" +
+	"\tsignature\x18\x03 \x01(\fR\tsignature\x129\n" +
+	"\bfeatures\x18\x04 \x03(\x0e2\x1d.dhow.runner.v1.RunnerFeatureR\bfeatures\"g\n" +
 	"\x14AuthenticateResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12,\n" +
 	"\x12expires_in_seconds\x18\x02 \x01(\x05R\x10expiresInSeconds\"\xdb\x01\n" +
@@ -595,6 +604,7 @@ var file_dhow_runner_v1_auth_proto_goTypes = []any{
 	(*RevokeResponse)(nil),        // 9: dhow.runner.v1.RevokeResponse
 	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
 	(*RunnerRef)(nil),             // 11: dhow.runner.v1.RunnerRef
+	(RunnerFeature)(0),            // 12: dhow.runner.v1.RunnerFeature
 }
 var file_dhow_runner_v1_auth_proto_depIdxs = []int32{
 	10, // 0: dhow.runner.v1.AuthChallenge.expires_at:type_name -> google.protobuf.Timestamp
@@ -602,19 +612,20 @@ var file_dhow_runner_v1_auth_proto_depIdxs = []int32{
 	1,  // 2: dhow.runner.v1.ChallengeResponse.challenge:type_name -> dhow.runner.v1.IssuedChallenge
 	11, // 3: dhow.runner.v1.AuthenticateRequest.runner:type_name -> dhow.runner.v1.RunnerRef
 	1,  // 4: dhow.runner.v1.AuthenticateRequest.challenge:type_name -> dhow.runner.v1.IssuedChallenge
-	2,  // 5: dhow.runner.v1.AuthService.Challenge:input_type -> dhow.runner.v1.ChallengeRequest
-	4,  // 6: dhow.runner.v1.AuthService.Authenticate:input_type -> dhow.runner.v1.AuthenticateRequest
-	6,  // 7: dhow.runner.v1.AuthService.RotateKeys:input_type -> dhow.runner.v1.RotateKeysRequest
-	8,  // 8: dhow.runner.v1.AuthService.Revoke:input_type -> dhow.runner.v1.RevokeRequest
-	3,  // 9: dhow.runner.v1.AuthService.Challenge:output_type -> dhow.runner.v1.ChallengeResponse
-	5,  // 10: dhow.runner.v1.AuthService.Authenticate:output_type -> dhow.runner.v1.AuthenticateResponse
-	7,  // 11: dhow.runner.v1.AuthService.RotateKeys:output_type -> dhow.runner.v1.RotateKeysResponse
-	9,  // 12: dhow.runner.v1.AuthService.Revoke:output_type -> dhow.runner.v1.RevokeResponse
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	12, // 5: dhow.runner.v1.AuthenticateRequest.features:type_name -> dhow.runner.v1.RunnerFeature
+	2,  // 6: dhow.runner.v1.AuthService.Challenge:input_type -> dhow.runner.v1.ChallengeRequest
+	4,  // 7: dhow.runner.v1.AuthService.Authenticate:input_type -> dhow.runner.v1.AuthenticateRequest
+	6,  // 8: dhow.runner.v1.AuthService.RotateKeys:input_type -> dhow.runner.v1.RotateKeysRequest
+	8,  // 9: dhow.runner.v1.AuthService.Revoke:input_type -> dhow.runner.v1.RevokeRequest
+	3,  // 10: dhow.runner.v1.AuthService.Challenge:output_type -> dhow.runner.v1.ChallengeResponse
+	5,  // 11: dhow.runner.v1.AuthService.Authenticate:output_type -> dhow.runner.v1.AuthenticateResponse
+	7,  // 12: dhow.runner.v1.AuthService.RotateKeys:output_type -> dhow.runner.v1.RotateKeysResponse
+	9,  // 13: dhow.runner.v1.AuthService.Revoke:output_type -> dhow.runner.v1.RevokeResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_dhow_runner_v1_auth_proto_init() }

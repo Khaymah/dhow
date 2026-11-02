@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
 	wire "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Wire"
 	agentv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/agent/v1"
 )
@@ -18,6 +19,7 @@ import (
 const (
 	ControlSocketPath = "/run/dhow/control/control.sock"
 	SecretsDir        = "/run/dhow/secrets"
+	OutputPath        = sandbox.OutputPath
 	Shell             = "/bin/sh"
 	agentVersion      = "1"
 	dialTimeout       = 30 * time.Second
@@ -32,6 +34,7 @@ type Options struct {
 	Harden       func() error
 	Sweep        func() error
 	SecretsDir   string
+	OutputPath   string
 	EgressSocket string
 	EgressAddrs  []string
 	Clock        func() time.Time
@@ -47,6 +50,7 @@ type Agent struct {
 	harden     func() error
 	sweep      func() error
 	secretsDir string
+	outputPath string
 	mu         sync.Mutex
 	current    *process
 	stopping   bool
@@ -65,6 +69,9 @@ func Run(ctx context.Context, o Options) error {
 	}
 	if o.SecretsDir == "" {
 		o.SecretsDir = SecretsDir
+	}
+	if o.OutputPath == "" {
+		o.OutputPath = OutputPath
 	}
 	if o.EgressSocket == "" {
 		o.EgressSocket = EgressSocketPath
@@ -88,7 +95,7 @@ func Run(ctx context.Context, o Options) error {
 	if err != nil {
 		return fmt.Errorf("connect to the runner control channel: %w", err)
 	}
-	a := &Agent{conn: wire.NewConn(rwc), harden: o.Harden, sweep: o.Sweep, secretsDir: o.SecretsDir}
+	a := &Agent{conn: wire.NewConn(rwc), harden: o.Harden, sweep: o.Sweep, secretsDir: o.SecretsDir, outputPath: o.OutputPath}
 	defer func() { _ = a.conn.Close() }()
 	stopForwarder, err := startForwarder(ctx, o.EgressSocket, o.EgressAddrs)
 	if err != nil {
@@ -121,20 +128,13 @@ func (a *Agent) loop(ctx context.Context) error {
 		}
 		switch body := frame.GetBody().(type) {
 		case *agentv1.Frame_RunStep:
-			if !a.claim() {
-				if err := a.conn.Write(stepExit(body.RunStep.GetIndex(), 1, 0, agentv1.StepFailure_STEP_FAILURE_START_FAILED)); err != nil {
-					return err
-				}
-				continue
+			if err := a.dispatch(ctx, &steps, stepOf(body.RunStep)); err != nil {
+				return err
 			}
-			step := body.RunStep
-			steps.Go(func() {
-				if err := a.runStep(ctx, step); err != nil {
-					_ = a.conn.Close()
-					return
-				}
-				a.release()
-			})
+		case *agentv1.Frame_RunExec:
+			if err := a.dispatch(ctx, &steps, execOf(body.RunExec)); err != nil {
+				return err
+			}
 		case *agentv1.Frame_Signal:
 			a.killCurrent(signalOf(body.Signal.GetSignal()))
 		case *agentv1.Frame_Shutdown:
@@ -144,6 +144,24 @@ func (a *Agent) loop(ctx context.Context) error {
 		default:
 		}
 	}
+}
+
+func (a *Agent) dispatch(ctx context.Context, steps *sync.WaitGroup, step job) error {
+	if !a.claim() {
+		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_START_FAILED, nil))
+	}
+	steps.Go(func() {
+		exit, err := a.runStep(ctx, step)
+		if err != nil {
+			_ = a.conn.Close()
+			return
+		}
+		a.release()
+		if err := a.conn.Write(exit); err != nil {
+			_ = a.conn.Close()
+		}
+	})
+	return nil
 }
 
 func signalOf(s agentv1.ProcessSignal) unix.Signal {

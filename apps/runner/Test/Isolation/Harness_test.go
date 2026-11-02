@@ -146,12 +146,22 @@ func start(t *testing.T, r sandbox.Resources) (sandbox.Sandbox, string) {
 	require.NoError(t, config.EnsurePrivateDir(dir))
 	box, err := shared.driver.Prepare(ctx, sandbox.PrepareSpec{
 		RunnerID: runnerID, AttemptID: id, Image: image, Isolation: runnerv1.Isolation_ISOLATION_CONTAINER,
-		Resources: r, Dir: dir, DiskMode: config.DiskModeTmpfs,
+		Resources: r, Dir: dir, DiskMode: config.DiskModeTmpfs, Workspace: workspaceFor(ctx, t, id, dir, r),
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = box.Destroy(context.Background()) })
 	require.NoError(t, box.Start(ctx))
 	return box, dir
+}
+
+func workspaceFor(ctx context.Context, t *testing.T, id, dir string, r sandbox.Resources) sandbox.Workspace {
+	t.Helper()
+	ws, err := shared.driver.Workspace(ctx, sandbox.WorkspaceSpec{
+		RunnerID: runnerID, AttemptID: id, Dir: dir, DiskMode: config.DiskModeTmpfs, DiskBytes: r.DiskBytes,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ws.Destroy(context.Background()) })
+	return ws
 }
 
 type output struct {

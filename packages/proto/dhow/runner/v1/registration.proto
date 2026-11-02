@@ -19,6 +19,7 @@ message RegisterRequest {
   bytes signing_public_key = 8;
   bytes encryption_public_key = 9;
   bytes proof = 10;
+  repeated RunnerFeature features = 11;
 }
 
 message RegisterResponse {

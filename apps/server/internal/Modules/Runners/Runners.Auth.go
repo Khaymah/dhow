@@ -97,7 +97,14 @@ func (s *Service) Authenticate(ctx context.Context, in models.AuthenticateInput)
 	if err != nil {
 		return "", err
 	}
+	features, err := runnersig.FeatureNames(in.Features)
+	if err != nil {
+		return "", runnerauth.InvalidRunnerCredentials(0)
+	}
 	message := runnersig.AuthMessage(s.origin, s.keys.SigningKeyVersion(), in.ChallengeBytes)
+	if len(features) > 0 {
+		message = runnersig.AuthFeaturesMessage(s.origin, s.keys.SigningKeyVersion(), in.ChallengeBytes, features)
+	}
 	if !runnersig.Verify(ident.SigningPublicKey, message, in.Signature) {
 		return "", runnerauth.InvalidRunnerCredentials(0)
 	}
@@ -108,7 +115,7 @@ func (s *Service) Authenticate(ctx context.Context, in models.AuthenticateInput)
 	if err != nil {
 		return "", err
 	}
-	switches, err := s.openSession(ctx, now, ident.SigningPublicKey, runnerID, nonce, hash)
+	switches, err := s.openSession(ctx, now, session{signingKey: ident.SigningPublicKey, runnerID: runnerID, nonce: nonce, hash: hash, features: features})
 	if errors.Is(err, errCloneSuspected) {
 		return "", s.reportClone(ctx, ident.OrganizationId, runnerID, switches)
 	}
@@ -119,7 +126,16 @@ func (s *Service) Authenticate(ctx context.Context, in models.AuthenticateInput)
 	return token, nil
 }
 
-func (s *Service) openSession(ctx context.Context, now time.Time, signingKey []byte, runnerID uuid.UUID, nonce, hash []byte) (int64, error) {
+type session struct {
+	signingKey []byte
+	runnerID   uuid.UUID
+	nonce      []byte
+	hash       []byte
+	features   []string
+}
+
+func (s *Service) openSession(ctx context.Context, now time.Time, in session) (int64, error) {
+	signingKey, runnerID, nonce, hash := in.signingKey, in.runnerID, in.nonce, in.hash
 	var switches int64
 	clone := false
 	err := dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
@@ -132,6 +148,9 @@ func (s *Service) openSession(ctx context.Context, now time.Time, signingKey []b
 		}
 		if !bytes.Equal(ident.SigningPublicKey, signingKey) {
 			return runnerauth.InvalidRunnerCredentials(0)
+		}
+		if err := q.SetRunnerFeatures(ctx, sqlc.SetRunnerFeaturesParams{ID: runnerID, Features: in.features, Now: now}); err != nil {
+			return err
 		}
 		var replaced *uuid.UUID
 		prev, err := q.GetActiveRunnerSession(ctx, runnerID)
