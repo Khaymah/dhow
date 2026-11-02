@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"slices"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/Khaymah/dhow/internal/buildinfo"
 	"github.com/Khaymah/dhow/internal/jobspec"
 )
+
+var errCheckoutChanged = errors.New("the repository address or host key changed after the job was queued")
 
 type checkoutSecrets struct {
 	next      jobs.SecretResolver
@@ -93,6 +96,11 @@ func (c *checkoutSecrets) checkoutCredential(ctx context.Context, req jobs.Secre
 	}
 	if len(cred.Secret) == 0 {
 		return nil, jobs.ErrSecretsUnavailable
+	}
+	co := req.Checkout
+	if co.GetRepositoryUrl() == "" || cred.URL != co.GetRepositoryUrl() || cred.KnownHost != co.GetKnownHost() {
+		clear(cred.Secret)
+		return nil, errCheckoutChanged
 	}
 	return cred.Secret, nil
 }

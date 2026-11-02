@@ -37,6 +37,7 @@ type Credential struct {
 	Kind      string
 	Secret    []byte
 	KnownHost string
+	URL       string
 }
 
 const redacted = "[redacted]"

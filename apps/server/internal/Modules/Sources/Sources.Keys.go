@@ -144,7 +144,7 @@ func (g genericProvider) MintCheckoutCredential(ctx context.Context, repo models
 	if err != nil {
 		return Credential{}, err
 	}
-	return Credential{Kind: credentialSSHKey, Secret: private, KnownHost: u.KnownHostsPattern() + " " + repo.HostKey}, nil
+	return Credential{Kind: credentialSSHKey, Secret: private, KnownHost: u.KnownHostsPattern() + " " + repo.HostKey, URL: u.String()}, nil
 }
 
 func (genericProvider) ReportStatus(context.Context, models.Repository, StatusReport) error {

@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+
+	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
 var ErrSecretsUnavailable = errors.New("no secret store is configured")
@@ -14,6 +16,7 @@ type SecretRequest struct {
 	JobID          uuid.UUID
 	AttemptID      uuid.UUID
 	Names          []string
+	Checkout       *runnerv1.Checkout
 }
 
 type SecretResolver interface {
