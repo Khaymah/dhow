@@ -279,6 +279,9 @@ func (b *box) Destroy(ctx context.Context) error {
 	if err != nil && !isGone(err) {
 		return errors.Join(err, survivors)
 	}
+	if survivors != nil {
+		return survivors
+	}
 	b.d.untrack(b.name)
 	for _, dir := range b.owned {
 		if err := b.d.removeOwned(ctx, dir); err != nil {

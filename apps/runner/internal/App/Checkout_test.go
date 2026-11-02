@@ -301,3 +301,24 @@ func TestAPluginGetsOnlyItsInputsItsOutputFileAndTheSecretsOfItsStep(t *testing.
 		assert.NotContains(t, plug, name)
 	}
 }
+
+func TestSurvivorsStopTheAttemptBeforeTheNextSandbox(t *testing.T) {
+	srv := runnertest.NewServer(t)
+	r := runnertest.Register(t, srv, srv.URL)
+	spec := runnertest.Spec(
+		&runnerv1.Step{Name: "build", Run: "make build"},
+		&runnerv1.Step{Name: "notify", Plugin: &runnerv1.Plugin{Image: pluginImage, Inputs: map[string]string{"channel": "#ops"}}},
+	)
+	srv.Enqueue(spec, nil)
+	running := r.Start(fake.Recording{Images: images(), DestroySurvivors: true}, runnertest.StartOptions{})
+	out := running.Next(t, finishWithin)
+	assert.Equal(t, runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, out.Reason)
+	prepares := 0
+	for _, e := range running.Driver.Events() {
+		if e.Kind == fake.EventPrepare {
+			prepares++
+		}
+	}
+	assert.Equal(t, 1, prepares, "no sandbox starts on a workspace where processes survived")
+	assert.Len(t, execs(running.Driver.Events()), 1)
+}

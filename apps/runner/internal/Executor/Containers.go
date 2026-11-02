@@ -69,6 +69,10 @@ func (a *attempt) runSegments(ctx context.Context, segs []segment) result {
 	for i, seg := range segs {
 		if i > 0 {
 			a.retire(ctx)
+			if a.hadSurvivors() {
+				a.pipe.Systemf(nil, "dhow: SANDBOX_FAILED: processes of the previous sandbox survived, so the next one does not start")
+				return failed(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, 0)
+			}
 			if r, stop := a.interrupted(jobCtx); stop {
 				return r
 			}
@@ -118,6 +122,12 @@ func (a *attempt) retire(ctx context.Context) {
 	a.mu.Lock()
 	a.box = nil
 	a.mu.Unlock()
+}
+
+func (a *attempt) hadSurvivors() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.survivors
 }
 
 func (a *attempt) closeWorkspace(ctx context.Context) {
