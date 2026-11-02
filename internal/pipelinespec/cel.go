@@ -117,7 +117,7 @@ func baseOptions() []cel.EnvOption {
 	}
 }
 
-func newEnv(scope exprScope, d *declarations) (*cel.Env, error) {
+func newEnv(scope exprScope, d *declarations, extra ...cel.EnvOption) (*cel.Env, error) {
 	opts := baseOptions()
 	if scope != scopeArtifactName {
 		for _, v := range contextVars() {
@@ -140,7 +140,9 @@ func newEnv(scope exprScope, d *declarations) (*cel.Env, error) {
 	case scopeStepIf, scopeStepValue, scopeCacheKey:
 		opts = append(opts, cel.Variable("env", cel.MapType(cel.StringType, cel.StringType)))
 	}
-	if scope == scopeCacheKey {
+	if scope == scopeCacheKey && len(extra) > 0 {
+		opts = append(opts, extra...)
+	} else if scope == scopeCacheKey {
 		opts = append(opts, cel.Function(hashFilesFunc,
 			cel.Overload("hash_files_string", []*cel.Type{cel.StringType}, cel.StringType),
 			cel.Overload("hash_files_list", []*cel.Type{cel.ListType(cel.StringType)}, cel.StringType),
@@ -386,8 +388,8 @@ type program struct {
 	scope exprScope
 }
 
-func prepare(scope exprScope, d *declarations, src string) (*program, error) {
-	env, err := newEnv(scope, d)
+func prepare(scope exprScope, d *declarations, src string, extra ...cel.EnvOption) (*program, error) {
+	env, err := newEnv(scope, d, extra...)
 	if err != nil {
 		return nil, err
 	}
@@ -432,8 +434,8 @@ func (p *program) run(ctx context.Context, act map[string]any, timeout time.Dura
 	return native, nil
 }
 
-func evaluate(ctx context.Context, scope exprScope, d *declarations, src string, act map[string]any) (any, error) {
-	p, err := prepare(scope, d, src)
+func evaluate(ctx context.Context, scope exprScope, d *declarations, src string, act map[string]any, extra ...cel.EnvOption) (any, error) {
+	p, err := prepare(scope, d, src, extra...)
 	if err != nil {
 		return nil, err
 	}

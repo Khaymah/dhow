@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/google/cel-go/cel"
+
 	"github.com/Khaymah/dhow/internal/jobspec"
 )
 
@@ -102,6 +104,10 @@ func (r *RunJob) EvalValue(ctx context.Context, ref string, c Context) (string, 
 }
 
 func (r *RunJob) evaluate(ctx context.Context, scope exprScope, src string, c Context) (any, error) {
+	return r.evaluateWith(ctx, scope, src, c, nil)
+}
+
+func (r *RunJob) evaluateWith(ctx context.Context, scope exprScope, src string, c Context, extra []cel.EnvOption) (any, error) {
 	secret := make(map[string]bool, len(c.SecretEnv)+len(r.Spec.GetSecrets()))
 	for _, name := range c.SecretEnv {
 		secret[name] = true
@@ -115,7 +121,7 @@ func (r *RunJob) evaluate(ctx context.Context, scope exprScope, src string, c Co
 	if err != nil {
 		return nil, err
 	}
-	return evaluate(ctx, scope, r.decls, src, act)
+	return evaluate(ctx, scope, r.decls, src, act, extra...)
 }
 
 func boundedString(out any, limit int) (string, error) {

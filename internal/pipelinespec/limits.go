@@ -1,6 +1,10 @@
 package pipelinespec
 
-import "time"
+import (
+	"time"
+
+	"github.com/Khaymah/dhow/internal/pathglob"
+)
 
 const (
 	MaxFileBytes   = 256 << 10
@@ -22,7 +26,7 @@ const (
 	MaxNeeds           = 64
 
 	MaxPatterns      = 50
-	MaxPatternLength = 256
+	MaxPatternLength = pathglob.MaxLength
 
 	MaxManualInputs  = 20
 	MaxChoiceOptions = 50
