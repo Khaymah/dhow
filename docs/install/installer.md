@@ -34,9 +34,11 @@ bash get.sh
 | Ubuntu 22.04 | apt، PGDG | لا توجد حزمة Caddy: اختر nginx، أو وكيلًا موجودًا، أو لا شيء |
 | Rocky Linux 9، AlmaLinux 9 | dnf، PGDG | Caddy وcertbot من EPEL، ويفعّله المثبّت عند الحاجة. ونوقف وحدة `postgresql` من AppStream |
 | RHEL 9 | dnf، PGDG | EPEL يحتاج إلى اشتراك، لذلك يجب أن يكون Caddy وcertbot مثبّتين مسبقًا |
-| Fedora 41 وأحدث | dnf5، PGDG | إعداد إضافي لـ dnf يمنع حزم `postgresql` الخاصة بـ Fedora من استبدال حزم PGDG |
+| Fedora 42 و43 و44 (الإصدارات التي ينشر لها PGDG حزم PostgreSQL 18) | dnf5، PGDG | إعداد إضافي لـ dnf يمنع حزم `postgresql` الخاصة بـ Fedora من استبدال حزم PGDG |
 
-نختبر Debian 12 وUbuntu 24.04 وRocky Linux 9 وFedora من البداية إلى النهاية في CI (راجع [كيف نختبره](#كيف-نختبره)). أما Ubuntu 22.04 وAlmaLinux وRHEL فتسلك مسارات الكود نفسها التي تسلكها أقاربها المختبَرة. في أي توزيعة أخرى يعمل المثبّت في **الوضع اليدوي**: لا يثبّت أي حزمة، ويذكر ما ينقص، ويفعل كل شيء آخر كالمعتاد. مع PostgreSQL موجود ووكيل موجود، لا يحتاج الوضع اليدوي إلى أي حزمة. المثبّت يحتاج دائمًا إلى systemd.
+في Fedora وRocky Linux وAlmaLinux وRHEL، يتحقق المثبّت أولًا من أن PGDG ينشر PostgreSQL 18 لهذا الإصدار، قبل أن يغيّر أي شيء. إذا لم ينشره، كما في Fedora 45 الآن، يتوقف المثبّت ويذكر الإصدارات المدعومة ولا يغيّر شيئًا. ثبّت على أحدها، أو استخدم [Docker Compose](compose.md). وإذا لم يصل الفحص إلى PGDG، يكمل المثبّت ويذكر ذلك في الخطة.
+
+نختبر Debian 12 وUbuntu 24.04 وRocky Linux 9 وFedora 44 من البداية إلى النهاية في CI (راجع [كيف نختبره](#كيف-نختبره)). أما Ubuntu 22.04 وAlmaLinux وRHEL فتسلك مسارات الكود نفسها التي تسلكها أقاربها المختبَرة. في أي توزيعة أخرى يعمل المثبّت في **الوضع اليدوي**: لا يثبّت أي حزمة، ويذكر ما ينقص، ويفعل كل شيء آخر كالمعتاد. مع PostgreSQL موجود ووكيل موجود، لا يحتاج الوضع اليدوي إلى أي حزمة. المثبّت يحتاج دائمًا إلى systemd.
 
 يعمل المثبّت كـ root. الأمر `install --dry-run` وحده يعمل بدونه.
 
@@ -204,4 +206,4 @@ install_packages: false
 ## كيف نختبره
 
 - اختبارات الوحدة تشغّل المثبّت على نظام وهمي: الاكتشاف، وبناء الخطة، وملف الإجابات، والتكرار الآمن، والتراجع، وdoctor، وuninstall. وتتأكد أن أي سر لا يصل إلى المخرجات أو سطر أوامر أو ملف الإجابات. واختبار يقود المسار التفاعلي عبر pseudo-terminal حقيقية، ويتأكد أن رابط قاعدة البيانات لا يظهر على الشاشة.
-- الـ [Installer workflow](../../.github/workflows/installer.yml) يشغّل [`deploy/install/e2e/run.sh`](../../deploy/install/e2e/run.sh) على Debian 12 وUbuntu 24.04 وRocky Linux 9 وFedora، في حاوية تشغّل systemd. يثبّت من ملف إجابات مع PostgreSQL 18 من PGDG، ويتحقق من الجاهزية، ورابط الإعداد في سجل النظام، وصلاحيات الملفات، وتقييم `systemd-analyze security`، وأن إعادة التشغيل لا تغيّر شيئًا. ثم يشغّل `doctor` و`uninstall` و`uninstall --purge`. الأمر `make installer-e2e E2E_BASE=ubuntu:24.04` يشغّله على جهازك.
+- الـ [Installer workflow](../../.github/workflows/installer.yml) يشغّل [`deploy/install/e2e/run.sh`](../../deploy/install/e2e/run.sh) على Debian 12 وUbuntu 24.04 وRocky Linux 9 وFedora 44، في حاوية تشغّل systemd. يثبّت من ملف إجابات مع PostgreSQL 18 من PGDG، ويتحقق من الجاهزية، ورابط الإعداد في سجل النظام، وصلاحيات الملفات، وتقييم `systemd-analyze security`، وأن إعادة التشغيل لا تغيّر شيئًا. ثم يشغّل `doctor` و`uninstall` و`uninstall --purge`. الأمر `make installer-e2e E2E_BASE=ubuntu:24.04` يشغّله على جهازك.

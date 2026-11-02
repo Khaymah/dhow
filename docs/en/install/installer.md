@@ -34,9 +34,11 @@ So `bash get.sh --version 1.2.3 --answers answers.yaml --yes` installs a pinned 
 | Ubuntu 22.04 | apt, PGDG | No Caddy package: choose nginx, an existing proxy or none |
 | Rocky Linux 9, AlmaLinux 9 | dnf, PGDG | Caddy and certbot from EPEL, which the installer enables when needed; the AppStream `postgresql` module is disabled |
 | RHEL 9 | dnf, PGDG | EPEL needs a subscription, so Caddy and certbot must already be installed |
-| Fedora 41 and newer | dnf5, PGDG | A dnf drop-in keeps Fedora's own `postgresql` packages from replacing the PGDG ones |
+| Fedora 42, 43 and 44 (the releases PGDG publishes PostgreSQL 18 for) | dnf5, PGDG | A dnf drop-in keeps Fedora's own `postgresql` packages from replacing the PGDG ones |
 
-Debian 12, Ubuntu 24.04, Rocky Linux 9 and Fedora are tested end to end in CI (see [How it is tested](#how-it-is-tested)); Ubuntu 22.04, AlmaLinux and RHEL take the same code paths as their tested relatives. On any other distribution the installer runs in **manual mode**: it installs no packages, lists what is missing, and does everything else the same. With an existing PostgreSQL and an existing proxy, manual mode needs no packages at all. The installer always needs systemd.
+On Fedora, Rocky Linux, AlmaLinux and RHEL, the installer first checks that PGDG publishes PostgreSQL 18 for the release, before it changes anything. When PGDG does not, as with Fedora 45 today, the installer stops, lists the supported releases and changes nothing: install on one of them, or use [Docker Compose](compose.md). When the check cannot reach PGDG, the installer goes on and says so in the plan.
+
+Debian 12, Ubuntu 24.04, Rocky Linux 9 and Fedora 44 are tested end to end in CI (see [How it is tested](#how-it-is-tested)); Ubuntu 22.04, AlmaLinux and RHEL take the same code paths as their tested relatives. On any other distribution the installer runs in **manual mode**: it installs no packages, lists what is missing, and does everything else the same. With an existing PostgreSQL and an existing proxy, manual mode needs no packages at all. The installer always needs systemd.
 
 The installer runs as root. Only `install --dry-run` works without it.
 
@@ -204,4 +206,4 @@ Back up the database and `/etc/dhow` together, as shown in [Back up and restore]
 ## How it is tested
 
 - Unit tests run the installer against a fake system: detection, plan building, the answers file, idempotency, rollback, doctor and uninstall, and that no secret reaches the output, a command line or the answers file. A test drives the interactive path through a real pseudo-terminal and checks that the database URL is not echoed.
-- The [Installer workflow](../../../.github/workflows/installer.yml) runs [`deploy/install/e2e/run.sh`](../../../deploy/install/e2e/run.sh) on Debian 12, Ubuntu 24.04, Rocky Linux 9 and Fedora in a container that boots systemd. It installs from an answers file with PostgreSQL 18 from PGDG, checks readiness, the setup link in the journal, the file modes, the `systemd-analyze security` rating and an idempotent re-run, then runs `doctor`, `uninstall` and `uninstall --purge`. `make installer-e2e E2E_BASE=ubuntu:24.04` runs it locally.
+- The [Installer workflow](../../../.github/workflows/installer.yml) runs [`deploy/install/e2e/run.sh`](../../../deploy/install/e2e/run.sh) on Debian 12, Ubuntu 24.04, Rocky Linux 9 and Fedora 44 in a container that boots systemd. It installs from an answers file with PostgreSQL 18 from PGDG, checks readiness, the setup link in the journal, the file modes, the `systemd-analyze security` rating and an idempotent re-run, then runs `doctor`, `uninstall` and `uninstall --purge`. `make installer-e2e E2E_BASE=ubuntu:24.04` runs it locally.
