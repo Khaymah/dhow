@@ -4,8 +4,8 @@ import (
 	"os"
 	"strconv"
 
-	archive "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Archive"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
+	archive "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Archive"
 )
 
 const (

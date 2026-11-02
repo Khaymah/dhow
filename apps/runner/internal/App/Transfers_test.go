@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	runnertest "github.com/Khaymah/dhow/apps/runner/internal/App/Testing"
-	archive "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Archive"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
+	archive "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Archive"
 	fake "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Fake"
 	"github.com/Khaymah/dhow/internal/cachekey"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"

@@ -237,7 +237,7 @@ FUZZ_TARGETS := \
 	Core/Auth:FuzzRecoveryCode Core/Auth:FuzzEmailAndName Core/Auth:FuzzPasswordLength Core/Auth:FuzzWebAuthnResponses \
 	Core/I18n:FuzzParseAcceptLanguage Core/Middleware:FuzzClientIP Core/RateLimit:FuzzNetwork \
 	Core/Oidc:FuzzEmailVerifiedClaim Core/Oidc:FuzzAcceptedEmail Modules/Sources/Test/Edge:FuzzWebhook \
-	Modules/Pipelines/Test/Edge:FuzzDefinitionProof
+	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName
 
 .PHONY: fuzz
 fuzz: ## Fuzz the auth inputs, FUZZTIME per target (default 10s; the M2.5 bar is 60s)
