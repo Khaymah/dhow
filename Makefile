@@ -64,6 +64,11 @@ dist: ## Build reproducible release archives and SHA256SUMS in dist/ (run make w
 git-image: ## Build the dhow-git checkout image locally (GIT_IMAGE=dhow-git:dev)
 	docker build --tag $(GIT_IMAGE) deploy/dhow-git
 
+.PHONY: git-image-pins
+git-image-pins: ## Print the apk versions that git and openssh-client resolve to on the pinned base, to paste into deploy/dhow-git/Dockerfile
+	base=$$(sed -n 's/^ARG BASE=//p' deploy/dhow-git/Dockerfile); \
+	docker run --rm "$$base" sh -c 'apk info -v 2>/dev/null | sort > /tmp/base && apk add -q --no-cache git openssh-client >/dev/null && apk info -v 2>/dev/null | sort | comm -13 /tmp/base - | sed -E "s/^(.+)-([^-]+-r[0-9]+)$$/\1=\2/"' 
+
 .PHONY: installer-e2e
 installer-e2e: build ## Run the installer end to end in a systemd container (E2E_BASE=debian:12)
 	deploy/install/e2e/run.sh $(E2E_BASE) bin/dhow-server
