@@ -56,7 +56,7 @@
 - **القيام بعد وقوع السيرفر:** كل خطوة في transaction واحدة، فالوقوع قبل الـ commit معناه إن الـ job لسه شغّال والـ `RunJob` لسه `active`، والـ runner بيعيد `Complete` أو الـ lease بيخلص ويتعاد زي M3. الاختبار بيعمل sink بيرجّع error بعد ما `Pipelines` يخلص شغله (نفس أثر الوقوع قبل الـ commit) ويتأكد إن مفيش حاجة اتسجّلت، وبعدين الـ run بيكمّل.
 
 ### التزامن (`concurrency`)
-- المجموعة لكل مشروع، وبتتقيّم مرة واحدة وقت البداية. من غير `cancel_in_progress` الأحدث بيستنى `queued` بالترتيب، ومعاه الجديد بيطلب إلغاء الأقدم (الـ `waiting` بيتلغي على طول، والشغّال بيوصله في الـ heartbeat).
+- المجموعة لكل مشروع، وبتتقيّم مرة واحدة وقت البداية. من غير `cancel_in_progress` الأحدث بيستنى `queued` بالترتيب، ومعاه الجديد بيطلب إلغاء الأقدم على نفس الـ ref بس (الـ `waiting` بيتلغي على طول، والشغّال بيوصله في الـ heartbeat).
 - «أعد تشغيل الفاشل» مابيستناش المجموعة: الـ run كان بدأ قبل كده.
 
 ### الأدوار والـ audit
@@ -73,8 +73,21 @@
 ### المصطلح
 - «Run» في الواجهة بقى «تنفيذ» (الجمع: التنفيذات)، و«Job» بيفضل «تشغيل». اتضاف في `Plan/Glossary.md`.
 
+## بعد المراجعة الأمنية المستقلة
+- **(High) run مسموم كان بيوقف بدء كل الـ runs:** matrix بـ 16 مفتاح وقيم 128 حرف كان بيعمل اسم `RunJob` حوالي 4,700 حرف، والـ CHECK (1024) بيرفضه، و`StartQueued` كان بيرجّع الـ error فكل pass بيقف كل 5 ثواني. الإصلاح على مستويين: (أ) `internal/pipelinespec` بيرفض وقت الـ validation أي تركيبة اسمها (القيم) أطول من 512 حرف بالكود الثابت `MATRIX_NAME_TOO_LONG` (فـ `dhow lint` بيقوله كمان)، و(ب) كل loop في الـ worker والـ reconciler بيعزل العنصر اللي فشل: خطأ بيانات أو constraint من Postgres (الفئات 22 و23) أو ملف مايتقريش بيخلّي الـ run ده بس `failed` بـ `RUN_EXPANSION_FAILED` (أو `RUN_STATE_INVALID`)، والخطأ العابر (شبكة أو قاعدة بيانات) بيتسجّل في الـ log ويستنى الـ pass الجاي، والـ pass عمره ما بيقف.
+- **(Medium) تثبيت الصور كان بيقفل الـ worker الوحيد:** ميزانية 30 ثانية للـ run كله، و4 طلبات بالتوازي، وكل صورة بعد ما تتكمّل (`alpine:3` و`docker.io/library/alpine:3`) بتتسأل مرة واحدة، وقراية الملف من المزوّد بمهلة 30 ثانية. والـ reconciler بقى على goroutine لوحده غير اللي بيبدأ الـ runs. و`POST .../runs` محدود 60 لكل مستخدم و240 لكل مشروع في 10 دقايق، بنفس limiter بتاع اتصالات `Sources`.
+- **(Medium) runs في الطابور كانت ممكن تجوع:** الـ runs `queued` المرشّحة هي أول run في كل (مشروع، مجموعة) بس، ومجموعته مافيهاش run شغّال، فطابور طويل في مجموعة واحدة مابيملاش الـ batch. والـ run `running` اللي اتقيّم ومااتحرّكش بيتعلّم `UpdatedAt` جديد، فبيروح آخر الطابور.
+- **(Low) عنوان التوكن بتاع الـ registry:** لازم `https` ومن غير user، وعلى نفس host الـ registry أو `auth.docker.io` أو `ghcr.io` بس، وعلى 443 أو منفذ الـ registry نفسه، وطلب التوكن بيعدّي على `netguard` من غير `DHOW_GIT_ALLOW_PRIVATE_CIDRS` خالص.
+- **(Low) الـ outputs:** بتتقص لحد 60 KiB من الـ JSON (تحت الـ CHECK بتاع 64 KiB) بترتيب ثابت، واللي بيتشال بيتسجّل `OUTPUTS_TRUNCATED` على الـ `RunJob`، ومابيفشّلش `FinishRunJob` ولا الـ transaction بتاع `Jobs`.
+- **الـ sha في التشغيل اليدوي والـ API:** لازم يبقى sha وصل بـ webhook لنفس المستودع ونفس الـ ref من run موثوق (`push` أو `tag`، مش fork)، وغير كده `422 SHA_NOT_ON_REF`. ومن غير `Sha` الـ run بياخد آخر sha زي ده للـ ref، ولو مفيش `422 REF_HEAD_UNKNOWN`. كده عضو عنده `run.trigger` مايقدرش يشغّل commit من fork أو commit قديم مش على الفرع. **والـ checkout بتاع M4.7 لازم يتأكد كمان إن الـ sha موجود في تاريخ الـ ref** (القرار 11) قبل أي خطوة.
+- **الـ dedupe وأصل الـ PR:** مفتاح التكرار بقى (المستودع، الـ ref، الـ sha، نوع الحدث، `IsFork`)، و`checkTrigger` بيطلب `refs/heads/*` للـ push و`refs/tags/*` للـ tag و`refs/pull/*` أو `refs/merge-requests/*` للـ PR. و`Trigger.IsFork` اتشال واتعمل بداله `Trigger.Origin` (`PullOriginUnknown` و`PullOriginSameRepository` و`PullOriginFork`)، والقيمة الافتراضية (unknown) بتتعامل كـ fork، فالمزوّد اللي ينسى يحدد الأصل بيقفل مش بيفتح.
+- **`cancel_in_progress` على نفس الـ ref بس:** بيلغي الـ runs الأقدم في المجموعة اللي على نفس الـ ref، والـ refs التانية بتفضل والجديد بيستنى `queued`. كده Developer مايقدرش يلغي runs فرع تاني بمجموعة مشتركة.
+- **الخطوة التانية لـ `run.approve`:** بتفضل زي ما هي، لأنها مطابقة لـ ADR-0054 (الموافقة بتشغّل كود من بره المؤسسة، فهي من الإجراءات الحساسة).
+- **أخطاء الـ JSON المخزّن:** فك `"Inputs"` و`"Outputs"` و`"Issues"` و`"ImagePins"` و`"Matrix"` بقى بيرجّع error ملفوف (`errStoredState`)، والـ run بيفشل مقفول بـ `RUN_STATE_INVALID` بدل ما يكمّل بقيمة فاضية.
+
 ## اللي اتأجّل لـ M4.7 (مكتوب في `Status.md`)
 - تنفيذ `CheckoutSeam` (الـ discovery job وcheckout كل job). ده الحاجة الوحيدة اللي فاضلة عشان Git العام يشتغل.
+- الـ checkout يتأكد إن الـ sha في تاريخ الـ ref قبل أي خطوة، حتى للـ runs اليدوية اللي السيرفر ربطها بـ sha موثوق.
 - الـ outputs من `CompleteRequest` (`runevents.Finished.Outputs` موجود و`Jobs` بيبعته فاضي)، ونقل الملف من الـ discovery job (ممكن يبقى أكبر من حد الـ outputs، فـ M4.7 يحدد الطريقة).
 - متغيرات `DHOW_*` (الـ sha والـ ref والـ run والمشروع) في `env` الـ job: `jobspec.Validate` بيرفض البادئة دي، و`internal/jobspec` بتاع M4.7.
 - خطوات `uses:` بتفشل `JOB_SPEC_INVALID` وقت الإدراج لحد ما `Step.plugin` ييجي، والـ jobs اللي فيها `artifacts` أو `cache` بتطلب الميزة دي وبتستنى runner بيعلنها.
