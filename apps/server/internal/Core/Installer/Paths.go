@@ -49,6 +49,7 @@ const (
 	DnfExcludePath = "/etc/dnf/libdnf5.conf.d/90-dhow-pgdg.conf"
 	AptKeyURL      = "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
 	DnfKeyURL      = "https://download.postgresql.org/pub/repos/yum/keys/PGDG-RPM-GPG-KEY-RHEL"
+	DnfRepoBase    = "https://download.postgresql.org/pub/repos/yum/18/"
 	AptKeyFinger   = "B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8"
 	DnfKeyFinger   = "D4BF08AE67A0B4C7A1DBCCD240BCA2B408B40D20"
 	maxKeyBytes    = 64 << 10

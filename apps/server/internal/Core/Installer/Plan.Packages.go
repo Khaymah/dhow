@@ -45,9 +45,9 @@ func aptSource(d Distro) []byte {
 }
 
 func dnfRepo(d Distro) []byte {
-	base := "https://download.postgresql.org/pub/repos/yum/18/redhat/rhel-$releasever-$basearch"
+	base := DnfRepoBase + "redhat/rhel-$releasever-$basearch"
 	if d.Fedora {
-		base = "https://download.postgresql.org/pub/repos/yum/18/fedora/fedora-$releasever-$basearch"
+		base = DnfRepoBase + "fedora/fedora-$releasever-$basearch"
 	}
 	return []byte("[dhow-pgdg18]\n" +
 		"name=PostgreSQL 18 from the PostgreSQL Global Development Group\n" +
