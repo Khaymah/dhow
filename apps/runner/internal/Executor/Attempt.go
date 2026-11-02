@@ -66,6 +66,9 @@ type attempt struct {
 
 	outputs map[string]string
 
+	cacheKeyValue string
+	cacheHit      bool
+
 	mu        sync.Mutex
 	box       sandbox.Sandbox
 	workspace sandbox.Workspace

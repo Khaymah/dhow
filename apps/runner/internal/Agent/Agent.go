@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -53,6 +54,8 @@ type Agent struct {
 	outputPath string
 	mu         sync.Mutex
 	current    *process
+	input      *os.File
+	inputStep  int32
 	stopping   bool
 	busy       bool
 }
@@ -135,6 +138,8 @@ func (a *Agent) loop(ctx context.Context) error {
 			if err := a.dispatch(ctx, &steps, execOf(body.RunExec)); err != nil {
 				return err
 			}
+		case *agentv1.Frame_Input:
+			a.feed(body.Input)
 		case *agentv1.Frame_Signal:
 			a.killCurrent(signalOf(body.Signal.GetSignal()))
 		case *agentv1.Frame_Shutdown:
@@ -150,7 +155,19 @@ func (a *Agent) dispatch(ctx context.Context, steps *sync.WaitGroup, step job) e
 	if !a.claim() {
 		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_START_FAILED, nil))
 	}
+	if step.stdin {
+		r, w, err := os.Pipe()
+		if err != nil {
+			a.release()
+			return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_START_FAILED, nil))
+		}
+		step.input = r
+		a.mu.Lock()
+		a.input, a.inputStep = w, step.index
+		a.mu.Unlock()
+	}
 	steps.Go(func() {
+		defer a.closeInput()
 		exit, err := a.runStep(ctx, step)
 		if err != nil {
 			_ = a.conn.Close()
@@ -162,6 +179,34 @@ func (a *Agent) dispatch(ctx context.Context, steps *sync.WaitGroup, step job) e
 		}
 	})
 	return nil
+}
+
+func (a *Agent) feed(in *agentv1.Input) {
+	a.mu.Lock()
+	w, step := a.input, a.inputStep
+	a.mu.Unlock()
+	if w == nil || step != in.GetStepIndex() {
+		return
+	}
+	if len(in.GetData()) > 0 {
+		if _, err := w.Write(in.GetData()); err != nil {
+			a.closeInput()
+			return
+		}
+	}
+	if in.GetEof() {
+		a.closeInput()
+	}
+}
+
+func (a *Agent) closeInput() {
+	a.mu.Lock()
+	w := a.input
+	a.input = nil
+	a.mu.Unlock()
+	if w != nil {
+		_ = w.Close()
+	}
 }
 
 func signalOf(s agentv1.ProcessSignal) unix.Signal {

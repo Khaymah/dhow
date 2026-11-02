@@ -73,6 +73,9 @@ func preflight(spec *runnerv1.JobSpec, cfg config.Config, levels []runnerv1.Isol
 	if spec.GetCheckout() != nil && cfg.CheckoutImage == "" {
 		return runnerv1.FailureReason_FAILURE_REASON_SPEC_REJECTED, "this runner has no checkout image, so it cannot run a job with a checkout"
 	}
+	if (restores(spec) || saves(spec)) && cfg.CheckoutImage == "" {
+		return runnerv1.FailureReason_FAILURE_REASON_SPEC_REJECTED, "this runner has no checkout image, so it cannot move artifacts or the cache"
+	}
 	r := spec.GetResources()
 	l := cfg.Limits
 	timeout := time.Duration(spec.GetTimeoutSeconds()) * time.Second

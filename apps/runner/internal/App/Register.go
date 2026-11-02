@@ -83,7 +83,8 @@ func runRegister(ctx context.Context, args []string, env Env) error {
 func runnerFeatures(cfg config.Config) []runnerv1.RunnerFeature {
 	features := []runnerv1.RunnerFeature{runnerv1.RunnerFeature_RUNNER_FEATURE_PLUGINS}
 	if cfg.CheckoutImage != "" {
-		features = append(features, runnerv1.RunnerFeature_RUNNER_FEATURE_CHECKOUT)
+		features = append(features, runnerv1.RunnerFeature_RUNNER_FEATURE_CHECKOUT,
+			runnerv1.RunnerFeature_RUNNER_FEATURE_ARTIFACTS, runnerv1.RunnerFeature_RUNNER_FEATURE_CACHE)
 	}
 	return features
 }

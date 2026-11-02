@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -142,6 +143,9 @@ func (b *box) Exec(ctx context.Context, step sandbox.StepSpec) (sandbox.StepResu
 	if err := conn.Write(runStepFrame(step)); err != nil {
 		return sandbox.StepResult{}, fmt.Errorf("send a step to the agent: %w", err)
 	}
+	if step.Stdin != nil {
+		go feedStdin(conn, step.Index, step.Stdin)
+	}
 	if step.Started != nil {
 		step.Started()
 	}
@@ -165,6 +169,25 @@ func (b *box) readStep(ctx context.Context, conn *wire.Conn, step sandbox.StepSp
 				return sandbox.StepResult{}, fmt.Errorf("%w: the agent ended step %d while step %d was running", sandbox.ErrSandbox, body.StepExit.GetIndex(), step.Index)
 			}
 			return b.stepResult(body.StepExit, oomBefore)
+		}
+	}
+}
+
+const stdinChunk = 64 << 10
+
+func feedStdin(conn *wire.Conn, index int32, r io.Reader) {
+	buf := make([]byte, stdinChunk)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			frame := &agentv1.Frame{Body: &agentv1.Frame_Input{Input: &agentv1.Input{StepIndex: index, Data: append([]byte(nil), buf[:n]...)}}}
+			if conn.Write(frame) != nil {
+				return
+			}
+		}
+		if err != nil {
+			_ = conn.Write(&agentv1.Frame{Body: &agentv1.Frame_Input{Input: &agentv1.Input{StepIndex: index, Eof: true}}})
+			return
 		}
 	}
 }
@@ -206,7 +229,7 @@ func runStepFrame(step sandbox.StepSpec) *agentv1.Frame {
 	}
 	if len(step.Argv) > 0 {
 		return &agentv1.Frame{Body: &agentv1.Frame_RunExec{RunExec: &agentv1.RunExec{
-			Index: step.Index, Argv: step.Argv, Env: step.Env, SecretFiles: files,
+			Index: step.Index, Argv: step.Argv, Env: step.Env, SecretFiles: files, Stdin: step.Stdin != nil,
 		}}}
 	}
 	return &agentv1.Frame{Body: &agentv1.Frame_RunStep{RunStep: &agentv1.RunStep{

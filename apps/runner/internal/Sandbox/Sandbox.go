@@ -32,6 +32,7 @@ const (
 	KindJob Kind = iota
 	KindCheckout
 	KindPlugin
+	KindTransfer
 )
 
 const (
@@ -81,6 +82,7 @@ type StepSpec struct {
 	Argv    []string
 	Env     map[string]string
 	Files   map[string][]byte
+	Stdin   io.Reader
 	Stdout  io.Writer
 	Stderr  io.Writer
 	Started func()

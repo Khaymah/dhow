@@ -83,7 +83,15 @@ func (b *box) Exec(ctx context.Context, spec sandbox.StepSpec) (sandbox.StepResu
 	if spec.Started != nil {
 		spec.Started()
 	}
+	if cmd, args, ok := transfer(spec.Argv); ok {
+		return b.finish(spec.Index, b.runTransfer(spec, cmd, args)), nil
+	}
 	rec := b.step(spec.Index)
+	if dir := b.d.WorkspaceDir(b.attempt); dir != "" && len(rec.Writes) > 0 {
+		if err := writeFiles(dir, rec.Writes); err != nil {
+			return sandbox.StepResult{}, err
+		}
+	}
 	stop := make(chan struct{})
 	var once sync.Once
 	halt := func() { once.Do(func() { close(stop) }) }

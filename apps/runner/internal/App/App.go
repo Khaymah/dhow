@@ -72,6 +72,12 @@ func Main(ctx context.Context, args []string, env Env) error {
 		return runGitSSH(ctx, args[1:], env)
 	case CommandGitAskpass:
 		return runGitAskpass(args[1:], env)
+	case CommandPack:
+		return runPack(args[1:], env)
+	case CommandUnpack:
+		return runUnpack(env)
+	case CommandHashFiles:
+		return runHashFiles(args[1:], env)
 	case podman.CommandMountWorkspace, podman.CommandUnmountWorkspace:
 		return podman.RunWorkspaceMount(args[0], args[1:])
 	case CommandRegister:
