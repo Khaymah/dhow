@@ -269,3 +269,35 @@ func TestARunnerWithoutTheCheckoutImageNeitherClaimsNorRunsACheckout(t *testing.
 	_, signed = srv2.RunnerFeatures()
 	assert.True(t, slices.Equal([]string{runnersig.FeatureCheckout, runnersig.FeaturePlugins}, signed), "%v", signed)
 }
+
+func TestAPluginGetsOnlyItsInputsItsOutputFileAndTheSecretsOfItsStep(t *testing.T) {
+	srv := runnertest.NewServer(t)
+	r := runnertest.Register(t, srv, srv.URL)
+	spec := runnertest.Spec(
+		&runnerv1.Step{Name: "build", Run: "make build"},
+		&runnerv1.Step{Name: "notify", Plugin: &runnerv1.Plugin{Image: pluginImage, Inputs: map[string]string{"channel": "#ops"}}},
+	)
+	spec.Env = map[string]string{"JOB_SETTING": "job-wide"}
+	spec.Secrets = []*runnerv1.SecretRef{
+		{Name: "DEPLOY_TOKEN", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "DEPLOY_TOKEN"}},
+		{Name: "CHAT_TOKEN", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "DHOW_INPUT_TOKEN"}, StepIndexes: []int32{1}},
+	}
+	srv.Enqueue(spec, map[string][]byte{"DEPLOY_TOKEN": []byte("job-wide-deploy-secret"), "CHAT_TOKEN": []byte("chat-secret-for-notify")})
+	labels := map[string]map[string]string{pluginImage: {sandbox.PluginManifestLabel: `{"Version":1,"Entrypoint":["/notify"],"Inputs":{"channel":{"Required":true},"token":{"Required":true}}}`}}
+	running := r.Start(fake.Recording{Images: labels}, runnertest.StartOptions{})
+	out := running.Next(t, finishWithin)
+	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, out.Result, out.Reason.String())
+	steps := execs(running.Driver.Events())
+	require.Len(t, steps, 2)
+	assert.Equal(t, "job-wide-deploy-secret", steps[0].Env["DEPLOY_TOKEN"], "a run step still gets the job's secret")
+	plug := steps[1].Env
+	assert.Equal(t, "chat-secret-for-notify", plug["DHOW_INPUT_TOKEN"])
+	assert.Equal(t, "#ops", plug["DHOW_INPUT_CHANNEL"])
+	assert.Equal(t, sandbox.OutputPath, plug["DHOW_OUTPUT"])
+	for name, v := range plug {
+		assert.NotContains(t, v, "job-wide-deploy-secret", name)
+	}
+	for _, name := range []string{"DEPLOY_TOKEN", "JOB_SETTING", "DHOW_FENCING_TOKEN", "DHOW_JOB_ID", "DHOW_ATTEMPT_ID", "DHOW_STEP_INDEX"} {
+		assert.NotContains(t, plug, name)
+	}
+}

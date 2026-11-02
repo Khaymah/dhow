@@ -18,6 +18,7 @@ const (
 	MaxStepIDLength      = 63
 	FeatureCheckout      = "checkout"
 	FeaturePlugins       = "plugins"
+	PluginInputEnvPrefix = "DHOW_INPUT_"
 )
 
 var (
@@ -196,5 +197,22 @@ func (c *checker) checkoutAccess(spec *runnerv1.JobSpec, u gitsource.URL) {
 	}
 	if co.GetCredentialSecret() == CheckoutSecret && !found {
 		c.add("Checkout.CredentialSecret", ReasonRequired)
+	}
+}
+
+func (c *checker) pluginSecret(field, name string, s *runnerv1.SecretRef, spec *runnerv1.JobSpec) {
+	idx := s.GetStepIndexes()
+	if len(idx) != 1 || idx[0] < 0 || int(idx[0]) >= len(spec.GetSteps()) {
+		c.add(field+".AsEnv", ReasonReserved)
+		return
+	}
+	p := spec.GetSteps()[idx[0]].GetPlugin()
+	input := strings.ToLower(strings.TrimPrefix(name, PluginInputEnvPrefix))
+	if p == nil || strings.ToUpper(input) != strings.TrimPrefix(name, PluginInputEnvPrefix) || !pluginInputPattern.MatchString(input) {
+		c.add(field+".AsEnv", ReasonReserved)
+		return
+	}
+	if _, set := p.GetInputs()[input]; set {
+		c.add(field+".AsEnv", ReasonDuplicate)
 	}
 }

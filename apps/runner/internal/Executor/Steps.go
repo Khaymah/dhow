@@ -30,11 +30,12 @@ type stepEnd struct {
 }
 
 type execPlan struct {
-	argv    []string
-	env     map[string]string
-	files   map[string][]byte
-	allowed []string
-	silent  bool
+	argv     []string
+	env      map[string]string
+	files    map[string][]byte
+	allowed  []string
+	silent   bool
+	isolated bool
 }
 
 func jobContext(ctx context.Context, spec *runnerv1.JobSpec) (context.Context, context.CancelFunc) {
@@ -101,7 +102,7 @@ func (a *attempt) runStep(ctx, jobCtx context.Context, idx int32, step *runnerv1
 	execCtx, stopExec := context.WithCancel(ctx)
 	defer stopExec()
 	env, files := plan.env, plan.files
-	if !plan.silent {
+	if !plan.silent && !plan.isolated {
 		env, files = a.stepEnv(idx)
 		maps.Copy(env, plan.env)
 	}

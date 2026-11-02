@@ -180,6 +180,7 @@ The image declares its inputs, outputs and entrypoint in the label `io.dhow.plug
 - `Entrypoint` starts with an absolute path and runs as is, without a shell (at most 32 arguments).
 - Every `with:` key must be in `Inputs`, and every input marked `Required` must be set or have a `Default`. Otherwise the step fails with `PLUGIN_INPUT_INVALID` before the plugin starts. An image without a valid label fails with `PLUGIN_MANIFEST_INVALID`.
 - Each input reaches the plugin as an environment variable `DHOW_INPUT_<NAME>`, with the name in upper case (`DHOW_INPUT_CHANNEL`). The value is never parsed by a shell.
+- **A plugin gets only what is given to it:** its inputs, `DHOW_OUTPUT`, the proxy variables of the job's egress, the `env` of its own step, and the secrets given to that step. A secret in `with:` (`token: ${{ secrets.CHAT_TOKEN }}`) arrives as `DHOW_INPUT_TOKEN` and only in that step. The job's `env`, secrets given to the whole job, and `DHOW_FENCING_TOKEN`, `DHOW_JOB_ID`, `DHOW_ATTEMPT_ID` and `DHOW_STEP_INDEX` never reach a plugin.
 
 ### Step outputs
 

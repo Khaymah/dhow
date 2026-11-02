@@ -73,6 +73,7 @@
   `Entrypoint` لازم يبدأ بمسار مطلق، و32 عنصر بالكتير، والـ inputs بنفس شكل أسماء `with:`، و64 KiB للـ label كله.
 - **التحقق:** الـ runner بيقرا الـ label بعد السحب بالـ digest وقبل أي تشغيل. input مش معلن أو input مطلوب مش موجود: `PLUGIN_INPUT_INVALID`. label مش موجود أو مش صح: `PLUGIN_MANIFEST_INVALID`. والسيرفر بيتحقق من الشكل بس (digest، و32 input، و32 KiB للقيمة).
 - **التشغيل:** حاوية لوحدها بنفس التقوية وعلى نفس الـ workspace، والـ egress بتاع الـ job، والـ inputs كـ `DHOW_INPUT_<NAME>`، والـ entrypoint بـ `RunExec` من غير shell (صورة من غير `/bin/sh` بتشتغل).
+- **أقل صلاحيات (بعد المراجعة الأمنية، MEDIUM):** الإضافة كود من بره، فبتاخد بس: الـ inputs، و`DHOW_OUTPUT`، ومتغيرات الـ proxy لو الـ job ليه egress، و`env` الخطوة نفسها، والأسرار اللي `step_indexes` بتاعها فيه رقم الخطوة دي. السر في `with:` بيوصل كـ SecretRef `as_env: DHOW_INPUT_<NAME>` محصور في خطوة الإضافة دي بس، و`jobspec` بيرفضه لو مش محصور فيها أو لو نفس الـ input موجود كقيمة عادية. ومابتاخدش `env` الـ job، ولا أسرار الـ job كله، ولا `DHOW_FENCING_TOKEN` و`DHOW_JOB_ID` و`DHOW_ATTEMPT_ID` و`DHOW_STEP_INDEX`. خطوات `run` بتفضل زي M3.
 
 ### 4. الـ outputs
 - كل خطوة (`run` أو إضافة) بتلاقي `DHOW_OUTPUT`، وبتكتب فيه سطور `key=value`. الـ agent بيقرا الملف بعد الخطوة (ملف عادي، 64 KiB بالكتير، من غير ما يتبع links) ويمسحه.

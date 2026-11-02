@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"slices"
 	"strconv"
+	"strings"
 
 	plugin "github.com/Khaymah/dhow/apps/runner/internal/Executor/Plugin"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
+	"github.com/Khaymah/dhow/internal/jobspec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -74,12 +77,46 @@ func (a *attempt) runPlugin(ctx, jobCtx context.Context, idx int32) (result, boo
 	if err != nil {
 		return a.refusePlugin(ctx, idx, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID, err)
 	}
-	env, err := m.Env(step.GetPlugin().GetInputs())
+	with, env, files := a.pluginEnv(idx, step)
+	inputs, err := m.Env(with)
+	clear(with)
 	if err != nil {
 		return a.refusePlugin(ctx, idx, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_INPUT_INVALID, err)
 	}
+	maps.Copy(env, inputs)
 	allowed := append([]string{}, m.Outputs...)
-	return a.runStep(ctx, jobCtx, idx, step, execPlan{argv: m.Entrypoint, env: env, allowed: allowed})
+	return a.runStep(ctx, jobCtx, idx, step, execPlan{argv: m.Entrypoint, env: env, files: files, allowed: allowed, isolated: true})
+}
+
+func (a *attempt) pluginEnv(idx int32, step *runnerv1.Step) (map[string]string, map[string]string, map[string][]byte) {
+	spec := a.grant.GetSpec()
+	with := maps.Clone(step.GetPlugin().GetInputs())
+	if with == nil {
+		with = map[string]string{}
+	}
+	env := map[string]string{plugin.EnvOutput: sandbox.OutputPath}
+	maps.Copy(env, step.GetEnv())
+	files := map[string][]byte{}
+	for _, ref := range spec.GetSecrets() {
+		if ref.GetName() == jobspec.CheckoutSecret || !slices.Contains(ref.GetStepIndexes(), idx) {
+			continue
+		}
+		v := a.secrets[ref.GetName()]
+		switch t := ref.GetTarget().(type) {
+		case *runnerv1.SecretRef_AsEnv:
+			if name, ok := strings.CutPrefix(t.AsEnv, jobspec.PluginInputEnvPrefix); ok {
+				with[strings.ToLower(name)] = string(v)
+				continue
+			}
+			env[t.AsEnv] = string(v)
+		case *runnerv1.SecretRef_AsFile:
+			files[t.AsFile] = append([]byte(nil), v...)
+		}
+	}
+	if len(spec.GetNetwork().GetEgress()) > 0 {
+		maps.Copy(env, proxyEnv())
+	}
+	return with, env, files
 }
 
 func (a *attempt) refusePlugin(ctx context.Context, idx int32, reason runnerv1.FailureReason, err error) (result, bool) {

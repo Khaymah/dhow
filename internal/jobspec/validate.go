@@ -188,6 +188,10 @@ func (c *checker) secrets(spec *runnerv1.JobSpec) {
 func (c *checker) secretTarget(field string, s *runnerv1.SecretRef, spec *runnerv1.JobSpec) string {
 	switch t := s.GetTarget().(type) {
 	case *runnerv1.SecretRef_AsEnv:
+		if strings.HasPrefix(t.AsEnv, PluginInputEnvPrefix) {
+			c.pluginSecret(field, t.AsEnv, s, spec)
+			return "env:" + t.AsEnv + ":" + fmt.Sprint(s.GetStepIndexes())
+		}
 		c.envName(field+".AsEnv", t.AsEnv)
 		if usesEnv(spec, t.AsEnv) {
 			c.add(field+".AsEnv", ReasonDuplicate)

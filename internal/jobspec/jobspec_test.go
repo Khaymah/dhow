@@ -350,3 +350,30 @@ func TestTheCheckoutSecretIsReservedWithoutACheckout(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, violations(t, err), jobspec.Violation{Field: "Secrets[2].Name", Reason: jobspec.ReasonReserved})
 }
+
+func TestASecretPluginInputIsScopedToItsPluginStep(t *testing.T) {
+	ok := withCheckout()
+	ok.Secrets = append(ok.Secrets, &runnerv1.SecretRef{Name: "CHAT", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "DHOW_INPUT_TOKEN"}, StepIndexes: []int32{1}})
+	require.NoError(t, jobspec.Validate(jobspec.Normalize(ok)))
+	tests := []struct {
+		name   string
+		ref    *runnerv1.SecretRef
+		reason string
+	}{
+		{"not scoped", &runnerv1.SecretRef{Name: "CHAT", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "DHOW_INPUT_TOKEN"}}, jobspec.ReasonReserved},
+		{"scoped to a run step", &runnerv1.SecretRef{Name: "CHAT", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "DHOW_INPUT_TOKEN"}, StepIndexes: []int32{0}}, jobspec.ReasonReserved},
+		{"scoped to two steps", &runnerv1.SecretRef{Name: "CHAT", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "DHOW_INPUT_TOKEN"}, StepIndexes: []int32{0, 1}}, jobspec.ReasonReserved},
+		{"a lowercase name", &runnerv1.SecretRef{Name: "CHAT", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "DHOW_INPUT_token"}, StepIndexes: []int32{1}}, jobspec.ReasonReserved},
+		{"also a plain input", &runnerv1.SecretRef{Name: "CHAT", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "DHOW_INPUT_CHANNEL"}, StepIndexes: []int32{1}}, jobspec.ReasonDuplicate},
+		{"another reserved name", &runnerv1.SecretRef{Name: "CHAT", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "DHOW_OUTPUT"}, StepIndexes: []int32{1}}, jobspec.ReasonReserved},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := withCheckout()
+			spec.Secrets = append(spec.Secrets, tt.ref)
+			err := jobspec.Validate(jobspec.Normalize(spec))
+			require.Error(t, err)
+			assert.Contains(t, violations(t, err), jobspec.Violation{Field: "Secrets[3].AsEnv", Reason: tt.reason})
+		})
+	}
+}
