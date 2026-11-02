@@ -89,20 +89,29 @@ docker compose -f deploy/dev/compose.yaml up
    docker compose -f deploy/dev/compose.yaml exec runner dhow-dev-register
    ```
 
-   لا يظهر الرمز في سطر الأوامر أبدًا. لقراءته من ملف بدلًا من ذلك، شغّل `docker compose -f deploy/dev/compose.yaml exec -T runner dhow-dev-register < token.txt`.
+   الصق الرمز عند الطلب، ولن يظهر على الشاشة. لا يدخل الرمز سطر الأوامر ولا أي ملف. إذا حفظته في ملف، فمرّره بـ `docker compose -f deploy/dev/compose.yaml exec -T runner dhow-dev-register < token.txt`، ثم احذف الملف.
 3. خلال ثوانٍ يظهر جهاز التشغيل **متصلًا** في صفحة أجهزة التشغيل. التشغيلات التي لا تحتاج إلى checkout، مثل التي تنشئها بـ `POST /api/v1/organizations/{id}/jobs`، تعمل عليه الآن. تابعها بـ `docker compose -f deploy/dev/compose.yaml logs -f runner`.
 
 > [!WARNING]
 > الحاوية `runner` **privileged**، لأن Podman بلا root داخلها يحتاج إلى إنشاء user namespaces وmounts وcgroups. هذا للتطوير على جهازك أنت فقط. جهاز تشغيل الإنتاج لا يعمل بهذه الطريقة أبدًا: يعمل تحت وحدة systemd، كما يشرح [تثبيت جهاز تشغيل](runner/install.md).
+>
+> - **ما يصل إليه تشغيل يهرب من عزله.** لا تملك الحاوية باقي حماية وحدة systemd: لا `ProtectSystem` ولا `InaccessiblePaths` ولا `ProtectProc` ولا `SystemCallFilter` ولا `RestrictAddressFamilies`، ولا ملف seccomp أو AppArmor من Docker. التشغيل الذي يهرب من عزله إلى المستخدم `dhow-runner` تفصله ثغرة رفع صلاحيات محلية واحدة عن root في حاوية privileged، وهذا يعني root على آلة Docker الافتراضية (Docker Desktop) أو على جهازك (Docker Engine على Linux).
+> - **الكود غير الموثوق.** تشغيل فرع من داو لا تثق به مع هذه الحزمة يعطي هذا الفرع صلاحيات root في حاوية privileged، لأن الحاوية تبني جهاز التشغيل من نسختك وتشغّله.
+> - **عندما لا تحتاج إلى تشغيلات حقيقية**، استخدم [جهاز التشغيل الوهمي](#جهاز-التشغيل-الوهمي) بدلًا منه: يعمل في حاوية عادية.
+>
+> تسد الصورة الثغرات السهلة: لا يحتفظ ببت setuid إلا `newuidmap` و`newgidmap` (يحتاجهما Podman)، فلا تعطي `su` و`passwd` و`chsh` و`chfn` و`newgrp` و`gpasswd` صلاحيات root، و`mount` و`umount` لـ root فقط، كما تجعلهما وحدة systemd غير متاحين.
 
 كيف يعمل:
 
 - **المستخدم.** تضيف الصورة المستخدم `dhow-runner` مع 1,048,576 sub-id في `/etc/subuid` و`/etc/subgid`، وهذا يكفي 16 تشغيلًا في الوقت نفسه. سكربت صغير يبدأ بصلاحيات root، ويجهّز الـ cgroup، ثم يشغّل جهاز التشغيل بالمستخدم `dhow-runner` مع حدود الصلاحيات (capability bounding set) نفسها التي في وحدة systemd.
+- **ملفات root.** السكربتات التي يشغّلها root تُنسخ إلى الصورة وقت بنائها، ونسختك مربوطة للقراءة فقط على `/src`، فلا يستطيع شيء داخل الحاوية تغييرها. يبني root جهاز التشغيل من `/src` إلى `/opt/dhow-dev`، ويحفظ ملاحظاته في `/var/lib/dhow-dev`، الذي لا يدخله إلا root. ولا يفتح أبدًا ملفًا في مجلد يستطيع `dhow-runner` الكتابة فيه: يتحقق من وجود الهوية بالمستخدم `dhow-runner`.
 - **الـ cgroup.** للحاوية cgroup namespace خاص بها (`cgroup: private`). ينقل السكربت عملياته إلى cgroup فرعي، ويفعّل المتحكمات `cpu` و`io` و`memory` و`pids`، ويعطي جهاز التشغيل cgroup خاصًا به يملكه `dhow-runner`، بلا swap. هذا ما يعطيه `Delegate=yes` و`MemorySwapMax=0` لجهاز التشغيل تحت systemd، فتنجح فحوص جهاز التشغيل كما هي، ويفرض كل حدود التشغيل.
 - **عنوان السيرفر.** `--dev` يسمح بـ `http://` العادي إلى عنوان loopback فقط. داخل الحاوية، يمرّر forwarder على `127.0.0.1:8080` كل اتصال إلى `server:8080`، فيسجّل جهاز التشغيل بـ `--dev --url http://127.0.0.1:8080`، ويبقى `--dev` محصورًا في loopback.
 - **الحالة.** الهوية ومخزن الصور في مساحة التخزين `runner-state`، فيبقى جهاز التشغيل مسجلًا بعد `down` ثم `up`.
 
-**جهاز التشغيل الوهمي.** على جهاز لا يستطيع تشغيل جهاز التشغيل مع Podman، شغّل الوهمي بدلًا منه. هو مبني مع الوسم `dhowtest` والمشغّل الوهمي، ولا يشغّل أي عملية (كل خطوة تطبع سطرًا واحدًا وتنجح)، ولا يحتاج إلى حاوية privileged:
+#### جهاز التشغيل الوهمي
+
+على جهاز لا يستطيع تشغيل جهاز التشغيل مع Podman، أو عندما لا تحتاج إلى تشغيلات حقيقية، شغّل الوهمي بدلًا منه. هو مبني مع الوسم `dhowtest` والمشغّل الوهمي، ولا يشغّل أي عملية (كل خطوة تطبع سطرًا واحدًا وتنجح)، ولا يحتاج إلى حاوية privileged:
 
 ```sh
 docker compose -f deploy/dev/compose.yaml --profile fake-runner up --scale runner=0
@@ -111,15 +120,17 @@ docker compose -f deploy/dev/compose.yaml exec fake-runner dhow-dev-register
 
 `--scale runner=0` يُبقي جهاز التشغيل مع Podman متوقفًا. لكل منهما مساحة تخزين منفصلة (`runner-state` و`fake-runner-state`)، فكل واحد جهاز تشغيل مستقل بتسجيله الخاص، ولا يأخذ أحدهما هوية الآخر أبدًا.
 
-**إعادة ضبط جهاز التشغيل.** احذف حاويته ومساحة تخزينه، ثم شغّله مرة أخرى وسجّله برمز جديد. واحذف جهاز التشغيل القديم من صفحة أجهزة التشغيل أيضًا.
+#### إعادة ضبط جهاز التشغيل
+
+احذف حاويته ومساحة تخزينه، ثم شغّله مرة أخرى وسجّله برمز جديد. واحذف جهاز التشغيل القديم من صفحة أجهزة التشغيل أيضًا.
 
 ```sh
 docker compose -f deploy/dev/compose.yaml rm --stop --force runner
-docker volume rm dhow-dev_runner-state
+docker volume rm dhow-dev_runner-state dhow-dev_runner-dev
 docker compose -f deploy/dev/compose.yaml up -d runner
 ```
 
-لجهاز التشغيل الوهمي، استخدم `fake-runner` و`dhow-dev_fake-runner-state`. بعد تغيير `deploy/dev/runner/Dockerfile`، أعد بناء الصورة بـ `docker compose -f deploy/dev/compose.yaml build runner`.
+لجهاز التشغيل الوهمي، استخدم `fake-runner` و`dhow-dev_fake-runner-state` و`dhow-dev_fake-runner-dev`. تحمل الصورة السكربتات التي في `deploy/dev/runner`، فبعد أي تغيير هناك أعد بناءها بـ `docker compose -f deploy/dev/compose.yaml build runner`. تغييرات Go لا تحتاج إلى إعادة البناء.
 
 ### عندما لا يبدأ جهاز التشغيل
 

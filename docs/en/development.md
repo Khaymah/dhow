@@ -89,20 +89,29 @@ The `runner` service is a real runner: it runs each job in rootless Podman, with
    docker compose -f deploy/dev/compose.yaml exec runner dhow-dev-register
    ```
 
-   The token never goes on the command line. To read it from a file instead, run `docker compose -f deploy/dev/compose.yaml exec -T runner dhow-dev-register < token.txt`.
+   Paste the token at the prompt, which does not show it. It never goes on the command line or into a file. If you do save it in a file, pass it with `docker compose -f deploy/dev/compose.yaml exec -T runner dhow-dev-register < token.txt`, then delete the file.
 3. Within a few seconds the runner shows as **online** on the Runners page. Jobs that need no checkout, such as those from `POST /api/v1/organizations/{id}/jobs`, now run on it. Watch them with `docker compose -f deploy/dev/compose.yaml logs -f runner`.
 
 > [!WARNING]
 > The `runner` container is **privileged**, because rootless Podman inside it needs to make user namespaces, mounts and cgroups. That is for development on your own machine only. A production runner never runs this way: it runs under the systemd unit, as [Install a runner](runner/install.md) describes.
+>
+> - **What a job escape reaches.** The container has none of the unit's other hardening: no `ProtectSystem`, `InaccessiblePaths`, `ProtectProc`, `SystemCallFilter` or `RestrictAddressFamilies`, and no Docker seccomp or AppArmor profile. A job that escapes its sandbox to the `dhow-runner` user is one local privilege escalation away from root in a privileged container, which is root on the Docker VM (Docker Desktop) or on your machine (Docker Engine on Linux).
+> - **Untrusted code.** Running a branch of Dhow you do not trust with this stack gives that branch root in a privileged container, because the container builds and runs the runner from your clone.
+> - **When you do not need real jobs**, use the [fake runner](#the-fake-runner) instead: it runs in an ordinary container.
+>
+> The image closes the cheap gaps: only `newuidmap` and `newgidmap` keep their setuid bit (Podman needs them), so `su`, `passwd`, `chsh`, `chfn`, `newgrp` and `gpasswd` give no root, and `mount` and `umount` are for root only, as the unit makes them unreachable.
 
 How it works:
 
 - **The user.** The image adds a `dhow-runner` user with 1,048,576 sub-ids in `/etc/subuid` and `/etc/subgid`, enough for 16 jobs at once. A small script starts as root, prepares the cgroup, then runs the runner as `dhow-runner` with the same capability bounding set as the systemd unit.
+- **Root's files.** The scripts root runs are copied into the image when it is built, and your clone is mounted read-only at `/src`, so nothing inside the container can change them. Root builds the runner from `/src` into `/opt/dhow-dev`, and keeps its own notes in `/var/lib/dhow-dev`, which only root can enter. It never opens a file in a folder `dhow-runner` can write to: it checks for the identity as `dhow-runner`.
 - **The cgroup.** The container has its own cgroup namespace (`cgroup: private`). The script moves its own processes into a leaf cgroup, turns on the `cpu`, `io`, `memory` and `pids` controllers, and gives the runner a cgroup of its own, owned by `dhow-runner`, with swap off. That is what `Delegate=yes` and `MemorySwapMax=0` give the runner under systemd, so the runner's checks pass as they are and it enforces every job limit.
 - **The server address.** `--dev` allows plain `http://` to a loopback address only. Inside the container, a forwarder on `127.0.0.1:8080` passes each connection to `server:8080`, so the runner registers with `--dev --url http://127.0.0.1:8080` and `--dev` stays limited to loopback.
 - **The state.** The identity and the image store live in the `runner-state` volume, so the runner stays registered across `down` and `up`.
 
-**The fake runner.** On a machine that cannot run the Podman runner, start the fake one instead. It is built with the `dhowtest` tag and the fake driver, runs no process (every step prints one line and succeeds), and needs no privileged container:
+#### The fake runner
+
+On a machine that cannot run the Podman runner, or when you do not need real jobs, start the fake one instead. It is built with the `dhowtest` tag and the fake driver, runs no process (every step prints one line and succeeds), and needs no privileged container:
 
 ```sh
 docker compose -f deploy/dev/compose.yaml --profile fake-runner up --scale runner=0
@@ -111,15 +120,17 @@ docker compose -f deploy/dev/compose.yaml exec fake-runner dhow-dev-register
 
 `--scale runner=0` keeps the Podman runner stopped. The two use separate volumes (`runner-state` and `fake-runner-state`), so each is a runner of its own with its own registration, and one never takes over the other's identity.
 
-**Reset the runner.** Remove its container and its volume, then start it again and register it with a new token. Delete the old runner on the Runners page too.
+#### Reset the runner
+
+Remove its container and its volume, then start it again and register it with a new token. Delete the old runner on the Runners page too.
 
 ```sh
 docker compose -f deploy/dev/compose.yaml rm --stop --force runner
-docker volume rm dhow-dev_runner-state
+docker volume rm dhow-dev_runner-state dhow-dev_runner-dev
 docker compose -f deploy/dev/compose.yaml up -d runner
 ```
 
-For the fake runner, use `fake-runner` and `dhow-dev_fake-runner-state`. After a change to `deploy/dev/runner/Dockerfile`, rebuild the image with `docker compose -f deploy/dev/compose.yaml build runner`.
+For the fake runner, use `fake-runner`, `dhow-dev_fake-runner-state` and `dhow-dev_fake-runner-dev`. The image holds the scripts under `deploy/dev/runner`, so after a change there, rebuild it with `docker compose -f deploy/dev/compose.yaml build runner`. Go changes need no rebuild.
 
 ### When the runner does not start
 
