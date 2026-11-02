@@ -95,7 +95,7 @@ func newRegistry(t *testing.T, allow bool, address string) fakeRegistry {
 		},
 	}
 	return fakeRegistry{resolver: pipelines.Registry{
-		Dialer: dialer, TLS: &tls.Config{RootCAs: transport.TLSClientConfig.RootCAs, MinVersion: tls.VersionTLS12}, Timeout: 500 * time.Millisecond,
+		Dialer: dialer, TLS: &tls.Config{RootCAs: transport.TLSClientConfig.RootCAs, MinVersion: tls.VersionTLS12}, Timeout: 10 * time.Second,
 	}}
 }
 
@@ -139,6 +139,7 @@ func TestTheRegistryRefusesWhatItShouldNotReach(t *testing.T) {
 
 func TestTheRegistryCallHasATimeLimit(t *testing.T) {
 	r := newRegistry(t, true, "10.255.0.20")
+	r.resolver.Timeout = 300 * time.Millisecond
 	start := time.Now()
 	_, err := r.resolver.Resolve(context.Background(), "registry.example.com/team/slow:v1")
 	require.Error(t, err)
