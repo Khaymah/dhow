@@ -35,23 +35,50 @@ func (p *process) signal(sig unix.Signal) {
 	_ = unix.Kill(-cmd.Process.Pid, sig)
 }
 
-func (a *Agent) runStep(ctx context.Context, step *agentv1.RunStep) error {
-	secrets, err := writeSecretFiles(a.secretsDir, step.GetSecretFiles())
-	if err != nil {
-		return a.conn.Write(stepExit(step.GetIndex(), 1, 0, agentv1.StepFailure_STEP_FAILURE_SECRET_FILES))
+type job struct {
+	index   int32
+	argv    []string
+	script  string
+	shell   bool
+	env     map[string]string
+	secrets []*agentv1.SecretFile
+}
+
+func stepOf(s *agentv1.RunStep) job {
+	return job{index: s.GetIndex(), argv: []string{Shell, "-e", "-s"}, script: s.GetScript(), shell: true, env: s.GetEnv(), secrets: s.GetSecretFiles()}
+}
+
+func execOf(e *agentv1.RunExec) job {
+	return job{index: e.GetIndex(), argv: e.GetArgv(), env: e.GetEnv(), secrets: e.GetSecretFiles()}
+}
+
+func (a *Agent) runStep(ctx context.Context, step job) error {
+	if len(step.argv) == 0 || step.argv[0] == "" {
+		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_START_FAILED, nil))
 	}
-	code, sig, failure, err := a.runShell(ctx, step)
+	secrets, err := writeSecretFiles(a.secretsDir, step.secrets)
+	if err != nil {
+		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_SECRET_FILES, nil))
+	}
+	clearOutput(a.outputPath)
+	code, sig, failure, err := a.runProcess(ctx, step)
 	wipeSecretFiles(a.secretsDir, secrets)
 	if err != nil {
 		return err
 	}
-	return a.conn.Write(stepExit(step.GetIndex(), code, sig, failure))
+	outputs, ok := readOutput(a.outputPath)
+	if !ok && failure == agentv1.StepFailure_STEP_FAILURE_UNSPECIFIED {
+		failure = agentv1.StepFailure_STEP_FAILURE_OUTPUTS
+	}
+	return a.conn.Write(stepExit(step.index, code, sig, failure, outputs))
 }
 
-func (a *Agent) runShell(ctx context.Context, step *agentv1.RunStep) (int32, int32, agentv1.StepFailure, error) {
-	cmd := exec.CommandContext(ctx, Shell, "-e", "-s")
-	cmd.Env = stepEnv(step.GetEnv())
-	cmd.Stdin = stdinReader(step.GetScript())
+func (a *Agent) runProcess(ctx context.Context, step job) (int32, int32, agentv1.StepFailure, error) {
+	cmd := exec.CommandContext(ctx, step.argv[0], step.argv[1:]...) //nolint:gosec // The runner builds every argv itself: the shell, the checkout or a plugin entrypoint.
+	cmd.Env = stepEnv(step.env)
+	if step.shell {
+		cmd.Stdin = stdinReader(step.script)
+	}
 	cmd.SysProcAttr = &unix.SysProcAttr{Setpgid: true}
 	outR, outW, err := os.Pipe()
 	if err != nil {
@@ -72,8 +99,8 @@ func (a *Agent) runShell(ctx context.Context, step *agentv1.RunStep) (int32, int
 	a.setCurrent(&process{cmd: cmd})
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go a.pump(&wg, step.GetIndex(), agentv1.OutputStream_OUTPUT_STREAM_STDOUT, outR)
-	go a.pump(&wg, step.GetIndex(), agentv1.OutputStream_OUTPUT_STREAM_STDERR, errR)
+	go a.pump(&wg, step.index, agentv1.OutputStream_OUTPUT_STREAM_STDOUT, outR)
+	go a.pump(&wg, step.index, agentv1.OutputStream_OUTPUT_STREAM_STDERR, errR)
 	waitErr := cmd.Wait()
 	a.clearCurrent()
 	sweepErr := a.sweep()
@@ -163,8 +190,8 @@ func exitStatus(err error) (int32, int32) {
 	return 1, 0
 }
 
-func stepExit(index, code, sig int32, failure agentv1.StepFailure) *agentv1.Frame {
+func stepExit(index, code, sig int32, failure agentv1.StepFailure, outputs []byte) *agentv1.Frame {
 	return &agentv1.Frame{Body: &agentv1.Frame_StepExit{StepExit: &agentv1.StepExit{
-		Index: index, ExitCode: code, Signal: sig, Failure: failure,
+		Index: index, ExitCode: code, Signal: sig, Failure: failure, Outputs: outputs,
 	}}}
 }
