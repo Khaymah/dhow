@@ -139,7 +139,7 @@ jobs:
 | `steps[].if` | CEL bool | Evaluated before the job is queued; `false` leaves the step out |
 | `steps[].run` | string | Executed by `/bin/sh -e` **inside the sandbox**; the script is passed on stdin, and the image must provide the shell. At most 64 KiB, and `${{ }}` is refused (§5) |
 | `steps[].uses` | image ref | Plugin; must be pinned by digest (`name@sha256:…`), or the file is refused |
-| `steps[].with` | map | Plugin inputs, only on a `uses:` step: at most 32, names in lowercase `a-z`, `0-9` and `_`, values up to 32 KiB (text or CEL `string`). The plugin manifest declares the types and the runner checks them |
+| `steps[].with` | map | Plugin inputs, only on a `uses:` step: at most 32, names in lowercase `a-z`, `0-9` and `_`, values up to 32 KiB (text or CEL `string`). The plugin manifest declares the inputs, and the runner checks them before the plugin starts ([Plugins](#plugins)) |
 | `steps[].env` | map | Same rules as `jobs.<id>.env`; values may reference `secrets.*` and `vars.*` |
 | `steps[].timeout` | duration | Not longer than the job timeout |
 | `artifacts` | list | At most 16 per job. `name` (letters, digits, `.`, `_`, `-`, up to 64, unique in the pipeline: in a matrix job, join text and `matrix.*` values with `+`, like `${{ "web-" + matrix.os }}`), `paths` (1 to 32, relative to the workspace, without `..`, `~` or a leading `/`) and `retention` (`1d` to `30d`, default 30 days) |
@@ -156,6 +156,38 @@ jobs:
 These functions are available: `hash_files()` (cache key only, evaluated by the runner inside the workspace), `startsWith()`, `endsWith()`, `contains()`, `size()`, and the rest of the CEL standard library, except `matches()` (regular expressions cannot be stopped in the middle) and the time functions (`timestamp()`, `duration()` and the `get…()` functions, which can read time zone files).
 
 The values in the context have limits, and an evaluation with a larger value fails: `git.message` up to 64 KiB, the other `git.*` and `project.*` values up to 1 KiB, `vars.*` and `inputs.*` up to 4 KiB (256 variables), `env.*` up to 32 KiB (100 variables), and each `needs` output up to 1 KiB (64 outputs). An `env` name that holds a secret is never visible in `env.*`.
+
+### The checkout
+
+A job of a pipeline starts with a checkout of the run's commit into `/workspace`. You write nothing for it in `.dhow.yml`.
+
+- **Where it runs:** in a sandbox of its own, from the `dhow-git` image that the runner pins by digest. That sandbox can reach the repository host and nothing else, whatever the job's `network.egress` says.
+- **What it fetches:** the run's ref with `--depth=1`, then exactly the run's commit. If the branch moved on and the commit is no longer in its history, the runner fetches the commit by id, and if that fails too the job fails with `CHECKOUT_REF_MOVED`. Submodules, LFS files, hooks and redirects are off; a step of yours can fetch them with its own egress.
+- **The credential** (a deploy key over SSH, or a short token over HTTPS) is a file in the checkout sandbox only. Your steps and plugins never get it, not in the environment, not in a file and not in `/proc`. Over SSH only the host key an admin confirmed for the repository is accepted, and any other key fails the job with `HOST_KEY_MISMATCH`.
+- **Old runners:** a job with a checkout goes only to a runner that declared the `checkout` feature when it signed in. Until such a runner is online the job waits in the queue.
+
+### Plugins
+
+A `uses:` step runs a container image in a sandbox of its own, on the same `/workspace` and with the job's `network.egress`. It cannot widen the egress. The image needs no shell.
+
+The image declares its inputs, outputs and entrypoint in the label `io.dhow.plugin.manifest`:
+
+```json
+{"Version": 1, "Entrypoint": ["/usr/local/bin/notify", "--quiet"],
+ "Inputs": {"channel": {"Required": true}, "message": {"Default": "done"}}, "Outputs": ["url"]}
+```
+
+- `Entrypoint` starts with an absolute path and runs as is, without a shell (at most 32 arguments).
+- Every `with:` key must be in `Inputs`, and every input marked `Required` must be set or have a `Default`. Otherwise the step fails with `PLUGIN_INPUT_INVALID` before the plugin starts. An image without a valid label fails with `PLUGIN_MANIFEST_INVALID`.
+- Each input reaches the plugin as an environment variable `DHOW_INPUT_<NAME>`, with the name in upper case (`DHOW_INPUT_CHANNEL`). The value is never parsed by a shell.
+
+### Step outputs
+
+Every step, `run:` or `uses:`, gets the variable `DHOW_OUTPUT`, a file where it may write `key=value` lines. Jobs that list this job in `needs` read the values as `needs.<job>.outputs.<key>`.
+
+- Keys are letters, digits and `_` and do not start with a digit; a value is up to 1 KiB on one line. A job keeps at most 64 outputs, and a later step overwrites an earlier key.
+- A plugin may write only the keys in its manifest's `Outputs`.
+- A line that breaks these rules fails the step. Values pass through the masker, so a secret in an output is hidden. Outputs are kept only when the job succeeds.
 
 ## 4. Expressions
 

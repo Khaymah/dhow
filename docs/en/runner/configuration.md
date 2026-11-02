@@ -22,6 +22,7 @@ The runner reads its settings from the environment, usually `/etc/dhow-runner/ru
 | `DHOW_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS` | none | `10.20.0.0/16,fd00::/8` | Private ranges the egress proxy may reach, comma separated, for an internal registry or mirror. A range written here also opens the runner host's own addresses inside it. Cloud metadata and credential addresses stay denied even when a range covers them: AWS (`169.254.169.254`, `169.254.170.2`, `169.254.170.23`, `fd00:ec2::254`, `fd00:ec2::23`), Azure (`168.63.129.16`), Alibaba (`100.100.100.200`), Oracle (`192.0.0.192`, `fd00:c1::a9fe:a9fe`) and Google (`fd20:ce::254`). A range broader than `/8` for IPv4 or `/7` for IPv6 stops the runner. A job still reaches these hosts only by a name in its `network.egress` list, never by IP. The runner treats its interface addresses as its own; a public address that reaches the host through 1:1 NAT is not known to it, so keep services on that address behind your firewall. |
 | `DHOW_RUNNER_ALLOW_UNPINNED_IMAGES` | `false` | `true` | Reserved for the Podman driver (M3.6). Jobs must pin images by digest either way. |
 | `DHOW_RUNNER_RUNSC_PATH` | none | `/usr/local/bin/runsc` | An absolute path to an executable `runsc`. When set with the Podman driver, the runner offers the `gvisor` isolation level (M3.8). |
+| `DHOW_RUNNER_CHECKOUT_IMAGE` | the digest built into the release | `ghcr.io/khaymah/dhow-git@sha256:…` | The image the checkout runs in. Only a full reference pinned by digest is accepted. Leave it unset unless you mirror the signed `dhow-git` image into your own registry; without a value (a build from source) the runner does not offer checkout, and the server never gives it a job with one. |
 | `DHOW_RUNNER_LOG_LEVEL` | `info` | `debug` | `debug`, `info`, `warn` or `error`. |
 
 ## Limits and the machine
@@ -29,6 +30,8 @@ The runner reads its settings from the environment, usually `/etc/dhow-runner/ru
 Every `MAX_*` value is a ceiling for one job, and the runner refuses to start if a ceiling is more than the host has: CPUs from the kernel, processes from `/proc/sys/kernel/pid_max`, memory from `sysinfo`, and free disk under the state directory. With the default `tmpfs` disk mode, memory plus disk counts against memory, because tmpfs pages are charged to the job's memory. The defaults (2 GiB of memory and a 4 GiB tmpfs disk) therefore need a host with at least 6 GiB of memory. On a smaller host, lower `DHOW_RUNNER_MAX_MEMORY` and `DHOW_RUNNER_MAX_DISK`. `dhow-runner install` picks values that fit for you when you set neither ([Memory per job](install.md#memory-per-job)).
 
 The state directory must also have room for one 256 MiB log spill file per job slot (`DHOW_RUNNER_CAPACITY`).
+
+With the Podman driver, every running job takes a range of 65536 user ids from the runner user's `/etc/subuid` and `/etc/subgid`, so they must give at least 65536 × `DHOW_RUNNER_CAPACITY` ids (the 16 × 65536 that `dhow-runner install` sets up covers the largest capacity, 16). A job that finds no free range fails with `SANDBOX_FAILED`.
 
 A job that asks for more than a ceiling fails on this runner with `RESOURCE_REQUEST_EXCEEDS_RUNNER` before it starts, and the server gives it to another runner. The default job request (1 CPU, 2 GiB, 1024 processes, 4 GiB of disk, one hour) fits the default ceilings.
 
