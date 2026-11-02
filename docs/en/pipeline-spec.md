@@ -206,6 +206,7 @@ jobs:
 | YAML nodes | 50,000 |
 | Jobs before the matrix | 64 |
 | Jobs after the matrix | 256 |
+| Name of one matrix job (its values) | 512 characters |
 | Steps per job | 100 |
 | `env` variables per job or step | 100 (32 KiB per value) |
 | `with` inputs per step | 32 (32 KiB per value) |
@@ -260,6 +261,7 @@ A run is one pass of the pipeline over one commit. The server makes it from a tr
 - **`pull_request`:** a webhook from GitHub or GitLab (M4.5 and M4.6). The run uses the head commit, not a merge commit, so the check shows on the commit you pushed.
 - **`manual`:** a person with `run.trigger` on the project, through `POST /organizations/{id}/projects/{projectId}/runs` with `Ref`, an optional `Sha` and `Inputs`.
 - **`api`:** the same request with an API token that has the `run.trigger` scope.
+- **Which commit a hand-started run uses:** only a commit that a webhook already brought for that ref, from the repository itself and not from a fork. A `Sha` that did not come that way is refused (`SHA_NOT_ON_REF`). Without `Sha`, the run uses the latest such commit of the ref, or is refused (`REF_HEAD_UNKNOWN`) until a first push arrives. One person starts at most 60 runs and one project 240 runs in ten minutes.
 - A run goes on only when its trigger is in `on:` and the filters match. Otherwise it ends `skipped` with `TRIGGER_NOT_ENABLED`.
 - A commit without the file gives a `skipped` run with `DEFINITION_NOT_FOUND`, and the provider gets no check.
 - `paths` filters apply once a provider sends the changed files (M4.5 and M4.6). Until then they match every push.
@@ -278,12 +280,13 @@ A run is one pass of the pipeline over one commit. The server makes it from a tr
 - A job starts when every job in its `needs` succeeded or was skipped by its own `if`. When a need fails or is canceled, the jobs after it are `skipped` with `NEEDS_FAILED`.
 - `cancel` cancels the jobs that wait at once, and a running job stops at its runner's next heartbeat.
 - `rerun-failed` runs again the jobs that failed or were canceled, and the jobs skipped because of them, with the same file and the same image digests. The jobs that succeeded keep their result.
+- When the server cannot make the jobs of a run, the run ends `failed` with `RUN_EXPANSION_FAILED`, and the runs of every other project go on.
 - The logs of each job are under `/organizations/{id}/jobs/{jobId}`. A role binding on the project applies there too: a Maintainer lowered to Viewer on a project cannot cancel its jobs from that route.
 
 ### 12.3 Concurrency
 
 - `concurrency.group` names a group inside the project. One run of a group runs at a time, and the newer ones wait as `queued`, in order.
-- With `cancel_in_progress: true`, a new run cancels the older runs of its group instead of waiting for them.
+- With `cancel_in_progress: true`, a new run cancels the older runs of its group **on the same ref** instead of waiting for them. Runs of other refs in the group are never canceled: the new run waits for them as `queued`.
 
 ```yaml
 version: 1
@@ -310,7 +313,8 @@ jobs:
 ### 12.5 Images given by tag
 
 - When a run starts, the server asks the registry for the digest of every `image:` given by tag. Every job and every rerun of the run then pulls `name:tag@sha256:…`, even if the tag moves later. The run lists these pins under `ImagePins`.
-- The server reaches the registry through the same guard as Git: no loopback, link-local, metadata or private address unless `DHOW_GIT_ALLOW_PRIVATE_CIDRS` allows the range. It waits 15 seconds at most, follows no redirect and reads at most 4 MiB.
+- The server reaches the registry through the same guard as Git: no loopback, link-local, metadata or private address unless `DHOW_GIT_ALLOW_PRIVATE_CIDRS` allows the range. It waits 15 seconds at most per image and 30 seconds for the whole run, asks for four images at a time and for each image once, follows no redirect and reads at most 4 MiB.
+- A token address from the registry must be `https` on the registry's own host, or on `auth.docker.io` or `ghcr.io`, on port 443 (or the registry's own port). The private ranges in `DHOW_GIT_ALLOW_PRIVATE_CIDRS` never apply to it.
 - Anonymous pull tokens (like Docker Hub's) work. A registry that needs a password does not work yet (M5), so pin those images by digest in the file.
 - A tag the registry does not know fails the run with `IMAGE_PIN_FAILED` at `jobs.<id>.image`.
 - `dhow lint` still warns about a tag (`IMAGE_NOT_PINNED`), because a digest in the file is still the best way.
