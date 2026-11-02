@@ -64,8 +64,11 @@ type attempt struct {
 	shutdown   <-chan struct{}
 	secrets    map[string][]byte
 
+	outputs map[string]string
+
 	mu        sync.Mutex
 	box       sandbox.Sandbox
+	workspace sandbox.Workspace
 	killedAt  time.Time
 	survivors bool
 }

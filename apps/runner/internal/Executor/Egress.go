@@ -25,8 +25,7 @@ func proxyEnv() map[string]string {
 	return env
 }
 
-func (a *attempt) startEgress(ctx context.Context, box sandbox.Sandbox) error {
-	allow := a.grant.GetSpec().GetNetwork().GetEgress()
+func (a *attempt) startEgress(ctx context.Context, box sandbox.Sandbox, allow []string) error {
 	eb, ok := box.(sandbox.Egress)
 	if len(allow) == 0 || !ok || eb.EgressListener() == nil {
 		return nil

@@ -14,6 +14,7 @@ import (
 	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	"github.com/Khaymah/dhow/internal/jobspec"
+	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
 var ErrInvalidEnqueue = errors.New("invalid job queue request")
@@ -65,6 +66,10 @@ func checkRequest(r jobqueue.Request) (int, []string, error) {
 	return retries, wanted, nil
 }
 
+func userSecrets(spec *runnerv1.JobSpec) []string {
+	return slices.DeleteFunc(jobspec.SecretNames(spec), func(name string) bool { return name == jobspec.CheckoutSecret })
+}
+
 func checkOwnership(ctx context.Context, tx *sqlc.Queries, r jobqueue.Request) error {
 	if r.CreatedByUserID != uuid.Nil {
 		member, err := tx.IsEnabledMemberOf(ctx, sqlc.IsEnabledMemberOfParams{UserID: r.CreatedByUserID, OrganizationID: r.OrganizationID})
@@ -94,7 +99,11 @@ func (qu queue) Enqueue(ctx context.Context, tx *sqlc.Queries, r jobqueue.Reques
 	if err != nil {
 		return jobqueue.Enqueued{}, specViolations(err)
 	}
-	if names := jobspec.SecretNames(spec); len(names) > 0 {
+	wanted, ok := features(append(wanted, jobspec.Features(spec)...))
+	if !ok {
+		return jobqueue.Enqueued{}, apperrors.ValidationFailed(invalid("RequiredFeatures"))
+	}
+	if names := userSecrets(spec); len(names) > 0 {
 		if err := qu.service.secrets.Accepts(ctx, r.OrganizationID, names); err != nil {
 			if errors.Is(err, ErrSecretsUnavailable) {
 				return jobqueue.Enqueued{}, apperrors.SecretsUnavailable()

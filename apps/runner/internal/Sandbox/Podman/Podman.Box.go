@@ -30,6 +30,8 @@ type box struct {
 	owned    []string
 	listener net.Listener
 	egress   net.Listener
+	labels   map[string]string
+	idStart  int64
 
 	mu        sync.Mutex
 	conn      *wire.Conn
@@ -48,7 +50,7 @@ func newBox(ctx context.Context, d *Driver, l layout, spec sandbox.PrepareSpec) 
 		_ = ln.Close()
 		return nil, fmt.Errorf("lock down the control channel: %w", err)
 	}
-	b := &box{d: d, name: l.name, spec: spec, socket: socket, owned: []string{l.controlDir, l.workDir}, listener: ln}
+	b := &box{d: d, name: l.name, spec: spec, socket: socket, owned: []string{l.controlDir}, listener: ln, idStart: l.hostStart}
 	if len(spec.Egress) > 0 {
 		eln, err := listenPrivate(ctx, filepath.Join(l.controlDir, egressSocketName))
 		if err != nil {
@@ -74,6 +76,8 @@ func listenPrivate(ctx context.Context, path string) (net.Listener, error) {
 }
 
 func (b *box) EgressListener() net.Listener { return b.egress }
+
+func (b *box) ImageLabels() map[string]string { return b.labels }
 
 func (b *box) Start(ctx context.Context) error {
 	b.mu.Lock()
@@ -176,10 +180,13 @@ func writeOutput(step sandbox.StepSpec, o *agentv1.Output) {
 }
 
 func (b *box) stepResult(exit *agentv1.StepExit, oomBefore int64) (sandbox.StepResult, error) {
-	if exit.GetFailure() == agentv1.StepFailure_STEP_FAILURE_SHELL_NOT_FOUND {
+	switch exit.GetFailure() {
+	case agentv1.StepFailure_STEP_FAILURE_SHELL_NOT_FOUND:
 		return sandbox.StepResult{}, sandbox.ErrShellMissing
+	case agentv1.StepFailure_STEP_FAILURE_OUTPUTS:
+		return sandbox.StepResult{ExitCode: exit.GetExitCode()}, sandbox.ErrOutputs
 	}
-	res := sandbox.StepResult{ExitCode: exit.GetExitCode(), Signal: syscall.Signal(exit.GetSignal())}
+	res := sandbox.StepResult{ExitCode: exit.GetExitCode(), Signal: syscall.Signal(exit.GetSignal()), Outputs: exit.GetOutputs()}
 	if res.ExitCode != 0 && oomKills(b.cgroupDir()) > oomBefore {
 		res.Reason = runnerv1.FailureReason_FAILURE_REASON_OOM_KILLED
 	}
@@ -196,6 +203,11 @@ func runStepFrame(step sandbox.StepSpec) *agentv1.Frame {
 	files := make([]*agentv1.SecretFile, 0, len(step.Files))
 	for name, data := range step.Files {
 		files = append(files, &agentv1.SecretFile{Name: name, Data: data})
+	}
+	if len(step.Argv) > 0 {
+		return &agentv1.Frame{Body: &agentv1.Frame_RunExec{RunExec: &agentv1.RunExec{
+			Index: step.Index, Argv: step.Argv, Env: step.Env, SecretFiles: files,
+		}}}
 	}
 	return &agentv1.Frame{Body: &agentv1.Frame_RunStep{RunStep: &agentv1.RunStep{
 		Index: step.Index, Script: step.Script, Env: step.Env, SecretFiles: files,
@@ -266,6 +278,9 @@ func (b *box) Destroy(ctx context.Context) error {
 	survivors := killCgroup(ctx, b.cgroupDir(), killDrainWait)
 	if err != nil && !isGone(err) {
 		return errors.Join(err, survivors)
+	}
+	if survivors != nil {
+		return survivors
 	}
 	b.d.untrack(b.name)
 	for _, dir := range b.owned {

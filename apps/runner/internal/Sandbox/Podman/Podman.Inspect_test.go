@@ -23,14 +23,14 @@ func goodInspection(spec sandbox.PrepareSpec, l layout) *inspection {
 	h.PidsLimit = spec.Resources.Pids
 	h.NanoCpus = spec.Resources.CPUMillis * nanosPerMilliCPU
 	h.Tmpfs = map[string]string{
-		workspacePath: "rw,size=1024,mode=0755,nosuid,nodev",
-		tmpPath:       "rw,size=1024,mode=1777,nosuid,nodev",
-		secretsMount:  "rw,size=4194304,mode=0700,noexec,nosuid,nodev",
+		tmpPath:      "rw,size=1024,mode=1777,nosuid,nodev",
+		secretsMount: "rw,size=4194304,mode=0700,noexec,nosuid,nodev",
 	}
 	in.Config.Env = []string{"container=podman", "HOME=/root"}
 	in.Mounts = []mountInfo{
 		{Type: "bind", Source: l.agentPath, Destination: agentMount},
 		{Type: "bind", Source: l.controlDir, Destination: controlMount},
+		{Type: "bind", Source: l.workDir, Destination: workspacePath, RW: true},
 	}
 	return in
 }
@@ -41,7 +41,7 @@ func testSpec() (sandbox.PrepareSpec, layout) {
 	spec.Resources.DiskBytes = 1 << 30
 	spec.Resources.Pids = 512
 	spec.Resources.CPUMillis = 1000
-	return spec, layout{agentPath: "/usr/bin/dhow-runner", controlDir: "/state/attempts/a/control"}
+	return spec, layout{agentPath: "/usr/bin/dhow-runner", controlDir: "/state/attempts/a/control", workDir: "/state/attempts/a/workspace", idStart: 65537, hostStart: 265536}
 }
 
 func TestVerifyRefusesASandboxThatDriftsFromThePolicy(t *testing.T) {
@@ -69,6 +69,12 @@ func TestVerifyRefusesASandboxThatDriftsFromThePolicy(t *testing.T) {
 			in.HostConfig.Tmpfs[secretsMount] = "rw,size=4194304,mode=0700,nosuid,nodev"
 		}, "secrets tmpfs"},
 		{"a /tmp that allows setuid", func(in *inspection) { in.HostConfig.Tmpfs[tmpPath] = "rw,nodev" }, "/tmp tmpfs"},
+		{"a workspace of its own", func(in *inspection) { in.HostConfig.Tmpfs[workspacePath] = "rw,nosuid,nodev" }, "shared workspace"},
+		{"the workspace from elsewhere", func(in *inspection) { in.Mounts[2].Source = "/home" }, "unexpected source"},
+		{"a git helper outside a checkout", func(in *inspection) {
+			in.Mounts = append(in.Mounts, mountInfo{Type: "bind", Source: "/usr/bin/dhow-runner", Destination: gitSSHMount})
+		}, "unexpected mount"},
+		{"a writable agent", func(in *inspection) { in.Mounts[0].RW = true }, "writable"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -121,6 +127,29 @@ func TestTheSandboxIsCreatedFromTheImageIDWithoutImageEnv(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("the image environment must not reach the agent (--unsetenv-all)")
+	}
+}
+
+func TestEverySandboxOfAnAttemptGetsTheSameExplicitIDMapAndWorkspace(t *testing.T) {
+	spec, l := testSpec()
+	args := strings.Join(createArgs(spec, l, "/seccomp.json", strings.Repeat("b", 64)), " ")
+	for _, want := range []string{"--uidmap=0:65537:65536", "--gidmap=0:65537:65536", "type=bind,src=/state/attempts/a/workspace,dst=/workspace,relabel=private"} {
+		if !strings.Contains(args, want) {
+			t.Fatalf("want %q in %s", want, args)
+		}
+	}
+	if strings.Contains(args, "userns=auto") || strings.Contains(args, gitSSHMount) {
+		t.Fatalf("a job sandbox must not use userns=auto or get the git helpers: %s", args)
+	}
+	l.kind = sandbox.KindCheckout
+	args = strings.Join(createArgs(spec, l, "/seccomp.json", strings.Repeat("b", 64)), " ")
+	if !strings.Contains(args, "dst="+gitSSHMount+",ro=true") || !strings.Contains(args, "dst="+askpassMount+",ro=true") {
+		t.Fatalf("the checkout sandbox needs the read-only git helpers: %s", args)
+	}
+	in := goodInspection(spec, l)
+	in.Mounts = append(in.Mounts, mountInfo{Type: "bind", Source: l.agentPath, Destination: gitSSHMount}, mountInfo{Type: "bind", Source: l.agentPath, Destination: askpassMount})
+	if err := verify(in, spec, l); err != nil {
+		t.Fatalf("the checkout sandbox with its helpers must pass: %v", err)
 	}
 }
 

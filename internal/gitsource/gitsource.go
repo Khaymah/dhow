@@ -2,11 +2,10 @@ package gitsource
 
 import (
 	"errors"
-	"net"
 	"strconv"
 	"strings"
 
-	"github.com/Khaymah/dhow/internal/jobspec"
+	"github.com/Khaymah/dhow/internal/hostname"
 )
 
 const (
@@ -171,11 +170,11 @@ func checkHost(host string) (string, error) {
 	if host == "" || strings.HasPrefix(host, "-") || strings.HasPrefix(host, "*") {
 		return "", ErrHost
 	}
-	rule, err := jobspec.ParseEgress(strings.ToLower(host))
-	if err != nil || rule.Wildcard || rule.Port != 0 {
+	h := strings.ToLower(host)
+	if hostname.Check(h) != nil || !strings.Contains(h, ".") {
 		return "", ErrHost
 	}
-	return rule.Host, nil
+	return h, nil
 }
 
 func cleanPath(path string) (string, error) {
@@ -238,7 +237,7 @@ func (u URL) EffectivePort() int {
 }
 
 func (u URL) HostPort() string {
-	return net.JoinHostPort(u.Host, strconv.Itoa(u.EffectivePort()))
+	return u.Host + ":" + strconv.Itoa(u.EffectivePort())
 }
 
 func (u URL) String() string {

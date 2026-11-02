@@ -148,6 +148,7 @@ type SeedRunnerSpec struct {
 	Labels    []string
 	Isolation []string
 	Capacity  int
+	Features  []string
 }
 
 func (e *Env) SeedConnectedRunner(org, creator uuid.UUID, spec SeedRunnerSpec) *TestRunner {
@@ -161,6 +162,9 @@ func (e *Env) SeedConnectedRunner(org, creator uuid.UUID, spec SeedRunnerSpec) *
 	if spec.Labels == nil {
 		spec.Labels = []string{}
 	}
+	if spec.Features == nil {
+		spec.Features = []string{}
+	}
 	capabilities := []string{"dhow.os=linux", "dhow.arch=amd64"}
 	for _, l := range spec.Isolation {
 		capabilities = append(capabilities, "dhow.isolation="+l)
@@ -171,9 +175,9 @@ func (e *Env) SeedConnectedRunner(org, creator uuid.UUID, spec SeedRunnerSpec) *
 	var runnerID uuid.UUID
 	require.NoError(e.T, e.Pool.QueryRow(ctx,
 		`INSERT INTO "Runners" ("OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version",
-		 "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey") VALUES ($1, $2, 'seeded', $3, $4, 'linux', 'amd64', '0.1.0',
-		 $5, $6, $7, $8) RETURNING "Id"`, org, token, spec.Labels, capabilities, spec.Isolation, spec.Capacity,
-		id.SigningPublicKey(), id.EncryptionPublicKey()).Scan(&runnerID))
+		 "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "Features") VALUES ($1, $2, 'seeded', $3, $4, 'linux', 'amd64', '0.1.0',
+		 $5, $6, $7, $8, $9) RETURNING "Id"`, org, token, spec.Labels, capabilities, spec.Isolation, spec.Capacity,
+		id.SigningPublicKey(), id.EncryptionPublicKey(), spec.Features).Scan(&runnerID))
 	access, hash, err := runnerauth.NewAccessToken()
 	require.NoError(e.T, err)
 	nonce := make([]byte, runnersig.NonceSize)

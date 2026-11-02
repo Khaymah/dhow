@@ -77,6 +77,7 @@ const (
 	StepFailure_STEP_FAILURE_SHELL_NOT_FOUND StepFailure = 1
 	StepFailure_STEP_FAILURE_START_FAILED    StepFailure = 2
 	StepFailure_STEP_FAILURE_SECRET_FILES    StepFailure = 3
+	StepFailure_STEP_FAILURE_OUTPUTS         StepFailure = 4
 )
 
 // Enum value maps for StepFailure.
@@ -86,12 +87,14 @@ var (
 		1: "STEP_FAILURE_SHELL_NOT_FOUND",
 		2: "STEP_FAILURE_START_FAILED",
 		3: "STEP_FAILURE_SECRET_FILES",
+		4: "STEP_FAILURE_OUTPUTS",
 	}
 	StepFailure_value = map[string]int32{
 		"STEP_FAILURE_UNSPECIFIED":     0,
 		"STEP_FAILURE_SHELL_NOT_FOUND": 1,
 		"STEP_FAILURE_START_FAILED":    2,
 		"STEP_FAILURE_SECRET_FILES":    3,
+		"STEP_FAILURE_OUTPUTS":         4,
 	}
 )
 
@@ -182,6 +185,7 @@ type Frame struct {
 	//	*Frame_Signal
 	//	*Frame_AddMask
 	//	*Frame_Shutdown
+	//	*Frame_RunExec
 	Body          isFrame_Body `protobuf_oneof:"body"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -287,6 +291,15 @@ func (x *Frame) GetShutdown() *Shutdown {
 	return nil
 }
 
+func (x *Frame) GetRunExec() *RunExec {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_RunExec); ok {
+			return x.RunExec
+		}
+	}
+	return nil
+}
+
 type isFrame_Body interface {
 	isFrame_Body()
 }
@@ -319,6 +332,10 @@ type Frame_Shutdown struct {
 	Shutdown *Shutdown `protobuf:"bytes,7,opt,name=shutdown,proto3,oneof"`
 }
 
+type Frame_RunExec struct {
+	RunExec *RunExec `protobuf:"bytes,8,opt,name=run_exec,json=runExec,proto3,oneof"`
+}
+
 func (*Frame_Hello) isFrame_Body() {}
 
 func (*Frame_RunStep) isFrame_Body() {}
@@ -332,6 +349,8 @@ func (*Frame_Signal) isFrame_Body() {}
 func (*Frame_AddMask) isFrame_Body() {}
 
 func (*Frame_Shutdown) isFrame_Body() {}
+
+func (*Frame_RunExec) isFrame_Body() {}
 
 type Hello struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
@@ -505,6 +524,74 @@ func (x *RunStep) GetSecretFiles() []*SecretFile {
 	return nil
 }
 
+type RunExec struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Index         int32                  `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
+	Argv          []string               `protobuf:"bytes,2,rep,name=argv,proto3" json:"argv,omitempty"`
+	Env           map[string]string      `protobuf:"bytes,3,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	SecretFiles   []*SecretFile          `protobuf:"bytes,4,rep,name=secret_files,json=secretFiles,proto3" json:"secret_files,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunExec) Reset() {
+	*x = RunExec{}
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunExec) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunExec) ProtoMessage() {}
+
+func (x *RunExec) ProtoReflect() protoreflect.Message {
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunExec.ProtoReflect.Descriptor instead.
+func (*RunExec) Descriptor() ([]byte, []int) {
+	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RunExec) GetIndex() int32 {
+	if x != nil {
+		return x.Index
+	}
+	return 0
+}
+
+func (x *RunExec) GetArgv() []string {
+	if x != nil {
+		return x.Argv
+	}
+	return nil
+}
+
+func (x *RunExec) GetEnv() map[string]string {
+	if x != nil {
+		return x.Env
+	}
+	return nil
+}
+
+func (x *RunExec) GetSecretFiles() []*SecretFile {
+	if x != nil {
+		return x.SecretFiles
+	}
+	return nil
+}
+
 type Output struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StepIndex     int32                  `protobuf:"varint,1,opt,name=step_index,json=stepIndex,proto3" json:"step_index,omitempty"`
@@ -516,7 +603,7 @@ type Output struct {
 
 func (x *Output) Reset() {
 	*x = Output{}
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[4]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -528,7 +615,7 @@ func (x *Output) String() string {
 func (*Output) ProtoMessage() {}
 
 func (x *Output) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[4]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -541,7 +628,7 @@ func (x *Output) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Output.ProtoReflect.Descriptor instead.
 func (*Output) Descriptor() ([]byte, []int) {
-	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{4}
+	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Output) GetStepIndex() int32 {
@@ -571,13 +658,14 @@ type StepExit struct {
 	ExitCode      int32                  `protobuf:"varint,2,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
 	Signal        int32                  `protobuf:"varint,3,opt,name=signal,proto3" json:"signal,omitempty"`
 	Failure       StepFailure            `protobuf:"varint,4,opt,name=failure,proto3,enum=dhow.agent.v1.StepFailure" json:"failure,omitempty"`
+	Outputs       []byte                 `protobuf:"bytes,5,opt,name=outputs,proto3" json:"outputs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StepExit) Reset() {
 	*x = StepExit{}
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[5]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -589,7 +677,7 @@ func (x *StepExit) String() string {
 func (*StepExit) ProtoMessage() {}
 
 func (x *StepExit) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[5]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -602,7 +690,7 @@ func (x *StepExit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepExit.ProtoReflect.Descriptor instead.
 func (*StepExit) Descriptor() ([]byte, []int) {
-	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{5}
+	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *StepExit) GetIndex() int32 {
@@ -633,6 +721,13 @@ func (x *StepExit) GetFailure() StepFailure {
 	return StepFailure_STEP_FAILURE_UNSPECIFIED
 }
 
+func (x *StepExit) GetOutputs() []byte {
+	if x != nil {
+		return x.Outputs
+	}
+	return nil
+}
+
 type Signal struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StepIndex     int32                  `protobuf:"varint,1,opt,name=step_index,json=stepIndex,proto3" json:"step_index,omitempty"`
@@ -643,7 +738,7 @@ type Signal struct {
 
 func (x *Signal) Reset() {
 	*x = Signal{}
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[6]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -655,7 +750,7 @@ func (x *Signal) String() string {
 func (*Signal) ProtoMessage() {}
 
 func (x *Signal) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[6]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -668,7 +763,7 @@ func (x *Signal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Signal.ProtoReflect.Descriptor instead.
 func (*Signal) Descriptor() ([]byte, []int) {
-	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{6}
+	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Signal) GetStepIndex() int32 {
@@ -694,7 +789,7 @@ type AddMask struct {
 
 func (x *AddMask) Reset() {
 	*x = AddMask{}
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[7]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -706,7 +801,7 @@ func (x *AddMask) String() string {
 func (*AddMask) ProtoMessage() {}
 
 func (x *AddMask) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[7]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -719,7 +814,7 @@ func (x *AddMask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddMask.ProtoReflect.Descriptor instead.
 func (*AddMask) Descriptor() ([]byte, []int) {
-	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{7}
+	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AddMask) GetValue() []byte {
@@ -737,7 +832,7 @@ type Shutdown struct {
 
 func (x *Shutdown) Reset() {
 	*x = Shutdown{}
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[8]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -749,7 +844,7 @@ func (x *Shutdown) String() string {
 func (*Shutdown) ProtoMessage() {}
 
 func (x *Shutdown) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_agent_v1_agent_proto_msgTypes[8]
+	mi := &file_dhow_agent_v1_agent_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -762,14 +857,14 @@ func (x *Shutdown) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Shutdown.ProtoReflect.Descriptor instead.
 func (*Shutdown) Descriptor() ([]byte, []int) {
-	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{8}
+	return file_dhow_agent_v1_agent_proto_rawDescGZIP(), []int{9}
 }
 
 var File_dhow_agent_v1_agent_proto protoreflect.FileDescriptor
 
 const file_dhow_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x19dhow/agent/v1/agent.proto\x12\rdhow.agent.v1\"\xf8\x02\n" +
+	"\x19dhow/agent/v1/agent.proto\x12\rdhow.agent.v1\"\xad\x03\n" +
 	"\x05Frame\x12,\n" +
 	"\x05hello\x18\x01 \x01(\v2\x14.dhow.agent.v1.HelloH\x00R\x05hello\x123\n" +
 	"\brun_step\x18\x02 \x01(\v2\x16.dhow.agent.v1.RunStepH\x00R\arunStep\x12/\n" +
@@ -777,7 +872,8 @@ const file_dhow_agent_v1_agent_proto_rawDesc = "" +
 	"\tstep_exit\x18\x04 \x01(\v2\x17.dhow.agent.v1.StepExitH\x00R\bstepExit\x12/\n" +
 	"\x06signal\x18\x05 \x01(\v2\x15.dhow.agent.v1.SignalH\x00R\x06signal\x123\n" +
 	"\badd_mask\x18\x06 \x01(\v2\x16.dhow.agent.v1.AddMaskH\x00R\aaddMask\x125\n" +
-	"\bshutdown\x18\a \x01(\v2\x17.dhow.agent.v1.ShutdownH\x00R\bshutdownB\x06\n" +
+	"\bshutdown\x18\a \x01(\v2\x17.dhow.agent.v1.ShutdownH\x00R\bshutdown\x123\n" +
+	"\brun_exec\x18\b \x01(\v2\x16.dhow.agent.v1.RunExecH\x00R\arunExecB\x06\n" +
 	"\x04body\"W\n" +
 	"\x05Hello\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\x05R\x0fprotocolVersion\x12#\n" +
@@ -793,17 +889,26 @@ const file_dhow_agent_v1_agent_proto_rawDesc = "" +
 	"\fsecret_files\x18\x04 \x03(\v2\x19.dhow.agent.v1.SecretFileR\vsecretFiles\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xdc\x01\n" +
+	"\aRunExec\x12\x14\n" +
+	"\x05index\x18\x01 \x01(\x05R\x05index\x12\x12\n" +
+	"\x04argv\x18\x02 \x03(\tR\x04argv\x121\n" +
+	"\x03env\x18\x03 \x03(\v2\x1f.dhow.agent.v1.RunExec.EnvEntryR\x03env\x12<\n" +
+	"\fsecret_files\x18\x04 \x03(\v2\x19.dhow.agent.v1.SecretFileR\vsecretFiles\x1a6\n" +
+	"\bEnvEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"p\n" +
 	"\x06Output\x12\x1d\n" +
 	"\n" +
 	"step_index\x18\x01 \x01(\x05R\tstepIndex\x123\n" +
 	"\x06stream\x18\x02 \x01(\x0e2\x1b.dhow.agent.v1.OutputStreamR\x06stream\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\"\x8b\x01\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\"\xa5\x01\n" +
 	"\bStepExit\x12\x14\n" +
 	"\x05index\x18\x01 \x01(\x05R\x05index\x12\x1b\n" +
 	"\texit_code\x18\x02 \x01(\x05R\bexitCode\x12\x16\n" +
 	"\x06signal\x18\x03 \x01(\x05R\x06signal\x124\n" +
-	"\afailure\x18\x04 \x01(\x0e2\x1a.dhow.agent.v1.StepFailureR\afailure\"]\n" +
+	"\afailure\x18\x04 \x01(\x0e2\x1a.dhow.agent.v1.StepFailureR\afailure\x12\x18\n" +
+	"\aoutputs\x18\x05 \x01(\fR\aoutputs\"]\n" +
 	"\x06Signal\x12\x1d\n" +
 	"\n" +
 	"step_index\x18\x01 \x01(\x05R\tstepIndex\x124\n" +
@@ -815,12 +920,13 @@ const file_dhow_agent_v1_agent_proto_rawDesc = "" +
 	"\fOutputStream\x12\x1d\n" +
 	"\x19OUTPUT_STREAM_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14OUTPUT_STREAM_STDOUT\x10\x01\x12\x18\n" +
-	"\x14OUTPUT_STREAM_STDERR\x10\x02*\x8b\x01\n" +
+	"\x14OUTPUT_STREAM_STDERR\x10\x02*\xa5\x01\n" +
 	"\vStepFailure\x12\x1c\n" +
 	"\x18STEP_FAILURE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cSTEP_FAILURE_SHELL_NOT_FOUND\x10\x01\x12\x1d\n" +
 	"\x19STEP_FAILURE_START_FAILED\x10\x02\x12\x1d\n" +
-	"\x19STEP_FAILURE_SECRET_FILES\x10\x03*a\n" +
+	"\x19STEP_FAILURE_SECRET_FILES\x10\x03\x12\x18\n" +
+	"\x14STEP_FAILURE_OUTPUTS\x10\x04*a\n" +
 	"\rProcessSignal\x12\x1e\n" +
 	"\x1aPROCESS_SIGNAL_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13PROCESS_SIGNAL_TERM\x10\x01\x12\x17\n" +
@@ -841,7 +947,7 @@ func file_dhow_agent_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_dhow_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_dhow_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_dhow_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_dhow_agent_v1_agent_proto_goTypes = []any{
 	(OutputStream)(0),  // 0: dhow.agent.v1.OutputStream
 	(StepFailure)(0),   // 1: dhow.agent.v1.StepFailure
@@ -850,31 +956,36 @@ var file_dhow_agent_v1_agent_proto_goTypes = []any{
 	(*Hello)(nil),      // 4: dhow.agent.v1.Hello
 	(*SecretFile)(nil), // 5: dhow.agent.v1.SecretFile
 	(*RunStep)(nil),    // 6: dhow.agent.v1.RunStep
-	(*Output)(nil),     // 7: dhow.agent.v1.Output
-	(*StepExit)(nil),   // 8: dhow.agent.v1.StepExit
-	(*Signal)(nil),     // 9: dhow.agent.v1.Signal
-	(*AddMask)(nil),    // 10: dhow.agent.v1.AddMask
-	(*Shutdown)(nil),   // 11: dhow.agent.v1.Shutdown
-	nil,                // 12: dhow.agent.v1.RunStep.EnvEntry
+	(*RunExec)(nil),    // 7: dhow.agent.v1.RunExec
+	(*Output)(nil),     // 8: dhow.agent.v1.Output
+	(*StepExit)(nil),   // 9: dhow.agent.v1.StepExit
+	(*Signal)(nil),     // 10: dhow.agent.v1.Signal
+	(*AddMask)(nil),    // 11: dhow.agent.v1.AddMask
+	(*Shutdown)(nil),   // 12: dhow.agent.v1.Shutdown
+	nil,                // 13: dhow.agent.v1.RunStep.EnvEntry
+	nil,                // 14: dhow.agent.v1.RunExec.EnvEntry
 }
 var file_dhow_agent_v1_agent_proto_depIdxs = []int32{
 	4,  // 0: dhow.agent.v1.Frame.hello:type_name -> dhow.agent.v1.Hello
 	6,  // 1: dhow.agent.v1.Frame.run_step:type_name -> dhow.agent.v1.RunStep
-	7,  // 2: dhow.agent.v1.Frame.output:type_name -> dhow.agent.v1.Output
-	8,  // 3: dhow.agent.v1.Frame.step_exit:type_name -> dhow.agent.v1.StepExit
-	9,  // 4: dhow.agent.v1.Frame.signal:type_name -> dhow.agent.v1.Signal
-	10, // 5: dhow.agent.v1.Frame.add_mask:type_name -> dhow.agent.v1.AddMask
-	11, // 6: dhow.agent.v1.Frame.shutdown:type_name -> dhow.agent.v1.Shutdown
-	12, // 7: dhow.agent.v1.RunStep.env:type_name -> dhow.agent.v1.RunStep.EnvEntry
-	5,  // 8: dhow.agent.v1.RunStep.secret_files:type_name -> dhow.agent.v1.SecretFile
-	0,  // 9: dhow.agent.v1.Output.stream:type_name -> dhow.agent.v1.OutputStream
-	1,  // 10: dhow.agent.v1.StepExit.failure:type_name -> dhow.agent.v1.StepFailure
-	2,  // 11: dhow.agent.v1.Signal.signal:type_name -> dhow.agent.v1.ProcessSignal
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	8,  // 2: dhow.agent.v1.Frame.output:type_name -> dhow.agent.v1.Output
+	9,  // 3: dhow.agent.v1.Frame.step_exit:type_name -> dhow.agent.v1.StepExit
+	10, // 4: dhow.agent.v1.Frame.signal:type_name -> dhow.agent.v1.Signal
+	11, // 5: dhow.agent.v1.Frame.add_mask:type_name -> dhow.agent.v1.AddMask
+	12, // 6: dhow.agent.v1.Frame.shutdown:type_name -> dhow.agent.v1.Shutdown
+	7,  // 7: dhow.agent.v1.Frame.run_exec:type_name -> dhow.agent.v1.RunExec
+	13, // 8: dhow.agent.v1.RunStep.env:type_name -> dhow.agent.v1.RunStep.EnvEntry
+	5,  // 9: dhow.agent.v1.RunStep.secret_files:type_name -> dhow.agent.v1.SecretFile
+	14, // 10: dhow.agent.v1.RunExec.env:type_name -> dhow.agent.v1.RunExec.EnvEntry
+	5,  // 11: dhow.agent.v1.RunExec.secret_files:type_name -> dhow.agent.v1.SecretFile
+	0,  // 12: dhow.agent.v1.Output.stream:type_name -> dhow.agent.v1.OutputStream
+	1,  // 13: dhow.agent.v1.StepExit.failure:type_name -> dhow.agent.v1.StepFailure
+	2,  // 14: dhow.agent.v1.Signal.signal:type_name -> dhow.agent.v1.ProcessSignal
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_dhow_agent_v1_agent_proto_init() }
@@ -890,6 +1001,7 @@ func file_dhow_agent_v1_agent_proto_init() {
 		(*Frame_Signal)(nil),
 		(*Frame_AddMask)(nil),
 		(*Frame_Shutdown)(nil),
+		(*Frame_RunExec)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -897,7 +1009,7 @@ func file_dhow_agent_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dhow_agent_v1_agent_proto_rawDesc), len(file_dhow_agent_v1_agent_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

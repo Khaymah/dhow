@@ -15,6 +15,7 @@ message JobSpec {
   Network network = 7;
   Isolation isolation = 8;
   repeated string labels = 9;
+  Checkout checkout = 10;
 }
 
 message Step {
@@ -23,6 +24,29 @@ message Step {
   map<string, string> env = 3;
   bool mutating = 4;
   int32 timeout_seconds = 5;
+  string id = 6;
+  Plugin plugin = 7;
+}
+
+message Plugin {
+  string image = 1;
+  map<string, string> inputs = 2;
+}
+
+enum CheckoutTransport {
+  CHECKOUT_TRANSPORT_UNSPECIFIED = 0;
+  CHECKOUT_TRANSPORT_HTTPS = 1;
+  CHECKOUT_TRANSPORT_SSH = 2;
+}
+
+message Checkout {
+  string repository_url = 1;
+  string ref = 2;
+  string sha = 3;
+  CheckoutTransport transport = 4;
+  string credential_secret = 5;
+  string known_host = 6;
+  int32 depth = 7;
 }
 
 message SecretRef {

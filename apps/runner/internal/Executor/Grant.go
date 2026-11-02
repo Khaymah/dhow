@@ -70,6 +70,9 @@ func preflight(spec *runnerv1.JobSpec, cfg config.Config, levels []runnerv1.Isol
 	if err := jobspec.Validate(spec); err != nil {
 		return runnerv1.FailureReason_FAILURE_REASON_SPEC_REJECTED, err.Error()
 	}
+	if spec.GetCheckout() != nil && cfg.CheckoutImage == "" {
+		return runnerv1.FailureReason_FAILURE_REASON_SPEC_REJECTED, "this runner has no checkout image, so it cannot run a job with a checkout"
+	}
 	r := spec.GetResources()
 	l := cfg.Limits
 	timeout := time.Duration(spec.GetTimeoutSeconds()) * time.Second

@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -11,11 +12,15 @@ import (
 
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
+	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
+	jobsmodels "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs/Models"
+	"github.com/Khaymah/dhow/internal/jobspec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -112,6 +117,75 @@ func TestAJobThatNeedsAFeatureIsNeverLeasedToARunnerWithoutIt(t *testing.T) {
 	var origin uuid.UUID
 	require.NoError(t, w.env.Pool.QueryRow(context.Background(), `SELECT "OriginId" FROM "Jobs" WHERE "Id" = $1`, g.Grant.GetJobId()).Scan(&origin))
 	assert.Equal(t, plain.OriginID, origin)
+}
+
+func checkoutSpec() *runnerv1.JobSpec {
+	return &runnerv1.JobSpec{
+		Image: apptest.TestImage,
+		Checkout: &runnerv1.Checkout{
+			RepositoryUrl: "https://git.example.com/team/app.git", Ref: "refs/heads/main",
+			Sha: "0123456789abcdef0123456789abcdef01234567", Transport: runnerv1.CheckoutTransport_CHECKOUT_TRANSPORT_HTTPS,
+			CredentialSecret: jobspec.CheckoutSecret,
+		},
+		Secrets: []*runnerv1.SecretRef{{Name: jobspec.CheckoutSecret, Target: &runnerv1.SecretRef_AsFile{AsFile: jobspec.CheckoutSecretFile}}},
+		Steps: []*runnerv1.Step{
+			{Name: "build", Run: "make build"},
+			{Name: "notify", Plugin: &runnerv1.Plugin{Image: apptest.TestImage, Inputs: map[string]string{"channel": "ops"}}},
+		},
+	}
+}
+
+func TestEnqueueTakesTheFeaturesFromTheSpecItself(t *testing.T) {
+	w := newWorld(t)
+	r := w.runner(apptest.SeedRunnerSpec{})
+	req := pipelineRequest(w)
+	req.Spec = checkoutSpec()
+	require.NoError(t, dbtx.Run(context.Background(), w.env.Pool, func(q *sqlc.Queries) error {
+		_, err := w.env.Wired.JobQueue.Enqueue(context.Background(), q, req)
+		return err
+	}), "the checkout credential is minted at Start, so it does not need the M5 secret store")
+	var features []string
+	require.NoError(t, w.env.Pool.QueryRow(context.Background(),
+		`SELECT "RequiredFeatures" FROM "Jobs" WHERE "OriginId" = $1`, req.OriginID).Scan(&features))
+	assert.Equal(t, []string{jobqueue.FeatureCheckout, jobqueue.FeaturePlugins}, features)
+	noLease(t, r)
+	partial := w.runner(apptest.SeedRunnerSpec{Features: []string{jobqueue.FeatureCheckout}})
+	noLease(t, partial)
+	full := w.runner(apptest.SeedRunnerSpec{Features: []string{jobqueue.FeatureCheckout, jobqueue.FeaturePlugins}})
+	g := leaseNow(t, full)
+	assert.Equal(t, "https://git.example.com/team/app.git", g.Grant.GetSpec().GetCheckout().GetRepositoryUrl())
+}
+
+func TestEnqueueValidatesTheEvaluatedSpecAgain(t *testing.T) {
+	w := newWorld(t)
+	tests := []struct {
+		name   string
+		mutate func(*runnerv1.JobSpec)
+	}{
+		{"an evaluated env value with NUL", func(s *runnerv1.JobSpec) { s.Env = map[string]string{"BRANCH": "main\x00"} }},
+		{"an evaluated env value that is too long", func(s *runnerv1.JobSpec) {
+			s.Env = map[string]string{"MESSAGE": strings.Repeat("x", jobspec.MaxEnvValueBytes+1)}
+		}},
+		{"an evaluated plugin input with NUL", func(s *runnerv1.JobSpec) { s.Steps[1].Plugin.Inputs["channel"] = "ops\x00" }},
+		{"a plugin that is not pinned", func(s *runnerv1.JobSpec) { s.Steps[1].Plugin.Image = "docker.io/library/alpine:3" }},
+		{"a checkout from file://", func(s *runnerv1.JobSpec) { s.Checkout.RepositoryUrl = "file:///etc" }},
+		{"a checkout ref that is an option", func(s *runnerv1.JobSpec) { s.Checkout.Ref = "--upload-pack=touch" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := pipelineRequest(w)
+			req.Spec = checkoutSpec()
+			tt.mutate(req.Spec)
+			err := dbtx.Run(context.Background(), w.env.Pool, func(q *sqlc.Queries) error {
+				_, err := w.env.Wired.JobQueue.Enqueue(context.Background(), q, req)
+				return err
+			})
+			var ae *apperrors.AppError
+			require.ErrorAs(t, err, &ae)
+			assert.Equal(t, apperrors.CodeValidationFailed, ae.Code)
+			assert.Zero(t, countJobs(t, w, req.OriginID))
+		})
+	}
 }
 
 func TestEnqueueRefusesWhatOnlyTheAPIMayQueue(t *testing.T) {
@@ -229,4 +303,20 @@ func TestJobsThatNeedFeaturesHaveTheirOwnSmallCap(t *testing.T) {
 	assert.Equal(t, apperrors.CodeJobQueueFull, ae.Code)
 	require.NoError(t, enqueue(t, w, pipelineRequest(w)), "jobs a runner can take today are not held back")
 	w.job(t, apptest.SimpleSpec(), nil)
+}
+
+func TestAManualJobAlsoNeedsTheFeaturesOfItsSpec(t *testing.T) {
+	w := newWorld(t)
+	r := w.runner(apptest.SeedRunnerSpec{})
+	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Subject: policy.Subject{UserID: w.ownerID}})
+	spec := &runnerv1.JobSpec{Steps: []*runnerv1.Step{{Name: "notify", Plugin: &runnerv1.Plugin{Image: apptest.TestImage}}}}
+	created, err := w.env.Wired.Jobs.Create(ctx, w.org, jobsmodels.CreateInput{Name: "plugin only", Spec: spec})
+	require.NoError(t, err)
+	var features []string
+	require.NoError(t, w.env.Pool.QueryRow(context.Background(),
+		`SELECT "RequiredFeatures" FROM "Jobs" WHERE "Id" = $1`, created.Job.ID).Scan(&features))
+	assert.Equal(t, []string{jobqueue.FeaturePlugins}, features)
+	noLease(t, r)
+	g := leaseNow(t, w.runner(apptest.SeedRunnerSpec{Features: []string{jobqueue.FeaturePlugins}}))
+	assert.Equal(t, created.Job.ID.String(), g.Grant.GetJobId())
 }

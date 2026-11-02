@@ -532,6 +532,7 @@ type CompleteRequest struct {
 	ExitCode      int32                  `protobuf:"varint,3,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
 	FailureReason FailureReason          `protobuf:"varint,4,opt,name=failure_reason,json=failureReason,proto3,enum=dhow.runner.v1.FailureReason" json:"failure_reason,omitempty"`
 	Digest        []byte                 `protobuf:"bytes,5,opt,name=digest,proto3" json:"digest,omitempty"`
+	Outputs       map[string]string      `protobuf:"bytes,6,rep,name=outputs,proto3" json:"outputs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -597,6 +598,13 @@ func (x *CompleteRequest) GetFailureReason() FailureReason {
 func (x *CompleteRequest) GetDigest() []byte {
 	if x != nil {
 		return x.Digest
+	}
+	return nil
+}
+
+func (x *CompleteRequest) GetOutputs() map[string]string {
+	if x != nil {
+		return x.Outputs
 	}
 	return nil
 }
@@ -670,13 +678,17 @@ const file_dhow_runner_v1_lease_proto_rawDesc = "" +
 	"\texit_code\x18\x03 \x01(\x05R\bexitCode\x12D\n" +
 	"\x0efailure_reason\x18\x04 \x01(\x0e2\x1d.dhow.runner.v1.FailureReasonR\rfailureReason\"I\n" +
 	"\x0fEndStepResponse\x126\n" +
-	"\acontrol\x18\x01 \x01(\v2\x1c.dhow.runner.v1.LeaseControlR\acontrol\"\xf3\x01\n" +
+	"\acontrol\x18\x01 \x01(\v2\x1c.dhow.runner.v1.LeaseControlR\acontrol\"\xf7\x02\n" +
 	"\x0fCompleteRequest\x12.\n" +
 	"\x05lease\x18\x01 \x01(\v2\x18.dhow.runner.v1.LeaseRefR\x05lease\x125\n" +
 	"\x06result\x18\x02 \x01(\x0e2\x1d.dhow.runner.v1.AttemptResultR\x06result\x12\x1b\n" +
 	"\texit_code\x18\x03 \x01(\x05R\bexitCode\x12D\n" +
 	"\x0efailure_reason\x18\x04 \x01(\x0e2\x1d.dhow.runner.v1.FailureReasonR\rfailureReason\x12\x16\n" +
-	"\x06digest\x18\x05 \x01(\fR\x06digest\"\x12\n" +
+	"\x06digest\x18\x05 \x01(\fR\x06digest\x12F\n" +
+	"\aoutputs\x18\x06 \x03(\v2,.dhow.runner.v1.CompleteRequest.OutputsEntryR\aoutputs\x1a:\n" +
+	"\fOutputsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x12\n" +
 	"\x10CompleteResponse2\xd9\x03\n" +
 	"\fLeaseService\x12D\n" +
 	"\x05Lease\x12\x1c.dhow.runner.v1.LeaseRequest\x1a\x1d.dhow.runner.v1.LeaseResponse\x12D\n" +
@@ -700,7 +712,7 @@ func file_dhow_runner_v1_lease_proto_rawDescGZIP() []byte {
 	return file_dhow_runner_v1_lease_proto_rawDescData
 }
 
-var file_dhow_runner_v1_lease_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_dhow_runner_v1_lease_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_dhow_runner_v1_lease_proto_goTypes = []any{
 	(*LeaseRequest)(nil),      // 0: dhow.runner.v1.LeaseRequest
 	(*LeaseResponse)(nil),     // 1: dhow.runner.v1.LeaseResponse
@@ -714,45 +726,47 @@ var file_dhow_runner_v1_lease_proto_goTypes = []any{
 	(*EndStepResponse)(nil),   // 9: dhow.runner.v1.EndStepResponse
 	(*CompleteRequest)(nil),   // 10: dhow.runner.v1.CompleteRequest
 	(*CompleteResponse)(nil),  // 11: dhow.runner.v1.CompleteResponse
-	(*SignedLeaseGrant)(nil),  // 12: dhow.runner.v1.SignedLeaseGrant
-	(*LeaseRef)(nil),          // 13: dhow.runner.v1.LeaseRef
-	(*SealedSecrets)(nil),     // 14: dhow.runner.v1.SealedSecrets
-	(*LeaseControl)(nil),      // 15: dhow.runner.v1.LeaseControl
-	(FailureReason)(0),        // 16: dhow.runner.v1.FailureReason
-	(AttemptResult)(0),        // 17: dhow.runner.v1.AttemptResult
+	nil,                       // 12: dhow.runner.v1.CompleteRequest.OutputsEntry
+	(*SignedLeaseGrant)(nil),  // 13: dhow.runner.v1.SignedLeaseGrant
+	(*LeaseRef)(nil),          // 14: dhow.runner.v1.LeaseRef
+	(*SealedSecrets)(nil),     // 15: dhow.runner.v1.SealedSecrets
+	(*LeaseControl)(nil),      // 16: dhow.runner.v1.LeaseControl
+	(FailureReason)(0),        // 17: dhow.runner.v1.FailureReason
+	(AttemptResult)(0),        // 18: dhow.runner.v1.AttemptResult
 }
 var file_dhow_runner_v1_lease_proto_depIdxs = []int32{
-	12, // 0: dhow.runner.v1.LeaseResponse.grant:type_name -> dhow.runner.v1.SignedLeaseGrant
-	13, // 1: dhow.runner.v1.StartRequest.lease:type_name -> dhow.runner.v1.LeaseRef
-	14, // 2: dhow.runner.v1.StartResponse.secrets:type_name -> dhow.runner.v1.SealedSecrets
-	15, // 3: dhow.runner.v1.StartResponse.control:type_name -> dhow.runner.v1.LeaseControl
-	13, // 4: dhow.runner.v1.HeartbeatRequest.lease:type_name -> dhow.runner.v1.LeaseRef
-	15, // 5: dhow.runner.v1.HeartbeatResponse.control:type_name -> dhow.runner.v1.LeaseControl
-	13, // 6: dhow.runner.v1.BeginStepRequest.lease:type_name -> dhow.runner.v1.LeaseRef
-	15, // 7: dhow.runner.v1.BeginStepResponse.control:type_name -> dhow.runner.v1.LeaseControl
-	13, // 8: dhow.runner.v1.EndStepRequest.lease:type_name -> dhow.runner.v1.LeaseRef
-	16, // 9: dhow.runner.v1.EndStepRequest.failure_reason:type_name -> dhow.runner.v1.FailureReason
-	15, // 10: dhow.runner.v1.EndStepResponse.control:type_name -> dhow.runner.v1.LeaseControl
-	13, // 11: dhow.runner.v1.CompleteRequest.lease:type_name -> dhow.runner.v1.LeaseRef
-	17, // 12: dhow.runner.v1.CompleteRequest.result:type_name -> dhow.runner.v1.AttemptResult
-	16, // 13: dhow.runner.v1.CompleteRequest.failure_reason:type_name -> dhow.runner.v1.FailureReason
-	0,  // 14: dhow.runner.v1.LeaseService.Lease:input_type -> dhow.runner.v1.LeaseRequest
-	2,  // 15: dhow.runner.v1.LeaseService.Start:input_type -> dhow.runner.v1.StartRequest
-	4,  // 16: dhow.runner.v1.LeaseService.Heartbeat:input_type -> dhow.runner.v1.HeartbeatRequest
-	6,  // 17: dhow.runner.v1.LeaseService.BeginStep:input_type -> dhow.runner.v1.BeginStepRequest
-	8,  // 18: dhow.runner.v1.LeaseService.EndStep:input_type -> dhow.runner.v1.EndStepRequest
-	10, // 19: dhow.runner.v1.LeaseService.Complete:input_type -> dhow.runner.v1.CompleteRequest
-	1,  // 20: dhow.runner.v1.LeaseService.Lease:output_type -> dhow.runner.v1.LeaseResponse
-	3,  // 21: dhow.runner.v1.LeaseService.Start:output_type -> dhow.runner.v1.StartResponse
-	5,  // 22: dhow.runner.v1.LeaseService.Heartbeat:output_type -> dhow.runner.v1.HeartbeatResponse
-	7,  // 23: dhow.runner.v1.LeaseService.BeginStep:output_type -> dhow.runner.v1.BeginStepResponse
-	9,  // 24: dhow.runner.v1.LeaseService.EndStep:output_type -> dhow.runner.v1.EndStepResponse
-	11, // 25: dhow.runner.v1.LeaseService.Complete:output_type -> dhow.runner.v1.CompleteResponse
-	20, // [20:26] is the sub-list for method output_type
-	14, // [14:20] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	13, // 0: dhow.runner.v1.LeaseResponse.grant:type_name -> dhow.runner.v1.SignedLeaseGrant
+	14, // 1: dhow.runner.v1.StartRequest.lease:type_name -> dhow.runner.v1.LeaseRef
+	15, // 2: dhow.runner.v1.StartResponse.secrets:type_name -> dhow.runner.v1.SealedSecrets
+	16, // 3: dhow.runner.v1.StartResponse.control:type_name -> dhow.runner.v1.LeaseControl
+	14, // 4: dhow.runner.v1.HeartbeatRequest.lease:type_name -> dhow.runner.v1.LeaseRef
+	16, // 5: dhow.runner.v1.HeartbeatResponse.control:type_name -> dhow.runner.v1.LeaseControl
+	14, // 6: dhow.runner.v1.BeginStepRequest.lease:type_name -> dhow.runner.v1.LeaseRef
+	16, // 7: dhow.runner.v1.BeginStepResponse.control:type_name -> dhow.runner.v1.LeaseControl
+	14, // 8: dhow.runner.v1.EndStepRequest.lease:type_name -> dhow.runner.v1.LeaseRef
+	17, // 9: dhow.runner.v1.EndStepRequest.failure_reason:type_name -> dhow.runner.v1.FailureReason
+	16, // 10: dhow.runner.v1.EndStepResponse.control:type_name -> dhow.runner.v1.LeaseControl
+	14, // 11: dhow.runner.v1.CompleteRequest.lease:type_name -> dhow.runner.v1.LeaseRef
+	18, // 12: dhow.runner.v1.CompleteRequest.result:type_name -> dhow.runner.v1.AttemptResult
+	17, // 13: dhow.runner.v1.CompleteRequest.failure_reason:type_name -> dhow.runner.v1.FailureReason
+	12, // 14: dhow.runner.v1.CompleteRequest.outputs:type_name -> dhow.runner.v1.CompleteRequest.OutputsEntry
+	0,  // 15: dhow.runner.v1.LeaseService.Lease:input_type -> dhow.runner.v1.LeaseRequest
+	2,  // 16: dhow.runner.v1.LeaseService.Start:input_type -> dhow.runner.v1.StartRequest
+	4,  // 17: dhow.runner.v1.LeaseService.Heartbeat:input_type -> dhow.runner.v1.HeartbeatRequest
+	6,  // 18: dhow.runner.v1.LeaseService.BeginStep:input_type -> dhow.runner.v1.BeginStepRequest
+	8,  // 19: dhow.runner.v1.LeaseService.EndStep:input_type -> dhow.runner.v1.EndStepRequest
+	10, // 20: dhow.runner.v1.LeaseService.Complete:input_type -> dhow.runner.v1.CompleteRequest
+	1,  // 21: dhow.runner.v1.LeaseService.Lease:output_type -> dhow.runner.v1.LeaseResponse
+	3,  // 22: dhow.runner.v1.LeaseService.Start:output_type -> dhow.runner.v1.StartResponse
+	5,  // 23: dhow.runner.v1.LeaseService.Heartbeat:output_type -> dhow.runner.v1.HeartbeatResponse
+	7,  // 24: dhow.runner.v1.LeaseService.BeginStep:output_type -> dhow.runner.v1.BeginStepResponse
+	9,  // 25: dhow.runner.v1.LeaseService.EndStep:output_type -> dhow.runner.v1.EndStepResponse
+	11, // 26: dhow.runner.v1.LeaseService.Complete:output_type -> dhow.runner.v1.CompleteResponse
+	21, // [21:27] is the sub-list for method output_type
+	15, // [15:21] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_dhow_runner_v1_lease_proto_init() }
@@ -768,7 +782,7 @@ func file_dhow_runner_v1_lease_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dhow_runner_v1_lease_proto_rawDesc), len(file_dhow_runner_v1_lease_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -9,9 +9,11 @@ import (
 )
 
 const (
-	agentMount    = "/run/dhow/agent"
+	agentMount    = sandbox.AgentPath
 	controlMount  = "/run/dhow/control"
 	connectMount  = "/run/dhow/bin/connect"
+	gitSSHMount   = "/run/dhow/bin/git-ssh"
+	askpassMount  = "/run/dhow/bin/git-askpass" //nolint:gosec // A helper path, not a credential.
 	secretsMount  = "/run/dhow/secrets"
 	workspacePath = "/workspace"
 	tmpPath       = "/tmp"
@@ -23,27 +25,39 @@ const (
 
 type layout struct {
 	name       string
+	kind       sandbox.Kind
 	agentPath  string
 	controlDir string
 	workDir    string
+	idStart    int64
+	hostStart  int64
+}
+
+func helperMounts(l layout) []string {
+	if l.kind != sandbox.KindCheckout {
+		return nil
+	}
+	return []string{
+		"--mount", fmt.Sprintf("type=bind,src=%s,dst=%s,ro=true", l.agentPath, gitSSHMount),
+		"--mount", fmt.Sprintf("type=bind,src=%s,dst=%s,ro=true", l.agentPath, askpassMount),
+	}
 }
 
 func createArgs(spec sandbox.PrepareSpec, l layout, seccompFile, imageID string) []string {
 	r := spec.Resources
 	mem := r.MemoryBytes
-	diskMount := tmpfsMount(workspacePath, r.DiskBytes, "tmpfs-mode=0755,nosuid,nodev,U")
 	if spec.DiskMode == config.DiskModeTmpfs {
 		mem += r.DiskBytes
-	} else {
-		diskMount = fmt.Sprintf("type=bind,src=%s,dst=%s,relabel=private,U=true", l.workDir, workspacePath)
 	}
+	idmap := fmt.Sprintf("0:%d:%d", l.idStart, userNSSize)
 	args := []string{
 		"create",
 		"--name", l.name,
 		"--label", sandbox.LabelRunner + "=" + spec.RunnerID,
 		"--label", sandbox.LabelAttempt + "=" + spec.AttemptID,
 		"--pull=never",
-		"--userns=auto:size=65536",
+		"--uidmap=" + idmap,
+		"--gidmap=" + idmap,
 		"--cap-drop=ALL",
 		"--security-opt=no-new-privileges",
 		"--security-opt=seccomp=" + seccompFile,
@@ -70,14 +84,12 @@ func createArgs(spec sandbox.PrepareSpec, l layout, seccompFile, imageID string)
 		"--mount", fmt.Sprintf("type=bind,src=%s,dst=%s,ro=true", l.agentPath, agentMount),
 		"--mount", fmt.Sprintf("type=bind,src=%s,dst=%s,ro=true", l.agentPath, connectMount),
 		"--mount", fmt.Sprintf("type=bind,src=%s,dst=%s,ro=true,relabel=private,U=true", l.controlDir, controlMount),
-		"--mount", diskMount,
+		"--mount", fmt.Sprintf("type=bind,src=%s,dst=%s,relabel=private", l.workDir, workspacePath),
 		"--mount", tmpfsMount(tmpPath, r.DiskBytes, "tmpfs-mode=1777,nosuid,nodev"),
 		"--mount", tmpfsMount(secretsMount, secretsTmpfs, "tmpfs-mode=0700,noexec,nosuid,nodev,U"),
-		"--workdir=" + workspacePath,
-		"--entrypoint=" + entrypoint,
-		"--", imageID,
 	}
-	return args
+	args = append(args, helperMounts(l)...)
+	return append(args, "--workdir="+workspacePath, "--entrypoint="+entrypoint, "--", imageID)
 }
 
 func tmpfsMount(dst string, size int64, opts string) string {

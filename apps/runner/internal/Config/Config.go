@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Khaymah/dhow/internal/buildinfo"
 	"github.com/Khaymah/dhow/internal/jobspec"
 )
 
@@ -31,6 +32,7 @@ const (
 	EnvEgressAllowPrivate = "DHOW_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS"
 	EnvAllowUnpinned      = "DHOW_RUNNER_ALLOW_UNPINNED_IMAGES"
 	EnvRunscPath          = "DHOW_RUNNER_RUNSC_PATH"
+	EnvCheckoutImage      = "DHOW_RUNNER_CHECKOUT_IMAGE"
 	EnvLogLevel           = "DHOW_RUNNER_LOG_LEVEL"
 	EnvCredentialsDir     = "CREDENTIALS_DIRECTORY"
 	EnvInvocationID       = "INVOCATION_ID"
@@ -57,6 +59,7 @@ type Config struct {
 	EgressAllowPrivate  []netip.Prefix
 	AllowUnpinnedImages bool
 	RunscPath           string
+	CheckoutImage       string
 	LogLevel            slog.Level
 	Dev                 bool
 	FakeRecording       string
@@ -82,6 +85,7 @@ var (
 	ErrOutOfRange     = errors.New("is out of range")
 	ErrCAFileNoCerts  = errors.New("has no PEM certificate")
 	ErrRunscNotBinary = errors.New("must point to an executable file")
+	ErrCheckoutImage  = errors.New("must be a full image reference pinned by digest (registry/name@sha256:...)")
 )
 
 func FromEnv() func(string) string { return os.Getenv }
@@ -90,7 +94,7 @@ func SettableEnv() []string {
 	return append([]string{
 		EnvURL, EnvCAFile, EnvStateDir, EnvServerOrigin, EnvDriver, EnvCapacity, EnvMaxCPU, EnvMaxMemory, EnvMaxPids,
 		EnvMaxDisk, EnvMaxTimeout, EnvDiskMode, EnvCancelGrace, EnvEgressAllowPrivate, EnvAllowUnpinned, EnvRunscPath,
-		EnvLogLevel,
+		EnvLogLevel, EnvCheckoutImage,
 	}, buildEnv()...)
 }
 
@@ -139,6 +143,8 @@ func Load(getenv func(string) string, o Options) (Config, error) {
 	add(EnvRunscPath, err)
 	cfg.LogLevel, err = parseLevel(getenv(EnvLogLevel))
 	add(EnvLogLevel, err)
+	cfg.CheckoutImage, err = loadCheckoutImage(getenv(EnvCheckoutImage), buildinfo.CheckoutImage())
+	add(EnvCheckoutImage, err)
 	cfg.FakeRecording, err = loadFake(getenv, cfg.Driver)
 	add(EnvDriver, err)
 	cfg.CredentialsDir, err = loadCredentialsDir(getenv(EnvCredentialsDir), getenv(EnvInvocationID))
@@ -175,6 +181,19 @@ func (c Config) LockPath() string { return filepath.Join(c.StateDir, LockFileNam
 func (c Config) JournalPath() string { return filepath.Join(c.StateDir, JournalFileName) }
 
 func (c Config) AttemptsDir() string { return filepath.Join(c.StateDir, AttemptsDirName) }
+
+func loadCheckoutImage(v, baked string) (string, error) {
+	if v == "" {
+		v = baked
+	}
+	if v == "" {
+		return "", nil
+	}
+	if jobspec.ImageReason(v) != "" || jobspec.QualifyImage(v) != v {
+		return "", ErrCheckoutImage
+	}
+	return v, nil
+}
 
 func loadStateDir(v string) (string, error) {
 	if v == "" {

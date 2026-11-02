@@ -24,6 +24,7 @@ func CompleteRequest(attemptID string, ref *runnerv1.LeaseRef, res runnerv1.Atte
 
 func (a *attempt) finish(ctx context.Context, r result) Outcome {
 	a.destroy(ctx)
+	a.closeWorkspace(ctx)
 	a.mu.Lock()
 	survivors := a.survivors
 	a.mu.Unlock()
@@ -86,6 +87,10 @@ func (a *attempt) complete(ctx context.Context, r result) bool {
 		a.log.Error("could not record the result in the journal", "error", a.masked(err))
 	}
 	req := CompleteRequest(a.grant.GetAttemptId(), a.ref, r.state, r.exitCode, r.reason)
+	if r.state == runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED && len(a.outputs) > 0 {
+		req.Outputs = maskOutputs(a.masker, a.outputs)
+	}
+	clear(a.outputs)
 	acked, definitive := sendComplete(cctx, a.e.o.API, a.e.o.Backoff, req, a.log, 0)
 	if definitive {
 		a.forget()

@@ -51,7 +51,10 @@ func resultRules() map[runnerv1.AttemptResult]resultRule {
 			runnerv1.FailureReason_FAILURE_REASON_PIDS_LIMIT_REACHED, runnerv1.FailureReason_FAILURE_REASON_IMAGE_PULL_FAILED,
 			runnerv1.FailureReason_FAILURE_REASON_SHELL_NOT_FOUND, runnerv1.FailureReason_FAILURE_REASON_SPEC_REJECTED,
 			runnerv1.FailureReason_FAILURE_REASON_RESOURCE_REQUEST_EXCEEDS_RUNNER, runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED,
-			runnerv1.FailureReason_FAILURE_REASON_RUNNER_DISK_FULL,
+			runnerv1.FailureReason_FAILURE_REASON_RUNNER_DISK_FULL, runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_FAILED,
+			runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_REF_MOVED, runnerv1.FailureReason_FAILURE_REASON_HOST_KEY_MISMATCH,
+			runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_DISK_FULL, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_INPUT_INVALID,
+			runnerv1.FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID,
 		}},
 		runnerv1.AttemptResult_ATTEMPT_RESULT_CANCELED: {
 			models.AttemptCanceled, runnerv1.FailureReason_FAILURE_REASON_CANCELED,
@@ -72,7 +75,9 @@ func stepReasons() []runnerv1.FailureReason {
 		runnerv1.FailureReason_FAILURE_REASON_UNSPECIFIED, runnerv1.FailureReason_FAILURE_REASON_STEP_FAILED,
 		runnerv1.FailureReason_FAILURE_REASON_OOM_KILLED, runnerv1.FailureReason_FAILURE_REASON_PIDS_LIMIT_REACHED,
 		runnerv1.FailureReason_FAILURE_REASON_TIMED_OUT, runnerv1.FailureReason_FAILURE_REASON_CANCELED,
-		runnerv1.FailureReason_FAILURE_REASON_SHELL_NOT_FOUND,
+		runnerv1.FailureReason_FAILURE_REASON_SHELL_NOT_FOUND, runnerv1.FailureReason_FAILURE_REASON_IMAGE_PULL_FAILED,
+		runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_INPUT_INVALID,
+		runnerv1.FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID,
 	}
 }
 

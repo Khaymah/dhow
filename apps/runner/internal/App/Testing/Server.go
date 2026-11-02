@@ -79,6 +79,8 @@ type runnerRecord struct {
 	encryption []byte
 	keyVersion int32
 	revoked    bool
+	features   []string
+	registered []string
 }
 
 type Server struct {
@@ -196,6 +198,15 @@ func (s *Server) RunnerKey() (ed25519.PublicKey, []byte, int32) {
 		return nil, nil, 0
 	}
 	return s.runner.signing, s.runner.encryption, s.runner.keyVersion
+}
+
+func (s *Server) RunnerFeatures() ([]string, []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.runner == nil {
+		return nil, nil
+	}
+	return append([]string(nil), s.runner.registered...), append([]string(nil), s.runner.features...)
 }
 
 func (s *Server) Revoked() bool {

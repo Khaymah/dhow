@@ -27,6 +27,7 @@ type Principal struct {
 	EncryptionPublicKey []byte
 	KeyVersion          int32
 	Disabled            bool
+	Features            []string
 }
 
 type Verifier interface {

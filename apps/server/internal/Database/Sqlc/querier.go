@@ -313,6 +313,7 @@ type Querier interface {
 	SetRunDefinition(ctx context.Context, arg SetRunDefinitionParams) error
 	SetRunIssues(ctx context.Context, arg SetRunIssuesParams) error
 	SetRunSource(ctx context.Context, arg SetRunSourceParams) error
+	SetRunnerFeatures(ctx context.Context, arg SetRunnerFeaturesParams) error
 	SetTeamBindingRole(ctx context.Context, arg SetTeamBindingRoleParams) (int64, error)
 	SetUserLocale(ctx context.Context, arg SetUserLocaleParams) error
 	SetUserPassword(ctx context.Context, arg SetUserPasswordParams) error

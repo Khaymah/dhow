@@ -145,6 +145,12 @@ const (
 	FailureReason_FAILURE_REASON_RUNNER_DISK_FULL                FailureReason = 11
 	FailureReason_FAILURE_REASON_RUNNER_RESTARTED                FailureReason = 12
 	FailureReason_FAILURE_REASON_LEASE_LOST                      FailureReason = 13
+	FailureReason_FAILURE_REASON_CHECKOUT_FAILED                 FailureReason = 14
+	FailureReason_FAILURE_REASON_CHECKOUT_REF_MOVED              FailureReason = 15
+	FailureReason_FAILURE_REASON_HOST_KEY_MISMATCH               FailureReason = 16
+	FailureReason_FAILURE_REASON_CHECKOUT_DISK_FULL              FailureReason = 17
+	FailureReason_FAILURE_REASON_PLUGIN_INPUT_INVALID            FailureReason = 18
+	FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID         FailureReason = 19
 )
 
 // Enum value maps for FailureReason.
@@ -164,6 +170,12 @@ var (
 		11: "FAILURE_REASON_RUNNER_DISK_FULL",
 		12: "FAILURE_REASON_RUNNER_RESTARTED",
 		13: "FAILURE_REASON_LEASE_LOST",
+		14: "FAILURE_REASON_CHECKOUT_FAILED",
+		15: "FAILURE_REASON_CHECKOUT_REF_MOVED",
+		16: "FAILURE_REASON_HOST_KEY_MISMATCH",
+		17: "FAILURE_REASON_CHECKOUT_DISK_FULL",
+		18: "FAILURE_REASON_PLUGIN_INPUT_INVALID",
+		19: "FAILURE_REASON_PLUGIN_MANIFEST_INVALID",
 	}
 	FailureReason_value = map[string]int32{
 		"FAILURE_REASON_UNSPECIFIED":                     0,
@@ -180,6 +192,12 @@ var (
 		"FAILURE_REASON_RUNNER_DISK_FULL":                11,
 		"FAILURE_REASON_RUNNER_RESTARTED":                12,
 		"FAILURE_REASON_LEASE_LOST":                      13,
+		"FAILURE_REASON_CHECKOUT_FAILED":                 14,
+		"FAILURE_REASON_CHECKOUT_REF_MOVED":              15,
+		"FAILURE_REASON_HOST_KEY_MISMATCH":               16,
+		"FAILURE_REASON_CHECKOUT_DISK_FULL":              17,
+		"FAILURE_REASON_PLUGIN_INPUT_INVALID":            18,
+		"FAILURE_REASON_PLUGIN_MANIFEST_INVALID":         19,
 	}
 )
 
@@ -208,6 +226,61 @@ func (x FailureReason) Number() protoreflect.EnumNumber {
 // Deprecated: Use FailureReason.Descriptor instead.
 func (FailureReason) EnumDescriptor() ([]byte, []int) {
 	return file_dhow_runner_v1_common_proto_rawDescGZIP(), []int{2}
+}
+
+type RunnerFeature int32
+
+const (
+	RunnerFeature_RUNNER_FEATURE_UNSPECIFIED RunnerFeature = 0
+	RunnerFeature_RUNNER_FEATURE_CHECKOUT    RunnerFeature = 1
+	RunnerFeature_RUNNER_FEATURE_PLUGINS     RunnerFeature = 2
+	RunnerFeature_RUNNER_FEATURE_ARTIFACTS   RunnerFeature = 3
+	RunnerFeature_RUNNER_FEATURE_CACHE       RunnerFeature = 4
+)
+
+// Enum value maps for RunnerFeature.
+var (
+	RunnerFeature_name = map[int32]string{
+		0: "RUNNER_FEATURE_UNSPECIFIED",
+		1: "RUNNER_FEATURE_CHECKOUT",
+		2: "RUNNER_FEATURE_PLUGINS",
+		3: "RUNNER_FEATURE_ARTIFACTS",
+		4: "RUNNER_FEATURE_CACHE",
+	}
+	RunnerFeature_value = map[string]int32{
+		"RUNNER_FEATURE_UNSPECIFIED": 0,
+		"RUNNER_FEATURE_CHECKOUT":    1,
+		"RUNNER_FEATURE_PLUGINS":     2,
+		"RUNNER_FEATURE_ARTIFACTS":   3,
+		"RUNNER_FEATURE_CACHE":       4,
+	}
+)
+
+func (x RunnerFeature) Enum() *RunnerFeature {
+	p := new(RunnerFeature)
+	*p = x
+	return p
+}
+
+func (x RunnerFeature) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RunnerFeature) Descriptor() protoreflect.EnumDescriptor {
+	return file_dhow_runner_v1_common_proto_enumTypes[3].Descriptor()
+}
+
+func (RunnerFeature) Type() protoreflect.EnumType {
+	return &file_dhow_runner_v1_common_proto_enumTypes[3]
+}
+
+func (x RunnerFeature) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RunnerFeature.Descriptor instead.
+func (RunnerFeature) EnumDescriptor() ([]byte, []int) {
+	return file_dhow_runner_v1_common_proto_rawDescGZIP(), []int{3}
 }
 
 type RunnerRef struct {
@@ -381,7 +454,7 @@ const file_dhow_runner_v1_common_proto_rawDesc = "" +
 	"\x15ATTEMPT_RESULT_FAILED\x10\x02\x12\x1b\n" +
 	"\x17ATTEMPT_RESULT_CANCELED\x10\x03\x12\x1c\n" +
 	"\x18ATTEMPT_RESULT_TIMED_OUT\x10\x04\x12\x17\n" +
-	"\x13ATTEMPT_RESULT_LOST\x10\x05*\xfc\x03\n" +
+	"\x13ATTEMPT_RESULT_LOST\x10\x05*\xe9\x05\n" +
 	"\rFailureReason\x12\x1e\n" +
 	"\x1aFAILURE_REASON_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFAILURE_REASON_STEP_FAILED\x10\x01\x12\x1d\n" +
@@ -397,7 +470,19 @@ const file_dhow_runner_v1_common_proto_rawDesc = "" +
 	"\x12#\n" +
 	"\x1fFAILURE_REASON_RUNNER_DISK_FULL\x10\v\x12#\n" +
 	"\x1fFAILURE_REASON_RUNNER_RESTARTED\x10\f\x12\x1d\n" +
-	"\x19FAILURE_REASON_LEASE_LOST\x10\rB\xc2\x01\n" +
+	"\x19FAILURE_REASON_LEASE_LOST\x10\r\x12\"\n" +
+	"\x1eFAILURE_REASON_CHECKOUT_FAILED\x10\x0e\x12%\n" +
+	"!FAILURE_REASON_CHECKOUT_REF_MOVED\x10\x0f\x12$\n" +
+	" FAILURE_REASON_HOST_KEY_MISMATCH\x10\x10\x12%\n" +
+	"!FAILURE_REASON_CHECKOUT_DISK_FULL\x10\x11\x12'\n" +
+	"#FAILURE_REASON_PLUGIN_INPUT_INVALID\x10\x12\x12*\n" +
+	"&FAILURE_REASON_PLUGIN_MANIFEST_INVALID\x10\x13*\xa0\x01\n" +
+	"\rRunnerFeature\x12\x1e\n" +
+	"\x1aRUNNER_FEATURE_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17RUNNER_FEATURE_CHECKOUT\x10\x01\x12\x1a\n" +
+	"\x16RUNNER_FEATURE_PLUGINS\x10\x02\x12\x1c\n" +
+	"\x18RUNNER_FEATURE_ARTIFACTS\x10\x03\x12\x18\n" +
+	"\x14RUNNER_FEATURE_CACHE\x10\x04B\xc2\x01\n" +
 	"\x12com.dhow.runner.v1B\vCommonProtoP\x01ZEgithub.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1;runnerv1\xa2\x02\x03DRX\xaa\x02\x0eDhow.Runner.V1\xca\x02\x0eDhow\\Runner\\V1\xe2\x02\x1aDhow\\Runner\\V1\\GPBMetadata\xea\x02\x10Dhow::Runner::V1b\x06proto3"
 
 var (
@@ -412,15 +497,16 @@ func file_dhow_runner_v1_common_proto_rawDescGZIP() []byte {
 	return file_dhow_runner_v1_common_proto_rawDescData
 }
 
-var file_dhow_runner_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_dhow_runner_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
 var file_dhow_runner_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_dhow_runner_v1_common_proto_goTypes = []any{
 	(Isolation)(0),       // 0: dhow.runner.v1.Isolation
 	(AttemptResult)(0),   // 1: dhow.runner.v1.AttemptResult
 	(FailureReason)(0),   // 2: dhow.runner.v1.FailureReason
-	(*RunnerRef)(nil),    // 3: dhow.runner.v1.RunnerRef
-	(*LeaseRef)(nil),     // 4: dhow.runner.v1.LeaseRef
-	(*LeaseControl)(nil), // 5: dhow.runner.v1.LeaseControl
+	(RunnerFeature)(0),   // 3: dhow.runner.v1.RunnerFeature
+	(*RunnerRef)(nil),    // 4: dhow.runner.v1.RunnerRef
+	(*LeaseRef)(nil),     // 5: dhow.runner.v1.LeaseRef
+	(*LeaseControl)(nil), // 6: dhow.runner.v1.LeaseControl
 }
 var file_dhow_runner_v1_common_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -440,7 +526,7 @@ func file_dhow_runner_v1_common_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dhow_runner_v1_common_proto_rawDesc), len(file_dhow_runner_v1_common_proto_rawDesc)),
-			NumEnums:      3,
+			NumEnums:      4,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,

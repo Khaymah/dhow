@@ -2,7 +2,6 @@ package gitsource
 
 import (
 	"errors"
-	"strconv"
 	"strings"
 
 	"github.com/Khaymah/dhow/internal/gitref"
@@ -20,35 +19,6 @@ var (
 	ErrObjectID   = errors.New("an object id is 40 or 64 lowercase hexadecimal characters")
 	ErrNotFetched = errors.New("only https and ssh repositories are fetched")
 )
-
-func SafeConfig() []string {
-	return []string{
-		"-c", "protocol.allow=never",
-		"-c", "protocol.https.allow=always",
-		"-c", "protocol.ssh.allow=always",
-		"-c", "core.hooksPath=/dev/null",
-		"-c", "submodule.recurse=false",
-		"-c", "http.followRedirects=false",
-		"-c", "transfer.fsckObjects=true",
-	}
-}
-
-func FetchArgs(u URL, ref string, depth int) ([]string, error) {
-	if u.Transport != TransportHTTPS && u.Transport != TransportSSH {
-		return nil, ErrNotFetched
-	}
-	if _, err := Parse(u.String()); err != nil {
-		return nil, err
-	}
-	if _, err := gitref.Parse(ref); err != nil {
-		return nil, err
-	}
-	if depth < 1 || depth > MaxDepth {
-		return nil, ErrDepth
-	}
-	args := append(SafeConfig(), "fetch", "--depth="+strconv.Itoa(depth), "--no-tags", "--", u.String(), ref)
-	return args, nil
-}
 
 func ListFileArgs(sha, path string) ([]string, error) {
 	if err := gitref.CheckSha(sha); err != nil {

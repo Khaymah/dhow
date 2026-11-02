@@ -38,9 +38,10 @@ RETURNING t."Id", t."OrganizationId", t."Labels";
 -- name: InsertRunner :one
 INSERT INTO "Runners" ("OrganizationId", "RegistrationTokenId", "Name", "Labels", "CapabilityLabels", "Os", "Arch", "Version",
                        "IsolationLevels", "Capacity", "SigningPublicKey", "EncryptionPublicKey", "KeysRotatedAt",
-                       "LastSeenAt", "LastIpAddress", "CreatedAt", "UpdatedAt")
+                       "LastSeenAt", "LastIpAddress", "Features", "CreatedAt", "UpdatedAt")
 VALUES (@organization_id, @registration_token_id, @name, @labels::text[], @capability_labels::text[], @os, @arch, @version,
-        @isolation_levels::text[], @capacity, @signing_public_key, @encryption_public_key, @now, @now, @ip_address, @now, @now)
+        @isolation_levels::text[], @capacity, @signing_public_key, @encryption_public_key, @now, @now, @ip_address,
+        @features::text[], @now, @now)
 RETURNING *;
 
 -- name: CountRunners :one
@@ -148,10 +149,16 @@ SELECT s."Id"          AS "SessionId",
        r."EncryptionPublicKey",
        r."KeyVersion",
        r."State",
-       r."LastSeenAt"
+       r."LastSeenAt",
+       r."Features"
 FROM "RunnerSessions" s
 JOIN "Runners" r ON r."Id" = s."RunnerId" AND NOT r."IsDeleted"
 WHERE s."TokenHash" = @token_hash AND NOT s."IsDeleted";
+
+-- name: SetRunnerFeatures :exec
+UPDATE "Runners"
+SET "Features" = @features::text[], "UpdatedAt" = @now
+WHERE "Id" = @id AND "Features" IS DISTINCT FROM @features::text[] AND NOT "IsDeleted";
 
 -- name: RotateRunnerKeys :one
 UPDATE "Runners"

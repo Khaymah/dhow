@@ -17,6 +17,7 @@ import (
 
 	config "github.com/Khaymah/dhow/apps/runner/internal/Config"
 	identity "github.com/Khaymah/dhow/apps/runner/internal/Identity"
+	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 	"github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1/runnerv1connect"
 )
 
@@ -43,6 +44,7 @@ type Options struct {
 	Identity *identity.Identity
 	Log      *slog.Logger
 	Now      func() time.Time
+	Features []runnerv1.RunnerFeature
 }
 
 type Client struct {
@@ -92,7 +94,7 @@ func New(o Options) (*Client, error) {
 		log:          o.Log,
 	}
 	if o.Identity != nil {
-		c.tokens = &tokens{auth: c.auth, id: o.Identity, now: o.Now}
+		c.tokens = &tokens{auth: c.auth, id: o.Identity, now: o.Now, features: o.Features}
 	}
 	return c, nil
 }

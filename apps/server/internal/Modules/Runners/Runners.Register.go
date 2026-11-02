@@ -62,6 +62,10 @@ func (s *Service) Register(ctx context.Context, in models.RegisterInput) (models
 	if err := s.checkRegistration(&in); err != nil {
 		return models.RegisterResult{}, err
 	}
+	features, err := runnersig.FeatureNames(in.Features)
+	if err != nil {
+		return models.RegisterResult{}, runnerauth.ValidationFailed("Features")
+	}
 	var row sqlc.Runner
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		token, err := q.ConsumeRegistrationToken(ctx, sqlc.ConsumeRegistrationTokenParams{TokenHash: s.keys.RegistrationTokenHash(raw), Now: now})
@@ -76,6 +80,7 @@ func (s *Service) Register(ctx context.Context, in models.RegisterInput) (models
 			CapabilityLabels: capabilityLabels(in.Os, in.Arch, in.IsolationLevels), Os: in.Os, Arch: in.Arch, Version: in.Version,
 			IsolationLevels: in.IsolationLevels, Capacity: int32(in.Capacity), //nolint:gosec // Bounded to 1..16 by validRegistration.
 			SigningPublicKey: in.SigningPublicKey, EncryptionPublicKey: in.EncryptionPublicKey, IpAddress: meta.IPString(), Now: now,
+			Features: features,
 		})
 		if isKeyInUse(err) {
 			return runnerauth.KeyInUse()

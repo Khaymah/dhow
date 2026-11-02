@@ -30,6 +30,8 @@ type Output struct {
 
 type Step struct {
 	Output     []Output `json:"Output"`
+	Outputs    string   `json:"Outputs"`
+	BadOutputs bool     `json:"BadOutputs"`
 	ExitCode   int32    `json:"ExitCode"`
 	Reason     string   `json:"Reason"`
 	HangMillis int      `json:"HangMillis"`
@@ -38,11 +40,15 @@ type Step struct {
 }
 
 type Recording struct {
-	Steps              []Step `json:"Steps"`
-	PrepareError       string `json:"PrepareError"`
-	PrepareDelayMillis int    `json:"PrepareDelayMillis"`
-	KillSurvivors      bool   `json:"KillSurvivors"`
-	DestroySurvivors   bool   `json:"DestroySurvivors"`
+	Steps              []Step                       `json:"Steps"`
+	Checkout           *Step                        `json:"Checkout"`
+	Images             map[string]map[string]string `json:"Images"`
+	WorkspaceError     bool                         `json:"WorkspaceError"`
+	WorkspaceDrift     bool                         `json:"WorkspaceDrift"`
+	PrepareError       string                       `json:"PrepareError"`
+	PrepareDelayMillis int                          `json:"PrepareDelayMillis"`
+	KillSurvivors      bool                         `json:"KillSurvivors"`
+	DestroySurvivors   bool                         `json:"DestroySurvivors"`
 }
 
 type EventKind string
@@ -56,6 +62,9 @@ const (
 	EventSignal  EventKind = "signal"
 	EventKill    EventKind = "kill"
 	EventDestroy EventKind = "destroy"
+
+	EventWorkspace        EventKind = "workspace"
+	EventWorkspaceDestroy EventKind = "workspace_destroy"
 )
 
 type Event struct {
@@ -67,6 +76,10 @@ type Event struct {
 	FileNames []string
 	FileData  [][]byte
 	Env       map[string]string
+	Argv      []string
+	Image     string
+	Box       sandbox.Kind
+	Seq       int
 	At        time.Time
 }
 
@@ -143,7 +156,10 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 	d.mu.Lock()
 	d.lastSpec = spec
 	d.mu.Unlock()
-	d.record(Event{Kind: EventPrepare, AttemptID: spec.AttemptID})
+	d.record(Event{Kind: EventPrepare, AttemptID: spec.AttemptID, Image: spec.Image, Box: spec.Kind, Seq: spec.Seq})
+	if spec.Workspace == nil {
+		return nil, sandbox.ErrSandbox
+	}
 	if err := sleep(ctx, nil, d.rec.PrepareDelayMillis); err != nil {
 		return nil, err
 	}
@@ -153,7 +169,33 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 	case PrepareSandbox:
 		return nil, sandbox.ErrSandbox
 	}
-	return &box{d: d, attempt: spec.AttemptID, killed: make(chan struct{})}, nil
+	return &box{d: d, attempt: spec.AttemptID, labels: d.rec.Images[spec.Image], killed: make(chan struct{})}, nil
+}
+
+type workspace struct {
+	d       *Driver
+	attempt string
+	once    sync.Once
+}
+
+func (d *Driver) Workspace(_ context.Context, spec sandbox.WorkspaceSpec) (sandbox.Workspace, error) {
+	d.record(Event{Kind: EventWorkspace, AttemptID: spec.AttemptID})
+	if d.rec.WorkspaceError {
+		return nil, sandbox.ErrSandbox
+	}
+	return &workspace{d: d, attempt: spec.AttemptID}, nil
+}
+
+func (w *workspace) Check(_ context.Context) error {
+	if w.d.rec.WorkspaceDrift {
+		return sandbox.ErrWorkspace
+	}
+	return nil
+}
+
+func (w *workspace) Destroy(_ context.Context) error {
+	w.once.Do(func() { w.d.record(Event{Kind: EventWorkspaceDestroy, AttemptID: w.attempt}) })
+	return nil
 }
 
 func sleep(ctx context.Context, stop <-chan struct{}, millis int) error {

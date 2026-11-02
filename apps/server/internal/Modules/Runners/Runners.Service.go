@@ -87,7 +87,7 @@ func (s *Service) Resolve(ctx context.Context, tokenHash []byte, now time.Time) 
 		RunnerID: row.Id, OrganizationID: row.OrganizationId, SessionID: row.SessionId, Name: row.Name,
 		Labels: labels, Capacity: int(row.Capacity), IsolationLevels: row.IsolationLevels,
 		SigningPublicKey: row.SigningPublicKey, EncryptionPublicKey: row.EncryptionPublicKey, KeyVersion: row.KeyVersion,
-		Disabled: row.State == models.StateDisabled,
+		Disabled: row.State == models.StateDisabled, Features: row.Features,
 	}, nil
 }
 

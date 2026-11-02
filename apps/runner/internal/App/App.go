@@ -14,6 +14,7 @@ import (
 	config "github.com/Khaymah/dhow/apps/runner/internal/Config"
 	identity "github.com/Khaymah/dhow/apps/runner/internal/Identity"
 	installer "github.com/Khaymah/dhow/apps/runner/internal/Installer"
+	podman "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Podman"
 	"github.com/Khaymah/dhow/internal/buildinfo"
 	"github.com/Khaymah/dhow/internal/logging"
 )
@@ -65,6 +66,14 @@ func Main(ctx context.Context, args []string, env Env) error {
 		return runAgent(ctx, env)
 	case CommandConnect:
 		return runConnect(ctx, args[1:], env)
+	case CommandCheckout:
+		return runCheckout(ctx, env)
+	case CommandGitSSH:
+		return runGitSSH(ctx, args[1:], env)
+	case CommandGitAskpass:
+		return runGitAskpass(args[1:], env)
+	case podman.CommandMountWorkspace, podman.CommandUnmountWorkspace:
+		return podman.RunWorkspaceMount(args[0], args[1:])
 	case CommandRegister:
 		return runRegister(ctx, args[1:], env)
 	case CommandRun:
@@ -75,8 +84,14 @@ func Main(ctx context.Context, args []string, env Env) error {
 		return runInstaller(ctx, args, env)
 	case CommandVersion:
 		info := buildinfo.Get()
-		_, err := fmt.Fprintf(env.Stdio.Out, "dhow-runner %s (%s, %s)\n", info.Version, info.Commit, info.GoVersion)
-		return err
+		if _, err := fmt.Fprintf(env.Stdio.Out, "dhow-runner %s (%s, %s)\n", info.Version, info.Commit, info.GoVersion); err != nil {
+			return err
+		}
+		if image := buildinfo.CheckoutImage(); image != "" {
+			_, err := fmt.Fprintf(env.Stdio.Out, "checkout image %s\n", image)
+			return err
+		}
+		return nil
 	default:
 		return fmt.Errorf("unknown command %q: %w", args[0], ErrUsage)
 	}

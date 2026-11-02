@@ -525,6 +525,7 @@ type Runner struct {
 	LastSeenAt          *time.Time
 	LastIpAddress       string
 	RevokedAt           *time.Time
+	Features            []string
 }
 
 type RunnerRegistrationToken struct {

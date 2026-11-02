@@ -20,7 +20,7 @@ func TestFetchArgsPutTheAddressAndRefAfterDoubleDash(t *testing.T) {
 	require.NoError(t, err)
 	args, err := FetchArgs(u, "refs/heads/main", 1)
 	require.NoError(t, err)
-	assert.Equal(t, append(SafeConfig(), "fetch", "--depth=1", "--no-tags", "--", "ssh://git@git.example.com/team/app.git", "refs/heads/main"), args)
+	assert.Equal(t, append(SafeConfig(), "fetch", "--quiet", "--depth=1", "--no-tags", "--", "ssh://git@git.example.com/team/app.git", "refs/heads/main"), args)
 	assert.Contains(t, strings.Join(args, " "), "protocol.allow=never")
 }
 

@@ -70,6 +70,13 @@ func verifyIDMap(ranges []idRange, hostID int64, others [][]idRange) error {
 	return nil
 }
 
+func exactMap(ranges []idRange, hostStart int64) error {
+	if len(ranges) != 1 || ranges[0] != (idRange{inside: 0, outside: hostStart, count: userNSSize}) {
+		return fmt.Errorf("%w: the user namespace is not the attempt's id range starting at %d", ErrPolicyMismatch, hostStart)
+	}
+	return nil
+}
+
 func (b *box) verifyUserNS(pid int) error {
 	if pid <= 0 {
 		return fmt.Errorf("%w: the sandbox has no running process", ErrPolicyMismatch)
@@ -86,6 +93,12 @@ func (b *box) verifyUserNS(pid int) error {
 		return err
 	}
 	if err := verifyIDMap(gids, int64(os.Getgid()), nil); err != nil {
+		return fmt.Errorf("gid_map: %w", err)
+	}
+	if err := exactMap(uids, b.idStart); err != nil {
+		return fmt.Errorf("uid_map: %w", err)
+	}
+	if err := exactMap(gids, b.idStart); err != nil {
 		return fmt.Errorf("gid_map: %w", err)
 	}
 	b.d.track(b.name, uids)
