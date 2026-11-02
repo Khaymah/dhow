@@ -72,7 +72,7 @@ func (s *Service) failTimedOutQueued(ctx context.Context) (int, error) {
 			return err
 		}
 		for _, row := range rows {
-			if err := s.jobFinished(ctx, q, row); err != nil {
+			if err := s.jobFinished(ctx, q, row, nil); err != nil {
 				return err
 			}
 		}

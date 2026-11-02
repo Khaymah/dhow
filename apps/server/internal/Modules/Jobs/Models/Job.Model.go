@@ -77,4 +77,5 @@ type Outcome struct {
 	ExitCode      *int32
 	Digest        []byte
 	LeaseState    string
+	Outputs       map[string]string
 }

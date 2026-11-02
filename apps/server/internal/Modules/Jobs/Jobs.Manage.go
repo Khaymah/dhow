@@ -321,7 +321,7 @@ func (s *Service) cancelJob(ctx context.Context, q *sqlc.Queries, org, id, user 
 		if err != nil {
 			return canceled{}, err
 		}
-		return canceled{row: row, changed: true}, s.jobFinished(ctx, q, row)
+		return canceled{row: row, changed: true}, s.jobFinished(ctx, q, row, nil)
 	case !models.JobFinished(job.State) && job.CancelRequestedAt == nil:
 		row, err := q.RequestJobCancel(ctx, sqlc.RequestJobCancelParams{ID: id, UserID: requester(user)})
 		return canceled{row: row, changed: err == nil}, err

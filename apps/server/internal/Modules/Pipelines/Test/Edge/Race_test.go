@@ -45,7 +45,9 @@ func newWorld(t *testing.T, source string) world {
 	project := env.SeedProject(org, ownerID)
 	w := world{env: env, org: org, project: project, repo: env.SeedRepository(org, project, ownerID), defs: defs}
 	for range runners {
-		w.runners = append(w.runners, env.SeedConnectedRunner(org, ownerID, apptest.SeedRunnerSpec{Capacity: 8}))
+		w.runners = append(w.runners, env.SeedConnectedRunner(org, ownerID, apptest.SeedRunnerSpec{
+			Capacity: 8, Features: []string{"checkout", "plugins"},
+		}))
 	}
 	return w
 }

@@ -14,7 +14,6 @@ import (
 	runevents "github.com/Khaymah/dhow/apps/server/internal/Core/RunEvents"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
-	"github.com/Khaymah/dhow/internal/gitref"
 	"github.com/Khaymah/dhow/internal/pipelinespec"
 )
 
@@ -24,7 +23,7 @@ const (
 	maxOutputs     = 64
 	maxOutputSize  = 1 << 10
 	maxOutputsJSON = 60 << 10
-	foundFalse     = "false"
+	reasonRefMoved = "CHECKOUT_REF_MOVED"
 )
 
 func runJobOutcome(f runevents.Finished) (string, string) {
@@ -45,7 +44,7 @@ func runJobOutcome(f runevents.Finished) (string, string) {
 func boundedOutputs(in map[string]string) ([]byte, bool) {
 	keys := make([]string, 0, len(in))
 	for k := range in {
-		if k != OutputDefinition && k != OutputSha && k != OutputFound {
+		if k != OutputFound && k != OutputDigest {
 			keys = append(keys, k)
 		}
 	}
@@ -99,7 +98,7 @@ func (s *Service) JobFinished(ctx context.Context, q *sqlc.Queries, f runevents.
 		return err
 	}
 	if rj.Kind == models.KindDiscovery {
-		return s.discovered(ctx, q, run, state, f.Outputs)
+		return s.discovered(ctx, q, run, f)
 	}
 	if models.RunFinished(run.State) {
 		return nil
@@ -147,21 +146,27 @@ func (s *Service) abandon(ctx context.Context, q *sqlc.Queries, run sqlc.Pipelin
 	return s.recordStatus(ctx, q, run, commitstatus.StateFailed)
 }
 
-func (s *Service) discovered(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, state string, outputs map[string]string) error {
+func (s *Service) discovered(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, f runevents.Finished) error {
 	if run.State != models.RunPending {
 		return nil
 	}
-	source, sha := outputs[OutputDefinition], outputs[OutputSha]
 	switch {
-	case state != models.JobSucceeded:
+	case f.State != jobSucceeded && f.FailureReason == reasonRefMoved:
+		return s.endPending(ctx, q, run, models.RunFailed, models.ReasonShaNotOnRef)
+	case f.State != jobSucceeded:
 		return s.endPending(ctx, q, run, models.RunFailed, models.ReasonDiscoveryFailed)
-	case outputs[OutputFound] == foundFalse:
+	case f.Outputs[OutputFound] != foundTrue:
 		return s.endPending(ctx, q, run, models.RunSkipped, models.ReasonDefinitionNotFound)
-	case source == "" || len(source) > pipelinespec.MaxFileBytes || (sha != "" && !gitref.ValidSha(sha)):
+	}
+	source, err := s.readDiscovered(ctx, q, f.JobID, f.Outputs[OutputDigest])
+	if errors.Is(err, errDiscoveryOutput) {
 		return s.endPending(ctx, q, run, models.RunFailed, models.ReasonDiscoveryFailed)
 	}
-	digest := sha256.Sum256([]byte(source))
-	return q.SetRunSource(ctx, sqlc.SetRunSourceParams{ID: run.Id, DefinitionSource: text(source), DefinitionDigest: digest[:], Sha: text(sha)})
+	if err != nil {
+		return err
+	}
+	digest := sha256.Sum256(source)
+	return q.SetRunSource(ctx, sqlc.SetRunSourceParams{ID: run.Id, DefinitionSource: text(string(source)), DefinitionDigest: digest[:]})
 }
 
 func (s *Service) endPending(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, state, reason string) error {
@@ -175,13 +180,13 @@ func (s *Service) endPending(ctx context.Context, q *sqlc.Queries, run sqlc.Pipe
 }
 
 func (s *Service) launchDiscovery(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun) error {
-	req := s.checkoutRequest(run)
-	req.Sha = run.DefinitionSha.String
-	spec, features, err := s.checkout.DiscoverySpec(req)
-	if errors.Is(err, ErrCheckoutUnavailable) {
+	spec, err := s.discoverySpec(ctx, q, run)
+	switch {
+	case errors.Is(err, ErrCheckoutUnavailable):
 		return s.endPending(ctx, q, run, models.RunFailed, models.ReasonCheckoutUnavailable)
-	}
-	if err != nil {
+	case errors.Is(err, errRepositoryUnavailable):
+		return s.endPending(ctx, q, run, models.RunFailed, models.ReasonRepositoryUnavailable)
+	case err != nil:
 		return err
 	}
 	rj, err := q.InsertRunJob(ctx, sqlc.InsertRunJobParams{
@@ -193,7 +198,7 @@ func (s *Service) launchDiscovery(ctx context.Context, q *sqlc.Queries, run sqlc
 	}
 	out, err := s.queue.Enqueue(ctx, q, jobqueue.Request{
 		OrganizationID: run.OrganizationId, OriginKind: jobqueue.OriginPipeline, OriginID: rj.Id, Name: discoveryName, Spec: spec,
-		Priority: discoveryPriority, RequiredFeatures: append([]string{jobqueue.FeatureCheckout}, features...),
+		Priority: discoveryPriority,
 	})
 	if reason, refused := refusal(err); refused {
 		return s.endPending(ctx, q, run, models.RunFailed, reason)

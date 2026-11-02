@@ -48,6 +48,31 @@ func (q *Queries) ApproveRun(ctx context.Context, arg ApproveRunParams) error {
 	return err
 }
 
+const checkoutRepositoryOfJob = `-- name: CheckoutRepositoryOfJob :one
+SELECT r."RepositoryId"::uuid AS "RepositoryId", r."ProjectId"
+FROM "Jobs" j
+JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
+JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+WHERE j."Id" = $1 AND j."OrganizationId" = $2 AND j."OriginKind" = 'pipeline' AND r."RepositoryId" IS NOT NULL
+`
+
+type CheckoutRepositoryOfJobParams struct {
+	JobID          uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+type CheckoutRepositoryOfJobRow struct {
+	RepositoryId uuid.UUID
+	ProjectId    uuid.UUID
+}
+
+func (q *Queries) CheckoutRepositoryOfJob(ctx context.Context, arg CheckoutRepositoryOfJobParams) (CheckoutRepositoryOfJobRow, error) {
+	row := q.db.QueryRow(ctx, checkoutRepositoryOfJob, arg.JobID, arg.OrganizationID)
+	var i CheckoutRepositoryOfJobRow
+	err := row.Scan(&i.RepositoryId, &i.ProjectId)
+	return i, err
+}
+
 const claimPendingRun = `-- name: ClaimPendingRun :one
 UPDATE "PipelineRuns"
 SET "ClaimedUntil" = $1::timestamptz, "UpdatedAt" = now()
@@ -140,6 +165,38 @@ func (q *Queries) CountRuns(ctx context.Context, arg CountRunsParams) (int64, er
 	return count, err
 }
 
+const discoveryLog = `-- name: DiscoveryLog :many
+SELECT c."Data"
+FROM "LogChunks" c
+WHERE c."JobId" = $1 AND c."Stream" = 'stdout' AND c."StepIndex" = 0 AND NOT c."IsDeleted"
+  AND c."AttemptId" = (SELECT a."Id"
+                       FROM "JobAttempts" a
+                       WHERE a."JobId" = $1
+                       ORDER BY a."Number" DESC
+                       LIMIT 1)
+ORDER BY c."Seq"
+`
+
+func (q *Queries) DiscoveryLog(ctx context.Context, jobID uuid.UUID) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, discoveryLog, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := [][]byte{}
+	for rows.Next() {
+		var Data []byte
+		if err := rows.Scan(&Data); err != nil {
+			return nil, err
+		}
+		items = append(items, Data)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findCommitRun = `-- name: FindCommitRun :one
 SELECT "Id"
 FROM "PipelineRuns"
@@ -208,6 +265,38 @@ func (q *Queries) FinishRunJob(ctx context.Context, arg FinishRunJobParams) (int
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getCheckoutRepository = `-- name: GetCheckoutRepository :one
+SELECT "Id", "CloneUrl", "Transport", "HostKey", ("DeployKeySealed" IS NOT NULL)::boolean AS "HasDeployKey"
+FROM "Repositories"
+WHERE "Id" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+`
+
+type GetCheckoutRepositoryParams struct {
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+type GetCheckoutRepositoryRow struct {
+	Id           uuid.UUID
+	CloneUrl     string
+	Transport    string
+	HostKey      pgtype.Text
+	HasDeployKey bool
+}
+
+func (q *Queries) GetCheckoutRepository(ctx context.Context, arg GetCheckoutRepositoryParams) (GetCheckoutRepositoryRow, error) {
+	row := q.db.QueryRow(ctx, getCheckoutRepository, arg.ID, arg.OrganizationID)
+	var i GetCheckoutRepositoryRow
+	err := row.Scan(
+		&i.Id,
+		&i.CloneUrl,
+		&i.Transport,
+		&i.HostKey,
+		&i.HasDeployKey,
+	)
+	return i, err
 }
 
 const getRun = `-- name: GetRun :one

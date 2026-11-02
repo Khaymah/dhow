@@ -86,7 +86,7 @@ func newWorldWith(t *testing.T, o apptest.Options) world {
 	project := env.SeedProject(org, ownerID)
 	runners := make([]*apptest.TestRunner, 0, runnerPool)
 	for range runnerPool {
-		runners = append(runners, env.SeedConnectedRunner(org, ownerID, apptest.SeedRunnerSpec{Capacity: 8}))
+		runners = append(runners, env.SeedConnectedRunner(org, ownerID, apptest.SeedRunnerSpec{Capacity: 8, Features: checkoutFeatures()}))
 	}
 	return world{
 		env: env, owner: owner, ownerID: ownerID, org: org, project: project, repo: env.SeedRepository(org, project, ownerID),
@@ -186,3 +186,5 @@ func sha256Hex(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
+
+func checkoutFeatures() []string { return []string{"checkout", "plugins"} }

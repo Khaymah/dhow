@@ -118,7 +118,7 @@ func TestARunWithAMissingOrWrongFileEndsClearly(t *testing.T) {
 	assert.Empty(t, w.env.RunJobs(invalid))
 }
 
-func TestAGenericRepositoryWaitsForTheCheckoutAndFailsClosed(t *testing.T) {
+func TestAServerWithoutACheckoutImageFailsGenericRunsClosed(t *testing.T) {
 	env := apptest.New(t)
 	owner, d := env.SetupAndLogin()
 	org, ownerID := env.OrganizationID(d.OrgSlug), uuid.MustParse(owner.UserID)
@@ -131,7 +131,7 @@ func TestAGenericRepositoryWaitsForTheCheckoutAndFailsClosed(t *testing.T) {
 	env.StartRuns()
 	state, reason := env.RunState(got.RunID)
 	assert.Equal(t, "failed", state)
-	assert.Equal(t, "CHECKOUT_UNAVAILABLE", reason, "no runner can read the file of a generic repository until the checkout lands")
+	assert.Equal(t, "CHECKOUT_UNAVAILABLE", reason, "a server built without the checkout image cannot read the file of a generic repository")
 	assert.Zero(t, env.CountRows(`SELECT count(*) FROM "Jobs"`))
 }
 

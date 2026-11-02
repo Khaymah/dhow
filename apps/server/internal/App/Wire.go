@@ -68,7 +68,7 @@ type Infra struct {
 	GitDial            netguard.DialFunc
 	Definitions        pipelines.Definitions
 	Images             pipelines.ImageResolver
-	Checkout           pipelines.CheckoutSeam
+	CheckoutImage      string
 	RegistryTLS        *tls.Config
 	ManualJobs         bool
 	PinBudget          time.Duration
@@ -150,17 +150,15 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		DB: in.Pool, Tokens: external.apiTokens, Factors: sessionService, Bus: bus, Log: in.Log, Now: in.Now,
 	})
 	gate := runnerauth.NewGate(runnerauth.GateOptions{Verifier: runnersService, Log: in.Log, Now: in.Now})
-	jobsService, logPool, err := buildJobs(ctx, in, runnerKeys, bus, store)
+	secrets := newCheckoutSecrets(in)
+	jobsService, logPool, err := buildJobs(ctx, in, runnerKeys, bus, store, secrets)
 	if err != nil {
 		return nil, err
 	}
-	pipelinesService := pipelinesFor(in, bus, jobsService.Queue(), limiter)
-	jobsService.UseRunEvents(pipelinesService)
-	sourcesService, err := sourcesFor(in, bus, limiter, pipelinesService)
+	pipelinesService, sourcesService, err := runsFor(in, bus, limiter, jobsService, secrets)
 	if err != nil {
 		return nil, err
 	}
-	pipelinesService.UseStatuses(sourcesService.StatusRecorder())
 
 	opts := Options{
 		Config: in.Config,
@@ -242,14 +240,14 @@ func settingsFor(
 }
 
 func buildJobs(
-	ctx context.Context, in Infra, keys *runnerauth.Keys, bus *eventbus.Bus, store *instancesettings.Store,
+	ctx context.Context, in Infra, keys *runnerauth.Keys, bus *eventbus.Bus, store *instancesettings.Store, secrets jobs.SecretResolver,
 ) (*jobs.Service, *pgxpool.Pool, error) {
 	logPool, err := logReadPool(ctx, in.Pool, in.Config.Logs)
 	if err != nil {
 		return nil, nil, err
 	}
 	opts := jobs.Options{
-		DB: in.Pool, Keys: keys, Secrets: in.Secrets, Bus: bus, Listen: listener(in.Pool),
+		DB: in.Pool, Keys: keys, Secrets: secrets, Bus: bus, Listen: listener(in.Pool),
 		MaxPolls: in.Config.RunnerMaxPolls, Logs: in.Config.Logs, StreamWriteWait: in.LogStreamWriteWait,
 		ReadWait: in.LogReadWait, Log: in.Log, ManualJobs: in.Config.Dev || in.ManualJobs,
 		LogSettings: func() config.LogSettings { return store.Current().Values.Logs },

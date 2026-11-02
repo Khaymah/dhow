@@ -134,12 +134,13 @@ func (s *Service) inTx(ctx context.Context, fn func(q *sqlc.Queries) error) erro
 
 func (s *Service) UseRunEvents(sink runevents.Sink) { s.runs = sink }
 
-func (s *Service) jobFinished(ctx context.Context, q *sqlc.Queries, job sqlc.Job) error {
+func (s *Service) jobFinished(ctx context.Context, q *sqlc.Queries, job sqlc.Job, outputs map[string]string) error {
 	if s.runs == nil || job.OriginKind != jobqueue.OriginPipeline || job.OriginId == nil {
 		return nil
 	}
 	return s.runs.JobFinished(ctx, q, runevents.Finished{
 		OrganizationID: job.OrganizationId, JobID: job.Id, OriginID: *job.OriginId, State: job.State, FailureReason: job.FailureReason,
+		Outputs: outputs,
 	})
 }
 

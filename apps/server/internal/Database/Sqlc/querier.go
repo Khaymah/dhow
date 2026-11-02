@@ -18,6 +18,7 @@ type Querier interface {
 	ApproveRun(ctx context.Context, arg ApproveRunParams) error
 	ArchiveProject(ctx context.Context, arg ArchiveProjectParams) (Project, error)
 	CancelQueuedJob(ctx context.Context, arg CancelQueuedJobParams) (Job, error)
+	CheckoutRepositoryOfJob(ctx context.Context, arg CheckoutRepositoryOfJobParams) (CheckoutRepositoryOfJobRow, error)
 	ClaimCommitStatuses(ctx context.Context, arg ClaimCommitStatusesParams) ([]ClaimCommitStatusesRow, error)
 	ClaimPendingRun(ctx context.Context, arg ClaimPendingRunParams) (PipelineRun, error)
 	ClaimQueuedJob(ctx context.Context, arg ClaimQueuedJobParams) (Job, error)
@@ -51,6 +52,7 @@ type Querier interface {
 	DeleteTeamBinding(ctx context.Context, arg DeleteTeamBindingParams) (int64, error)
 	DisableRunnerAsClone(ctx context.Context, arg DisableRunnerAsCloneParams) (int64, error)
 	DiscardPendingTotp(ctx context.Context, arg DiscardPendingTotpParams) error
+	DiscoveryLog(ctx context.Context, jobID uuid.UUID) ([][]byte, error)
 	DropLogPartitions(ctx context.Context, retentionDays int32) (int32, error)
 	DropWebhookPartitions(ctx context.Context, retentionDays int32) (int32, error)
 	EndAttemptStep(ctx context.Context, arg EndAttemptStepParams) (int64, error)
@@ -78,6 +80,7 @@ type Querier interface {
 	GetAlertRecipient(ctx context.Context, id uuid.UUID) (GetAlertRecipientRow, error)
 	GetAttemptStepState(ctx context.Context, arg GetAttemptStepStateParams) (string, error)
 	GetAuditEvent(ctx context.Context, arg GetAuditEventParams) (GetAuditEventRow, error)
+	GetCheckoutRepository(ctx context.Context, arg GetCheckoutRepositoryParams) (GetCheckoutRepositoryRow, error)
 	GetConfirmedTotp(ctx context.Context, userID uuid.UUID) (GetConfirmedTotpRow, error)
 	GetInstance(ctx context.Context) (Instance, error)
 	GetJob(ctx context.Context, arg GetJobParams) (Job, error)

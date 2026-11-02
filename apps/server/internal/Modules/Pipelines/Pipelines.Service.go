@@ -37,33 +37,33 @@ type Publisher interface {
 }
 
 type Options struct {
-	DB          DB
-	Bus         Publisher
-	Log         *slog.Logger
-	Now         func() time.Time
-	Queue       jobqueue.Queue
-	Statuses    commitstatus.Recorder
-	Definitions Definitions
-	Images      ImageResolver
-	Checkout    CheckoutSeam
-	PublicURL   string
-	Limiter     ratelimit.Limiter
-	PinBudget   time.Duration
+	DB            DB
+	Bus           Publisher
+	Log           *slog.Logger
+	Now           func() time.Time
+	Queue         jobqueue.Queue
+	Statuses      commitstatus.Recorder
+	Definitions   Definitions
+	Images        ImageResolver
+	CheckoutImage string
+	PublicURL     string
+	Limiter       ratelimit.Limiter
+	PinBudget     time.Duration
 }
 
 type Service struct {
-	db          DB
-	bus         Publisher
-	log         *slog.Logger
-	now         func() time.Time
-	queue       jobqueue.Queue
-	statuses    commitstatus.Recorder
-	definitions Definitions
-	images      ImageResolver
-	checkout    CheckoutSeam
-	publicURL   string
-	limiter     ratelimit.Limiter
-	pinBudget   time.Duration
+	db            DB
+	bus           Publisher
+	log           *slog.Logger
+	now           func() time.Time
+	queue         jobqueue.Queue
+	statuses      commitstatus.Recorder
+	definitions   Definitions
+	images        ImageResolver
+	checkoutImage string
+	publicURL     string
+	limiter       ratelimit.Limiter
+	pinBudget     time.Duration
 }
 
 var (
@@ -80,17 +80,13 @@ func NewService(o Options) *Service {
 	if definitions == nil {
 		definitions = ProviderDefinitions{}
 	}
-	checkout := o.Checkout
-	if checkout == nil {
-		checkout = CheckoutPending{}
-	}
 	budget := o.PinBudget
 	if budget <= 0 {
 		budget = config.PipelinePinBudget
 	}
 	return &Service{
 		db: o.DB, bus: o.Bus, log: o.Log, now: now, queue: o.Queue, statuses: o.Statuses, definitions: definitions,
-		images: o.Images, checkout: checkout, publicURL: strings.TrimSuffix(o.PublicURL, "/"), limiter: o.Limiter, pinBudget: budget,
+		images: o.Images, checkoutImage: o.CheckoutImage, publicURL: strings.TrimSuffix(o.PublicURL, "/"), limiter: o.Limiter, pinBudget: budget,
 	}
 }
 

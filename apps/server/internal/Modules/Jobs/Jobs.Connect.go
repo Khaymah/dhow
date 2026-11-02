@@ -60,6 +60,7 @@ func (h connectHandler) Complete(ctx context.Context, req *connect.Request[runne
 	m := req.Msg
 	err := h.service.Complete(ctx, CompleteInput{
 		Lease: m.GetLease(), Result: m.GetResult(), ExitCode: m.GetExitCode(), Reason: m.GetFailureReason(), Digest: m.GetDigest(),
+		Outputs: m.GetOutputs(),
 	})
 	if err != nil {
 		return nil, err

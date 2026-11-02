@@ -202,16 +202,25 @@ func placeValue(spec *runnerv1.JobSpec, ref, v string) {
 	if !found {
 		return
 	}
-	index, name, found := strings.Cut(rest, "].Env.")
+	index, field, found := strings.Cut(rest, "].")
 	i, err := strconv.Atoi(index)
 	if !found || err != nil || i < 0 || i >= len(spec.GetSteps()) {
 		return
 	}
 	step := spec.GetSteps()[i]
-	if step.Env == nil {
-		step.Env = map[string]string{}
+	if name, ok := strings.CutPrefix(field, "Env."); ok {
+		if step.Env == nil {
+			step.Env = map[string]string{}
+		}
+		step.Env[name] = v
+		return
 	}
-	step.Env[name] = v
+	if name, ok := strings.CutPrefix(field, "With."); ok && step.GetPlugin() != nil {
+		if step.Plugin.Inputs == nil {
+			step.Plugin.Inputs = map[string]string{}
+		}
+		step.Plugin.Inputs[name] = v
+	}
 }
 
 func jobName(run sqlc.PipelineRun, rj sqlc.RunJob) string {
@@ -225,17 +234,6 @@ func jobName(run sqlc.PipelineRun, rj sqlc.RunJob) string {
 		}
 		return r
 	}, strings.TrimSpace(string(name)))
-}
-
-func (s *Service) checkoutRequest(run sqlc.PipelineRun) CheckoutRequest {
-	out := CheckoutRequest{
-		RunID: run.Id, OrganizationID: run.OrganizationId, ProjectID: run.ProjectId, Ref: run.Ref, Sha: run.Sha.String,
-		Path: run.DefinitionPath,
-	}
-	if run.RepositoryId != nil {
-		out.RepositoryID = *run.RepositoryId
-	}
-	return out
 }
 
 func (s *Service) enqueue(
@@ -252,14 +250,18 @@ func (s *Service) enqueue(
 			return models.ReasonCreatorNotMember, nil
 		}
 	}
-	features, err := s.checkout.ForJob(spec, s.checkoutRequest(st.run))
-	if err != nil {
-		return models.ReasonCheckoutUnavailable, nil
+	co, secrets, err := s.checkoutFor(ctx, q, st.run, st.run.Ref, st.run.Sha.String)
+	if errors.Is(err, errRepositoryUnavailable) {
+		return models.ReasonRepositoryUnavailable, nil
 	}
-	features = append(features, planFeatures(plan)...)
+	if err != nil {
+		return "", err
+	}
+	spec.Checkout = co
+	spec.Secrets = append(spec.Secrets, secrets...)
 	out, err := s.queue.Enqueue(ctx, q, jobqueue.Request{
 		OrganizationID: st.run.OrganizationId, CreatedByUserID: creator, OriginKind: jobqueue.OriginPipeline, OriginID: rj.Id,
-		Name: jobName(st.run, rj), Spec: spec, RequiredFeatures: features,
+		Name: jobName(st.run, rj), Spec: spec, RequiredFeatures: planFeatures(plan),
 	})
 	if reason, refused := refusal(err); refused {
 		return reason, nil

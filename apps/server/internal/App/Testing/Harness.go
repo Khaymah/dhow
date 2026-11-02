@@ -147,7 +147,7 @@ type Options struct {
 	GitDial       netguard.DialFunc
 	Definitions   pipelines.Definitions
 	Images        pipelines.ImageResolver
-	Checkout      pipelines.CheckoutSeam
+	CheckoutImage string
 	RegistryTLS   *tls.Config
 	NoManualJobs  bool
 	PinBudget     time.Duration
@@ -208,7 +208,7 @@ func NewWithOptions(t *testing.T, o Options) *Env {
 		Config: cfg, Log: log, Pool: pool, Migrations: fakeMigrations{}, Build: buildinfo.Info{Version: "test", Commit: "test"},
 		Breach: breach, HashParams: &params, Now: clock.Now, Mailer: o.Mailer, OidcTransport: o.OidcTransport,
 		LogStreamWriteWait: o.LogStreamWriteWait, LogReadWait: o.LogReadWait, Triggers: o.Triggers, GitLookup: o.GitLookup, GitDial: o.GitDial,
-		Definitions: o.Definitions, Images: o.Images, Checkout: o.Checkout, RegistryTLS: o.RegistryTLS, ManualJobs: !o.NoManualJobs,
+		Definitions: o.Definitions, Images: o.Images, CheckoutImage: o.CheckoutImage, RegistryTLS: o.RegistryTLS, ManualJobs: !o.NoManualJobs,
 		PinBudget: o.PinBudget,
 	}
 	if o.Secrets != nil {

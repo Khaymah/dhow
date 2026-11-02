@@ -250,3 +250,26 @@ WHERE r."State" = 'running' AND NOT r."IsDeleted" AND r."UpdatedAt" < @updated_b
                   WHERE rj."RunId" = r."Id" AND rj."State" = 'active')
 ORDER BY r."UpdatedAt"
 LIMIT @batch;
+
+-- name: GetCheckoutRepository :one
+SELECT "Id", "CloneUrl", "Transport", "HostKey", ("DeployKeySealed" IS NOT NULL)::boolean AS "HasDeployKey"
+FROM "Repositories"
+WHERE "Id" = @id AND "OrganizationId" = @organization_id AND NOT "IsDeleted";
+
+-- name: DiscoveryLog :many
+SELECT c."Data"
+FROM "LogChunks" c
+WHERE c."JobId" = @job_id AND c."Stream" = 'stdout' AND c."StepIndex" = 0 AND NOT c."IsDeleted"
+  AND c."AttemptId" = (SELECT a."Id"
+                       FROM "JobAttempts" a
+                       WHERE a."JobId" = @job_id
+                       ORDER BY a."Number" DESC
+                       LIMIT 1)
+ORDER BY c."Seq";
+
+-- name: CheckoutRepositoryOfJob :one
+SELECT r."RepositoryId"::uuid AS "RepositoryId", r."ProjectId"
+FROM "Jobs" j
+JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
+JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+WHERE j."Id" = @job_id AND j."OrganizationId" = @organization_id AND j."OriginKind" = 'pipeline' AND r."RepositoryId" IS NOT NULL;

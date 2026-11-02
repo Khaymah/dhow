@@ -2,11 +2,23 @@ package apptest
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/pem"
+	"strings"
 	"sync"
+
+	"connectrpc.com/connect"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
@@ -192,4 +204,84 @@ func (r *TestRunner) FinishNext(result runnerv1.AttemptResult) (string, bool) {
 	}
 	require.NoError(r.T, r.Complete(g, result, exit, reason))
 	return key, true
+}
+
+type SSHRepository struct {
+	ID         uuid.UUID
+	PrivateKey []byte
+	KnownHost  string
+	CloneURL   string
+}
+
+func (e *Env) SeedSSHRepository(org, project, creator uuid.UUID) SSHRepository {
+	e.T.Helper()
+	_, deployPriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(e.T, err)
+	block, err := ssh.MarshalPrivateKey(deployPriv, config.DeployKeyComment)
+	require.NoError(e.T, err)
+	private := pem.EncodeToMemory(block)
+	deployPub, err := ssh.NewPublicKey(deployPriv.Public())
+	require.NoError(e.T, err)
+	hostPub, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(e.T, err)
+	hostKey, err := ssh.NewPublicKey(hostPub)
+	require.NoError(e.T, err)
+	hostLine := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(hostKey)))
+	id := uuid.New()
+	sealer, err := appcrypto.NewSealer(e.Config.SecretKey, config.DeployKeySealLabel)
+	require.NoError(e.T, err)
+	sealed, err := sealer.Seal(private, []byte("deploy-key:"+id.String()))
+	require.NoError(e.T, err)
+	out := SSHRepository{ID: id, PrivateKey: private, KnownHost: "git.example.com " + hostLine, CloneURL: "ssh://git@git.example.com/team/app.git"}
+	_, err = e.Pool.Exec(context.Background(),
+		`INSERT INTO "Repositories" ("Id", "OrganizationId", "ProjectId", "Provider", "FullName", "CloneUrl", "Transport", "HookId",
+		 "WebhookSecretSealed", "HostKey", "HostKeyConfirmedAt", "HostKeyConfirmedByUserId", "DeployKeyPublic", "DeployKeySealed",
+		 "CreatedByUserId")
+		 VALUES ($1, $2, $3, 'generic', 'team/app', $4, 'ssh', $5, '\x01', $6, now(), $7, $8, $9, $7)`,
+		id, org, project, out.CloneURL, hex32(uuid.New()), hostLine, creator,
+		strings.TrimSpace(string(ssh.MarshalAuthorizedKey(deployPub))), sealed)
+	require.NoError(e.T, err)
+	return out
+}
+
+func DiscoveryLog(source string) string {
+	encoded := base64.StdEncoding.EncodeToString([]byte(source))
+	var b strings.Builder
+	for len(encoded) > 0 {
+		n := min(76, len(encoded))
+		b.WriteString("dhow-definition:" + encoded[:n] + "\n")
+		encoded = encoded[n:]
+	}
+	return b.String()
+}
+
+func DiscoveryOutputs(source string) map[string]string {
+	sum := sha256.Sum256([]byte(source))
+	return map[string]string{"dhow_found": "true", "dhow_sha256": hex.EncodeToString(sum[:])}
+}
+
+func (r *TestRunner) Discover(source string) (*Grant, bool) {
+	r.T.Helper()
+	g, err := r.Lease(context.Background(), 1, 0)
+	require.NoError(r.T, err)
+	if g == nil {
+		return nil, false
+	}
+	_, err = r.Start(g)
+	require.NoError(r.T, err)
+	require.NoError(r.T, r.BeginStep(g.Ref, 0, false))
+	step := int32(0)
+	r.MustAppend(g.Ref, &runnerv1.LogChunk{Seq: 1, Stream: runnerv1.LogStream_LOG_STREAM_STDOUT, StepIndex: &step, Data: []byte(DiscoveryLog(source))})
+	require.NoError(r.T, r.EndStep(g.Ref, 0, 0))
+	require.NoError(r.T, r.CompleteOutputs(g, DiscoveryOutputs(source)))
+	return g, true
+}
+
+func (r *TestRunner) CompleteOutputs(g *Grant, outputs map[string]string) error {
+	result := runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED
+	reason := runnerv1.FailureReason_FAILURE_REASON_UNSPECIFIED
+	_, err := r.Client.Lease.Complete(context.Background(), connect.NewRequest(&runnerv1.CompleteRequest{
+		Lease: g.Ref, Result: result, FailureReason: reason, Digest: Digest(g, result, 0, reason), Outputs: outputs,
+	}))
+	return err
 }
