@@ -13,10 +13,13 @@ import (
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
+	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
+	jobsmodels "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs/Models"
 	"github.com/Khaymah/dhow/internal/jobspec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
@@ -279,4 +282,20 @@ func TestJobsThatNeedFeaturesHaveTheirOwnSmallCap(t *testing.T) {
 	assert.Equal(t, apperrors.CodeJobQueueFull, ae.Code)
 	require.NoError(t, enqueue(t, w, pipelineRequest(w)), "jobs a runner can take today are not held back")
 	w.job(t, apptest.SimpleSpec(), nil)
+}
+
+func TestAManualJobAlsoNeedsTheFeaturesOfItsSpec(t *testing.T) {
+	w := newWorld(t)
+	r := w.runner(apptest.SeedRunnerSpec{})
+	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Subject: policy.Subject{UserID: w.ownerID}})
+	spec := &runnerv1.JobSpec{Steps: []*runnerv1.Step{{Name: "notify", Plugin: &runnerv1.Plugin{Image: apptest.TestImage}}}}
+	created, err := w.env.Wired.Jobs.Create(ctx, w.org, jobsmodels.CreateInput{Name: "plugin only", Spec: spec})
+	require.NoError(t, err)
+	var features []string
+	require.NoError(t, w.env.Pool.QueryRow(context.Background(),
+		`SELECT "RequiredFeatures" FROM "Jobs" WHERE "Id" = $1`, created.Job.ID).Scan(&features))
+	assert.Equal(t, []string{jobqueue.FeaturePlugins}, features)
+	noLease(t, r)
+	g := leaseNow(t, w.runner(apptest.SeedRunnerSpec{Features: []string{jobqueue.FeaturePlugins}}))
+	assert.Equal(t, created.Job.ID.String(), g.Grant.GetJobId())
 }
