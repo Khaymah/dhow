@@ -3300,7 +3300,7 @@ export interface components {
             PrNumber?: number;
             Actor?: string;
             State: components["schemas"]["RunState"];
-            /** @description Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs) or `RUN_STATE_INVALID` (a stored value of the run could not be read). */
+            /** @description Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs), `RUN_STATE_INVALID` (a stored value of the run could not be read), `SHA_NOT_ON_REF` (the commit is not in the history of its ref), `DISCOVERY_FAILED` (the job that reads the file of a generic repository failed) or `REPOSITORY_UNAVAILABLE`. */
             FailureReason?: string;
             DefinitionPath: string;
             /** @description The commit the pipeline file was read from. For a fork's pull request it is the base. */
@@ -3338,7 +3338,7 @@ export interface components {
             };
             Needs: string[];
             State: components["schemas"]["RunJobState"];
-            /** @description For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`. */
+            /** @description For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`. */
             FailureReason?: string;
             /**
              * Format: uuid
