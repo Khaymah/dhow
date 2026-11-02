@@ -49,6 +49,12 @@ func Normalize(spec *runnerv1.JobSpec) *runnerv1.JobSpec {
 		out = &runnerv1.JobSpec{}
 	}
 	out.Image = QualifyImage(strings.TrimSpace(out.GetImage()))
+	for _, s := range out.GetSteps() {
+		if p := s.GetPlugin(); p != nil {
+			p.Image = QualifyImage(strings.TrimSpace(p.GetImage()))
+		}
+	}
+	normalizeCheckout(out.GetCheckout())
 	if out.GetIsolation() == runnerv1.Isolation_ISOLATION_UNSPECIFIED {
 		out.Isolation = runnerv1.Isolation_ISOLATION_CONTAINER
 	}

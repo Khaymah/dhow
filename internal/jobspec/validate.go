@@ -47,8 +47,11 @@ func Validate(spec *runnerv1.JobSpec) error {
 		c.add("Spec", ReasonTooLong)
 		return &Error{Violations: c.violations}
 	}
-	c.image(spec.GetImage())
+	if HasRunStep(spec) || spec.GetImage() != "" {
+		c.image(spec.GetImage())
+	}
 	c.steps(spec.GetSteps(), spec.GetTimeoutSeconds())
+	c.checkout(spec)
 	c.env("Env", spec.GetEnv())
 	c.secrets(spec)
 	c.resources(spec.GetResources())
@@ -109,19 +112,14 @@ func (c *checker) steps(steps []*runnerv1.Step, jobTimeout int32) {
 		c.add("Steps", ReasonTooMany)
 		return
 	}
+	ids := map[string]bool{}
 	for i, s := range steps {
 		field := at("Steps", i)
 		if r := validText(s.GetName(), MaxStepNameLength); r != "" {
 			c.add(field+".Name", r)
 		}
-		switch {
-		case strings.TrimSpace(s.GetRun()) == "":
-			c.add(field+".Run", ReasonRequired)
-		case len(s.GetRun()) > MaxRunBytes:
-			c.add(field+".Run", ReasonTooLong)
-		case strings.ContainsRune(s.GetRun(), 0):
-			c.add(field+".Run", ReasonInvalid)
-		}
+		c.stepID(field, s.GetId(), ids)
+		c.stepBody(field, s)
 		c.env(field+".Env", s.GetEnv())
 		if t := s.GetTimeoutSeconds(); t < 0 || t > jobTimeout {
 			c.add(field+".TimeoutSeconds", ReasonOutOfRange)
@@ -167,6 +165,7 @@ func (c *checker) secrets(spec *runnerv1.JobSpec) {
 	for i, s := range secrets {
 		field := at("Secrets", i)
 		switch {
+		case s.GetName() == CheckoutSecret:
 		case s.GetName() == "" || !secretName.MatchString(s.GetName()):
 			c.add(field+".Name", ReasonInvalid)
 		case len(s.GetName()) > MaxSecretNameLength:

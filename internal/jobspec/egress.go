@@ -2,7 +2,7 @@ package jobspec
 
 import (
 	"errors"
-		"strconv"
+	"strconv"
 	"strings"
 
 	"github.com/Khaymah/dhow/internal/hostname"

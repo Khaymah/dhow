@@ -1,6 +1,7 @@
 package jobspec_test
 
 import (
+	"encoding/base64"
 	"errors"
 	"strings"
 	"testing"
@@ -239,4 +240,113 @@ func TestShortImageNamesAreQualifiedLikeDocker(t *testing.T) {
 	out, err := jobspec.Prepare(s)
 	require.NoError(t, err)
 	assert.Equal(t, "docker.io/library/node:22-bookworm"+digest, out.GetImage(), "the server signs the qualified name")
+}
+
+const (
+	pinned  = "registry.example.com/tools/notify@sha256:" + "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+	headSha = "0123456789abcdef0123456789abcdef01234567"
+)
+
+func knownHost(pattern string) string {
+	blob := append([]byte{0, 0, 0, 11}, "ssh-ed25519"...)
+	blob = append(blob, make([]byte, 36)...)
+	return pattern + " ssh-ed25519 " + base64.StdEncoding.EncodeToString(blob)
+}
+
+func withCheckout() *runnerv1.JobSpec {
+	spec := valid()
+	spec.Checkout = &runnerv1.Checkout{
+		RepositoryUrl: "ssh://git@git.example.com:2222/team/app.git", Ref: "refs/heads/main", Sha: headSha,
+		Transport: runnerv1.CheckoutTransport_CHECKOUT_TRANSPORT_SSH, CredentialSecret: jobspec.CheckoutSecret,
+		KnownHost: knownHost("[git.example.com]:2222"),
+	}
+	spec.Secrets = append(spec.Secrets, &runnerv1.SecretRef{Name: jobspec.CheckoutSecret, Target: &runnerv1.SecretRef_AsFile{AsFile: jobspec.CheckoutSecretFile}})
+	spec.Steps = append(spec.Steps, &runnerv1.Step{Name: "notify", Id: "notify", Plugin: &runnerv1.Plugin{Image: pinned, Inputs: map[string]string{"channel": "#ops"}}})
+	return spec
+}
+
+func TestCheckoutAndPluginsAreAccepted(t *testing.T) {
+	out, err := jobspec.Prepare(withCheckout())
+	require.NoError(t, err)
+	assert.EqualValues(t, jobspec.DefaultCheckoutDepth, out.GetCheckout().GetDepth())
+	assert.Equal(t, []string{jobspec.FeatureCheckout, jobspec.FeaturePlugins}, jobspec.Features(out))
+
+	public := valid()
+	public.Checkout = &runnerv1.Checkout{
+		RepositoryUrl: "https://git.example.com/team/app.git", Ref: "refs/tags/v1", Sha: headSha,
+		Transport: runnerv1.CheckoutTransport_CHECKOUT_TRANSPORT_HTTPS, Depth: 50,
+	}
+	_, err = jobspec.Prepare(public)
+	require.NoError(t, err)
+
+	pluginsOnly := &runnerv1.JobSpec{Steps: []*runnerv1.Step{{Name: "notify", Plugin: &runnerv1.Plugin{Image: pinned}}}}
+	out, err = jobspec.Prepare(pluginsOnly)
+	require.NoError(t, err)
+	assert.Empty(t, out.GetImage())
+	assert.Equal(t, []string{jobspec.FeaturePlugins}, jobspec.Features(out))
+	assert.Empty(t, jobspec.Features(valid()))
+}
+
+func TestCheckoutAndPluginsAreChecked(t *testing.T) {
+	tests := []struct {
+		name  string
+		edit  func(*runnerv1.JobSpec)
+		field string
+	}{
+		{"an ext:: address", func(s *runnerv1.JobSpec) { s.Checkout.RepositoryUrl = "ext::sh -c touch% /tmp/x" }, "Checkout.RepositoryUrl"},
+		{"a file:// address", func(s *runnerv1.JobSpec) { s.Checkout.RepositoryUrl = "file:///etc" }, "Checkout.RepositoryUrl"},
+		{"a non-canonical address", func(s *runnerv1.JobSpec) { s.Checkout.RepositoryUrl = "git@git.example.com:team/app.git" }, "Checkout.RepositoryUrl"},
+		{"a host that starts with a dash", func(s *runnerv1.JobSpec) { s.Checkout.RepositoryUrl = "ssh://-oProxyCommand=x/app.git" }, "Checkout.RepositoryUrl"},
+		{"a transport that does not match", func(s *runnerv1.JobSpec) {
+			s.Checkout.Transport = runnerv1.CheckoutTransport_CHECKOUT_TRANSPORT_HTTPS
+		}, "Checkout.Transport"},
+		{"a ref that is an option", func(s *runnerv1.JobSpec) { s.Checkout.Ref = "--upload-pack=touch" }, "Checkout.Ref"},
+		{"a ref with ..", func(s *runnerv1.JobSpec) { s.Checkout.Ref = "refs/heads/a..b" }, "Checkout.Ref"},
+		{"a short sha", func(s *runnerv1.JobSpec) { s.Checkout.Sha = "abc" }, "Checkout.Sha"},
+		{"a negative depth", func(s *runnerv1.JobSpec) { s.Checkout.Depth = -1 }, "Checkout.Depth"},
+		{"a known host for another host", func(s *runnerv1.JobSpec) { s.Checkout.KnownHost = knownHost("evil.example.com") }, "Checkout.KnownHost"},
+		{"a known host with a second line", func(s *runnerv1.JobSpec) {
+			s.Checkout.KnownHost += "\n" + knownHost("*")
+		}, "Checkout.KnownHost"},
+		{"ssh without a credential", func(s *runnerv1.JobSpec) {
+			s.Checkout.CredentialSecret = ""
+			s.Secrets = s.Secrets[:2]
+		}, "Checkout.CredentialSecret"},
+		{"another credential name", func(s *runnerv1.JobSpec) { s.Checkout.CredentialSecret = "DEPLOY_TOKEN" }, "Checkout.CredentialSecret"},
+		{"the credential given to a step", func(s *runnerv1.JobSpec) { s.Secrets[2].StepIndexes = []int32{0} }, "Secrets[2]"},
+		{"the credential as an env variable", func(s *runnerv1.JobSpec) {
+			s.Secrets[2].Target = &runnerv1.SecretRef_AsEnv{AsEnv: "GIT_TOKEN"}
+		}, "Secrets[2]"},
+		{"a plugin from a tag", func(s *runnerv1.JobSpec) { s.Steps[1].Plugin.Image = "registry.example.com/tools/notify:1" }, "Steps[1].Plugin.Image"},
+		{"a plugin with a script", func(s *runnerv1.JobSpec) { s.Steps[1].Run = "echo hi" }, "Steps[1].Run"},
+		{"a plugin input with a bad name", func(s *runnerv1.JobSpec) { s.Steps[1].Plugin.Inputs["Bad-Name"] = "x" }, "Steps[1].Plugin.Inputs.Bad-Name"},
+		{"a plugin input with NUL", func(s *runnerv1.JobSpec) { s.Steps[1].Plugin.Inputs["channel"] = "a\x00b" }, "Steps[1].Plugin.Inputs.channel"},
+		{"a plugin input that is too long", func(s *runnerv1.JobSpec) {
+			s.Steps[1].Plugin.Inputs["channel"] = strings.Repeat("x", jobspec.MaxPluginInputBytes+1)
+		}, "Steps[1].Plugin.Inputs.channel"},
+		{"a duplicate step id", func(s *runnerv1.JobSpec) { s.Steps[0].Id = "notify" }, "Steps[1].Id"},
+		{"a step id with capitals", func(s *runnerv1.JobSpec) { s.Steps[0].Id = "Build" }, "Steps[0].Id"},
+		{"a run step without an image", func(s *runnerv1.JobSpec) { s.Image = "" }, "Image"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := withCheckout()
+			tt.edit(spec)
+			err := jobspec.Validate(jobspec.Normalize(spec))
+			require.Error(t, err)
+			fields := []string{}
+			for _, v := range violations(t, err) {
+				fields = append(fields, v.Field)
+			}
+			assert.Contains(t, fields, tt.field)
+		})
+	}
+}
+
+func TestTheCheckoutSecretIsReservedWithoutACheckout(t *testing.T) {
+	spec := valid()
+	spec.Secrets = append(spec.Secrets, &runnerv1.SecretRef{Name: jobspec.CheckoutSecret, Target: &runnerv1.SecretRef_AsFile{AsFile: jobspec.CheckoutSecretFile}})
+	err := jobspec.Validate(spec)
+	require.Error(t, err)
+	assert.Contains(t, violations(t, err), jobspec.Violation{Field: "Secrets[2].Name", Reason: jobspec.ReasonReserved})
 }
