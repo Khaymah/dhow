@@ -1603,7 +1603,7 @@ export interface paths {
         put?: never;
         /**
          * Start a run by hand or from an API token
-         * @description Needs `run.trigger` on the project. A session starts a `manual` run and an API token starts an `api` run, and the pipeline must allow that trigger in `on:`. `Ref` is a branch (`main` or `refs/heads/main`) or a tag (`refs/tags/v1`). Without `Sha` the server finds the commit of the ref before the run starts. `Inputs` are checked against `on.manual.inputs` when the run starts, and a wrong input fails the run with `INPUTS_INVALID`. A project without a repository answers 404 `REPOSITORY_NOT_LINKED`, and an archived project 409 `PROJECT_ARCHIVED`.
+         * @description Needs `run.trigger` on the project. A session starts a `manual` run and an API token starts an `api` run, and the pipeline must allow that trigger in `on:`. `Ref` is a branch (`main` or `refs/heads/main`) or a tag (`refs/tags/v1`). The commit must be one a webhook already brought for that ref from the repository itself (not from a fork): a `Sha` that did not answers 422 `SHA_NOT_ON_REF`, and without `Sha` the run takes the latest such commit, or answers 422 `REF_HEAD_UNKNOWN` when no webhook brought one yet. `Inputs` are checked against `on.manual.inputs` when the run starts, and a wrong input fails the run with `INPUTS_INVALID`. A project without a repository answers 404 `REPOSITORY_NOT_LINKED`, and an archived project 409 `PROJECT_ARCHIVED`. One user starts at most 60 runs and one project 240 runs in ten minutes (429 `RATE_LIMITED`).
          */
         post: operations["triggerRun"];
         delete?: never;
@@ -3300,7 +3300,7 @@ export interface components {
             PrNumber?: number;
             Actor?: string;
             State: components["schemas"]["RunState"];
-            /** @description Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND` or `TRIGGER_NOT_ENABLED`. */
+            /** @description Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs) or `RUN_STATE_INVALID` (a stored value of the run could not be read). */
             FailureReason?: string;
             DefinitionPath: string;
             /** @description The commit the pipeline file was read from. For a fork's pull request it is the base. */
@@ -3338,7 +3338,7 @@ export interface components {
             };
             Needs: string[];
             State: components["schemas"]["RunJobState"];
-            /** @description For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED`. */
+            /** @description For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`. */
             FailureReason?: string;
             /**
              * Format: uuid
