@@ -39,7 +39,7 @@ func TestSchemaEnforcesTheJobInvariants(t *testing.T) {
 		{"a finished job without a finish time", `UPDATE "Jobs" SET "State" = 'canceled' WHERE "Id" = $1`, []any{job}, checkViolation},
 		{"a queued job with a finish time", `UPDATE "Jobs" SET "FinishedAt" = now() WHERE "Id" = $1`, []any{job}, checkViolation},
 		{"an unknown job state", `UPDATE "Jobs" SET "State" = 'paused' WHERE "Id" = $1`, []any{job}, checkViolation},
-		{"a cancel request without who asked", `UPDATE "Jobs" SET "CancelRequestedAt" = now() WHERE "Id" = $1`, []any{job}, checkViolation},
+		{"who asked without a cancel request", `UPDATE "Jobs" SET "CancelRequestedBy" = "CreatedByUserId" WHERE "Id" = $1`, []any{job}, checkViolation},
 		{"more attempts than retries allow", `UPDATE "Jobs" SET "AttemptCount" = 4 WHERE "Id" = $1`, []any{job}, checkViolation},
 		{"a priority above 100", `UPDATE "Jobs" SET "Priority" = 101 WHERE "Id" = $1`, []any{job}, checkViolation},
 		{"a short spec digest", `UPDATE "Jobs" SET "SpecDigest" = '\x01' WHERE "Id" = $1`, []any{job}, checkViolation},

@@ -78,13 +78,13 @@ FOR UPDATE;
 -- name: CancelQueuedJob :one
 UPDATE "Jobs"
 SET "State" = 'canceled', "FailureReason" = 'CANCELED', "FinishedAt" = now(), "CancelRequestedAt" = now(),
-    "CancelRequestedBy" = @user_id::uuid, "UpdatedAt" = now()
+    "CancelRequestedBy" = sqlc.narg('user_id')::uuid, "UpdatedAt" = now()
 WHERE "Id" = @id AND "State" = 'queued'
 RETURNING *;
 
 -- name: RequestJobCancel :one
 UPDATE "Jobs"
-SET "CancelRequestedAt" = now(), "CancelRequestedBy" = @user_id::uuid, "UpdatedAt" = now()
+SET "CancelRequestedAt" = now(), "CancelRequestedBy" = sqlc.narg('user_id')::uuid, "UpdatedAt" = now()
 WHERE "Id" = @id AND "State" IN ('leased', 'running') AND "CancelRequestedAt" IS NULL
 RETURNING *;
 
@@ -305,7 +305,14 @@ WHERE "Id" IN (SELECT q."Id"
                ORDER BY q."QueueDeadline"
                LIMIT @batch
                FOR UPDATE SKIP LOCKED)
-RETURNING "Id", "OrganizationId";
+RETURNING *;
 
 -- name: ListenJobsQueued :exec
 LISTEN dhow_jobs_queued;
+
+-- name: GetJobProject :one
+SELECT r."ProjectId"
+FROM "Jobs" j
+JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
+JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+WHERE j."Id" = @id AND j."OrganizationId" = @organization_id AND j."OriginKind" = 'pipeline';

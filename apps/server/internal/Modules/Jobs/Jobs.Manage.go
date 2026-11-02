@@ -63,6 +63,9 @@ func (s *Service) Create(ctx context.Context, org uuid.UUID, in models.CreateInp
 	if err != nil {
 		return models.Detail{}, err
 	}
+	if !s.manual {
+		return models.Detail{}, apperrors.NotFound()
+	}
 	var details []apperrors.IErrorDetail
 	if !auth.ValidDisplayName(in.Name, config.JobNameMaxLength) {
 		details = append(details, invalid("Name"))
@@ -95,7 +98,7 @@ func (s *Service) Create(ctx context.Context, org uuid.UUID, in models.CreateInp
 
 type newJob struct {
 	org      uuid.UUID
-	user     uuid.UUID
+	user     *uuid.UUID
 	name     string
 	spec     *runnerv1.JobSpec
 	priority int
@@ -150,7 +153,7 @@ func (s *Service) insert(ctx context.Context, p auth.Principal, org uuid.UUID, n
 	err := dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		var err error
 		row, digest, err = insertJob(ctx, q, newJob{
-			org: org, user: p.UserID, name: name, spec: spec, priority: priority, retries: retries, origin: jobqueue.OriginManual,
+			org: org, user: &p.UserID, name: name, spec: spec, priority: priority, retries: retries, origin: jobqueue.OriginManual,
 		})
 		return err
 	})
@@ -164,6 +167,17 @@ func (s *Service) insert(ctx context.Context, p auth.Principal, org uuid.UUID, n
 		return models.Detail{}, err
 	}
 	return models.Detail{Job: jobOf(row), Spec: spec, Attempts: []models.Attempt{}}, nil
+}
+
+func (s *Service) ProjectOfJob(ctx context.Context, org, job uuid.UUID) (uuid.UUID, bool, error) {
+	project, err := s.queries().GetJobProject(ctx, sqlc.GetJobProjectParams{ID: job, OrganizationID: org})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, false, nil
+	}
+	if err != nil {
+		return uuid.Nil, false, err
+	}
+	return project, true, nil
 }
 
 func (s *Service) List(ctx context.Context, org uuid.UUID, states []string, page, limit int) ([]models.Job, int64, error) {
@@ -253,7 +267,7 @@ func (s *Service) Cancel(ctx context.Context, org, id uuid.UUID) (models.Job, er
 	var out canceled
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		var err error
-		out, err = cancelJob(ctx, q, org, id, p.UserID)
+		out, err = s.cancelJob(ctx, q, org, id, p.UserID)
 		if err == nil && out.finished && out.row.State != models.JobCanceled {
 			return apperrors.JobFinished()
 		}
@@ -276,7 +290,7 @@ type canceled struct {
 	finished bool
 }
 
-func cancelJob(ctx context.Context, q *sqlc.Queries, org, id, user uuid.UUID) (canceled, error) {
+func (s *Service) cancelJob(ctx context.Context, q *sqlc.Queries, org, id, user uuid.UUID) (canceled, error) {
 	job, err := q.LockJob(ctx, sqlc.LockJobParams{ID: id, OrganizationID: org})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return canceled{}, apperrors.NotFound()
@@ -286,14 +300,24 @@ func cancelJob(ctx context.Context, q *sqlc.Queries, org, id, user uuid.UUID) (c
 	}
 	switch {
 	case job.State == models.JobQueued:
-		row, err := q.CancelQueuedJob(ctx, sqlc.CancelQueuedJobParams{ID: id, UserID: user})
-		return canceled{row: row, changed: err == nil}, err
+		row, err := q.CancelQueuedJob(ctx, sqlc.CancelQueuedJobParams{ID: id, UserID: requester(user)})
+		if err != nil {
+			return canceled{}, err
+		}
+		return canceled{row: row, changed: true}, s.jobFinished(ctx, q, row)
 	case !models.JobFinished(job.State) && job.CancelRequestedAt == nil:
-		row, err := q.RequestJobCancel(ctx, sqlc.RequestJobCancelParams{ID: id, UserID: user})
+		row, err := q.RequestJobCancel(ctx, sqlc.RequestJobCancelParams{ID: id, UserID: requester(user)})
 		return canceled{row: row, changed: err == nil}, err
 	default:
 		return canceled{row: job, finished: models.JobFinished(job.State)}, nil
 	}
+}
+
+func requester(user uuid.UUID) *uuid.UUID {
+	if user == uuid.Nil {
+		return nil
+	}
+	return &user
 }
 
 func (s *Service) publishByUser(ctx context.Context, name string, p auth.Principal, org, id uuid.UUID, data map[string]string) error {

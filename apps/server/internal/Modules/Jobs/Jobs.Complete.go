@@ -196,8 +196,11 @@ func (s *Service) finalize(ctx context.Context, q *sqlc.Queries, leaseID uuid.UU
 		}
 		return q.NotifyJobsQueued(ctx, job.OrganizationId.String())
 	}
-	_, err = q.FinishJob(ctx, sqlc.FinishJobParams{ID: job.Id, State: to, FailureReason: reason, FromState: job.State})
-	return err
+	finished, err := q.FinishJob(ctx, sqlc.FinishJobParams{ID: job.Id, State: to, FailureReason: reason, FromState: job.State})
+	if err != nil {
+		return err
+	}
+	return s.jobFinished(ctx, q, finished)
 }
 
 func decide(job sqlc.Job, attempt sqlc.JobAttempt) (string, string) {

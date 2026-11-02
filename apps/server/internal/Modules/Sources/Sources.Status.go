@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	commitstatus "github.com/Khaymah/dhow/apps/server/internal/Core/CommitStatus"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Sources/Models"
@@ -15,11 +16,11 @@ import (
 )
 
 const (
-	StatusPending  = "pending"
-	StatusRunning  = "running"
-	StatusSuccess  = "success"
-	StatusFailed   = "failed"
-	StatusCanceled = "canceled"
+	StatusPending  = commitstatus.StatePending
+	StatusRunning  = commitstatus.StateRunning
+	StatusSuccess  = commitstatus.StateSuccess
+	StatusFailed   = commitstatus.StateFailed
+	StatusCanceled = commitstatus.StateCanceled
 
 	maxStatusError = 256
 )
@@ -142,4 +143,18 @@ func (s *Service) RunStatusWorker(ctx context.Context) {
 			s.log.WarnContext(ctx, "commit statuses were given up after a day of failures", "abandoned", pass.Abandoned)
 		}
 	}
+}
+
+type statusRecorder struct {
+	service *Service
+}
+
+var _ commitstatus.Recorder = statusRecorder{}
+
+func (s *Service) StatusRecorder() commitstatus.Recorder { return statusRecorder{service: s} }
+
+func (r statusRecorder) Record(ctx context.Context, tx *sqlc.Queries, d commitstatus.Desired) error {
+	return r.service.RecordStatus(ctx, tx, DesiredStatus{
+		OrganizationID: d.OrganizationID, RepositoryID: d.RepositoryID, RunID: d.RunID, Sha: d.Sha, State: d.State, TargetURL: d.TargetURL,
+	})
 }

@@ -53,6 +53,10 @@ const (
 	LogRead           Action = "log.read"
 	ProjectRead       Action = "project.read"
 	ProjectManage     Action = "project.manage"
+	RunRead           Action = "run.read"
+	RunTrigger        Action = "run.trigger"
+	RunCancel         Action = "run.cancel"
+	RunApprove        Action = "run.approve"
 
 	InstanceSettingsManage Action = "instance.settings.manage"
 )
@@ -61,13 +65,14 @@ func Actions() []Action {
 	return []Action{
 		OrgRead, OrgUpdate, OrgLeave, OrgTransfer, OrgSecurity, MemberRead, MemberManage, AuditRead, SessionManageSelf, OrgCreate,
 		RunnerRead, RunnerManage, TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, InstanceSettingsManage,
-		ProjectRead, ProjectManage,
+		ProjectRead, ProjectManage, RunRead, RunTrigger, RunCancel, RunApprove,
 	}
 }
 
 func TokenActions() []Action {
 	return []Action{
 		OrgRead, OrgUpdate, MemberRead, MemberManage, AuditRead, RunnerRead, RunnerManage, JobRead, JobCancel, ProjectRead, ProjectManage,
+		RunRead, RunTrigger, RunCancel,
 	}
 }
 
@@ -90,20 +95,25 @@ func Grants(role Role) []Action {
 		return []Action{
 			OrgRead, OrgUpdate, OrgLeave, OrgTransfer, OrgSecurity, MemberRead, MemberManage, AuditRead, SessionManageSelf, RunnerRead,
 			RunnerManage, TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, ProjectRead, ProjectManage,
+			RunRead, RunTrigger, RunCancel, RunApprove,
 		}
 	case RoleAdmin:
 		return []Action{
 			OrgRead, OrgUpdate, OrgLeave, MemberRead, MemberManage, AuditRead, SessionManageSelf, RunnerRead, RunnerManage,
 			TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, ProjectRead, ProjectManage,
+			RunRead, RunTrigger, RunCancel, RunApprove,
 		}
 	case RoleMaintainer:
 		return []Action{
 			OrgRead, OrgLeave, MemberRead, SessionManageSelf, RunnerRead, JobRead, JobCancel, LogRead, TokenCreate, ProjectRead, ProjectManage,
+			RunRead, RunTrigger, RunCancel, RunApprove,
 		}
 	case RoleDeveloper:
-		return []Action{OrgRead, OrgLeave, MemberRead, SessionManageSelf, RunnerRead, JobRead, LogRead, TokenCreate, ProjectRead}
+		return []Action{
+			OrgRead, OrgLeave, MemberRead, SessionManageSelf, RunnerRead, JobRead, LogRead, TokenCreate, ProjectRead, RunRead, RunTrigger,
+		}
 	case RoleViewer:
-		return []Action{OrgRead, OrgLeave, SessionManageSelf, JobRead, TokenCreate, ProjectRead}
+		return []Action{OrgRead, OrgLeave, SessionManageSelf, JobRead, TokenCreate, ProjectRead, RunRead}
 	default:
 		return nil
 	}

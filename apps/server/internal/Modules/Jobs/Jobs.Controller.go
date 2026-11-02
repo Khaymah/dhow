@@ -28,6 +28,15 @@ type Controller struct {
 
 type Reauthorizer interface {
 	Reauthorize(ctx context.Context, action policy.Action, org uuid.UUID) error
+	AuthorizeProject(ctx context.Context, action policy.Action, org, project uuid.UUID) error
+}
+
+func (c *Controller) authorizeJob(ctx context.Context, action policy.Action, org, job uuid.UUID) error {
+	project, found, err := c.service.ProjectOfJob(ctx, org, job)
+	if err != nil || !found {
+		return err
+	}
+	return c.guard.AuthorizeProject(ctx, action, org, project)
 }
 
 var _ gen.StrictServerInterface = (*Controller)(nil)
@@ -94,6 +103,9 @@ func (c *Controller) CreateJob(ctx context.Context, req gen.CreateJobRequestObje
 }
 
 func (c *Controller) GetJob(ctx context.Context, req gen.GetJobRequestObject) (gen.GetJobResponseObject, error) {
+	if err := c.authorizeJob(ctx, policy.JobRead, req.Id, req.JobId); err != nil {
+		return nil, err
+	}
 	d, err := c.service.Get(ctx, req.Id, req.JobId)
 	if err != nil {
 		return nil, err
@@ -103,6 +115,9 @@ func (c *Controller) GetJob(ctx context.Context, req gen.GetJobRequestObject) (g
 }
 
 func (c *Controller) CancelJob(ctx context.Context, req gen.CancelJobRequestObject) (gen.CancelJobResponseObject, error) {
+	if err := c.authorizeJob(ctx, policy.JobCancel, req.Id, req.JobId); err != nil {
+		return nil, err
+	}
 	j, err := c.service.Cancel(ctx, req.Id, req.JobId)
 	if err != nil {
 		return nil, err

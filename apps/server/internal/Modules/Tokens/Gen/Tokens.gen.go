@@ -27,6 +27,9 @@ const (
 	OrgUpdate     ApiTokenScope = "org.update"
 	ProjectManage ApiTokenScope = "project.manage"
 	ProjectRead   ApiTokenScope = "project.read"
+	RunCancel     ApiTokenScope = "run.cancel"
+	RunRead       ApiTokenScope = "run.read"
+	RunTrigger    ApiTokenScope = "run.trigger"
 	RunnerManage  ApiTokenScope = "runner.manage"
 	RunnerRead    ApiTokenScope = "runner.read"
 )
@@ -51,6 +54,12 @@ func (e ApiTokenScope) Valid() bool {
 	case ProjectManage:
 		return true
 	case ProjectRead:
+		return true
+	case RunCancel:
+		return true
+	case RunRead:
+		return true
+	case RunTrigger:
 		return true
 	case RunnerManage:
 		return true

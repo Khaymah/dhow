@@ -58,12 +58,28 @@ func (s *Service) Reconcile(ctx context.Context) (ReconcileResult, error) {
 	}, models.Outcome{State: models.AttemptTimedOut, FailureReason: models.ReasonTimedOut, LeaseState: models.LeaseRevoked}); err != nil {
 		return out, fmt.Errorf("time out jobs: %w", err)
 	}
-	rows, err := s.queries().FailTimedOutQueuedJobs(ctx, config.JobReconcileBatch)
-	if err != nil {
+	if out.QueueTimeouts, err = s.failTimedOutQueued(ctx); err != nil {
 		return out, fmt.Errorf("fail jobs past their queue deadline: %w", err)
 	}
-	out.QueueTimeouts = len(rows)
 	return out, nil
+}
+
+func (s *Service) failTimedOutQueued(ctx context.Context) (int, error) {
+	done := 0
+	err := dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
+		rows, err := q.FailTimedOutQueuedJobs(ctx, config.JobReconcileBatch)
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			if err := s.jobFinished(ctx, q, row); err != nil {
+				return err
+			}
+		}
+		done = len(rows)
+		return nil
+	})
+	return done, err
 }
 
 func (s *Service) sweepUnstarted(ctx context.Context, out *ReconcileResult) error {

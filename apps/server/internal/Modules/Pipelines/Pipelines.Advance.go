@@ -1,0 +1,330 @@
+package pipelines
+
+import (
+	"context"
+	"errors"
+	"slices"
+	"strconv"
+	"strings"
+	"unicode"
+
+	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
+
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	commitstatus "github.com/Khaymah/dhow/apps/server/internal/Core/CommitStatus"
+	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
+	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
+	"github.com/Khaymah/dhow/internal/pipelinespec"
+	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
+)
+
+const projectActive = "active"
+
+var errQueueFull = errors.New("the organization's job queue is full")
+
+type step struct {
+	run     sqlc.PipelineRun
+	project string
+	c       compiled
+	rows    []sqlc.RunJob
+	byKey   map[string]int
+}
+
+func (st *step) settled(rj sqlc.RunJob) (done, ok bool) {
+	for _, need := range rj.Needs {
+		i, found := st.byKey[need]
+		if !found {
+			return true, false
+		}
+		dep := st.rows[i]
+		if !models.JobFinished(dep.State) {
+			return false, false
+		}
+		if !models.Satisfied(dep.State, dep.FailureReason) {
+			return true, false
+		}
+	}
+	return true, true
+}
+
+func (st *step) busy(jobID string) int {
+	n := 0
+	for _, rj := range st.rows {
+		if rj.JobId == jobID && rj.State == models.JobActive {
+			n++
+		}
+	}
+	return n
+}
+
+func (s *Service) advance(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, project string, c compiled) error {
+	rows, err := q.ListRunJobs(ctx, run.Id)
+	if err != nil {
+		return err
+	}
+	st := &step{run: run, project: project, c: c, rows: rows, byKey: make(map[string]int, len(rows))}
+	for i, rj := range rows {
+		st.byKey[rj.Key] = i
+	}
+	for changed := true; changed; {
+		changed = false
+		for i := range st.rows {
+			moved, err := s.consider(ctx, q, st, i)
+			if errors.Is(err, errQueueFull) {
+				return s.settle(ctx, q, st)
+			}
+			if err != nil {
+				return err
+			}
+			changed = changed || moved
+		}
+	}
+	return s.settle(ctx, q, st)
+}
+
+func (s *Service) consider(ctx context.Context, q *sqlc.Queries, st *step, i int) (bool, error) {
+	rj := st.rows[i]
+	if rj.Kind != models.KindJob || rj.State != models.JobWaiting {
+		return false, nil
+	}
+	if st.run.CancelRequestedAt != nil {
+		return true, s.endRunJob(ctx, q, st, i, models.JobCanceled, models.ReasonCanceled)
+	}
+	done, ok := st.settled(rj)
+	if !done {
+		return false, nil
+	}
+	if !ok {
+		return true, s.endRunJob(ctx, q, st, i, models.JobSkipped, models.ReasonNeedsFailed)
+	}
+	plan, found := st.c.byKey[rj.Key]
+	if !found || plan.Digest != rj.Digest {
+		return true, s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonDefinitionChanged)
+	}
+	if plan.MaxParallel > 0 && st.busy(rj.JobId) >= plan.MaxParallel {
+		return false, nil
+	}
+	return true, s.launch(ctx, q, st, i, plan)
+}
+
+func (s *Service) endRunJob(ctx context.Context, q *sqlc.Queries, st *step, i int, state, reason string) error {
+	if _, err := q.FinishRunJob(ctx, sqlc.FinishRunJobParams{ID: st.rows[i].Id, State: state, FailureReason: reason, Outputs: []byte("{}")}); err != nil {
+		return err
+	}
+	st.rows[i].State, st.rows[i].FailureReason = state, reason
+	return nil
+}
+
+func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, plan *pipelinespec.RunJob) error {
+	rj := st.rows[i]
+	if plan.Environment != "" {
+		reason := models.ReasonEnvironments
+		if st.run.IsFork {
+			reason = models.ReasonForkEnvironment
+		}
+		return s.endRunJob(ctx, q, st, i, models.JobSkipped, reason)
+	}
+	evalCtx := evalContext(st.run, st.project, needsContext(st.rows))
+	run, err := plan.EvalIf(ctx, evalCtx)
+	if err != nil {
+		return s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonExpressionFailed)
+	}
+	if !run {
+		return s.endRunJob(ctx, q, st, i, models.JobSkipped, models.ReasonConditionFalse)
+	}
+	spec, err := buildSpec(ctx, plan, evalCtx)
+	if err != nil {
+		return s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonExpressionFailed)
+	}
+	if len(spec.GetSteps()) == 0 {
+		return s.endRunJob(ctx, q, st, i, models.JobSkipped, models.ReasonConditionFalse)
+	}
+	if st.run.IsFork && (len(spec.GetSecrets()) > 0 || hasPluginSecrets(plan)) {
+		return s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonForkSecrets)
+	}
+	reason, err := s.enqueue(ctx, q, st, rj, plan, spec)
+	if err != nil || reason == "" {
+		return err
+	}
+	return s.endRunJob(ctx, q, st, i, models.JobFailed, reason)
+}
+
+func hasPluginSecrets(plan *pipelinespec.RunJob) bool {
+	return slices.ContainsFunc(plan.Steps, func(sp pipelinespec.StepPlan) bool { return sp.Plugin != nil && len(sp.Plugin.Secrets) > 0 })
+}
+
+func buildSpec(ctx context.Context, plan *pipelinespec.RunJob, evalCtx pipelinespec.Context) (*runnerv1.JobSpec, error) {
+	spec, ok := proto.Clone(plan.Spec).(*runnerv1.JobSpec)
+	if !ok {
+		return nil, pipelinespec.ErrExpression
+	}
+	if spec.Env == nil {
+		spec.Env = map[string]string{}
+	}
+	for ref := range plan.Expressions {
+		v, err := plan.EvalValue(ctx, ref, evalCtx)
+		if err != nil {
+			return nil, err
+		}
+		placeValue(spec, ref, v)
+	}
+	evalCtx.Env = spec.GetEnv()
+	kept := make([]*runnerv1.Step, 0, len(spec.GetSteps()))
+	for i, st := range spec.GetSteps() {
+		keep, err := plan.EvalStepIf(ctx, i, evalCtx)
+		if err != nil {
+			return nil, err
+		}
+		if keep {
+			kept = append(kept, st)
+		}
+	}
+	spec.Steps = kept
+	return spec, nil
+}
+
+func placeValue(spec *runnerv1.JobSpec, ref, v string) {
+	if name, found := strings.CutPrefix(ref, "Env."); found {
+		spec.Env[name] = v
+		return
+	}
+	rest, found := strings.CutPrefix(ref, "Steps[")
+	if !found {
+		return
+	}
+	index, name, found := strings.Cut(rest, "].Env.")
+	i, err := strconv.Atoi(index)
+	if !found || err != nil || i < 0 || i >= len(spec.GetSteps()) {
+		return
+	}
+	step := spec.GetSteps()[i]
+	if step.Env == nil {
+		step.Env = map[string]string{}
+	}
+	step.Env[name] = v
+}
+
+func jobName(run sqlc.PipelineRun, rj sqlc.RunJob) string {
+	name := []rune("#" + strconv.FormatInt(run.Number, 10) + " " + rj.JobName)
+	if len(name) > config.JobNameMaxLength {
+		name = name[:config.JobNameMaxLength]
+	}
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, strings.TrimSpace(string(name)))
+}
+
+func (s *Service) checkoutRequest(run sqlc.PipelineRun) CheckoutRequest {
+	out := CheckoutRequest{
+		RunID: run.Id, OrganizationID: run.OrganizationId, ProjectID: run.ProjectId, Ref: run.Ref, Sha: run.Sha.String,
+		Path: run.DefinitionPath,
+	}
+	if run.RepositoryId != nil {
+		out.RepositoryID = *run.RepositoryId
+	}
+	return out
+}
+
+func (s *Service) enqueue(
+	ctx context.Context, q *sqlc.Queries, st *step, rj sqlc.RunJob, plan *pipelinespec.RunJob, spec *runnerv1.JobSpec,
+) (string, error) {
+	creator := uuid.Nil
+	if st.run.TriggeredByUserId != nil {
+		creator = *st.run.TriggeredByUserId
+		member, err := q.RunCreatorIsMember(ctx, sqlc.RunCreatorIsMemberParams{UserID: creator, OrganizationID: st.run.OrganizationId})
+		if err != nil {
+			return "", err
+		}
+		if !member {
+			return models.ReasonCreatorNotMember, nil
+		}
+	}
+	features, err := s.checkout.ForJob(spec, s.checkoutRequest(st.run))
+	if err != nil {
+		return models.ReasonCheckoutUnavailable, nil
+	}
+	features = append(features, planFeatures(plan)...)
+	out, err := s.queue.Enqueue(ctx, q, jobqueue.Request{
+		OrganizationID: st.run.OrganizationId, CreatedByUserID: creator, OriginKind: jobqueue.OriginPipeline, OriginID: rj.Id,
+		Name: jobName(st.run, rj), Spec: spec, RequiredFeatures: features,
+	})
+	if reason, refused := refusal(err); refused {
+		return reason, nil
+	}
+	var ae *apperrors.AppError
+	if errors.As(err, &ae) && ae.Code == apperrors.CodeJobQueueFull {
+		return "", errQueueFull
+	}
+	if err != nil {
+		return "", err
+	}
+	if _, err := q.ActivateRunJob(ctx, sqlc.ActivateRunJobParams{ID: rj.Id, JobID: &out.JobID}); err != nil {
+		return "", err
+	}
+	i := st.byKey[rj.Key]
+	st.rows[i].State, st.rows[i].CurrentJobId = models.JobActive, &out.JobID
+	return "", nil
+}
+
+func planFeatures(plan *pipelinespec.RunJob) []string {
+	var out []string
+	if slices.ContainsFunc(plan.Steps, func(sp pipelinespec.StepPlan) bool { return sp.Plugin != nil }) {
+		out = append(out, jobqueue.FeaturePlugins)
+	}
+	if len(plan.Artifacts) > 0 {
+		out = append(out, jobqueue.FeatureArtifacts)
+	}
+	if plan.Cache != nil {
+		out = append(out, jobqueue.FeatureCache)
+	}
+	return out
+}
+
+func refusal(err error) (string, bool) {
+	var ae *apperrors.AppError
+	if err == nil || !errors.As(err, &ae) {
+		return "", false
+	}
+	switch ae.Code {
+	case apperrors.CodeJobQueueFull:
+		return "", false
+	case apperrors.CodeSecretsUnavailable:
+		return models.ReasonSecretsUnavailable, true
+	case apperrors.CodeValidationFailed:
+		return models.ReasonJobSpecInvalid, true
+	default:
+		return models.ReasonEnqueueRefused, true
+	}
+}
+
+func (s *Service) settle(ctx context.Context, q *sqlc.Queries, st *step) error {
+	if models.RunFinished(st.run.State) {
+		return nil
+	}
+	failed, canceled := false, false
+	for _, rj := range st.rows {
+		if !models.JobFinished(rj.State) {
+			return nil
+		}
+		failed = failed || rj.State == models.JobFailed
+		canceled = canceled || rj.State == models.JobCanceled
+	}
+	state, reason, status := models.RunSucceeded, "", commitstatus.StateSuccess
+	switch {
+	case failed:
+		state, reason, status = models.RunFailed, models.ReasonJobsFailed, commitstatus.StateFailed
+	case canceled || st.run.CancelRequestedAt != nil:
+		state, reason, status = models.RunCanceled, models.ReasonCanceled, commitstatus.StateCanceled
+	}
+	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: st.run.Id, State: state, FailureReason: reason}); err != nil {
+		return err
+	}
+	st.run.State = state
+	return s.recordStatus(ctx, q, st.run, status)
+}

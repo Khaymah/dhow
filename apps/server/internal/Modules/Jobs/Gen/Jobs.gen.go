@@ -222,11 +222,13 @@ type ErrorResponse struct {
 
 // Job defines model for Job.
 type Job struct {
-	AttemptCount      int                `json:"AttemptCount"`
-	CancelRequestedAt *time.Time         `json:"CancelRequestedAt,omitempty"`
-	CreatedAt         time.Time          `json:"CreatedAt"`
-	CreatedByUserId   openapi_types.UUID `json:"CreatedByUserId"`
-	Deadline          *time.Time         `json:"Deadline,omitempty"`
+	AttemptCount      int        `json:"AttemptCount"`
+	CancelRequestedAt *time.Time `json:"CancelRequestedAt,omitempty"`
+	CreatedAt         time.Time  `json:"CreatedAt"`
+
+	// CreatedByUserId Empty for a job that a webhook's run made.
+	CreatedByUserId *openapi_types.UUID `json:"CreatedByUserId,omitempty"`
+	Deadline        *time.Time          `json:"Deadline,omitempty"`
 
 	// FailureReason Why the job ended the way it did, for example `QUEUE_TIMEOUT` or `LOST_AFTER_MUTATION`.
 	FailureReason   *string            `json:"FailureReason,omitempty"`

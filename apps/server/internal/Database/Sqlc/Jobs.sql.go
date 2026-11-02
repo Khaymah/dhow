@@ -22,7 +22,7 @@ RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Create
 `
 
 type CancelQueuedJobParams struct {
-	UserID uuid.UUID
+	UserID *uuid.UUID
 	ID     uuid.UUID
 }
 
@@ -259,24 +259,47 @@ WHERE "Id" IN (SELECT q."Id"
                ORDER BY q."QueueDeadline"
                LIMIT $1
                FOR UPDATE SKIP LOCKED)
-RETURNING "Id", "OrganizationId"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "CreatedByUserId", "Name", "Spec", "SpecDigest", "Image", "Labels", "Isolation", "Priority", "State", "FailureReason", "QueuedAt", "StartedAt", "FinishedAt", "Deadline", "QueueDeadline", "CancelRequestedAt", "CancelRequestedBy", "AttemptCount", "MaxInfraRetries", "OriginKind", "OriginId", "RequiredFeatures"
 `
 
-type FailTimedOutQueuedJobsRow struct {
-	Id             uuid.UUID
-	OrganizationId uuid.UUID
-}
-
-func (q *Queries) FailTimedOutQueuedJobs(ctx context.Context, batch int32) ([]FailTimedOutQueuedJobsRow, error) {
+func (q *Queries) FailTimedOutQueuedJobs(ctx context.Context, batch int32) ([]Job, error) {
 	rows, err := q.db.Query(ctx, failTimedOutQueuedJobs, batch)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []FailTimedOutQueuedJobsRow{}
+	items := []Job{}
 	for rows.Next() {
-		var i FailTimedOutQueuedJobsRow
-		if err := rows.Scan(&i.Id, &i.OrganizationId); err != nil {
+		var i Job
+		if err := rows.Scan(
+			&i.Id,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsDeleted,
+			&i.OrganizationId,
+			&i.CreatedByUserId,
+			&i.Name,
+			&i.Spec,
+			&i.SpecDigest,
+			&i.Image,
+			&i.Labels,
+			&i.Isolation,
+			&i.Priority,
+			&i.State,
+			&i.FailureReason,
+			&i.QueuedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.Deadline,
+			&i.QueueDeadline,
+			&i.CancelRequestedAt,
+			&i.CancelRequestedBy,
+			&i.AttemptCount,
+			&i.MaxInfraRetries,
+			&i.OriginKind,
+			&i.OriginId,
+			&i.RequiredFeatures,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -457,6 +480,26 @@ func (q *Queries) GetJob(ctx context.Context, arg GetJobParams) (Job, error) {
 	return i, err
 }
 
+const getJobProject = `-- name: GetJobProject :one
+SELECT r."ProjectId"
+FROM "Jobs" j
+JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
+JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+WHERE j."Id" = $1 AND j."OrganizationId" = $2 AND j."OriginKind" = 'pipeline'
+`
+
+type GetJobProjectParams struct {
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) GetJobProject(ctx context.Context, arg GetJobProjectParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getJobProject, arg.ID, arg.OrganizationID)
+	var ProjectId uuid.UUID
+	err := row.Scan(&ProjectId)
+	return ProjectId, err
+}
+
 const getLeaseAttempt = `-- name: GetLeaseAttempt :one
 SELECT l."Id", l."AttemptId", l."JobId", a."State" AS "AttemptState"
 FROM "Leases" l
@@ -574,7 +617,7 @@ RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Create
 
 type InsertJobParams struct {
 	OrganizationID      uuid.UUID
-	CreatedByUserID     uuid.UUID
+	CreatedByUserID     *uuid.UUID
 	Name                string
 	Spec                []byte
 	SpecDigest          []byte
@@ -856,7 +899,7 @@ type ListJobsRow struct {
 	Id                uuid.UUID
 	CreatedAt         time.Time
 	OrganizationId    uuid.UUID
-	CreatedByUserId   uuid.UUID
+	CreatedByUserId   *uuid.UUID
 	Name              string
 	SpecDigest        []byte
 	Image             string
@@ -1350,7 +1393,7 @@ RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Create
 `
 
 type RequestJobCancelParams struct {
-	UserID uuid.UUID
+	UserID *uuid.UUID
 	ID     uuid.UUID
 }
 

@@ -58,6 +58,12 @@ tags:
       The Git repository linked to a project, its deploy key, its pinned host key and its webhook secret. Served by the
       Sources module. Private keys and webhook secrets are write-only: a webhook secret is shown once, when it is made,
       and a deploy key only ever shows its public half. Providers call `/webhooks/...`, outside this API.
+  - name: pipelines
+    description: >-
+      Runs of a project's pipeline: the jobs each run made from the pipeline file, in the order of their `needs`.
+      Served by the Pipelines module. A webhook, a person (`manual`) or an API token (`api`) starts a run; a run reads
+      its pipeline file at the commit it runs, pins every image tag to a digest when it starts, and makes the jobs of
+      the Jobs module, whose logs are under `/jobs/{jobId}`.
   - name: overview
     description: >-
       Counts for the home page and the sidebar, in one request. Served by the Overview module, which reads the jobs,
@@ -2012,6 +2018,8 @@ paths:
       tags: [jobs]
       summary: Create a job from a job spec
       description: >-
+        A development tool: a server started without `DHOW_DEV` answers 404, because in production every job comes
+        from a pipeline file in a repository (`POST /organizations/{id}/projects/{projectId}/runs` with `on: manual`).
         Needs `job.create`. The spec is validated and normalized (defaults filled in) and the job is queued. The image
         must be pinned by digest. A spec that references secrets is refused with 422 `SECRETS_UNAVAILABLE` while no
         secret store is configured, and an organization with 1000 queued jobs gets 429 `JOB_QUEUE_FULL`. API tokens cannot create jobs.
@@ -2041,8 +2049,9 @@ paths:
       tags: [jobs]
       summary: Read a job with its spec, attempts and steps
       description: >-
-        Needs `job.read`. A queued job that no active runner of the organization can take carries `QueuedReason`
-        `NO_MATCHING_RUNNER`. A job of another organization gets 404.
+        Needs `job.read`, and for a job that a pipeline run made, `job.read` with the caller's role on that run's
+        project, after its role bindings. A queued job that no active runner of the organization can take carries
+        `QueuedReason` `NO_MATCHING_RUNNER`. A job of another organization gets 404.
       security:
         - SessionCookie: []
         - ApiToken: []
@@ -2064,7 +2073,9 @@ paths:
       tags: [jobs]
       summary: Cancel a job
       description: >-
-        Needs `job.cancel`. Idempotent. A queued job is canceled at once. A leased or running job is marked, its runner
+        Needs `job.cancel`, and for a job that a pipeline run made, `job.cancel` with the caller's role on that run's
+        project too, so a binding that lowers the role on the project also holds here. Idempotent. A queued job is
+        canceled at once. A leased or running job is marked, its runner
         sees the request on its next heartbeat and no step may begin after it. A job that already finished in another
         state answers 409 `JOB_FINISHED`.
       security:
@@ -2089,7 +2100,8 @@ paths:
       tags: [jobs]
       summary: Read a page of the log of a job attempt
       description: >-
-        Needs `log.read`, which a viewer does not have. Reads the chunks of one attempt (the latest without `Attempt`)
+        Needs `log.read`, which a viewer does not have, with the caller's role on the run's project for a job that a
+        pipeline run made. Reads the chunks of one attempt (the latest without `Attempt`)
         from `FromSeq` on, in order. A page holds at most `Limit` chunks and about 1 MiB of text, and `NextSeq` is
         set while more chunks follow. `Text` is the stored bytes as UTF-8, with every invalid byte replaced by
         U+FFFD. A job without that attempt answers 404 `ATTEMPT_NOT_FOUND`, and a job of another organization 404
@@ -2117,7 +2129,8 @@ paths:
       tags: [jobs]
       summary: Follow the log of a job attempt as server-sent events
       description: >-
-        Needs `log.read`. Streams the chunks of one attempt (the latest without `Attempt`) after `Last-Event-ID`,
+        Needs `log.read`, with the caller's role on the run's project for a job that a pipeline run made. Streams the
+        chunks of one attempt (the latest without `Attempt`) after `Last-Event-ID`,
         or from `FromSeq`, or from the start. Events: `chunk` (its `id` is `<attempt>:<seq>` and its data a
         `JobLogChunk`),
         `status` (data `JobLogStatus`, sent first and on every change of the attempt) and `end` (data
@@ -2444,6 +2457,179 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WebhookSecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs:
+    get:
+      operationId: listRuns
+      tags: [pipelines]
+      summary: List the runs of a project
+      description: >-
+        Needs `run.read` on the project, after its role bindings. Newest first, optionally filtered by one or more states
+        and by ref. A project of another organization is 404.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: State
+          in: query
+          required: false
+          description: One or more run states, repeated or comma-separated.
+          schema:
+            type: array
+            maxItems: 8
+            items:
+              type: string
+        - name: Ref
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 255
+      responses:
+        "200":
+          description: A page of runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: triggerRun
+      tags: [pipelines]
+      summary: Start a run by hand or from an API token
+      description: >-
+        Needs `run.trigger` on the project. A session starts a `manual` run and an API token starts an `api` run, and the
+        pipeline must allow that trigger in `on:`. `Ref` is a branch (`main` or `refs/heads/main`) or a tag
+        (`refs/tags/v1`). Without `Sha` the server finds the commit of the ref before the run starts. `Inputs` are checked
+        against `on.manual.inputs` when the run starts, and a wrong input fails the run with `INPUTS_INVALID`. A project
+        without a repository answers 404 `REPOSITORY_NOT_LINKED`, and an archived project 409 `PROJECT_ARCHIVED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriggerRunRequest"
+      responses:
+        "201":
+          description: The new run, still pending.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs/{runId}:
+    get:
+      operationId: getRun
+      tags: [pipelines]
+      summary: Read a run with its jobs and the problems found in its pipeline file
+      description: >-
+        Needs `run.read` on the project. A run whose pipeline file is wrong has `FailureReason` `PIPELINE_INVALID` and
+        lists every problem in `Issues`, with its line and column. A run of another project is 404.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetailResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs/{runId}/cancel:
+    post:
+      operationId: cancelRun
+      tags: [pipelines]
+      summary: Cancel a run
+      description: >-
+        Needs `run.cancel` on the project. Idempotent. Jobs that have not started are canceled at once, and a running
+        job sees the request on its runner's next heartbeat. A run that already finished is returned as it is.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: The run after the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetailResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs/{runId}/rerun-failed:
+    post:
+      operationId: rerunFailedRun
+      tags: [pipelines]
+      summary: Run the failed and canceled jobs of a finished run again
+      description: >-
+        Needs `run.trigger` on the project. Only a run that ended `failed` or `canceled` can be run again (409
+        `RUN_NOT_RERUNNABLE` otherwise). Every job that failed, was canceled or was skipped because of them waits again
+        and gets a new job; the jobs that succeeded keep their result. The run uses the same pipeline file and the
+        same image digests as before.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: The run, running again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetailResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs/{runId}/approve:
+    post:
+      operationId: approveRun
+      tags: [pipelines]
+      summary: Approve a run from a fork's pull request
+      description: >-
+        Needs `run.approve` on the project (Maintainer and above). Only a run that waits for approval can be approved
+        (409 `RUN_NOT_AWAITING_APPROVAL` otherwise). The run still has no secrets and no environments, and reads its
+        pipeline file from the base branch.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: The approved run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetailResponse"
         default:
           $ref: "#/components/responses/Error"
   /organizations/{id}/overview:
@@ -2971,6 +3157,13 @@ components:
         format: uuid
     ProjectId:
       name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RunId:
+      name: runId
       in: path
       required: true
       schema:
@@ -5033,7 +5226,8 @@ components:
               $ref: "#/components/schemas/LinkedIdentityChange"
     ApiTokenScope:
       type: string
-      enum: [org.read, org.update, member.read, member.manage, audit.read, runner.read, runner.manage, job.read, job.cancel, project.read, project.manage]
+      enum: [org.read, org.update, member.read, member.manage, audit.read, runner.read, runner.manage, job.read, job.cancel, project.read, project.manage,
+             run.read, run.trigger, run.cancel]
     ApiTokenStatus:
       type: string
       enum: [active, expired, revoked, inactive]
@@ -5370,7 +5564,7 @@ components:
       type: object
       additionalProperties: false
       required: [Id, OrganizationId, Name, State, Labels, Isolation, Priority, Image, SpecDigest, AttemptCount,
-                 MaxInfraRetries, QueuedAt, QueueDeadline, CreatedAt, CreatedByUserId]
+                 MaxInfraRetries, QueuedAt, QueueDeadline, CreatedAt]
       properties:
         Id:
           type: string
@@ -5430,6 +5624,8 @@ components:
         CreatedByUserId:
           type: string
           format: uuid
+          nullable: true
+          description: Empty for a job that a webhook's run made.
     JobAttemptStep:
       type: object
       additionalProperties: false
@@ -5705,6 +5901,230 @@ components:
           maxLength: 255
         ForkPolicy:
           $ref: "#/components/schemas/ForkPolicy"
+    RunState:
+      type: string
+      enum: [awaiting_approval, pending, queued, running, succeeded, failed, canceled, skipped]
+      description: >-
+        `awaiting_approval`: a pull request from a fork waits for a Maintainer. `pending`: the server reads the pipeline
+        file and pins its images. `queued`: the run waits for an older run of its concurrency group. `skipped`: the
+        pipeline file is missing or does not run on this trigger.
+    RunTrigger:
+      type: string
+      enum: [push, tag, pull_request, manual, api]
+    RunJobState:
+      type: string
+      enum: [waiting, active, succeeded, failed, canceled, skipped]
+    RunIssue:
+      type: object
+      additionalProperties: false
+      required: [Code, Severity, Path, Line, Column, Message]
+      properties:
+        Code:
+          type: string
+          description: A stable code such as `UNKNOWN_KEY` or `IMAGE_NOT_PINNED`, the same that `dhow lint` prints.
+        Severity:
+          type: string
+          enum: [error, warning]
+        Path:
+          type: string
+        Line:
+          type: integer
+          minimum: 0
+        Column:
+          type: integer
+          minimum: 0
+        Message:
+          type: string
+    RunImagePin:
+      type: object
+      additionalProperties: false
+      required: [Image, Pinned]
+      properties:
+        Image:
+          type: string
+          description: The image as the pipeline file names it, by tag.
+        Pinned:
+          type: string
+          description: The same image by digest, as every job and every rerun of this run pulls it.
+    Run:
+      type: object
+      additionalProperties: false
+      required: [Id, ProjectId, Number, Trigger, Ref, IsFork, State, DefinitionPath, CreatedAt, UpdatedAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        ProjectId:
+          type: string
+          format: uuid
+        Number:
+          type: integer
+          format: int64
+          minimum: 1
+        Trigger:
+          $ref: "#/components/schemas/RunTrigger"
+        Ref:
+          type: string
+        Sha:
+          type: string
+        BaseRef:
+          type: string
+        BaseSha:
+          type: string
+        IsFork:
+          type: boolean
+        PrNumber:
+          type: integer
+        Actor:
+          type: string
+        State:
+          $ref: "#/components/schemas/RunState"
+        FailureReason:
+          type: string
+          description: >-
+            Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`,
+            `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND` or `TRIGGER_NOT_ENABLED`.
+        DefinitionPath:
+          type: string
+        DefinitionSha:
+          type: string
+          description: The commit the pipeline file was read from. For a fork's pull request it is the base.
+        DefinitionDigest:
+          type: string
+          description: Hex SHA-256 of the pipeline file the run uses.
+        ConcurrencyGroup:
+          type: string
+        TriggeredByUserId:
+          type: string
+          format: uuid
+        ApprovedByUserId:
+          type: string
+          format: uuid
+        ApprovedAt:
+          type: string
+          format: date-time
+        CancelRequestedAt:
+          type: string
+          format: date-time
+        StartedAt:
+          type: string
+          format: date-time
+        FinishedAt:
+          type: string
+          format: date-time
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+    RunJob:
+      type: object
+      additionalProperties: false
+      required: [Id, Key, JobId, Name, Matrix, Needs, State, Attempts]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        Key:
+          type: string
+          description: The job's id, with its matrix values for a matrix job, such as `build (node=20, os=debian)`.
+        JobId:
+          type: string
+          description: The id of the job in the pipeline file.
+        Name:
+          type: string
+        Matrix:
+          type: object
+          additionalProperties:
+            type: string
+        Needs:
+          type: array
+          items:
+            type: string
+        State:
+          $ref: "#/components/schemas/RunJobState"
+        FailureReason:
+          type: string
+          description: >-
+            For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`,
+            `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED`.
+        CurrentJobId:
+          type: string
+          format: uuid
+          description: The job that runs this entry now, or ran it last. Its logs are under `/jobs/{jobId}`.
+        Attempts:
+          type: integer
+          minimum: 0
+          description: How many jobs this entry has had, reruns included.
+        StartedAt:
+          type: string
+          format: date-time
+        FinishedAt:
+          type: string
+          format: date-time
+    RunDetail:
+      type: object
+      additionalProperties: false
+      required: [Run, Jobs, Issues, ImagePins]
+      properties:
+        Run:
+          $ref: "#/components/schemas/Run"
+        Jobs:
+          type: array
+          description: In the order of the pipeline, every job after the jobs it needs.
+          items:
+            $ref: "#/components/schemas/RunJob"
+        Issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunIssue"
+        ImagePins:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunImagePin"
+    RunResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/Run"
+    RunDetailResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/RunDetail"
+    RunListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Run"
+    TriggerRunRequest:
+      type: object
+      additionalProperties: false
+      required: [Ref]
+      properties:
+        Ref:
+          type: string
+          minLength: 1
+          maxLength: 255
+        Sha:
+          type: string
+          minLength: 40
+          maxLength: 64
+          description: The full commit hash. Optional.
+        Inputs:
+          type: object
+          maxProperties: 20
+          description: Values for `on.manual.inputs`, each a string or a boolean.
+          additionalProperties: true
     GitProvider:
       type: string
       enum: [github, gitlab, generic]

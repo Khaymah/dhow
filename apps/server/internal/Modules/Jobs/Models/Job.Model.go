@@ -29,7 +29,7 @@ type Job struct {
 	QueueDeadline     time.Time
 	CancelRequestedAt *time.Time
 	CreatedAt         time.Time
-	CreatedByUserID   uuid.UUID
+	CreatedByUserID   *uuid.UUID
 }
 
 type Step struct {

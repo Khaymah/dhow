@@ -1,0 +1,9 @@
+package: gen
+output: apps/server/internal/Modules/Pipelines/Gen/Pipelines.gen.go
+generate:
+  chi-server: true
+  strict-server: true
+  models: true
+output-options:
+  include-tags:
+    - pipelines

@@ -32,6 +32,7 @@ import (
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	overview "github.com/Khaymah/dhow/apps/server/internal/Modules/Overview"
+	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
 	preferences "github.com/Khaymah/dhow/apps/server/internal/Modules/Preferences"
 	projects "github.com/Khaymah/dhow/apps/server/internal/Modules/Projects"
 	runners "github.com/Khaymah/dhow/apps/server/internal/Modules/Runners"
@@ -65,6 +66,11 @@ type Infra struct {
 	Triggers           triggers.Sink
 	GitLookup          netguard.Lookup
 	GitDial            netguard.DialFunc
+	Definitions        pipelines.Definitions
+	Images             pipelines.ImageResolver
+	Checkout           pipelines.CheckoutSeam
+	RegistryTLS        *tls.Config
+	ManualJobs         bool
 }
 
 type Wired struct {
@@ -76,6 +82,7 @@ type Wired struct {
 	JobQueue      jobqueue.Queue
 	Projects      *projects.Service
 	Sources       *sources.Service
+	Pipelines     *pipelines.Service
 	LogPool       *pgxpool.Pool
 	Retention     *retention.Runner
 	Alerts        *alerts.Service
@@ -146,10 +153,13 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	sourcesService, err := sourcesFor(in, bus, limiter)
+	pipelinesService := pipelinesFor(in, bus, jobsService.Queue())
+	jobsService.UseRunEvents(pipelinesService)
+	sourcesService, err := sourcesFor(in, bus, limiter, pipelinesService)
 	if err != nil {
 		return nil, err
 	}
+	pipelinesService.UseStatuses(sourcesService.StatusRecorder())
 
 	opts := Options{
 		Config: in.Config,
@@ -165,6 +175,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Jobs:      jobsService,
 		Projects:  projects.NewService(projects.Options{DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now}),
 		Sources:   sourcesService,
+		Pipelines: pipelinesService,
 		Overview:  overview.NewService(overview.Options{Counter: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
 		Tokens:    tokensService,
 		Prefs:     preferences.NewService(in.Pool, in.Log, in.Now),
@@ -180,7 +191,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	}
 	wired := &Wired{
 		Options: opts, Handler: NewRouter(opts), Identity: identityService, Jobs: jobsService, JobQueue: jobsService.Queue(),
-		Projects: opts.Projects, Sources: sourcesService, LogPool: logPool, Settings: store, Alerts: alertsService,
+		Projects: opts.Projects, Sources: sourcesService, Pipelines: pipelinesService, LogPool: logPool, Settings: store, Alerts: alertsService,
 		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now}),
 	}
 	if in.Config.RunnerPlaneSeparate() {
@@ -239,7 +250,7 @@ func buildJobs(
 	opts := jobs.Options{
 		DB: in.Pool, Keys: keys, Secrets: in.Secrets, Bus: bus, Listen: listener(in.Pool),
 		MaxPolls: in.Config.RunnerMaxPolls, Logs: in.Config.Logs, StreamWriteWait: in.LogStreamWriteWait,
-		ReadWait: in.LogReadWait, Log: in.Log,
+		ReadWait: in.LogReadWait, Log: in.Log, ManualJobs: in.Config.Dev || in.ManualJobs,
 		LogSettings: func() config.LogSettings { return store.Current().Values.Logs },
 	}
 	if logPool != nil {

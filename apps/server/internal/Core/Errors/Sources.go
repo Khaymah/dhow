@@ -18,7 +18,20 @@ const (
 	KeyDeployKeyNotApplicable   = "errors.deployKeyNotApplicable"
 	KeyWebhookRejected          = "errors.webhookRejected"
 	KeyWebhookDeliveryIDMissing = "errors.webhookDeliveryIdMissing"
+
+	CodeRunNotRerunnable       = "RUN_NOT_RERUNNABLE"
+	CodeRunNotAwaitingApproval = "RUN_NOT_AWAITING_APPROVAL"
+	KeyRunNotRerunnable        = "errors.runNotRerunnable"
+	KeyRunNotAwaitingApproval  = "errors.runNotAwaitingApproval"
 )
+
+func RunNotRerunnable() *AppError {
+	return New(http.StatusConflict, CodeRunNotRerunnable, KeyRunNotRerunnable)
+}
+
+func RunNotAwaitingApproval() *AppError {
+	return New(http.StatusConflict, CodeRunNotAwaitingApproval, KeyRunNotAwaitingApproval)
+}
 
 func RepositoryNotLinked() *AppError {
 	return New(http.StatusNotFound, CodeRepositoryNotLinked, KeyRepositoryNotLinked)
