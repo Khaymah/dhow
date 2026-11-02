@@ -75,7 +75,9 @@ func (d *Driver) detectSlots(ctx context.Context) error {
 		return err
 	}
 	d.mu.Lock()
-	d.slots = newSlots(r)
+	if d.slots == nil {
+		d.slots = newSlots(r)
+	}
 	d.mu.Unlock()
 	return nil
 }
@@ -89,7 +91,10 @@ type workspace struct {
 }
 
 func (d *Driver) Workspace(ctx context.Context, spec sandbox.WorkspaceSpec) (sandbox.Workspace, error) {
-	if d.slots == nil {
+	d.mu.Lock()
+	missing := d.slots == nil
+	d.mu.Unlock()
+	if missing {
 		if err := d.detectSlots(ctx); err != nil {
 			return nil, fmt.Errorf("%w: %w", sandbox.ErrSandbox, err)
 		}
