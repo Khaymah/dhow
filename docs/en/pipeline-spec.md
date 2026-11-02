@@ -286,9 +286,18 @@ A run is one pass of the pipeline over one commit. The server makes it from a tr
 - With `cancel_in_progress: true`, a new run cancels the older runs of its group instead of waiting for them.
 
 ```yaml
+version: 1
+on:
+  push:
+    branches: [main, "release/*"]
 concurrency:
   group: ${{ "deploy-" + git.branch }}
   cancel_in_progress: true
+jobs:
+  deploy:
+    image: alpine:3.22@sha256:61bb7a95b0f3650f3039c0fcabe07674458cf0d13afa51aade6188bab8215b07
+    steps:
+      - run: ./deploy.sh
 ```
 
 ### 12.4 Pull requests from forks

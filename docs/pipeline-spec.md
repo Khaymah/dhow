@@ -286,9 +286,18 @@ jobs:
 - مع `cancel_in_progress: true` يلغي التنفيذ الجديد التنفيذات الأقدم في مجموعته بدل أن ينتظرها.
 
 ```yaml
+version: 1
+on:
+  push:
+    branches: [main, "release/*"]
 concurrency:
   group: ${{ "deploy-" + git.branch }}
   cancel_in_progress: true
+jobs:
+  deploy:
+    image: alpine:3.22@sha256:61bb7a95b0f3650f3039c0fcabe07674458cf0d13afa51aade6188bab8215b07
+    steps:
+      - run: ./deploy.sh
 ```
 
 ### 12.4 طلبات الدمج من fork
