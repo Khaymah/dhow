@@ -100,8 +100,14 @@ online() {
 
 delegated() {
   local pid
-  pid=$(docker compose exec -T runner pgrep -o -u dhow-runner -x dhow-runner) || return 1
-  docker compose exec -T runner grep -q '^0::/dhow-runner[.]service' "/proc/$pid/cgroup"
+  if pid=$(docker compose exec -T runner pgrep -o -u dhow-runner -x dhow-runner) &&
+    docker compose exec -T runner grep -q '^0::/dhow-runner[.]service' "/proc/$pid/cgroup"; then
+    return 0
+  fi
+  printf '    runner pid: %s\n' "${pid:-none}" >&2
+  docker compose exec -T runner ps -eo pid,user,comm >&2 || true
+  docker compose exec -T runner find /proc -mindepth 2 -maxdepth 2 -path '/proc/[0-9]*/cgroup' -exec grep -H . {} + >&2 || true
+  return 1
 }
 
 job_succeeds() {
