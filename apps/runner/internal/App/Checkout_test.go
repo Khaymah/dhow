@@ -322,3 +322,14 @@ func TestSurvivorsStopTheAttemptBeforeTheNextSandbox(t *testing.T) {
 	assert.Equal(t, 1, prepares, "no sandbox starts on a workspace where processes survived")
 	assert.Len(t, execs(running.Driver.Events()), 1)
 }
+
+func TestASecretSplitAcrossOutputsIsDropped(t *testing.T) {
+	srv := runnertest.NewServer(t)
+	r := runnertest.Register(t, srv, srv.URL)
+	spec := runnertest.Spec(&runnerv1.Step{Name: "echo", Run: "echo"})
+	spec.Secrets = []*runnerv1.SecretRef{{Name: "API_TOKEN", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "API_TOKEN"}}}
+	srv.Enqueue(spec, map[string][]byte{"API_TOKEN": []byte("s3cr3t-value-123")})
+	running := r.Start(fake.Recording{Steps: []fake.Step{{Outputs: "half=s3cr3t-\nrest=value-123\nkept=fine\n"}}}, runnertest.StartOptions{})
+	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, running.Next(t, finishWithin).Result)
+	assert.Equal(t, map[string]string{"kept": "fine"}, srv.Leases()[0].Completes[0].GetOutputs())
+}

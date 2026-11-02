@@ -188,7 +188,8 @@ Every step, `run:` or `uses:`, gets the variable `DHOW_OUTPUT`, a file where it 
 
 - Keys are letters, digits and `_` and do not start with a digit; a value is up to 1 KiB on one line. A job keeps at most 64 outputs, and a later step overwrites an earlier key.
 - A plugin may write only the keys in its manifest's `Outputs`.
-- A line that breaks these rules fails the step. Values pass through the masker, so a secret in an output is hidden. Outputs are kept only when the job succeeds.
+- A line that breaks these rules fails the step. Outputs are kept only when the job succeeds.
+- **Masking:** the masker checks each value and also the values joined together (every run of keys in name order, and every pair in either order). A secret inside a value becomes `***`; a secret that only appears once values are joined drops every key it spans. A secret shorter than 4 characters cannot be masked anywhere (the job log says so), so it can leave in an output.
 
 ## 4. Expressions
 

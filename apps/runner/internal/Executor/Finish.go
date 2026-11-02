@@ -88,8 +88,9 @@ func (a *attempt) complete(ctx context.Context, r result) bool {
 	}
 	req := CompleteRequest(a.grant.GetAttemptId(), a.ref, r.state, r.exitCode, r.reason)
 	if r.state == runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED && len(a.outputs) > 0 {
-		req.Outputs = a.outputs
+		req.Outputs = maskOutputs(a.masker, a.outputs)
 	}
+	clear(a.outputs)
 	acked, definitive := sendComplete(cctx, a.e.o.API, a.e.o.Backoff, req, a.log, 0)
 	if definitive {
 		a.forget()

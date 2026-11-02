@@ -139,7 +139,7 @@ func (a *attempt) collectOutputs(end stepEnd, allowed []string) stepEnd {
 		a.outputs = map[string]string{}
 	}
 	for k, v := range got {
-		a.outputs[k] = a.masker.MaskString(v)
+		a.outputs[k] = v
 	}
 	if len(a.outputs) > plugin.MaxOutputs {
 		a.outputs = nil
