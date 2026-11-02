@@ -9,9 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	agent "github.com/Khaymah/dhow/apps/runner/internal/Agent"
 	client "github.com/Khaymah/dhow/apps/runner/internal/Client"
-	plugin "github.com/Khaymah/dhow/apps/runner/internal/Plugin"
+	plugin "github.com/Khaymah/dhow/apps/runner/internal/Executor/Plugin"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
 	"github.com/Khaymah/dhow/internal/jobspec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
@@ -297,7 +296,7 @@ func (a *attempt) stepEnv(idx int32) (map[string]string, map[string][]byte) {
 	env[EnvJobID] = a.grant.GetJobId()
 	env[EnvAttemptID] = a.grant.GetAttemptId()
 	env[EnvStepIndex] = strconv.Itoa(int(idx))
-	env[plugin.EnvOutput] = agent.OutputPath
+	env[plugin.EnvOutput] = sandbox.OutputPath
 	files := map[string][]byte{}
 	for _, ref := range spec.GetSecrets() {
 		if ref.GetName() == jobspec.CheckoutSecret {

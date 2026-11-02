@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	checkout "github.com/Khaymah/dhow/apps/runner/internal/Checkout"
+	checkout "github.com/Khaymah/dhow/apps/runner/internal/Agent/Checkout"
 	config "github.com/Khaymah/dhow/apps/runner/internal/Config"
 	egress "github.com/Khaymah/dhow/apps/runner/internal/Egress"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"

@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
 	wire "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Wire"
 	agentv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/agent/v1"
 )
@@ -18,7 +19,7 @@ import (
 const (
 	ControlSocketPath = "/run/dhow/control/control.sock"
 	SecretsDir        = "/run/dhow/secrets"
-	OutputPath        = "/tmp/.dhow-output"
+	OutputPath        = sandbox.OutputPath
 	Shell             = "/bin/sh"
 	agentVersion      = "1"
 	dialTimeout       = 30 * time.Second

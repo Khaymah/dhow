@@ -25,7 +25,7 @@ const (
 	checkoutImage = "ghcr.io/khaymah/dhow-git@sha256:1111111111111111111111111111111111111111111111111111111111111111"
 	pluginImage   = "registry.example.com/tools/notify@sha256:2222222222222222222222222222222222222222222222222222222222222222"
 	checkoutSha   = "0123456789abcdef0123456789abcdef01234567"
-	deployKey     = "-----BEGIN OPENSSH PRIVATE KEY-----\nc2VjcmV0LWRlcGxveS1rZXktbWF0ZXJpYWw=\n-----END OPENSSH PRIVATE KEY-----"
+	deployKey     = "fake-deploy-key-c2VjcmV0LWRlcGxveS1rZXktbWF0ZXJpYWw"
 	manifest      = `{"Version":1,"Entrypoint":["/usr/local/bin/notify","--quiet"],"Inputs":{"channel":{"Required":true},"message":{"Default":"done"}},"Outputs":["url"]}`
 )
 

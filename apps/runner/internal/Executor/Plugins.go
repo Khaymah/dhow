@@ -6,8 +6,7 @@ import (
 	"maps"
 	"strconv"
 
-	checkout "github.com/Khaymah/dhow/apps/runner/internal/Checkout"
-	plugin "github.com/Khaymah/dhow/apps/runner/internal/Plugin"
+	plugin "github.com/Khaymah/dhow/apps/runner/internal/Executor/Plugin"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
@@ -16,8 +15,8 @@ func (a *attempt) runCheckout(ctx, jobCtx context.Context) (result, bool) {
 	co := a.grant.GetSpec().GetCheckout()
 	a.pipe.Systemf(nil, "dhow: checkout: %s at %s", co.GetRef(), co.GetSha())
 	env := map[string]string{
-		checkout.EnvURL: co.GetRepositoryUrl(), checkout.EnvRef: co.GetRef(), checkout.EnvSha: co.GetSha(),
-		checkout.EnvDepth: strconv.Itoa(int(co.GetDepth())),
+		sandbox.CheckoutEnvURL: co.GetRepositoryUrl(), sandbox.CheckoutEnvRef: co.GetRef(), sandbox.CheckoutEnvSha: co.GetSha(),
+		sandbox.CheckoutEnvDepth: strconv.Itoa(int(co.GetDepth())),
 	}
 	files := map[string][]byte{}
 	if name := co.GetCredentialSecret(); name != "" {
@@ -26,16 +25,16 @@ func (a *attempt) runCheckout(ctx, jobCtx context.Context) (result, bool) {
 			a.pipe.Systemf(nil, "dhow: CHECKOUT_FAILED: the server sent no checkout credential")
 			return failed(runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_FAILED, 0), false
 		}
-		files[checkout.CredentialFile] = append([]byte(nil), v...)
-		env[checkout.EnvCredential] = "1"
+		files[sandbox.CheckoutCredentialFile] = append([]byte(nil), v...)
+		env[sandbox.CheckoutEnvCredential] = "1"
 	}
 	if kh := co.GetKnownHost(); kh != "" {
-		files[checkout.KnownHostsFile] = []byte(kh + "\n")
+		files[sandbox.CheckoutKnownHostsFile] = []byte(kh + "\n")
 	}
 	if co.GetTransport() == runnerv1.CheckoutTransport_CHECKOUT_TRANSPORT_HTTPS {
 		maps.Copy(env, proxyEnv())
 	}
-	plan := execPlan{argv: []string{sandbox.AgentPath, checkout.Command}, env: env, files: files, silent: true}
+	plan := execPlan{argv: []string{sandbox.AgentPath, sandbox.CheckoutCommand}, env: env, files: files, silent: true}
 	return a.runStep(ctx, jobCtx, sandbox.CheckoutStepIndex, &runnerv1.Step{Name: "checkout"}, plan)
 }
 
@@ -48,13 +47,13 @@ func (a *attempt) silentOutcome(end stepEnd, why result, stopped bool) (result, 
 		return failed(runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_FAILED, 0), false
 	}
 	switch end.res.ExitCode {
-	case checkout.ExitOK:
+	case sandbox.CheckoutExitOK:
 		return result{}, true
-	case checkout.ExitRefMoved:
+	case sandbox.CheckoutExitRefMoved:
 		return failed(runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_REF_MOVED, end.res.ExitCode), false
-	case checkout.ExitHostKeyMismatch:
+	case sandbox.CheckoutExitHostKeyMismatch:
 		return failed(runnerv1.FailureReason_FAILURE_REASON_HOST_KEY_MISMATCH, end.res.ExitCode), false
-	case checkout.ExitDiskFull:
+	case sandbox.CheckoutExitDiskFull:
 		return failed(runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_DISK_FULL, end.res.ExitCode), false
 	default:
 		a.pipe.Systemf(nil, "dhow: CHECKOUT_FAILED: the checkout exited with code %d", end.res.ExitCode)

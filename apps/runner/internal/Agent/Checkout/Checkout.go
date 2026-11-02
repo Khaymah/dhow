@@ -12,23 +12,24 @@ import (
 	"strconv"
 	"strings"
 
+	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
 	"github.com/Khaymah/dhow/internal/gitref"
 	"github.com/Khaymah/dhow/internal/gitsource"
 )
 
 const (
-	Command       = "__checkout"
-	EnvURL        = "DHOW_CHECKOUT_URL"
-	EnvRef        = "DHOW_CHECKOUT_REF"
-	EnvSha        = "DHOW_CHECKOUT_SHA"
-	EnvDepth      = "DHOW_CHECKOUT_DEPTH"
-	EnvCredential = "DHOW_CHECKOUT_CREDENTIAL" //nolint:gosec // The name of a flag variable, not a credential.
+	Command       = sandbox.CheckoutCommand
+	EnvURL        = sandbox.CheckoutEnvURL
+	EnvRef        = sandbox.CheckoutEnvRef
+	EnvSha        = sandbox.CheckoutEnvSha
+	EnvDepth      = sandbox.CheckoutEnvDepth
+	EnvCredential = sandbox.CheckoutEnvCredential
 	EnvProxy      = "HTTPS_PROXY"
 	envGitURL     = "DHOW_GIT_URL"
 	envMarkers    = "DHOW_GIT_MARKERS"
 
-	CredentialFile = "git-credential" //nolint:gosec // The name of the secret file, not a credential.
-	KnownHostsFile = "known_hosts"
+	CredentialFile = sandbox.CheckoutCredentialFile
+	KnownHostsFile = sandbox.CheckoutKnownHostsFile
 	SecretsDir     = "/run/dhow/secrets"
 	SSHHelper      = "/run/dhow/bin/git-ssh"
 	AskpassHelper  = "/run/dhow/bin/git-askpass" //nolint:gosec // A helper path, not a credential.
@@ -38,11 +39,11 @@ const (
 	ScratchDir     = "/tmp/dhow-git"
 	hostKeyMarker  = "host-key-mismatch"
 
-	ExitOK              = 0
-	ExitFailed          = 1
-	ExitRefMoved        = 3
-	ExitHostKeyMismatch = 4
-	ExitDiskFull        = 5
+	ExitOK              = sandbox.CheckoutExitOK
+	ExitFailed          = sandbox.CheckoutExitFailed
+	ExitRefMoved        = sandbox.CheckoutExitRefMoved
+	ExitHostKeyMismatch = sandbox.CheckoutExitHostKeyMismatch
+	ExitDiskFull        = sandbox.CheckoutExitDiskFull
 )
 
 var (

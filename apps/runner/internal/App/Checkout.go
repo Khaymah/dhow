@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	checkout "github.com/Khaymah/dhow/apps/runner/internal/Checkout"
+	checkout "github.com/Khaymah/dhow/apps/runner/internal/Agent/Checkout"
 )
 
 const (
