@@ -162,7 +162,7 @@ The values in the context have limits, and an evaluation with a larger value fai
 A job of a pipeline starts with a checkout of the run's commit into `/workspace`. You write nothing for it in `.dhow.yml`.
 
 - **Where it runs:** in a sandbox of its own, from the `dhow-git` image that the runner pins by digest. That sandbox can reach the repository host and nothing else, whatever the job's `network.egress` says.
-- **What it fetches:** the run's ref with `--depth=1`, then exactly the run's commit. If the branch moved on, the runner fetches more of the branch's history and checks that the commit is in it (`git merge-base --is-ancestor`). A commit that is not in the history of the ref (the branch was force-pushed, deleted, or the commit only exists on another branch) is never fetched by its id: the job fails with `CHECKOUT_REF_MOVED`. Submodules, LFS files, hooks and redirects are off; a step of yours can fetch them with its own egress.
+- **What it fetches:** the run's ref with `--depth=1`, then exactly the run's commit. If the branch moved on, the runner fetches more of the branch's history in steps (64, then 1024, then 65536 commits), commits only and without their files, for two minutes at most, and checks that the commit is in it (`git merge-base --is-ancestor`). A commit that is not in the history of the ref (the branch was force-pushed, deleted, or the commit only exists on another branch) is never fetched by its id: the job fails with `CHECKOUT_REF_MOVED`. Then only the files of the run's commit are fetched, so a `git` command of yours that needs an older commit's files has to fetch them. Submodules, LFS files, hooks and redirects are off; a step of yours can fetch them with its own egress.
 - **The credential** (a deploy key over SSH, or a short token over HTTPS) is a file in the checkout sandbox only. Your steps and plugins never get it, not in the environment, not in a file and not in `/proc`. Over SSH only the host key an admin confirmed for the repository is accepted, and any other key fails the job with `HOST_KEY_MISMATCH`.
 - **Old runners:** a job with a checkout goes only to a runner that declared the `checkout` feature when it signed in. Until such a runner is online the job waits in the queue.
 
@@ -180,7 +180,7 @@ The image declares its inputs, outputs and entrypoint in the label `io.dhow.plug
 - `Entrypoint` starts with an absolute path and runs as is, without a shell (at most 32 arguments).
 - Every `with:` key must be in `Inputs`, and every input marked `Required` must be set or have a `Default`. Otherwise the step fails with `PLUGIN_INPUT_INVALID` before the plugin starts. An image without a valid label fails with `PLUGIN_MANIFEST_INVALID`.
 - Each input reaches the plugin as an environment variable `DHOW_INPUT_<NAME>`, with the name in upper case (`DHOW_INPUT_CHANNEL`). The value is never parsed by a shell.
-- **A plugin gets only what is given to it:** its inputs, `DHOW_OUTPUT`, the proxy variables of the job's egress, the `env` of its own step, and the secrets given to that step. A secret in `with:` (`token: ${{ secrets.CHAT_TOKEN }}`) arrives as `DHOW_INPUT_TOKEN` and only in that step. The job's `env`, secrets given to the whole job, and `DHOW_FENCING_TOKEN`, `DHOW_JOB_ID`, `DHOW_ATTEMPT_ID` and `DHOW_STEP_INDEX` never reach a plugin.
+- **A plugin gets only what is given to it:** its inputs, `DHOW_OUTPUT`, the proxy variables of the job's egress, the `env` of its own step, and the secrets given to that step. A secret in `with:` (`token: ${{ secrets.CHAT_TOKEN }}`) arrives as `DHOW_INPUT_TOKEN` and only in that step. A step skipped by its `if:` takes its secrets with it, and no step ever gets a secret declared on another one: the server checks it before the job is queued and fails the job with `JOB_SPEC_INVALID` otherwise. The job's `env`, secrets given to the whole job, and `DHOW_FENCING_TOKEN`, `DHOW_JOB_ID`, `DHOW_ATTEMPT_ID` and `DHOW_STEP_INDEX` never reach a plugin.
 
 ### Step outputs
 
@@ -188,7 +188,8 @@ Every step, `run:` or `uses:`, gets the variable `DHOW_OUTPUT`, a file where it 
 
 - Keys are letters, digits and `_` and do not start with a digit; a value is up to 1 KiB on one line. A job keeps at most 64 outputs, and a later step overwrites an earlier key.
 - A plugin may write only the keys in its manifest's `Outputs`.
-- A line that breaks these rules fails the step. Outputs are kept only when the job succeeds.
+- A line that breaks these rules fails the step. Outputs are kept only when the job succeeds, also when the runner restarts before the server took the result.
+- **Who sees them:** an output, and every other value an expression made (`env: VERSION: ${{ needs.build.outputs.version }}`, a `git.*` value), reaches the job's steps as is, but the job's details in the API and the UI show `[REDACTED]` in its place, for every role.
 - **Masking:** the masker checks each value and also the values joined together (every run of keys in name order, and every pair in either order). A secret inside a value becomes `***`; a secret that only appears once values are joined drops every key it spans. A secret shorter than 4 characters cannot be masked anywhere (the job log says so), so it can leave in an output.
 
 ## 4. Expressions
@@ -358,6 +359,7 @@ jobs:
 - Gitea, Forgejo and plain Git servers have no API for files, so a small job on a runner checks the commit out and reads the file (a discovery job, `dhow.discovery` in the run's jobs). For a pull request from a fork it checks out the base commit.
 - It goes only to a runner with the `checkout` feature, like every checkout job. Until one is online it waits in the queue, and after the queue timeout it fails and the run ends `failed` with `DISCOVERY_FAILED`.
 - When the commit is not in the history of its ref, the run ends `failed` with `SHA_NOT_ON_REF` before any of your jobs runs.
-- The file reaches the server through the job's log with its SHA-256 in the job's outputs, and the server refuses it when they do not match. A missing file (or a symlink, or a path outside the repository) gives a `skipped` run with `DEFINITION_NOT_FOUND`.
+- The runner is not trusted with the file. The job prints the raw Git objects on the file's path (the commit, every folder on the path, the file) to its log, and the server hashes them in the commit's object format (SHA-1 or SHA-256) and follows the chain from the run's commit id down to a regular file. Only a file proven that way is read. A forged file or folder, a commit other than the run's, a symlink, a commit or folder larger than 1 MiB, or a file larger than 256 KiB ends the run `failed` with `DEFINITION_UNVERIFIED`.
+- A missing file, or a symlink, a folder or a submodule at the path, gives a `skipped` run with `DEFINITION_NOT_FOUND`, and the objects must prove that too. A job that reports neither `true` nor `false` for `dhow_found` ends the run `failed` with `DISCOVERY_FAILED`.
 - Every job of the run then checks out the run's commit with the repository's deploy key over SSH (only the host key an admin confirmed is accepted), or without a credential over HTTPS.
 - A server built without the checkout image ends such runs `failed` with `CHECKOUT_UNAVAILABLE`.
