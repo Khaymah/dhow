@@ -38,6 +38,7 @@ export const AdminEn: Record<keyof typeof AdminAr, string> = {
   'audit.target.team': 'Team',
   'audit.target.invitation': 'Invitation',
   'audit.target.api_token': 'API token',
+  'audit.target.run': 'Pipeline run',
   'audit.target.identity': 'External sign-in account',
   'audit.target.job': 'Job',
   'audit.target.runner': 'Runner',
