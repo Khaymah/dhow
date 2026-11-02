@@ -17,6 +17,35 @@ message JobSpec {
   repeated string labels = 9;
   Checkout checkout = 10;
   repeated string derived_values = 11;
+  repeated ArtifactUpload artifacts = 12;
+  repeated ArtifactInput inputs = 13;
+  Cache cache = 14;
+}
+
+message ArtifactUpload {
+  string name = 1;
+  repeated string paths = 2;
+  int64 max_bytes = 3;
+  int64 retention_seconds = 4;
+}
+
+message ArtifactInput {
+  string name = 1;
+  string digest = 2;
+  int64 size_bytes = 3;
+  string download_token = 4;
+}
+
+message CacheHash {
+  repeated string patterns = 1;
+}
+
+message Cache {
+  string key_expression = 1;
+  repeated CacheHash hashes = 2;
+  repeated string paths = 3;
+  bool read_only = 4;
+  int64 max_bytes = 5;
 }
 
 message Step {

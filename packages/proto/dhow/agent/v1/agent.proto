@@ -12,6 +12,7 @@ message Frame {
     AddMask add_mask = 6;
     Shutdown shutdown = 7;
     RunExec run_exec = 8;
+    Input input = 9;
   }
 }
 
@@ -37,6 +38,13 @@ message RunExec {
   repeated string argv = 2;
   map<string, string> env = 3;
   repeated SecretFile secret_files = 4;
+  bool stdin = 5;
+}
+
+message Input {
+  int32 step_index = 1;
+  bytes data = 2;
+  bool eof = 3;
 }
 
 enum OutputStream {

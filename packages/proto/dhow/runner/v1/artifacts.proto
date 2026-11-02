@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package dhow.runner.v1;
+
+import "dhow/runner/v1/common.proto";
+
+service ArtifactService {
+  rpc Commit(CommitArtifactRequest) returns (CommitArtifactResponse);
+}
+
+service CacheService {
+  rpc Lookup(LookupCacheRequest) returns (LookupCacheResponse);
+  rpc Commit(CommitCacheRequest) returns (CommitCacheResponse);
+}
+
+message CommitArtifactRequest {
+  LeaseRef lease = 1;
+  string name = 2;
+  string digest = 3;
+  int64 size_bytes = 4;
+}
+
+message CommitArtifactResponse {}
+
+message LookupCacheRequest {
+  LeaseRef lease = 1;
+  string key = 2;
+}
+
+message LookupCacheResponse {
+  bool hit = 1;
+  string digest = 2;
+  int64 size_bytes = 3;
+  string download_token = 4;
+}
+
+message CommitCacheRequest {
+  LeaseRef lease = 1;
+  string key = 2;
+  string digest = 3;
+  int64 size_bytes = 4;
+}
+
+message CommitCacheResponse {
+  bool stored = 1;
+}
