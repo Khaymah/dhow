@@ -1,7 +1,10 @@
 package pipelinespec
 
 import (
+	"fmt"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,5 +142,30 @@ func TestPatterns(t *testing.T) {
 	for _, bad := range []string{"", "a**", "[ab]", "{a,b}", "a\\b", "x\ny", "${{ x }}"} {
 		assert.False(t, ValidPattern(bad), bad)
 		assert.False(t, MatchPattern(bad, "a"), bad)
+	}
+}
+
+func longMatrix(axes int) string {
+	var b strings.Builder
+	b.WriteString("version: 1\non:\n  push: {}\njobs:\n  build:\n    image: alpine@sha256:" + strings.Repeat("a", 64) +
+		"\n    strategy:\n      matrix:\n")
+	for i := range axes {
+		fmt.Fprintf(&b, "        k%02d: [%q]\n", i, strings.Repeat(",", MaxMatrixValue))
+	}
+	b.WriteString("    steps:\n      - run: make\n")
+	return b.String()
+}
+
+func TestAMatrixNameTooLongForTheRunIsRefused(t *testing.T) {
+	_, issues := Check([]byte(longMatrix(MaxMatrixAxes)))
+	assert.Contains(t, issueCodes(issues, SeverityError), CodeMatrixNameTooLong)
+
+	spec, issues := Check([]byte(longMatrix(1)))
+	require.False(t, HasErrors(issues), "%v", issues)
+	plan, err := Compile(spec)
+	require.NoError(t, err)
+	for _, rj := range plan.Jobs {
+		assert.LessOrEqual(t, utf8.RuneCountInString(rj.Key), 1024)
+		assert.LessOrEqual(t, utf8.RuneCountInString(rj.Name), 1024)
 	}
 }

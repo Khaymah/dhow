@@ -68,6 +68,7 @@ const (
 	CodeMatrixValueInvalid     = "MATRIX_VALUE_INVALID"
 	CodeMatrixEntryInvalid     = "MATRIX_ENTRY_INVALID"
 	CodeMatrixDuplicate        = "MATRIX_DUPLICATE"
+	CodeMatrixNameTooLong      = "MATRIX_NAME_TOO_LONG"
 	CodeMaxParallelInvalid     = "MAX_PARALLEL_INVALID"
 	CodeTooManyRunJobs         = "TOO_MANY_RUN_JOBS"
 	CodeTimeoutInvalid         = "TIMEOUT_INVALID"
@@ -200,6 +201,8 @@ func jobMessage(code string) string {
 		return "an include or exclude entry must use the matrix keys"
 	case CodeMatrixDuplicate:
 		return "two matrix combinations give the same job name"
+	case CodeMatrixNameTooLong:
+		return "the matrix values of one job make its name longer than 512 characters"
 	case CodeMaxParallelInvalid:
 		return "max_parallel is from 1 to 256"
 	case CodeTooManyRunJobs:
