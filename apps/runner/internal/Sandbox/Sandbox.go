@@ -23,6 +23,7 @@ var (
 	ErrDestroyed    = errors.New("the sandbox is gone")
 	ErrSurvivors    = errors.New("processes of the sandbox survived the kill")
 	ErrNoIDRange    = errors.New("every user id range of the runner is in use")
+	ErrWorkspace    = errors.New("the workspace is no longer the nosuid,nodev tmpfs of the job's disk size")
 )
 
 type Kind int
@@ -55,6 +56,7 @@ type WorkspaceSpec struct {
 }
 
 type Workspace interface {
+	Check(ctx context.Context) error
 	Destroy(ctx context.Context) error
 }
 

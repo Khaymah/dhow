@@ -91,3 +91,28 @@ func TestSlotsComeFromTheRunnerSubidRange(t *testing.T) {
 		t.Fatalf("a runner without sub-ids has no slots: %v", err)
 	}
 }
+
+func TestTheWorkspaceMountIsCheckedBeforeEachSandbox(t *testing.T) {
+	const dir = "/state/attempts/a/workspace"
+	line := func(opts, fs, super string) string {
+		return "290 280 0:64 / " + dir + " " + opts + " shared:1 - " + fs + " tmpfs " + super + "\n"
+	}
+	good := "1 0 0:1 / / rw - ext4 /dev/vda rw\n" + line("rw,nosuid,nodev,relatime", "tmpfs", "rw,size=65536k,mode=755,uid=65537,gid=65537")
+	if err := checkWorkspaceMount(good, dir, 64<<20); err != nil {
+		t.Fatal(err)
+	}
+	for name, info := range map[string]string{
+		"nothing mounted":          "1 0 0:1 / / rw - ext4 /dev/vda rw\n",
+		"setuid allowed":           line("rw,nodev,relatime", "tmpfs", "rw,size=65536k"),
+		"devices allowed":          line("rw,nosuid,relatime", "tmpfs", "rw,size=65536k"),
+		"not a tmpfs":              line("rw,nosuid,nodev", "ext4", "rw"),
+		"bigger than the job disk": line("rw,nosuid,nodev", "tmpfs", "rw,size=131072k"),
+		"no size":                  line("rw,nosuid,nodev", "tmpfs", "rw,mode=755"),
+		"a later mount over it":    good + line("rw,relatime", "tmpfs", "rw,size=65536k"),
+		"a bind of another dir":    good + "300 290 0:70 / " + dir + " rw,nosuid,nodev - ext4 /dev/vda rw\n",
+	} {
+		if err := checkWorkspaceMount(info, dir, 64<<20); !errors.Is(err, sandbox.ErrWorkspace) {
+			t.Fatalf("%s: want ErrWorkspace, got %v", name, err)
+		}
+	}
+}

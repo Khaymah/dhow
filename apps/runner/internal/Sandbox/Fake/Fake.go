@@ -44,6 +44,7 @@ type Recording struct {
 	Checkout           *Step                        `json:"Checkout"`
 	Images             map[string]map[string]string `json:"Images"`
 	WorkspaceError     bool                         `json:"WorkspaceError"`
+	WorkspaceDrift     bool                         `json:"WorkspaceDrift"`
 	PrepareError       string                       `json:"PrepareError"`
 	PrepareDelayMillis int                          `json:"PrepareDelayMillis"`
 	KillSurvivors      bool                         `json:"KillSurvivors"`
@@ -183,6 +184,13 @@ func (d *Driver) Workspace(_ context.Context, spec sandbox.WorkspaceSpec) (sandb
 		return nil, sandbox.ErrSandbox
 	}
 	return &workspace{d: d, attempt: spec.AttemptID}, nil
+}
+
+func (w *workspace) Check(_ context.Context) error {
+	if w.d.rec.WorkspaceDrift {
+		return sandbox.ErrWorkspace
+	}
+	return nil
 }
 
 func (w *workspace) Destroy(_ context.Context) error {

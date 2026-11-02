@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -83,11 +84,12 @@ func (d *Driver) detectSlots(ctx context.Context) error {
 }
 
 type workspace struct {
-	d       *Driver
-	owner   string
-	dir     string
-	slot    int64
-	mounted bool
+	d         *Driver
+	owner     string
+	dir       string
+	slot      int64
+	mounted   bool
+	diskBytes int64
 }
 
 func (d *Driver) Workspace(ctx context.Context, spec sandbox.WorkspaceSpec) (sandbox.Workspace, error) {
@@ -106,7 +108,7 @@ func (d *Driver) Workspace(ctx context.Context, spec sandbox.WorkspaceSpec) (san
 	if err != nil {
 		return nil, err
 	}
-	w := &workspace{d: d, owner: spec.AttemptID, dir: filepath.Join(spec.Dir, workspaceDirName), slot: slot}
+	w := &workspace{d: d, owner: spec.AttemptID, dir: filepath.Join(spec.Dir, workspaceDirName), slot: slot, diskBytes: spec.DiskBytes}
 	if err := w.create(ctx, spec, inner); err != nil {
 		return nil, errors.Join(fmt.Errorf("%w: %w", sandbox.ErrSandbox, err), w.Destroy(ctx))
 	}
@@ -191,4 +193,71 @@ func (d *Driver) unmountLeftovers(ctx context.Context) {
 			d.log.Debug("no workspace mount to remove", "error", err.Error())
 		}
 	}
+}
+
+const pageBytes = 4096
+
+func (w *workspace) Check(ctx context.Context) error {
+	if !w.mounted {
+		return sandbox.ErrWorkspace
+	}
+	out, err := w.d.runner().run(ctx, "unshare", "cat", "/proc/self/mountinfo")
+	if err != nil {
+		return fmt.Errorf("%w: %w", sandbox.ErrWorkspace, err)
+	}
+	return checkWorkspaceMount(string(out), w.dir, w.diskBytes)
+}
+
+func checkWorkspaceMount(mountinfo, dir string, diskBytes int64) error {
+	var top []string
+	for _, line := range strings.Split(mountinfo, "\n") {
+		f := strings.Fields(line)
+		if len(f) >= 10 && f[4] == dir {
+			top = f
+		}
+	}
+	if top == nil {
+		return fmt.Errorf("%w: nothing is mounted on it", sandbox.ErrWorkspace)
+	}
+	sep := slices.Index(top, "-")
+	if sep < 6 || sep+3 >= len(top) || top[sep+1] != "tmpfs" {
+		return fmt.Errorf("%w: it is not a tmpfs", sandbox.ErrWorkspace)
+	}
+	opts := strings.Split(top[5], ",")
+	if !slices.Contains(opts, "nosuid") || !slices.Contains(opts, "nodev") {
+		return fmt.Errorf("%w: it allows setuid or devices", sandbox.ErrWorkspace)
+	}
+	size, ok := tmpfsSize(strings.Split(top[sep+3], ","))
+	limit := (diskBytes + pageBytes - 1) / pageBytes * pageBytes
+	if !ok || size > limit {
+		return fmt.Errorf("%w: its size is above the job's disk", sandbox.ErrWorkspace)
+	}
+	return nil
+}
+
+func tmpfsSize(opts []string) (int64, bool) {
+	for _, o := range opts {
+		v, found := strings.CutPrefix(o, "size=")
+		if !found || v == "" {
+			continue
+		}
+		mult := int64(1)
+		switch v[len(v)-1] {
+		case 'k':
+			mult = 1 << 10
+		case 'm':
+			mult = 1 << 20
+		case 'g':
+			mult = 1 << 30
+		}
+		if mult > 1 {
+			v = v[:len(v)-1]
+		}
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			return 0, false
+		}
+		return n * mult, true
+	}
+	return 0, false
 }

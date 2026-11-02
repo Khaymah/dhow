@@ -124,6 +124,21 @@ func (a *attempt) retire(ctx context.Context) {
 	a.mu.Unlock()
 }
 
+func (a *attempt) checkWorkspace(ctx context.Context) (result, bool) {
+	a.mu.Lock()
+	ws := a.workspace
+	a.mu.Unlock()
+	if ws == nil {
+		return failed(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, 0), false
+	}
+	if err := ws.Check(ctx); err != nil {
+		a.log.Error("the workspace drifted from its policy", "error", a.masked(err))
+		a.pipe.Systemf(nil, "dhow: SANDBOX_FAILED: the workspace is no longer what the runner mounted")
+		return failed(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, 0), false
+	}
+	return result{}, true
+}
+
 func (a *attempt) hadSurvivors() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()

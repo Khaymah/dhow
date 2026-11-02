@@ -12,8 +12,8 @@ import (
 
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
-	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
+	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
 	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"

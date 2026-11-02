@@ -64,6 +64,9 @@ type prepared struct {
 
 func (a *attempt) prepare(ctx context.Context, seq int, seg segment) (result, bool) {
 	spec := a.grant.GetSpec()
+	if r, ok := a.checkWorkspace(ctx); !ok {
+		return r, false
+	}
 	a.pipe.Systemf(nil, "dhow: preparing the sandbox for %s", seg.image)
 	pctx, cancel := context.WithTimeout(ctx, a.e.o.Timing.ImagePull)
 	defer cancel()

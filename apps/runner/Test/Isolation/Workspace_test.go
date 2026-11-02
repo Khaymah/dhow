@@ -33,7 +33,9 @@ func newAttempt(t *testing.T) *attempt {
 	id := token()
 	dir := filepath.Join(config.Config{StateDir: shared.stateDir}.AttemptsDir(), id)
 	require.NoError(t, config.EnsurePrivateDir(dir))
-	return &attempt{id: id, dir: dir, ws: workspaceFor(ctx, t, id, dir, defaultResources())}
+	ws := workspaceFor(ctx, t, id, dir, defaultResources())
+	require.NoError(t, ws.Check(ctx), "a fresh workspace passes its own check")
+	return &attempt{id: id, dir: dir, ws: ws}
 }
 
 func (a *attempt) sandbox(t *testing.T, kind sandbox.Kind, img string) sandbox.Sandbox {

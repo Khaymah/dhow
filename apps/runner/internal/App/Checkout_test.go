@@ -333,3 +333,13 @@ func TestASecretSplitAcrossOutputsIsDropped(t *testing.T) {
 	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, running.Next(t, finishWithin).Result)
 	assert.Equal(t, map[string]string{"kept": "fine"}, srv.Leases()[0].Completes[0].GetOutputs())
 }
+
+func TestAWorkspaceThatDriftedStopsTheAttempt(t *testing.T) {
+	srv := runnertest.NewServer(t)
+	r := runnertest.Register(t, srv, srv.URL)
+	srv.Enqueue(runnertest.Spec(), nil)
+	running := r.Start(fake.Recording{WorkspaceDrift: true}, runnertest.StartOptions{})
+	out := running.Next(t, finishWithin)
+	assert.Equal(t, runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, out.Reason)
+	assert.NotContains(t, kinds(running.Driver.Events()), fake.EventPrepare, "no sandbox starts on a workspace that is not what the runner mounted")
+}
