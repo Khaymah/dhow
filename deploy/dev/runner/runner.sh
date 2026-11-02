@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# shellcheck source=deploy/dev/stack/runner-env.sh
-. /src/deploy/dev/stack/runner-env.sh
+# shellcheck source=deploy/dev/runner/runner-env.sh
+. /usr/local/lib/dhow-dev/runner-env.sh
 
 poll=${DHOW_DEV_POLL_SECONDS:-1}
 cgroup=/sys/fs/cgroup
@@ -13,7 +13,7 @@ watched=(apps/runner internal packages/proto/gen/go go.mod go.sum)
 pid=
 forwarder=
 hinted=0
-history=$state/dev-starts
+history=$supervisor/starts
 starts=()
 start_window=630
 max_starts=3
@@ -86,10 +86,6 @@ build() {
   return 1
 }
 
-registered() {
-  [[ -e $state/identity ]]
-}
-
 hint() {
   if ((hinted == 0 || SECONDS - hinted >= 60)); then
     say "waiting for a registration token. Create one on the Runners page, then run this from the root of your clone and paste it:"
@@ -136,7 +132,7 @@ recent_starts() {
     mapfile -t lines <"$history"
   fi
   for t in "${lines[@]}"; do
-    if [[ $t =~ ^[0-9]+$ ]] && ((now - t < start_window)); then
+    if [[ $t =~ ^[0-9]{1,12}$ ]] && ((t <= now && now - t < start_window)); then
       starts+=("$t")
     fi
   done
@@ -203,7 +199,7 @@ else
   chmod 0644 "$recording"
   say "the fake driver runs no process: every step prints one line and succeeds"
 fi
-chown "$user:$user" "$state"
+chown -h "$user:$user" "$state"
 forward &
 forwarder=$!
 

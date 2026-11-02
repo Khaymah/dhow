@@ -5,13 +5,19 @@ x-repo: &repo
   source: ../..
   target: /src
 
+x-repo-read-only: &repo-read-only
+  type: bind
+  source: ../..
+  target: /src
+  read_only: true
+
 x-runner: &runner
   image: dhow-dev-runner:local
   build:
     context: ./runner
   init: true
   working_dir: /src
-  entrypoint: ["bash", "/src/deploy/dev/stack/runner.sh"]
+  entrypoint: ["/usr/local/lib/dhow-dev/runner.sh"]
   stop_grace_period: 30s
   depends_on:
     server:
@@ -99,10 +105,11 @@ services:
       GOTOOLCHAIN: auto
       GOFLAGS: -buildvcs=false
     volumes:
-      - *repo
+      - *repo-read-only
       - gomod:/go/pkg/mod
       - gocache:/root/.cache/go-build
       - runner-state:/var/lib/dhow-runner
+      - runner-dev:/var/lib/dhow-dev
 
   fake-runner:
     <<: *runner
@@ -116,10 +123,11 @@ services:
       GOTOOLCHAIN: auto
       GOFLAGS: -buildvcs=false
     volumes:
-      - *repo
+      - *repo-read-only
       - gomod:/go/pkg/mod
       - gocache:/root/.cache/go-build
       - fake-runner-state:/var/lib/dhow-runner
+      - fake-runner-dev:/var/lib/dhow-dev
 
 volumes:
   pgdata: {}
@@ -129,3 +137,5 @@ volumes:
   pnpm: {}
   runner-state: {}
   fake-runner-state: {}
+  runner-dev: {}
+  fake-runner-dev: {}

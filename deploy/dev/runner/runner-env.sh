@@ -5,6 +5,7 @@ mode=${DHOW_DEV_RUNNER_MODE:-podman}
 user=dhow-runner
 state=/var/lib/dhow-runner
 opt=/opt/dhow-dev
+supervisor=/var/lib/dhow-dev
 bin=$opt/dhow-runner
 recording=$opt/fake-recording.json
 server_url=http://127.0.0.1:8080
@@ -46,7 +47,11 @@ as_runner() {
   if [[ -n ${DHOW_DEV_RUNNER_MAX_DISK:-} ]]; then
     env+=(DHOW_RUNNER_MAX_DISK="$DHOW_DEV_RUNNER_MAX_DISK")
   fi
-  cd "$state" || exit 1
   exec setpriv --reuid="$user" --regid="$user" --init-groups --inh-caps=-all --bounding-set="$capabilities" \
-    env -i "${env[@]}" "$@"
+    env -i -C "$state" "${env[@]}" "$@"
+}
+
+registered() {
+  setpriv --reuid="$user" --regid="$user" --init-groups --inh-caps=-all --bounding-set=-all \
+    test -e "$state/identity"
 }

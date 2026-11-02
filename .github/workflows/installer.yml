@@ -41,12 +41,12 @@ jobs:
           persist-credentials: false
       - name: Check the shell scripts
         run: |
-          bash -n deploy/install/get.sh deploy/install/e2e/*.sh deploy/release/dist.sh deploy/systemd/*.sh deploy/test-vm/*.sh deploy/dev/setup.sh deploy/dev/lib/*.sh deploy/dev/stack/*.sh
+          bash -n deploy/install/get.sh deploy/install/e2e/*.sh deploy/release/dist.sh deploy/systemd/*.sh deploy/test-vm/*.sh deploy/dev/setup.sh deploy/dev/lib/*.sh deploy/dev/stack/*.sh deploy/dev/runner/*.sh
           shellcheck deploy/install/get.sh deploy/install/e2e/*.sh deploy/release/dist.sh deploy/systemd/*.sh deploy/test-vm/*.sh
           shellcheck -x deploy/dev/setup.sh
           shellcheck deploy/dev/test/fresh.sh
           shellcheck -x deploy/dev/test/settings.sh
-          shellcheck deploy/dev/stack/*.sh deploy/dev/test/runner-stack.sh
+          shellcheck deploy/dev/stack/*.sh deploy/dev/runner/*.sh deploy/dev/test/runner-stack.sh
           bash deploy/dev/test/settings.sh
       - name: Check the setup script with the bash 3.2 of macOS
         run: docker run --rm -v "$PWD":/w:ro -w /w bash:3.2 bash deploy/dev/test/settings.sh

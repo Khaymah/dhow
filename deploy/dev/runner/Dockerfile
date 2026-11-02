@@ -11,5 +11,13 @@ RUN useradd --system --user-group --home-dir /var/lib/dhow-runner --shell /usr/s
     && printf 'dhow-runner:1300000:1048576\n' | tee -a /etc/subuid >>/etc/subgid \
     && install -d -m 0700 -o dhow-runner -g dhow-runner /var/lib/dhow-runner \
     && install -d -m 0755 /opt/dhow-dev \
-    && printf '#!/bin/sh\nexec bash /src/deploy/dev/stack/runner-register.sh "$@"\n' >/usr/local/bin/dhow-dev-register \
-    && chmod 0755 /usr/local/bin/dhow-dev-register
+    && install -d -m 0700 /var/lib/dhow-dev \
+    && find / -xdev -type f -perm /6000 ! -path /usr/bin/newuidmap ! -path /usr/bin/newgidmap -exec chmod ug-s {} + \
+    && chmod 0700 /usr/bin/mount /usr/bin/umount
+
+COPY runner.sh runner-env.sh runner-register.sh /usr/local/lib/dhow-dev/
+RUN chown -R root:root /usr/local/lib/dhow-dev \
+    && chmod 0755 /usr/local/lib/dhow-dev \
+    && chmod 0644 /usr/local/lib/dhow-dev/runner-env.sh \
+    && chmod 0755 /usr/local/lib/dhow-dev/runner.sh /usr/local/lib/dhow-dev/runner-register.sh \
+    && ln -s /usr/local/lib/dhow-dev/runner-register.sh /usr/local/bin/dhow-dev-register
