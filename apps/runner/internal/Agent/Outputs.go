@@ -10,11 +10,12 @@ import (
 
 const MaxOutputFileBytes = 64 << 10
 
-func clearOutput(path string) {
-	_ = os.Remove(path)
+func clearOutput(path string) bool {
+	err := os.Remove(path)
+	return err == nil || errors.Is(err, os.ErrNotExist)
 }
 
-func readOutput(path string) ([]byte, bool) {
+func readOutput(path string) (data []byte, ok bool) {
 	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
 	if errors.Is(err, unix.ENOENT) {
 		return nil, true
@@ -24,16 +25,17 @@ func readOutput(path string) ([]byte, bool) {
 	}
 	f := os.NewFile(uintptr(fd), path)
 	defer func() {
-		_ = f.Close()
-		_ = os.Remove(path)
+		if err := errors.Join(f.Close(), os.Remove(path)); err != nil {
+			data, ok = nil, false
+		}
 	}()
 	var st unix.Stat_t
 	if err := unix.Fstat(fd, &st); err != nil || st.Mode&unix.S_IFMT != unix.S_IFREG || st.Size > MaxOutputFileBytes {
 		return nil, false
 	}
-	data, err := io.ReadAll(io.LimitReader(f, MaxOutputFileBytes+1))
-	if err != nil || len(data) > MaxOutputFileBytes {
+	raw, err := io.ReadAll(io.LimitReader(f, MaxOutputFileBytes+1))
+	if err != nil || len(raw) > MaxOutputFileBytes {
 		return nil, false
 	}
-	return data, true
+	return raw, true
 }

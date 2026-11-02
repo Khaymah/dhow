@@ -70,3 +70,29 @@ func TestRunExecWithAnEmptyArgvDoesNotStart(t *testing.T) {
 		t.Fatalf("unexpected exit %+v", e)
 	}
 }
+
+func TestAnOutputPathThatCannotBeClearedStopsTheNextStep(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "out")
+	marker := filepath.Join(dir, "ran")
+	conn, _ := startAgentWith(t, Options{SecretsDir: t.TempDir(), OutputPath: out})
+	first := &agentv1.Frame{Body: &agentv1.Frame_RunStep{RunStep: &agentv1.RunStep{
+		Index: 0, Script: "mkdir \"$DHOW_OUTPUT\" && touch \"$DHOW_OUTPUT/x\"\n", Env: map[string]string{"DHOW_OUTPUT": out},
+	}}}
+	if err := conn.Write(first); err != nil {
+		t.Fatal(err)
+	}
+	if e := stepExitOf(t, conn, 5*time.Second); e.GetFailure() != agentv1.StepFailure_STEP_FAILURE_OUTPUTS {
+		t.Fatalf("a directory with files is not an output file: %+v", e)
+	}
+	second := &agentv1.Frame{Body: &agentv1.Frame_RunStep{RunStep: &agentv1.RunStep{Index: 1, Script: "touch " + marker + "\n"}}}
+	if err := conn.Write(second); err != nil {
+		t.Fatal(err)
+	}
+	if e := stepExitOf(t, conn, 5*time.Second); e.GetFailure() != agentv1.StepFailure_STEP_FAILURE_OUTPUTS {
+		t.Fatalf("a step must not start while the output path cannot be cleared: %+v", e)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("the step ran even though its output file could not be cleared")
+	}
+}

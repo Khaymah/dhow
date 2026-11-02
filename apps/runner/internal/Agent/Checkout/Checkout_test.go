@@ -214,3 +214,23 @@ func TestAskpassAnswersOnlyUserAndPassword(t *testing.T) {
 	assert.Equal(t, ExitFailed, RunAskpass([]string{"Passphrase for key"}, o))
 	assert.Equal(t, ExitFailed, RunAskpass(nil, o))
 }
+
+func TestHostKeyMismatchIsReportedWithoutTheMarker(t *testing.T) {
+	w := newWorld(t)
+	script := "#!/bin/sh\nprintf 'Host key verification failed.\\n' >&2\nexit 255\n"
+	require.NoError(t, os.WriteFile(w.ssh, []byte(script), 0o700))
+	code, out := w.run(strings.Repeat("ab", 20), nil)
+	assert.Equal(t, ExitHostKeyMismatch, code, out)
+}
+
+func TestRunSSHReportsAMismatchItCannotRecord(t *testing.T) {
+	root := t.TempDir()
+	fakeSSH := filepath.Join(root, "ssh")
+	require.NoError(t, os.WriteFile(fakeSSH, []byte("#!/bin/sh\necho 'Host key verification failed.' >&2\nexit 255\n"), 0o700))
+	env := map[string]string{envGitURL: repoURL, envMarkers: filepath.Join(root, "missing", "dir"), "HOME": root}
+	var stderr bytes.Buffer
+	o := HelperOptions{Getenv: func(k string) string { return env[k] }, Stdin: strings.NewReader(""), Stdout: &bytes.Buffer{}, Stderr: &stderr, SSH: fakeSSH}
+	code := RunSSH(context.Background(), []string{"git@git.example.com", "git-upload-pack '/team/app.git'"}, o)
+	assert.Equal(t, ExitHostKeyMismatch, code)
+	assert.Contains(t, stderr.String(), "HOST_KEY_MISMATCH: could not record it")
+}

@@ -60,7 +60,10 @@ func (a *Agent) runStep(ctx context.Context, step job) error {
 	if err != nil {
 		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_SECRET_FILES, nil))
 	}
-	clearOutput(a.outputPath)
+	if !clearOutput(a.outputPath) {
+		wipeSecretFiles(a.secretsDir, secrets)
+		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_OUTPUTS, nil))
+	}
 	code, sig, failure, err := a.runProcess(ctx, step)
 	wipeSecretFiles(a.secretsDir, secrets)
 	if err != nil {

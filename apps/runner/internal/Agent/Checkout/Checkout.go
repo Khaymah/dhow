@@ -144,6 +144,7 @@ type repo struct {
 	env      []string
 	diskFull bool
 	refGone  bool
+	hostKey  bool
 }
 
 func newRepo(o Options, p plan) (*repo, error) {
@@ -178,6 +179,9 @@ func (r *repo) git(ctx context.Context, args []string, stdout io.Writer) error {
 	}
 	if err != nil && strings.Contains(errb.String(), "couldn't find remote ref") {
 		r.refGone = true
+	}
+	if err != nil && hostKeyFailed(errb.Bytes()) {
+		r.hostKey = true
 	}
 	return err
 }
@@ -229,6 +233,9 @@ func (r *repo) reaches(ctx context.Context) bool {
 }
 
 func (r *repo) hostKeyMismatch() bool {
+	if r.hostKey {
+		return true
+	}
 	_, err := os.Lstat(filepath.Join(r.o.ScratchDir, hostKeyMarker))
 	return err == nil
 }

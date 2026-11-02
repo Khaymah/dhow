@@ -66,7 +66,7 @@ func RunSSH(ctx context.Context, args []string, o HelperOptions) int {
 	var errb bytes.Buffer
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = o.Stdin, o.Stdout, io.MultiWriter(o.Stderr, &errb)
 	runErr := cmd.Run()
-	if markHostKey(errb.Bytes(), o.Getenv(envMarkers)) {
+	if markHostKey(errb.Bytes(), o.Getenv(envMarkers), o.Stderr) {
 		return ExitHostKeyMismatch
 	}
 	var ee *exec.ExitError
@@ -80,20 +80,30 @@ func RunSSH(ctx context.Context, args []string, o HelperOptions) int {
 	}
 }
 
-func markHostKey(stderr []byte, dir string) bool {
-	found := false
+func hostKeyFailed(stderr []byte) bool {
 	sc := bufio.NewScanner(bytes.NewReader(stderr))
-	for sc.Scan() && !found {
+	for sc.Scan() {
 		for _, f := range hostKeyFailures() {
 			if strings.Contains(sc.Text(), f) {
-				found = true
+				return true
 			}
 		}
 	}
-	if found && dir != "" && filepath.IsAbs(dir) {
-		_ = os.WriteFile(filepath.Join(dir, hostKeyMarker), nil, 0o600)
+	return false
+}
+
+func markHostKey(stderr []byte, dir string, errOut io.Writer) bool {
+	if !hostKeyFailed(stderr) {
+		return false
 	}
-	return found
+	if dir == "" || !filepath.IsAbs(dir) {
+		_, _ = fmt.Fprintln(errOut, "dhow: HOST_KEY_MISMATCH: the checkout has no marker directory to record it")
+		return true
+	}
+	if err := os.WriteFile(filepath.Join(dir, hostKeyMarker), nil, 0o600); err != nil {
+		_, _ = fmt.Fprintf(errOut, "dhow: HOST_KEY_MISMATCH: could not record it (%v)\n", err)
+	}
+	return true
 }
 
 func RunAskpass(args []string, o HelperOptions) int {
