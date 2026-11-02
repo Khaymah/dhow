@@ -111,6 +111,8 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
 
 **M4 شغّال:** خطته في [`M4-Pipelines.md`](M4-Pipelines.md) اتقبلت، وSabry جاوب أسئلتها كلها بالتوصية يوم 2026-10-30. **M4.1** (`internal/pipelinespec`، [ADR-0069](ADR/0069-pipeline-spec-parser-and-validator.md)) اتدمج في #65، و**M4.2** (`dhow lint`) في #66، و**M4.3** (`Projects` والـ ports، [ADR-0070](ADR/0070-ports-in-core-and-project-permissions.md)) في #68. **M4.4** (`Sources` وGit عام، [ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) شغّال على `feat/sources-generic-git`. وقرار Sabry الجديد لربط Git (الـ OAuth للتجهيز بس والـ deploy keys للوصول) في [ADR-0074](ADR/0074-git-connection-oauth-for-setup-deploy-keys-for-access.md)، وفيه نقط لازم تتحسم في أول M4.6.
 
+**الترقيات والمساعدة جوه التطبيق:** الخطة في [`Upgrades-and-Help.md`](Upgrades-and-Help.md) و[ADR-0077](ADR/0077-upgrades-migrations-and-update-policy.md) (مسودة، وفيها 11 سؤال لـ Sabry). قاعدة expand/contract شغّالة من 2026-11-02 على أي migration جديد، وU1 (الـ hook) وU2 (توافق الـ schema في الـ binary) أولوية مع M4.
+
 ## بنود مفتوحة اتأجلت
 
 - **SELinux enforcing (ADR-0067):** الـ runner مش مدعوم على Fedora وRHEL وRocky وAlma بـ enforcing، لأن `container_t` ممنوع من `connectto` على الـ control socket. اتأجّل لبعد أول نسخة (ADR-0068)، ووقتها نختار: نقلب اتجاه قناة التحكم، أو policy module بـ domain للـ runner. وبعدها نرجّع fedora وrocky-10 لـ `vm-test.yml`.
