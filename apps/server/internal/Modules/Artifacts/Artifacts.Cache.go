@@ -16,7 +16,7 @@ import (
 
 const evictPage = 100
 
-func (s *Service) LookupCache(ctx context.Context, lease *runnerv1.LeaseRef, key string) (*runnerv1.LookupCacheResponse, error) {
+func (s *Service) LookupCache(ctx context.Context, lease *runnerv1.LeaseRef, key string) (*runnerv1.CacheServiceLookupResponse, error) {
 	ref, err := refOf(lease)
 	if err != nil {
 		return nil, err
@@ -24,7 +24,7 @@ func (s *Service) LookupCache(ctx context.Context, lease *runnerv1.LeaseRef, key
 	if !cachekey.ValidKey(key) {
 		return nil, errInvalid("Key")
 	}
-	out := &runnerv1.LookupCacheResponse{}
+	out := &runnerv1.CacheServiceLookupResponse{}
 	err = s.withLease(ctx, ref, func(q *sqlc.Queries, l scope) error {
 		if !l.pipeline() {
 			return errNotPipeline()

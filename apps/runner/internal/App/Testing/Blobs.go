@@ -168,7 +168,7 @@ func (s *Server) getBlob(w http.ResponseWriter, r *http.Request, digest string, 
 	_, _ = w.Write(data)
 }
 
-func (h handlers) Commit(_ context.Context, req *connect.Request[runnerv1.CommitArtifactRequest]) (*connect.Response[runnerv1.CommitArtifactResponse], error) {
+func (h handlers) Commit(_ context.Context, req *connect.Request[runnerv1.ArtifactServiceCommitRequest]) (*connect.Response[runnerv1.ArtifactServiceCommitResponse], error) {
 	s := h.s
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -180,12 +180,12 @@ func (h handlers) Commit(_ context.Context, req *connect.Request[runnerv1.Commit
 		return nil, rpcError(connect.CodeNotFound, "BLOB_NOT_FOUND")
 	}
 	s.blobs.artifacts = append(s.blobs.artifacts, CommittedArtifact{Name: req.Msg.GetName(), Digest: req.Msg.GetDigest(), Size: req.Msg.GetSizeBytes()})
-	return connect.NewResponse(&runnerv1.CommitArtifactResponse{}), nil
+	return connect.NewResponse(&runnerv1.ArtifactServiceCommitResponse{}), nil
 }
 
 type cacheHandlers struct{ s *Server }
 
-func (h cacheHandlers) Lookup(_ context.Context, req *connect.Request[runnerv1.LookupCacheRequest]) (*connect.Response[runnerv1.LookupCacheResponse], error) {
+func (h cacheHandlers) Lookup(_ context.Context, req *connect.Request[runnerv1.CacheServiceLookupRequest]) (*connect.Response[runnerv1.CacheServiceLookupResponse], error) {
 	s := h.s
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -194,14 +194,14 @@ func (h cacheHandlers) Lookup(_ context.Context, req *connect.Request[runnerv1.L
 	}
 	d, ok := s.blobs.cache[req.Msg.GetKey()]
 	if !ok {
-		return connect.NewResponse(&runnerv1.LookupCacheResponse{}), nil
+		return connect.NewResponse(&runnerv1.CacheServiceLookupResponse{}), nil
 	}
-	return connect.NewResponse(&runnerv1.LookupCacheResponse{
+	return connect.NewResponse(&runnerv1.CacheServiceLookupResponse{
 		Hit: true, Digest: d, SizeBytes: int64(len(s.blobs.blobs[d])), DownloadToken: cacheToken(d),
 	}), nil
 }
 
-func (h cacheHandlers) Commit(_ context.Context, req *connect.Request[runnerv1.CommitCacheRequest]) (*connect.Response[runnerv1.CommitCacheResponse], error) {
+func (h cacheHandlers) Commit(_ context.Context, req *connect.Request[runnerv1.CacheServiceCommitRequest]) (*connect.Response[runnerv1.CacheServiceCommitResponse], error) {
 	s := h.s
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -212,9 +212,9 @@ func (h cacheHandlers) Commit(_ context.Context, req *connect.Request[runnerv1.C
 		return nil, rpcError(connect.CodePermissionDenied, "CACHE_READ_ONLY")
 	}
 	if _, ok := s.blobs.cache[req.Msg.GetKey()]; ok {
-		return connect.NewResponse(&runnerv1.CommitCacheResponse{}), nil
+		return connect.NewResponse(&runnerv1.CacheServiceCommitResponse{}), nil
 	}
 	s.blobs.cache[req.Msg.GetKey()] = req.Msg.GetDigest()
 	s.blobs.saved = append(s.blobs.saved, req.Msg.GetKey())
-	return connect.NewResponse(&runnerv1.CommitCacheResponse{Stored: true}), nil
+	return connect.NewResponse(&runnerv1.CacheServiceCommitResponse{Stored: true}), nil
 }

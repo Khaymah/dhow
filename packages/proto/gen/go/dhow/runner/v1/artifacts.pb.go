@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type CommitArtifactRequest struct {
+type ArtifactServiceCommitRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Lease         *LeaseRef              `protobuf:"bytes,1,opt,name=lease,proto3" json:"lease,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
@@ -31,20 +31,20 @@ type CommitArtifactRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CommitArtifactRequest) Reset() {
-	*x = CommitArtifactRequest{}
+func (x *ArtifactServiceCommitRequest) Reset() {
+	*x = ArtifactServiceCommitRequest{}
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CommitArtifactRequest) String() string {
+func (x *ArtifactServiceCommitRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CommitArtifactRequest) ProtoMessage() {}
+func (*ArtifactServiceCommitRequest) ProtoMessage() {}
 
-func (x *CommitArtifactRequest) ProtoReflect() protoreflect.Message {
+func (x *ArtifactServiceCommitRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -56,59 +56,59 @@ func (x *CommitArtifactRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CommitArtifactRequest.ProtoReflect.Descriptor instead.
-func (*CommitArtifactRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ArtifactServiceCommitRequest.ProtoReflect.Descriptor instead.
+func (*ArtifactServiceCommitRequest) Descriptor() ([]byte, []int) {
 	return file_dhow_runner_v1_artifacts_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CommitArtifactRequest) GetLease() *LeaseRef {
+func (x *ArtifactServiceCommitRequest) GetLease() *LeaseRef {
 	if x != nil {
 		return x.Lease
 	}
 	return nil
 }
 
-func (x *CommitArtifactRequest) GetName() string {
+func (x *ArtifactServiceCommitRequest) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *CommitArtifactRequest) GetDigest() string {
+func (x *ArtifactServiceCommitRequest) GetDigest() string {
 	if x != nil {
 		return x.Digest
 	}
 	return ""
 }
 
-func (x *CommitArtifactRequest) GetSizeBytes() int64 {
+func (x *ArtifactServiceCommitRequest) GetSizeBytes() int64 {
 	if x != nil {
 		return x.SizeBytes
 	}
 	return 0
 }
 
-type CommitArtifactResponse struct {
+type ArtifactServiceCommitResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CommitArtifactResponse) Reset() {
-	*x = CommitArtifactResponse{}
+func (x *ArtifactServiceCommitResponse) Reset() {
+	*x = ArtifactServiceCommitResponse{}
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CommitArtifactResponse) String() string {
+func (x *ArtifactServiceCommitResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CommitArtifactResponse) ProtoMessage() {}
+func (*ArtifactServiceCommitResponse) ProtoMessage() {}
 
-func (x *CommitArtifactResponse) ProtoReflect() protoreflect.Message {
+func (x *ArtifactServiceCommitResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -120,12 +120,12 @@ func (x *CommitArtifactResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CommitArtifactResponse.ProtoReflect.Descriptor instead.
-func (*CommitArtifactResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ArtifactServiceCommitResponse.ProtoReflect.Descriptor instead.
+func (*ArtifactServiceCommitResponse) Descriptor() ([]byte, []int) {
 	return file_dhow_runner_v1_artifacts_proto_rawDescGZIP(), []int{1}
 }
 
-type LookupCacheRequest struct {
+type CacheServiceLookupRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Lease         *LeaseRef              `protobuf:"bytes,1,opt,name=lease,proto3" json:"lease,omitempty"`
 	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
@@ -133,20 +133,20 @@ type LookupCacheRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LookupCacheRequest) Reset() {
-	*x = LookupCacheRequest{}
+func (x *CacheServiceLookupRequest) Reset() {
+	*x = CacheServiceLookupRequest{}
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LookupCacheRequest) String() string {
+func (x *CacheServiceLookupRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LookupCacheRequest) ProtoMessage() {}
+func (*CacheServiceLookupRequest) ProtoMessage() {}
 
-func (x *LookupCacheRequest) ProtoReflect() protoreflect.Message {
+func (x *CacheServiceLookupRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -158,26 +158,26 @@ func (x *LookupCacheRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LookupCacheRequest.ProtoReflect.Descriptor instead.
-func (*LookupCacheRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CacheServiceLookupRequest.ProtoReflect.Descriptor instead.
+func (*CacheServiceLookupRequest) Descriptor() ([]byte, []int) {
 	return file_dhow_runner_v1_artifacts_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *LookupCacheRequest) GetLease() *LeaseRef {
+func (x *CacheServiceLookupRequest) GetLease() *LeaseRef {
 	if x != nil {
 		return x.Lease
 	}
 	return nil
 }
 
-func (x *LookupCacheRequest) GetKey() string {
+func (x *CacheServiceLookupRequest) GetKey() string {
 	if x != nil {
 		return x.Key
 	}
 	return ""
 }
 
-type LookupCacheResponse struct {
+type CacheServiceLookupResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Hit           bool                   `protobuf:"varint,1,opt,name=hit,proto3" json:"hit,omitempty"`
 	Digest        string                 `protobuf:"bytes,2,opt,name=digest,proto3" json:"digest,omitempty"`
@@ -187,20 +187,20 @@ type LookupCacheResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LookupCacheResponse) Reset() {
-	*x = LookupCacheResponse{}
+func (x *CacheServiceLookupResponse) Reset() {
+	*x = CacheServiceLookupResponse{}
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LookupCacheResponse) String() string {
+func (x *CacheServiceLookupResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LookupCacheResponse) ProtoMessage() {}
+func (*CacheServiceLookupResponse) ProtoMessage() {}
 
-func (x *LookupCacheResponse) ProtoReflect() protoreflect.Message {
+func (x *CacheServiceLookupResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -212,40 +212,40 @@ func (x *LookupCacheResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LookupCacheResponse.ProtoReflect.Descriptor instead.
-func (*LookupCacheResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use CacheServiceLookupResponse.ProtoReflect.Descriptor instead.
+func (*CacheServiceLookupResponse) Descriptor() ([]byte, []int) {
 	return file_dhow_runner_v1_artifacts_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *LookupCacheResponse) GetHit() bool {
+func (x *CacheServiceLookupResponse) GetHit() bool {
 	if x != nil {
 		return x.Hit
 	}
 	return false
 }
 
-func (x *LookupCacheResponse) GetDigest() string {
+func (x *CacheServiceLookupResponse) GetDigest() string {
 	if x != nil {
 		return x.Digest
 	}
 	return ""
 }
 
-func (x *LookupCacheResponse) GetSizeBytes() int64 {
+func (x *CacheServiceLookupResponse) GetSizeBytes() int64 {
 	if x != nil {
 		return x.SizeBytes
 	}
 	return 0
 }
 
-func (x *LookupCacheResponse) GetDownloadToken() string {
+func (x *CacheServiceLookupResponse) GetDownloadToken() string {
 	if x != nil {
 		return x.DownloadToken
 	}
 	return ""
 }
 
-type CommitCacheRequest struct {
+type CacheServiceCommitRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Lease         *LeaseRef              `protobuf:"bytes,1,opt,name=lease,proto3" json:"lease,omitempty"`
 	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
@@ -255,20 +255,20 @@ type CommitCacheRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CommitCacheRequest) Reset() {
-	*x = CommitCacheRequest{}
+func (x *CacheServiceCommitRequest) Reset() {
+	*x = CacheServiceCommitRequest{}
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CommitCacheRequest) String() string {
+func (x *CacheServiceCommitRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CommitCacheRequest) ProtoMessage() {}
+func (*CacheServiceCommitRequest) ProtoMessage() {}
 
-func (x *CommitCacheRequest) ProtoReflect() protoreflect.Message {
+func (x *CacheServiceCommitRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -280,60 +280,60 @@ func (x *CommitCacheRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CommitCacheRequest.ProtoReflect.Descriptor instead.
-func (*CommitCacheRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CacheServiceCommitRequest.ProtoReflect.Descriptor instead.
+func (*CacheServiceCommitRequest) Descriptor() ([]byte, []int) {
 	return file_dhow_runner_v1_artifacts_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *CommitCacheRequest) GetLease() *LeaseRef {
+func (x *CacheServiceCommitRequest) GetLease() *LeaseRef {
 	if x != nil {
 		return x.Lease
 	}
 	return nil
 }
 
-func (x *CommitCacheRequest) GetKey() string {
+func (x *CacheServiceCommitRequest) GetKey() string {
 	if x != nil {
 		return x.Key
 	}
 	return ""
 }
 
-func (x *CommitCacheRequest) GetDigest() string {
+func (x *CacheServiceCommitRequest) GetDigest() string {
 	if x != nil {
 		return x.Digest
 	}
 	return ""
 }
 
-func (x *CommitCacheRequest) GetSizeBytes() int64 {
+func (x *CacheServiceCommitRequest) GetSizeBytes() int64 {
 	if x != nil {
 		return x.SizeBytes
 	}
 	return 0
 }
 
-type CommitCacheResponse struct {
+type CacheServiceCommitResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Stored        bool                   `protobuf:"varint,1,opt,name=stored,proto3" json:"stored,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CommitCacheResponse) Reset() {
-	*x = CommitCacheResponse{}
+func (x *CacheServiceCommitResponse) Reset() {
+	*x = CacheServiceCommitResponse{}
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CommitCacheResponse) String() string {
+func (x *CacheServiceCommitResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CommitCacheResponse) ProtoMessage() {}
+func (*CacheServiceCommitResponse) ProtoMessage() {}
 
-func (x *CommitCacheResponse) ProtoReflect() protoreflect.Message {
+func (x *CacheServiceCommitResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_dhow_runner_v1_artifacts_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -345,12 +345,12 @@ func (x *CommitCacheResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CommitCacheResponse.ProtoReflect.Descriptor instead.
-func (*CommitCacheResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use CacheServiceCommitResponse.ProtoReflect.Descriptor instead.
+func (*CacheServiceCommitResponse) Descriptor() ([]byte, []int) {
 	return file_dhow_runner_v1_artifacts_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *CommitCacheResponse) GetStored() bool {
+func (x *CacheServiceCommitResponse) GetStored() bool {
 	if x != nil {
 		return x.Stored
 	}
@@ -361,36 +361,36 @@ var File_dhow_runner_v1_artifacts_proto protoreflect.FileDescriptor
 
 const file_dhow_runner_v1_artifacts_proto_rawDesc = "" +
 	"\n" +
-	"\x1edhow/runner/v1/artifacts.proto\x12\x0edhow.runner.v1\x1a\x1bdhow/runner/v1/common.proto\"\x92\x01\n" +
-	"\x15CommitArtifactRequest\x12.\n" +
+	"\x1edhow/runner/v1/artifacts.proto\x12\x0edhow.runner.v1\x1a\x1bdhow/runner/v1/common.proto\"\x99\x01\n" +
+	"\x1cArtifactServiceCommitRequest\x12.\n" +
 	"\x05lease\x18\x01 \x01(\v2\x18.dhow.runner.v1.LeaseRefR\x05lease\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
 	"\x06digest\x18\x03 \x01(\tR\x06digest\x12\x1d\n" +
 	"\n" +
-	"size_bytes\x18\x04 \x01(\x03R\tsizeBytes\"\x18\n" +
-	"\x16CommitArtifactResponse\"V\n" +
-	"\x12LookupCacheRequest\x12.\n" +
+	"size_bytes\x18\x04 \x01(\x03R\tsizeBytes\"\x1f\n" +
+	"\x1dArtifactServiceCommitResponse\"]\n" +
+	"\x19CacheServiceLookupRequest\x12.\n" +
 	"\x05lease\x18\x01 \x01(\v2\x18.dhow.runner.v1.LeaseRefR\x05lease\x12\x10\n" +
-	"\x03key\x18\x02 \x01(\tR\x03key\"\x85\x01\n" +
-	"\x13LookupCacheResponse\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\"\x8c\x01\n" +
+	"\x1aCacheServiceLookupResponse\x12\x10\n" +
 	"\x03hit\x18\x01 \x01(\bR\x03hit\x12\x16\n" +
 	"\x06digest\x18\x02 \x01(\tR\x06digest\x12\x1d\n" +
 	"\n" +
 	"size_bytes\x18\x03 \x01(\x03R\tsizeBytes\x12%\n" +
-	"\x0edownload_token\x18\x04 \x01(\tR\rdownloadToken\"\x8d\x01\n" +
-	"\x12CommitCacheRequest\x12.\n" +
+	"\x0edownload_token\x18\x04 \x01(\tR\rdownloadToken\"\x94\x01\n" +
+	"\x19CacheServiceCommitRequest\x12.\n" +
 	"\x05lease\x18\x01 \x01(\v2\x18.dhow.runner.v1.LeaseRefR\x05lease\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x16\n" +
 	"\x06digest\x18\x03 \x01(\tR\x06digest\x12\x1d\n" +
 	"\n" +
-	"size_bytes\x18\x04 \x01(\x03R\tsizeBytes\"-\n" +
-	"\x13CommitCacheResponse\x12\x16\n" +
-	"\x06stored\x18\x01 \x01(\bR\x06stored2j\n" +
-	"\x0fArtifactService\x12W\n" +
-	"\x06Commit\x12%.dhow.runner.v1.CommitArtifactRequest\x1a&.dhow.runner.v1.CommitArtifactResponse2\xb4\x01\n" +
-	"\fCacheService\x12Q\n" +
-	"\x06Lookup\x12\".dhow.runner.v1.LookupCacheRequest\x1a#.dhow.runner.v1.LookupCacheResponse\x12Q\n" +
-	"\x06Commit\x12\".dhow.runner.v1.CommitCacheRequest\x1a#.dhow.runner.v1.CommitCacheResponseB\xc5\x01\n" +
+	"size_bytes\x18\x04 \x01(\x03R\tsizeBytes\"4\n" +
+	"\x1aCacheServiceCommitResponse\x12\x16\n" +
+	"\x06stored\x18\x01 \x01(\bR\x06stored2x\n" +
+	"\x0fArtifactService\x12e\n" +
+	"\x06Commit\x12,.dhow.runner.v1.ArtifactServiceCommitRequest\x1a-.dhow.runner.v1.ArtifactServiceCommitResponse2\xd0\x01\n" +
+	"\fCacheService\x12_\n" +
+	"\x06Lookup\x12).dhow.runner.v1.CacheServiceLookupRequest\x1a*.dhow.runner.v1.CacheServiceLookupResponse\x12_\n" +
+	"\x06Commit\x12).dhow.runner.v1.CacheServiceCommitRequest\x1a*.dhow.runner.v1.CacheServiceCommitResponseB\xc5\x01\n" +
 	"\x12com.dhow.runner.v1B\x0eArtifactsProtoP\x01ZEgithub.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1;runnerv1\xa2\x02\x03DRX\xaa\x02\x0eDhow.Runner.V1\xca\x02\x0eDhow\\Runner\\V1\xe2\x02\x1aDhow\\Runner\\V1\\GPBMetadata\xea\x02\x10Dhow::Runner::V1b\x06proto3"
 
 var (
@@ -407,24 +407,24 @@ func file_dhow_runner_v1_artifacts_proto_rawDescGZIP() []byte {
 
 var file_dhow_runner_v1_artifacts_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_dhow_runner_v1_artifacts_proto_goTypes = []any{
-	(*CommitArtifactRequest)(nil),  // 0: dhow.runner.v1.CommitArtifactRequest
-	(*CommitArtifactResponse)(nil), // 1: dhow.runner.v1.CommitArtifactResponse
-	(*LookupCacheRequest)(nil),     // 2: dhow.runner.v1.LookupCacheRequest
-	(*LookupCacheResponse)(nil),    // 3: dhow.runner.v1.LookupCacheResponse
-	(*CommitCacheRequest)(nil),     // 4: dhow.runner.v1.CommitCacheRequest
-	(*CommitCacheResponse)(nil),    // 5: dhow.runner.v1.CommitCacheResponse
-	(*LeaseRef)(nil),               // 6: dhow.runner.v1.LeaseRef
+	(*ArtifactServiceCommitRequest)(nil),  // 0: dhow.runner.v1.ArtifactServiceCommitRequest
+	(*ArtifactServiceCommitResponse)(nil), // 1: dhow.runner.v1.ArtifactServiceCommitResponse
+	(*CacheServiceLookupRequest)(nil),     // 2: dhow.runner.v1.CacheServiceLookupRequest
+	(*CacheServiceLookupResponse)(nil),    // 3: dhow.runner.v1.CacheServiceLookupResponse
+	(*CacheServiceCommitRequest)(nil),     // 4: dhow.runner.v1.CacheServiceCommitRequest
+	(*CacheServiceCommitResponse)(nil),    // 5: dhow.runner.v1.CacheServiceCommitResponse
+	(*LeaseRef)(nil),                      // 6: dhow.runner.v1.LeaseRef
 }
 var file_dhow_runner_v1_artifacts_proto_depIdxs = []int32{
-	6, // 0: dhow.runner.v1.CommitArtifactRequest.lease:type_name -> dhow.runner.v1.LeaseRef
-	6, // 1: dhow.runner.v1.LookupCacheRequest.lease:type_name -> dhow.runner.v1.LeaseRef
-	6, // 2: dhow.runner.v1.CommitCacheRequest.lease:type_name -> dhow.runner.v1.LeaseRef
-	0, // 3: dhow.runner.v1.ArtifactService.Commit:input_type -> dhow.runner.v1.CommitArtifactRequest
-	2, // 4: dhow.runner.v1.CacheService.Lookup:input_type -> dhow.runner.v1.LookupCacheRequest
-	4, // 5: dhow.runner.v1.CacheService.Commit:input_type -> dhow.runner.v1.CommitCacheRequest
-	1, // 6: dhow.runner.v1.ArtifactService.Commit:output_type -> dhow.runner.v1.CommitArtifactResponse
-	3, // 7: dhow.runner.v1.CacheService.Lookup:output_type -> dhow.runner.v1.LookupCacheResponse
-	5, // 8: dhow.runner.v1.CacheService.Commit:output_type -> dhow.runner.v1.CommitCacheResponse
+	6, // 0: dhow.runner.v1.ArtifactServiceCommitRequest.lease:type_name -> dhow.runner.v1.LeaseRef
+	6, // 1: dhow.runner.v1.CacheServiceLookupRequest.lease:type_name -> dhow.runner.v1.LeaseRef
+	6, // 2: dhow.runner.v1.CacheServiceCommitRequest.lease:type_name -> dhow.runner.v1.LeaseRef
+	0, // 3: dhow.runner.v1.ArtifactService.Commit:input_type -> dhow.runner.v1.ArtifactServiceCommitRequest
+	2, // 4: dhow.runner.v1.CacheService.Lookup:input_type -> dhow.runner.v1.CacheServiceLookupRequest
+	4, // 5: dhow.runner.v1.CacheService.Commit:input_type -> dhow.runner.v1.CacheServiceCommitRequest
+	1, // 6: dhow.runner.v1.ArtifactService.Commit:output_type -> dhow.runner.v1.ArtifactServiceCommitResponse
+	3, // 7: dhow.runner.v1.CacheService.Lookup:output_type -> dhow.runner.v1.CacheServiceLookupResponse
+	5, // 8: dhow.runner.v1.CacheService.Commit:output_type -> dhow.runner.v1.CacheServiceCommitResponse
 	6, // [6:9] is the sub-list for method output_type
 	3, // [3:6] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name

@@ -114,14 +114,14 @@ func (r *TestRunner) Cache() runnerv1connect.CacheServiceClient {
 }
 
 func (r *TestRunner) CommitArtifact(ref *runnerv1.LeaseRef, name string, data []byte) error {
-	_, err := r.Artifacts().Commit(context.Background(), connect.NewRequest(&runnerv1.CommitArtifactRequest{
+	_, err := r.Artifacts().Commit(context.Background(), connect.NewRequest(&runnerv1.ArtifactServiceCommitRequest{
 		Lease: ref, Name: name, Digest: DigestHex(data), SizeBytes: int64(len(data)),
 	}))
 	return err
 }
 
-func (r *TestRunner) LookupCache(ref *runnerv1.LeaseRef, key string) (*runnerv1.LookupCacheResponse, error) {
-	res, err := r.Cache().Lookup(context.Background(), connect.NewRequest(&runnerv1.LookupCacheRequest{Lease: ref, Key: key}))
+func (r *TestRunner) LookupCache(ref *runnerv1.LeaseRef, key string) (*runnerv1.CacheServiceLookupResponse, error) {
+	res, err := r.Cache().Lookup(context.Background(), connect.NewRequest(&runnerv1.CacheServiceLookupRequest{Lease: ref, Key: key}))
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (r *TestRunner) LookupCache(ref *runnerv1.LeaseRef, key string) (*runnerv1.
 }
 
 func (r *TestRunner) CommitCache(ref *runnerv1.LeaseRef, key string, data []byte) (bool, error) {
-	res, err := r.Cache().Commit(context.Background(), connect.NewRequest(&runnerv1.CommitCacheRequest{
+	res, err := r.Cache().Commit(context.Background(), connect.NewRequest(&runnerv1.CacheServiceCommitRequest{
 		Lease: ref, Key: key, Digest: DigestHex(data), SizeBytes: int64(len(data)),
 	}))
 	if err != nil {

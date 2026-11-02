@@ -142,18 +142,18 @@ func (c *Client) GetBlob(ctx context.Context, ref *runnerv1.LeaseRef, digest, to
 }
 
 func (c *Client) CommitArtifact(ctx context.Context, ref *runnerv1.LeaseRef, name, digest string, size int64) error {
-	_, err := call(ctx, c, config.RPCTimeout, c.artifacts.Commit, &runnerv1.CommitArtifactRequest{
+	_, err := call(ctx, c, config.RPCTimeout, c.artifacts.Commit, &runnerv1.ArtifactServiceCommitRequest{
 		Lease: ref, Name: name, Digest: digest, SizeBytes: size,
 	})
 	return err
 }
 
-func (c *Client) LookupCache(ctx context.Context, ref *runnerv1.LeaseRef, key string) (*runnerv1.LookupCacheResponse, error) {
-	return call(ctx, c, config.RPCTimeout, c.cache.Lookup, &runnerv1.LookupCacheRequest{Lease: ref, Key: key})
+func (c *Client) LookupCache(ctx context.Context, ref *runnerv1.LeaseRef, key string) (*runnerv1.CacheServiceLookupResponse, error) {
+	return call(ctx, c, config.RPCTimeout, c.cache.Lookup, &runnerv1.CacheServiceLookupRequest{Lease: ref, Key: key})
 }
 
 func (c *Client) CommitCache(ctx context.Context, ref *runnerv1.LeaseRef, key, digest string, size int64) (bool, error) {
-	res, err := call(ctx, c, config.RPCTimeout, c.cache.Commit, &runnerv1.CommitCacheRequest{
+	res, err := call(ctx, c, config.RPCTimeout, c.cache.Commit, &runnerv1.CacheServiceCommitRequest{
 		Lease: ref, Key: key, Digest: digest, SizeBytes: size,
 	})
 	if err != nil {

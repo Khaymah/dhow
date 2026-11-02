@@ -31,7 +31,7 @@ type transferAPI interface {
 	PutBlob(ctx context.Context, ref *runnerv1.LeaseRef, kind, digest string, size int64, open func() (io.ReadCloser, error)) error
 	GetBlob(ctx context.Context, ref *runnerv1.LeaseRef, digest, token string) (client.Blob, error)
 	CommitArtifact(ctx context.Context, ref *runnerv1.LeaseRef, name, digest string, size int64) error
-	LookupCache(ctx context.Context, ref *runnerv1.LeaseRef, key string) (*runnerv1.LookupCacheResponse, error)
+	LookupCache(ctx context.Context, ref *runnerv1.LeaseRef, key string) (*runnerv1.CacheServiceLookupResponse, error)
 	CommitCache(ctx context.Context, ref *runnerv1.LeaseRef, key, digest string, size int64) (bool, error)
 }
 
@@ -258,7 +258,7 @@ func (a *attempt) restoreCache(ctx, jobCtx context.Context, api transferAPI) (re
 		return result{}, true
 	}
 	a.cacheKeyValue = key
-	var hit *runnerv1.LookupCacheResponse
+	var hit *runnerv1.CacheServiceLookupResponse
 	err := a.retry(ctx, func(rctx context.Context) error {
 		var err error
 		hit, err = api.LookupCache(rctx, a.ref, key)

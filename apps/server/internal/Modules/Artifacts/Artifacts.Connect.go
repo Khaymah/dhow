@@ -18,19 +18,19 @@ type artifactHandler struct{ service *Service }
 
 var _ runnerv1connect.ArtifactServiceHandler = artifactHandler{}
 
-func (h artifactHandler) Commit(ctx context.Context, req *connect.Request[runnerv1.CommitArtifactRequest]) (*connect.Response[runnerv1.CommitArtifactResponse], error) {
+func (h artifactHandler) Commit(ctx context.Context, req *connect.Request[runnerv1.ArtifactServiceCommitRequest]) (*connect.Response[runnerv1.ArtifactServiceCommitResponse], error) {
 	m := req.Msg
 	if err := h.service.CommitArtifact(ctx, m.GetLease(), m.GetName(), m.GetDigest(), m.GetSizeBytes()); err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&runnerv1.CommitArtifactResponse{}), nil
+	return connect.NewResponse(&runnerv1.ArtifactServiceCommitResponse{}), nil
 }
 
 type cacheHandler struct{ service *Service }
 
 var _ runnerv1connect.CacheServiceHandler = cacheHandler{}
 
-func (h cacheHandler) Lookup(ctx context.Context, req *connect.Request[runnerv1.LookupCacheRequest]) (*connect.Response[runnerv1.LookupCacheResponse], error) {
+func (h cacheHandler) Lookup(ctx context.Context, req *connect.Request[runnerv1.CacheServiceLookupRequest]) (*connect.Response[runnerv1.CacheServiceLookupResponse], error) {
 	res, err := h.service.LookupCache(ctx, req.Msg.GetLease(), req.Msg.GetKey())
 	if err != nil {
 		return nil, rpcError(err)
@@ -38,13 +38,13 @@ func (h cacheHandler) Lookup(ctx context.Context, req *connect.Request[runnerv1.
 	return connect.NewResponse(res), nil
 }
 
-func (h cacheHandler) Commit(ctx context.Context, req *connect.Request[runnerv1.CommitCacheRequest]) (*connect.Response[runnerv1.CommitCacheResponse], error) {
+func (h cacheHandler) Commit(ctx context.Context, req *connect.Request[runnerv1.CacheServiceCommitRequest]) (*connect.Response[runnerv1.CacheServiceCommitResponse], error) {
 	m := req.Msg
 	stored, err := h.service.CommitCache(ctx, m.GetLease(), m.GetKey(), m.GetDigest(), m.GetSizeBytes())
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&runnerv1.CommitCacheResponse{Stored: stored}), nil
+	return connect.NewResponse(&runnerv1.CacheServiceCommitResponse{Stored: stored}), nil
 }
 
 func touchBlob(ctx context.Context, q *sqlc.Queries, d blob.Digest, size int64) error {

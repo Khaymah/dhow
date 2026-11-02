@@ -45,7 +45,7 @@ const (
 
 // ArtifactServiceClient is a client for the dhow.runner.v1.ArtifactService service.
 type ArtifactServiceClient interface {
-	Commit(context.Context, *connect.Request[v1.CommitArtifactRequest]) (*connect.Response[v1.CommitArtifactResponse], error)
+	Commit(context.Context, *connect.Request[v1.ArtifactServiceCommitRequest]) (*connect.Response[v1.ArtifactServiceCommitResponse], error)
 }
 
 // NewArtifactServiceClient constructs a client for the dhow.runner.v1.ArtifactService service. By
@@ -59,7 +59,7 @@ func NewArtifactServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 	baseURL = strings.TrimRight(baseURL, "/")
 	artifactServiceMethods := v1.File_dhow_runner_v1_artifacts_proto.Services().ByName("ArtifactService").Methods()
 	return &artifactServiceClient{
-		commit: connect.NewClient[v1.CommitArtifactRequest, v1.CommitArtifactResponse](
+		commit: connect.NewClient[v1.ArtifactServiceCommitRequest, v1.ArtifactServiceCommitResponse](
 			httpClient,
 			baseURL+ArtifactServiceCommitProcedure,
 			connect.WithSchema(artifactServiceMethods.ByName("Commit")),
@@ -70,17 +70,17 @@ func NewArtifactServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // artifactServiceClient implements ArtifactServiceClient.
 type artifactServiceClient struct {
-	commit *connect.Client[v1.CommitArtifactRequest, v1.CommitArtifactResponse]
+	commit *connect.Client[v1.ArtifactServiceCommitRequest, v1.ArtifactServiceCommitResponse]
 }
 
 // Commit calls dhow.runner.v1.ArtifactService.Commit.
-func (c *artifactServiceClient) Commit(ctx context.Context, req *connect.Request[v1.CommitArtifactRequest]) (*connect.Response[v1.CommitArtifactResponse], error) {
+func (c *artifactServiceClient) Commit(ctx context.Context, req *connect.Request[v1.ArtifactServiceCommitRequest]) (*connect.Response[v1.ArtifactServiceCommitResponse], error) {
 	return c.commit.CallUnary(ctx, req)
 }
 
 // ArtifactServiceHandler is an implementation of the dhow.runner.v1.ArtifactService service.
 type ArtifactServiceHandler interface {
-	Commit(context.Context, *connect.Request[v1.CommitArtifactRequest]) (*connect.Response[v1.CommitArtifactResponse], error)
+	Commit(context.Context, *connect.Request[v1.ArtifactServiceCommitRequest]) (*connect.Response[v1.ArtifactServiceCommitResponse], error)
 }
 
 // NewArtifactServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -109,14 +109,14 @@ func NewArtifactServiceHandler(svc ArtifactServiceHandler, opts ...connect.Handl
 // UnimplementedArtifactServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedArtifactServiceHandler struct{}
 
-func (UnimplementedArtifactServiceHandler) Commit(context.Context, *connect.Request[v1.CommitArtifactRequest]) (*connect.Response[v1.CommitArtifactResponse], error) {
+func (UnimplementedArtifactServiceHandler) Commit(context.Context, *connect.Request[v1.ArtifactServiceCommitRequest]) (*connect.Response[v1.ArtifactServiceCommitResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dhow.runner.v1.ArtifactService.Commit is not implemented"))
 }
 
 // CacheServiceClient is a client for the dhow.runner.v1.CacheService service.
 type CacheServiceClient interface {
-	Lookup(context.Context, *connect.Request[v1.LookupCacheRequest]) (*connect.Response[v1.LookupCacheResponse], error)
-	Commit(context.Context, *connect.Request[v1.CommitCacheRequest]) (*connect.Response[v1.CommitCacheResponse], error)
+	Lookup(context.Context, *connect.Request[v1.CacheServiceLookupRequest]) (*connect.Response[v1.CacheServiceLookupResponse], error)
+	Commit(context.Context, *connect.Request[v1.CacheServiceCommitRequest]) (*connect.Response[v1.CacheServiceCommitResponse], error)
 }
 
 // NewCacheServiceClient constructs a client for the dhow.runner.v1.CacheService service. By
@@ -130,13 +130,13 @@ func NewCacheServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 	baseURL = strings.TrimRight(baseURL, "/")
 	cacheServiceMethods := v1.File_dhow_runner_v1_artifacts_proto.Services().ByName("CacheService").Methods()
 	return &cacheServiceClient{
-		lookup: connect.NewClient[v1.LookupCacheRequest, v1.LookupCacheResponse](
+		lookup: connect.NewClient[v1.CacheServiceLookupRequest, v1.CacheServiceLookupResponse](
 			httpClient,
 			baseURL+CacheServiceLookupProcedure,
 			connect.WithSchema(cacheServiceMethods.ByName("Lookup")),
 			connect.WithClientOptions(opts...),
 		),
-		commit: connect.NewClient[v1.CommitCacheRequest, v1.CommitCacheResponse](
+		commit: connect.NewClient[v1.CacheServiceCommitRequest, v1.CacheServiceCommitResponse](
 			httpClient,
 			baseURL+CacheServiceCommitProcedure,
 			connect.WithSchema(cacheServiceMethods.ByName("Commit")),
@@ -147,24 +147,24 @@ func NewCacheServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // cacheServiceClient implements CacheServiceClient.
 type cacheServiceClient struct {
-	lookup *connect.Client[v1.LookupCacheRequest, v1.LookupCacheResponse]
-	commit *connect.Client[v1.CommitCacheRequest, v1.CommitCacheResponse]
+	lookup *connect.Client[v1.CacheServiceLookupRequest, v1.CacheServiceLookupResponse]
+	commit *connect.Client[v1.CacheServiceCommitRequest, v1.CacheServiceCommitResponse]
 }
 
 // Lookup calls dhow.runner.v1.CacheService.Lookup.
-func (c *cacheServiceClient) Lookup(ctx context.Context, req *connect.Request[v1.LookupCacheRequest]) (*connect.Response[v1.LookupCacheResponse], error) {
+func (c *cacheServiceClient) Lookup(ctx context.Context, req *connect.Request[v1.CacheServiceLookupRequest]) (*connect.Response[v1.CacheServiceLookupResponse], error) {
 	return c.lookup.CallUnary(ctx, req)
 }
 
 // Commit calls dhow.runner.v1.CacheService.Commit.
-func (c *cacheServiceClient) Commit(ctx context.Context, req *connect.Request[v1.CommitCacheRequest]) (*connect.Response[v1.CommitCacheResponse], error) {
+func (c *cacheServiceClient) Commit(ctx context.Context, req *connect.Request[v1.CacheServiceCommitRequest]) (*connect.Response[v1.CacheServiceCommitResponse], error) {
 	return c.commit.CallUnary(ctx, req)
 }
 
 // CacheServiceHandler is an implementation of the dhow.runner.v1.CacheService service.
 type CacheServiceHandler interface {
-	Lookup(context.Context, *connect.Request[v1.LookupCacheRequest]) (*connect.Response[v1.LookupCacheResponse], error)
-	Commit(context.Context, *connect.Request[v1.CommitCacheRequest]) (*connect.Response[v1.CommitCacheResponse], error)
+	Lookup(context.Context, *connect.Request[v1.CacheServiceLookupRequest]) (*connect.Response[v1.CacheServiceLookupResponse], error)
+	Commit(context.Context, *connect.Request[v1.CacheServiceCommitRequest]) (*connect.Response[v1.CacheServiceCommitResponse], error)
 }
 
 // NewCacheServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -201,10 +201,10 @@ func NewCacheServiceHandler(svc CacheServiceHandler, opts ...connect.HandlerOpti
 // UnimplementedCacheServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedCacheServiceHandler struct{}
 
-func (UnimplementedCacheServiceHandler) Lookup(context.Context, *connect.Request[v1.LookupCacheRequest]) (*connect.Response[v1.LookupCacheResponse], error) {
+func (UnimplementedCacheServiceHandler) Lookup(context.Context, *connect.Request[v1.CacheServiceLookupRequest]) (*connect.Response[v1.CacheServiceLookupResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dhow.runner.v1.CacheService.Lookup is not implemented"))
 }
 
-func (UnimplementedCacheServiceHandler) Commit(context.Context, *connect.Request[v1.CommitCacheRequest]) (*connect.Response[v1.CommitCacheResponse], error) {
+func (UnimplementedCacheServiceHandler) Commit(context.Context, *connect.Request[v1.CacheServiceCommitRequest]) (*connect.Response[v1.CacheServiceCommitResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dhow.runner.v1.CacheService.Commit is not implemented"))
 }
