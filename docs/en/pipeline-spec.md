@@ -162,7 +162,7 @@ The values in the context have limits, and an evaluation with a larger value fai
 A job of a pipeline starts with a checkout of the run's commit into `/workspace`. You write nothing for it in `.dhow.yml`.
 
 - **Where it runs:** in a sandbox of its own, from the `dhow-git` image that the runner pins by digest. That sandbox can reach the repository host and nothing else, whatever the job's `network.egress` says.
-- **What it fetches:** the run's ref with `--depth=1`, then exactly the run's commit. If the branch moved on and the commit is no longer in its history, the runner fetches the commit by id, and if that fails too the job fails with `CHECKOUT_REF_MOVED`. Submodules, LFS files, hooks and redirects are off; a step of yours can fetch them with its own egress.
+- **What it fetches:** the run's ref with `--depth=1`, then exactly the run's commit. If the branch moved on, the runner fetches more of the branch's history and checks that the commit is in it (`git merge-base --is-ancestor`). A commit that is not in the history of the ref (the branch was force-pushed, deleted, or the commit only exists on another branch) is never fetched by its id: the job fails with `CHECKOUT_REF_MOVED`. Submodules, LFS files, hooks and redirects are off; a step of yours can fetch them with its own egress.
 - **The credential** (a deploy key over SSH, or a short token over HTTPS) is a file in the checkout sandbox only. Your steps and plugins never get it, not in the environment, not in a file and not in `/proc`. Over SSH only the host key an admin confirmed for the repository is accepted, and any other key fails the job with `HOST_KEY_MISMATCH`.
 - **Old runners:** a job with a checkout goes only to a runner that declared the `checkout` feature when it signed in. Until such a runner is online the job waits in the queue.
 
@@ -355,5 +355,9 @@ jobs:
 
 ### 12.6 Generic Git repositories
 
-- Gitea, Forgejo and plain Git servers have no API for files, so a small job on a runner checks the commit out and reads the file (a discovery job).
-- That job needs the runner checkout of M4.7. Until it lands, a run of a generic repository ends `failed` with `CHECKOUT_UNAVAILABLE`.
+- Gitea, Forgejo and plain Git servers have no API for files, so a small job on a runner checks the commit out and reads the file (a discovery job, `dhow.discovery` in the run's jobs). For a pull request from a fork it checks out the base commit.
+- It goes only to a runner with the `checkout` feature, like every checkout job. Until one is online it waits in the queue, and after the queue timeout it fails and the run ends `failed` with `DISCOVERY_FAILED`.
+- When the commit is not in the history of its ref, the run ends `failed` with `SHA_NOT_ON_REF` before any of your jobs runs.
+- The file reaches the server through the job's log with its SHA-256 in the job's outputs, and the server refuses it when they do not match. A missing file (or a symlink, or a path outside the repository) gives a `skipped` run with `DEFINITION_NOT_FOUND`.
+- Every job of the run then checks out the run's commit with the repository's deploy key over SSH (only the host key an admin confirmed is accepted), or without a credential over HTTPS.
+- A server built without the checkout image ends such runs `failed` with `CHECKOUT_UNAVAILABLE`.
