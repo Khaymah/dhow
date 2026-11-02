@@ -138,6 +138,7 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
   - احتفاظ الـ audit 90 يوم.
   - GO-2026-5932 في `golang.org/x/crypto` لحد ما يطلع إصلاح.
 - **التنصيب:** ربط `make proxy-check` بالـ CI، وتجربة certbot وCloudflare وIPv6 الحقيقيين.
+- **Fedora 45 في الـ CI:** الـ matrix الاتنين في `installer.yml` متثبّتين على `fedora:44` لأن PGDG لسه مانشرش PostgreSQL 18 لـ Fedora 45. أول ما `fedora-45-x86_64/repodata/repomd.xml` يرجع 200، نرجّعهم لـ `fedora:latest` أو نضيف 45، ونحدّث سطر Fedora في `docs/install/installer.md` و`docs/en/install/installer.md`.
 - **الموارد:** قياس الـ sandbox بـ Podman على cgroup v2، وjob ليلي لـ `make bench` بعد ما نعرف ثبات الأرقام على أجهزة GitHub.
 
 ## طريقة الشغل اللي ماشيين بيها
