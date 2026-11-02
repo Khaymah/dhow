@@ -170,7 +170,7 @@ type Job struct {
 	UpdatedAt         time.Time
 	IsDeleted         bool
 	OrganizationId    uuid.UUID
-	CreatedByUserId   uuid.UUID
+	CreatedByUserId   *uuid.UUID
 	Name              string
 	Spec              []byte
 	SpecDigest        []byte
@@ -348,6 +348,55 @@ type Passkey struct {
 	LastUsedAt        *time.Time
 }
 
+type PipelineRun struct {
+	Id                uuid.UUID
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	IsDeleted         bool
+	OrganizationId    uuid.UUID
+	ProjectId         uuid.UUID
+	RepositoryId      *uuid.UUID
+	Provider          pgtype.Text
+	Number            int64
+	Trigger           string
+	Ref               string
+	BaseRef           pgtype.Text
+	Sha               pgtype.Text
+	BaseSha           pgtype.Text
+	IsFork            bool
+	PrNumber          pgtype.Int4
+	Actor             pgtype.Text
+	Inputs            []byte
+	DefinitionPath    string
+	DefinitionSha     pgtype.Text
+	DefinitionDigest  []byte
+	DefinitionSource  pgtype.Text
+	ImagePins         []byte
+	Issues            []byte
+	State             string
+	FailureReason     string
+	ConcurrencyGroup  pgtype.Text
+	CancelInProgress  bool
+	DeliveryId        *uuid.UUID
+	TriggeredByUserId *uuid.UUID
+	ApprovedByUserId  *uuid.UUID
+	ApprovedAt        *time.Time
+	CancelRequestedAt *time.Time
+	CancelRequestedBy *uuid.UUID
+	ClaimedUntil      *time.Time
+	StartedAt         *time.Time
+	FinishedAt        *time.Time
+}
+
+type PipelineRunCounter struct {
+	Id        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	IsDeleted bool
+	ProjectId uuid.UUID
+	Next      int64
+}
+
 type Project struct {
 	Id              uuid.UUID
 	CreatedAt       time.Time
@@ -426,6 +475,30 @@ type RoleBinding struct {
 	ProjectId      *uuid.UUID
 	EnvironmentId  *uuid.UUID
 	Role           string
+}
+
+type RunJob struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	RunId          uuid.UUID
+	Kind           string
+	Key            string
+	JobName        string
+	JobId          string
+	Matrix         []byte
+	Needs          []string
+	Position       int32
+	Digest         string
+	State          string
+	FailureReason  string
+	CurrentJobId   *uuid.UUID
+	Attempts       int32
+	Outputs        []byte
+	StartedAt      *time.Time
+	FinishedAt     *time.Time
 }
 
 type Runner struct {

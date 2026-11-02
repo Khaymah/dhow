@@ -34,6 +34,7 @@ type CompleteInput struct {
 	ExitCode int32
 	Reason   runnerv1.FailureReason
 	Digest   []byte
+	Outputs  map[string]string
 }
 
 type resultRule struct {
@@ -97,9 +98,13 @@ func outcomeOf(in CompleteInput) (models.Outcome, error) {
 		return models.Outcome{}, runnerauth.ValidationFailed("FailureReason")
 	}
 	exit := in.ExitCode
-	return models.Outcome{
+	out := models.Outcome{
 		State: rule.state, FailureReason: failureName(reason), ExitCode: &exit, Digest: in.Digest, LeaseState: models.LeaseReleased,
-	}, nil
+	}
+	if rule.state == models.AttemptSucceeded {
+		out.Outputs = in.Outputs
+	}
+	return out, nil
 }
 
 func (s *Service) Complete(ctx context.Context, in CompleteInput) error {
@@ -201,8 +206,11 @@ func (s *Service) finalize(ctx context.Context, q *sqlc.Queries, leaseID uuid.UU
 		}
 		return q.NotifyJobsQueued(ctx, job.OrganizationId.String())
 	}
-	_, err = q.FinishJob(ctx, sqlc.FinishJobParams{ID: job.Id, State: to, FailureReason: reason, FromState: job.State})
-	return err
+	finished, err := q.FinishJob(ctx, sqlc.FinishJobParams{ID: job.Id, State: to, FailureReason: reason, FromState: job.State})
+	if err != nil {
+		return err
+	}
+	return s.jobFinished(ctx, q, finished, o.Outputs)
 }
 
 func decide(job sqlc.Job, attempt sqlc.JobAttempt) (string, string) {

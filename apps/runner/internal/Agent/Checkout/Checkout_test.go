@@ -114,13 +114,13 @@ func TestCheckoutFetchesTheCommit(t *testing.T) {
 	assert.Equal(t, sha, w.plain("-C", w.work, "rev-parse", "HEAD"))
 }
 
-func TestARefThatMovedOnIsFetchedByCommit(t *testing.T) {
+func TestARefThatMovedOnStillFindsTheCommitInItsHistory(t *testing.T) {
 	w := newWorld(t)
 	old := w.plain("-C", w.seed, "rev-parse", "HEAD")
 	w.commit("second", "two\n")
 	code, out := w.run(old, nil)
 	require.Equal(t, ExitOK, code, out)
-	assert.Contains(t, out, "fetched by its id")
+	assert.Contains(t, out, "more of its history is fetched")
 	assert.Equal(t, old, w.plain("-C", w.work, "rev-parse", "HEAD"))
 	assert.NoFileExists(t, filepath.Join(w.work, "second"))
 }
@@ -132,11 +132,24 @@ func TestACommitThatIsGoneIsRefMoved(t *testing.T) {
 	assert.Contains(t, out, "CHECKOUT_REF_MOVED")
 }
 
-func TestADeletedBranchFallsBackToTheCommit(t *testing.T) {
+func TestADeletedBranchIsRefMoved(t *testing.T) {
 	w := newWorld(t)
 	sha := w.plain("-C", w.seed, "rev-parse", "HEAD")
 	code, out := w.run(sha, map[string]string{EnvRef: "refs/heads/gone"})
-	require.Equal(t, ExitOK, code, out)
+	assert.Equal(t, ExitRefMoved, code, out)
+}
+
+func TestACommitTheServerHasOffTheRefIsRefMoved(t *testing.T) {
+	w := newWorld(t)
+	w.plain("-C", w.seed, "checkout", "--quiet", "-b", "side")
+	require.NoError(t, os.WriteFile(filepath.Join(w.seed, "side"), []byte("side\n"), 0o600))
+	w.plain("-C", w.seed, "add", "--", "side")
+	w.plain("-C", w.seed, "commit", "--quiet", "-m", "side")
+	w.plain("-C", w.seed, "push", "--quiet", w.origin, "side")
+	side := w.plain("-C", w.seed, "rev-parse", "HEAD")
+	code, out := w.run(side, nil)
+	assert.Equal(t, ExitRefMoved, code, "a commit on another branch never runs as main: %s", out)
+	assert.NoFileExists(t, filepath.Join(w.work, "side"))
 }
 
 func TestHostKeyMismatchIsReported(t *testing.T) {

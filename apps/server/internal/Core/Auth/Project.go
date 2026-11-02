@@ -57,3 +57,28 @@ func withProjectRole(p Principal, resource policy.Resource) Principal {
 	p.ProjectRole = policy.ProjectRole(role, resource.ProjectBindings)
 	return p
 }
+
+func (g *Guard) AuthorizeProject(ctx context.Context, action policy.Action, org, project uuid.UUID) error {
+	p, ok := PrincipalFrom(ctx)
+	if !ok {
+		return apperrors.Unauthenticated()
+	}
+	role, member := p.RoleIn(org)
+	if !member {
+		return apperrors.NotFound()
+	}
+	if g.projects == nil {
+		return apperrors.Internal(errNoProjectsResolver)
+	}
+	bindings, err := g.projects.ProjectBindings(ctx, org, project, p.UserID)
+	switch {
+	case errors.Is(err, ErrNoProject):
+		return apperrors.Forbidden()
+	case err != nil:
+		return apperrors.Internal(err)
+	}
+	if !policy.Allows(policy.ProjectRole(role, bindings), action) {
+		return apperrors.Forbidden()
+	}
+	return nil
+}

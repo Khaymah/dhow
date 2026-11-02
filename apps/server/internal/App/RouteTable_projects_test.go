@@ -45,8 +45,13 @@ func projectRules(scope policy.Scope) []policy.Rule {
 
 func projectRequest(rule policy.Rule, org, project uuid.UUID, env *apptest.Env) apptest.Request {
 	path := strings.NewReplacer("{id}", org.String(), "{projectId}", project.String()).Replace(rule.Path)
+	if strings.Contains(path, "{runId}") {
+		path = strings.ReplaceAll(path, "{runId}", env.SeedRun(project, "awaiting_approval").String())
+	}
 	req := apptest.Request{Method: rule.Method, Path: path}
 	switch {
+	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/projects/{projectId}/runs":
+		req.Body = map[string]string{"Ref": "main"}
 	case rule.Method == http.MethodPatch:
 		req.Body = map[string]string{"Name": "Bound project " + randomSuffix(env.T)}
 	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/projects":
@@ -117,7 +122,13 @@ func TestRouteTableProjectBindingsApplyToAPITokens(t *testing.T) {
 					for project, role := range map[uuid.UUID]policy.Role{bound: c.want, other: c.org} {
 						req := projectRequest(rule, org, project, env)
 						req.Headers = map[string]string{"Origin": ""}
-						assertOutcome(t, env.Bearer(token.Value, req), scoped && policy.Allows(role, rule.Action))
+						res := env.Bearer(token.Value, req)
+						if !rule.Tokens {
+							require.NotNil(t, res.Error, string(res.Raw))
+							assert.Equal(t, "SESSION_REQUIRED", res.Error.Code, "a route without tokens needs a session")
+							continue
+						}
+						assertOutcome(t, res, scoped && policy.Allows(role, rule.Action))
 					}
 				})
 			}
@@ -139,4 +150,56 @@ func TestRouteTableProjectsOfAnotherOrganizationAreNotFound(t *testing.T) {
 			})
 		}
 	}
+}
+
+func organizationJobRules() []policy.Rule {
+	var out []policy.Rule
+	for _, r := range app.Policies() {
+		if r.Scope == policy.ScopeOrganization && strings.Contains(r.Path, "{jobId}") {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+func TestRouteTableOrganizationJobRoutesUseTheRoleOnTheJobsProject(t *testing.T) {
+	env := apptest.New(t)
+	fx := buildFixture(t, env)
+	org, owner := mustUUID(fx.orgA), mustUUID(fx.byRole[policy.RoleOwner])
+	rules := organizationJobRules()
+	require.NotEmpty(t, rules)
+	for _, c := range bindingCases() {
+		for _, rule := range rules {
+			t.Run(c.name+"/"+rule.Key(), func(t *testing.T) {
+				bound := env.SeedProject(org, owner)
+				client := env.SeedSession(boundMember(env, org, owner, bound, c))
+				for job, role := range map[uuid.UUID]policy.Role{
+					env.SeedPipelineJob(org, bound, owner):                       c.want,
+					env.SeedPipelineJob(org, env.SeedProject(org, owner), owner): c.org,
+				} {
+					path := strings.NewReplacer("{id}", org.String(), "{jobId}", job.String()).Replace(rule.Path)
+					res := client.Do(apptest.Request{Method: rule.Method, Path: path})
+					assertOutcome(t, res, policy.Allows(c.org, rule.Action) && policy.Allows(role, rule.Action))
+				}
+			})
+		}
+	}
+}
+
+func TestAMaintainerLoweredToViewerCannotCancelTheProjectsJobsFromTheOrganizationRoute(t *testing.T) {
+	env := apptest.New(t)
+	fx := buildFixture(t, env)
+	org, owner := mustUUID(fx.orgA), mustUUID(fx.byRole[policy.RoleOwner])
+	project := env.SeedProject(org, owner)
+	maintainer := env.SeedUser(org, randomEmail(t), "a long password for the maintainer", string(policy.RoleMaintainer))
+	env.SeedUserProjectBinding(org, project, maintainer, string(policy.RoleViewer))
+	client := env.SeedSession(maintainer)
+	job := env.SeedPipelineJob(org, project, owner)
+	res := client.Do(apptest.Request{Method: http.MethodPost, Path: apptest.OrgPath(org, "/jobs/"+job.String()+"/cancel")})
+	assertOutcome(t, res, false)
+	state, _ := env.JobState(job)
+	assert.Equal(t, "queued", state, "the job of the project keeps running")
+	other := env.SeedJob(org, owner)
+	allowed := client.Do(apptest.Request{Method: http.MethodPost, Path: apptest.OrgPath(org, "/jobs/"+other.String()+"/cancel")})
+	assertOutcome(t, allowed, true)
 }

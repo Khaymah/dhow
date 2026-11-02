@@ -14,6 +14,8 @@ import (
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
+	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
+	runevents "github.com/Khaymah/dhow/apps/server/internal/Core/RunEvents"
 	runnerauth "github.com/Khaymah/dhow/apps/server/internal/Core/RunnerAuth"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
@@ -46,6 +48,7 @@ type Options struct {
 	LogSettings     func() config.LogSettings
 	StreamWriteWait time.Duration
 	Log             *slog.Logger
+	ManualJobs      bool
 }
 
 type Service struct {
@@ -64,6 +67,8 @@ type Service struct {
 	readWait time.Duration
 	readRate *rateLimiter
 	openRate *rateLimiter
+	manual   bool
+	runs     runevents.Sink
 
 	pollMu  sync.Mutex
 	polls   int
@@ -106,7 +111,7 @@ func NewService(o Options) *Service {
 		readRate: newRateLimiter(config.LogReadBurst, config.LogReadRefill),
 		openRate: newRateLimiter(config.LogStreamOpenBurst, config.LogStreamOpenRefill),
 		hub:      newHub(o.Listen, o.Log), pollers: map[uuid.UUID]struct{}{}, buckets: map[uuid.UUID]claimBucket{},
-		stop: make(chan struct{}),
+		stop: make(chan struct{}), manual: o.ManualJobs,
 	}
 }
 
@@ -125,6 +130,18 @@ func (s *Service) readQueries() *sqlc.Queries { return sqlc.New(s.reads) }
 
 func (s *Service) inTx(ctx context.Context, fn func(q *sqlc.Queries) error) error {
 	return dbtx.Run(ctx, s.db, fn)
+}
+
+func (s *Service) UseRunEvents(sink runevents.Sink) { s.runs = sink }
+
+func (s *Service) jobFinished(ctx context.Context, q *sqlc.Queries, job sqlc.Job, outputs map[string]string) error {
+	if s.runs == nil || job.OriginKind != jobqueue.OriginPipeline || job.OriginId == nil {
+		return nil
+	}
+	return s.runs.JobFinished(ctx, q, runevents.Finished{
+		OrganizationID: job.OrganizationId, JobID: job.Id, OriginID: *job.OriginId, State: job.State, FailureReason: job.FailureReason,
+		Outputs: outputs,
+	})
 }
 
 func (s *Service) Drain() { s.stopOnce.Do(func() { close(s.stop) }) }

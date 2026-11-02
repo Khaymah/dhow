@@ -170,6 +170,7 @@ func (a *analysis) jobSpec(ja *jobAnalysis, rj *RunJob) *runnerv1.JobSpec {
 		plan := StepPlan{ID: s.ID, If: sa.ifExpr}
 		if s.Uses != "" {
 			plan.Plugin = pluginPlan(rj, s, sa, prefix)
+			step.Plugin = pluginStep(spec, plan.Plugin, int32(i))
 		}
 		spec.Steps = append(spec.Steps, step)
 		rj.Steps = append(rj.Steps, plan)
@@ -204,6 +205,20 @@ func pluginPlan(rj *RunJob, s *Step, sa stepAnalysis, prefix string) *PluginPlan
 		}
 	}
 	return p
+}
+
+func pluginStep(spec *runnerv1.JobSpec, p *PluginPlan, index int32) *runnerv1.Plugin {
+	out := &runnerv1.Plugin{Image: p.Image, Inputs: map[string]string{}}
+	for name, v := range p.Inputs {
+		out.Inputs[name] = v
+	}
+	for _, name := range sortedNames(p.Secrets) {
+		spec.Secrets = append(spec.Secrets, &runnerv1.SecretRef{
+			Name: p.Secrets[name], Target: &runnerv1.SecretRef_AsEnv{AsEnv: jobspec.PluginInputEnvPrefix + strings.ToUpper(name)},
+			StepIndexes: []int32{index},
+		})
+	}
+	return out
 }
 
 func stepName(s *Step) string {
@@ -245,35 +260,12 @@ func (a *analysis) checkJobSpec(ja *jobAnalysis, spec *runnerv1.JobSpec) {
 		return
 	}
 	for _, v := range verr.Violations {
-		if pluginGap(ja, v) {
-			continue
-		}
 		if v.Field == "Spec" {
 			a.issues.add(CodeSpecTooLarge, ja.path)
 			continue
 		}
 		a.issues.add(CodeSpecInvalid, ja.path)
 	}
-}
-
-func pluginGap(ja *jobAnalysis, v jobspec.Violation) bool {
-	if v.Reason != jobspec.ReasonRequired {
-		return false
-	}
-	if v.Field == "Image" {
-		for _, s := range ja.steps {
-			if s.step.Run != "" {
-				return false
-			}
-		}
-		return true
-	}
-	for i, s := range ja.steps {
-		if s.step.Uses != "" && v.Field == fmt.Sprintf("Steps[%d].Run", i) {
-			return true
-		}
-	}
-	return false
 }
 
 type digestInput struct {

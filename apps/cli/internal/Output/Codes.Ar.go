@@ -66,6 +66,7 @@ var arCodes = map[string]string{
 	ps.CodeMatrixValueInvalid:     "قيمة الـ matrix نص أو رقم أو boolean، حتى 128 حرفًا قابلًا للطباعة",
 	ps.CodeMatrixEntryInvalid:     "عنصر include أو exclude يجب أن يستخدم مفاتيح الـ matrix",
 	ps.CodeMatrixDuplicate:        "تركيبتان في الـ matrix تعطيان الاسم نفسه للتشغيل",
+	ps.CodeMatrixNameTooLong:      "قيم الـ matrix تجعل اسم التشغيل أطول من 512 حرفًا",
 	ps.CodeMaxParallelInvalid:     "قيمة max_parallel من 1 إلى 256",
 	ps.CodeTooManyRunJobs:         "تتوسع خطوات النشر إلى أكثر من 256 تشغيلًا",
 	ps.CodeTimeoutInvalid:         "المدة مثل 90s أو 20m أو 1h30m، من 1s إلى 24h، ولا تكون الخطوة أطول من تشغيلها",

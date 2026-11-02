@@ -51,6 +51,9 @@ func (c *Controller) GetJobLogs(ctx context.Context, req gen.GetJobLogsRequestOb
 	if err := c.service.AllowLogRead(p.UserID); err != nil {
 		return nil, err
 	}
+	if err := c.authorizeJob(ctx, policy.LogRead, req.Id, req.JobId); err != nil {
+		return nil, err
+	}
 	attempt, err := attemptParam(req.Params.Attempt)
 	if err != nil {
 		return nil, err
@@ -96,10 +99,18 @@ func (c *Controller) StreamJobLogs(ctx context.Context, req gen.StreamJobLogsReq
 		}
 		from = *req.Params.FromSeq
 	}
-	org := req.Id
+	org, job := req.Id, req.JobId
+	if err := c.authorizeJob(ctx, policy.LogRead, org, job); err != nil {
+		return nil, err
+	}
 	stream, err := c.service.OpenLogStream(ctx, StreamRequest{
-		Organization: org, Job: req.JobId, Attempt: attempt, FromSeq: from, LastEvent: last, User: p.UserID,
-		Reauthorize: func(ctx context.Context) error { return c.guard.Reauthorize(ctx, policy.LogRead, org) },
+		Organization: org, Job: job, Attempt: attempt, FromSeq: from, LastEvent: last, User: p.UserID,
+		Reauthorize: func(ctx context.Context) error {
+			if err := c.guard.Reauthorize(ctx, policy.LogRead, org); err != nil {
+				return err
+			}
+			return c.authorizeJob(ctx, policy.LogRead, org, job)
+		},
 	})
 	if err != nil {
 		return nil, err

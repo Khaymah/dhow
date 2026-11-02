@@ -2,7 +2,7 @@
 
 # Pipeline spec — `.dhow.yml` v1
 
-Status: **v1, validated.** The Go validator in `internal/pipelinespec` is the source of truth, and the server, the runner and the CLI (`dhow lint`) all use it. The JSON Schema in `packages/spec/dhow.schema.json` is for editors (VS Code), and a test keeps it in step with the validator. Runs that execute these files arrive with M4.8.
+Status: **v1, validated.** The Go validator in `internal/pipelinespec` is the source of truth, and the server, the runner and the CLI (`dhow lint`) all use it. The JSON Schema in `packages/spec/dhow.schema.json` is for editors (VS Code), and a test keeps it in step with the validator. How the server runs these files is in §12.
 
 ## 1. Principles
 
@@ -128,7 +128,7 @@ jobs:
 | `jobs.<id>.needs` | list | DAG edges; unknown jobs and cycles are rejected at validation time. A need on a matrix job waits for every copy |
 | `jobs.<id>.if` | CEL bool | Evaluated before the job is queued; `false` marks it `skipped` |
 | `jobs.<id>.strategy.matrix` | map | Cartesian product with `include` and `exclude` (§6); `strategy.max_parallel` from 1 to 256 |
-| `jobs.<id>.image` | string | Required when the job has a `run:` step. Should be digest-pinned: a tag-only image is a warning, and the runner refuses it unless `DHOW_RUNNER_ALLOW_UNPINNED_IMAGES` is set. A name without a registry host is completed the way Docker does it: `node:22-bookworm@sha256:…` runs as `docker.io/library/node:22-bookworm@sha256:…`. The runner never searches other registries. |
+| `jobs.<id>.image` | string | Required when the job has a `run:` step. Should be digest-pinned: a tag-only image is a warning, and the server pins the tag to a digest when the run starts (§12.5). A name without a registry host is completed the way Docker does it: `node:22-bookworm@sha256:…` runs as `docker.io/library/node:22-bookworm@sha256:…`. The runner never searches other registries. |
 | `jobs.<id>.runner` | map | Same keys as `defaults.runner`; its `labels` replace the defaults |
 | `jobs.<id>.timeout` | duration | From `1s` to `24h`, for example `90s`, `20m` or `1h30m` (units `d`, `h`, `m`, `s`, largest first) |
 | `jobs.<id>.environment` | string | Binds protection rules, secrets and targets. Accepted now with a warning; until M5 the job is skipped |
@@ -162,7 +162,7 @@ The values in the context have limits, and an evaluation with a larger value fai
 A job of a pipeline starts with a checkout of the run's commit into `/workspace`. You write nothing for it in `.dhow.yml`.
 
 - **Where it runs:** in a sandbox of its own, from the `dhow-git` image that the runner pins by digest. That sandbox can reach the repository host and nothing else, whatever the job's `network.egress` says.
-- **What it fetches:** the run's ref with `--depth=1`, then exactly the run's commit. If the branch moved on and the commit is no longer in its history, the runner fetches the commit by id, and if that fails too the job fails with `CHECKOUT_REF_MOVED`. Submodules, LFS files, hooks and redirects are off; a step of yours can fetch them with its own egress.
+- **What it fetches:** the run's ref with `--depth=1`, then exactly the run's commit. If the branch moved on, the runner fetches more of the branch's history and checks that the commit is in it (`git merge-base --is-ancestor`). A commit that is not in the history of the ref (the branch was force-pushed, deleted, or the commit only exists on another branch) is never fetched by its id: the job fails with `CHECKOUT_REF_MOVED`. Submodules, LFS files, hooks and redirects are off; a step of yours can fetch them with its own egress.
 - **The credential** (a deploy key over SSH, or a short token over HTTPS) is a file in the checkout sandbox only. Your steps and plugins never get it, not in the environment, not in a file and not in `/proc`. Over SSH only the host key an admin confirmed for the repository is accepted, and any other key fails the job with `HOST_KEY_MISMATCH`.
 - **Old runners:** a job with a checkout goes only to a runner that declared the `checkout` feature when it signed in. Until such a runner is online the job waits in the queue.
 
@@ -240,6 +240,7 @@ jobs:
 | YAML nodes | 50,000 |
 | Jobs before the matrix | 64 |
 | Jobs after the matrix | 256 |
+| Name of one matrix job (its values) | 512 characters |
 | Steps per job | 100 |
 | `env` variables per job or step | 100 (32 KiB per value) |
 | `with` inputs per step | 32 (32 KiB per value) |
@@ -283,3 +284,80 @@ The UI will offer a visual pipeline editor (a jobs graph plus step forms), inten
 - Every problem has a stable code (`UPPER_SNAKE`, for example `DAG_CYCLE` or `RUN_EXPRESSION_NOT_ALLOWED`), a path (`jobs.build.steps[2].run`), a line and a column. A message never repeats the value itself, in case a secret was pasted by mistake.
 - `error` stops the run, and `warning` (such as a tag-only image) shows in the lint output and the UI.
 - Unknown keys, duplicate keys, anchors, aliases, merge keys and custom tags are errors.
+
+## 12. Runs
+
+A run is one pass of the pipeline over one commit. The server makes it from a trigger, reads the file at that commit, and turns each job of the file (after the matrix) into a job for a runner.
+
+### 12.1 What starts a run
+
+- **`push` and `tag`:** a webhook. A commit runs once per ref: the same commit sent again for the same ref makes no new run, even after the webhook deliveries are deleted (they are kept 30 days).
+- **`pull_request`:** a webhook from GitHub or GitLab (M4.5 and M4.6). The run uses the head commit, not a merge commit, so the check shows on the commit you pushed.
+- **`manual`:** a person with `run.trigger` on the project, through `POST /organizations/{id}/projects/{projectId}/runs` with `Ref`, an optional `Sha` and `Inputs`.
+- **`api`:** the same request with an API token that has the `run.trigger` scope.
+- **Which commit a hand-started run uses:** only a commit that a webhook already brought for that ref, from the repository itself and not from a fork. A `Sha` that did not come that way is refused (`SHA_NOT_ON_REF`). Without `Sha`, the run uses the latest such commit of the ref, or is refused (`REF_HEAD_UNKNOWN`) until a first push arrives. One person starts at most 60 runs and one project 240 runs in ten minutes.
+- A run goes on only when its trigger is in `on:` and the filters match. Otherwise it ends `skipped` with `TRIGGER_NOT_ENABLED`.
+- A commit without the file gives a `skipped` run with `DEFINITION_NOT_FOUND`, and the provider gets no check.
+- `paths` filters apply once a provider sends the changed files (M4.5 and M4.6). Until then they match every push.
+
+### 12.2 How a run moves
+
+| State | Meaning |
+|---|---|
+| `awaiting_approval` | A pull request from a fork waits for a Maintainer (§12.4) |
+| `pending` | The server reads the file at the commit, checks it and pins its images (§12.5) |
+| `queued` | An older run of the same concurrency group still runs (§12.3) |
+| `running` | The jobs run in the order of their `needs` |
+| `succeeded`, `failed`, `canceled`, `skipped` | The run ended |
+
+- A wrong file ends the run `failed` with `PIPELINE_INVALID`. `GET /organizations/{id}/projects/{projectId}/runs/{runId}` lists every problem with its code, line and column, the same as `dhow lint`.
+- A job starts when every job in its `needs` succeeded or was skipped by its own `if`. When a need fails or is canceled, the jobs after it are `skipped` with `NEEDS_FAILED`.
+- `cancel` cancels the jobs that wait at once, and a running job stops at its runner's next heartbeat.
+- `rerun-failed` runs again the jobs that failed or were canceled, and the jobs skipped because of them, with the same file and the same image digests. The jobs that succeeded keep their result.
+- When the server cannot make the jobs of a run, the run ends `failed` with `RUN_EXPANSION_FAILED`, and the runs of every other project go on.
+- The logs of each job are under `/organizations/{id}/jobs/{jobId}`. A role binding on the project applies there too: a Maintainer lowered to Viewer on a project cannot cancel its jobs from that route.
+
+### 12.3 Concurrency
+
+- `concurrency.group` names a group inside the project. One run of a group runs at a time, and the newer ones wait as `queued`, in order.
+- With `cancel_in_progress: true`, a new run cancels the older runs of its group **on the same ref** instead of waiting for them. Runs of other refs in the group are never canceled: the new run waits for them as `queued`.
+
+```yaml
+version: 1
+on:
+  push:
+    branches: [main, "release/*"]
+concurrency:
+  group: ${{ "deploy-" + git.branch }}
+  cancel_in_progress: true
+jobs:
+  deploy:
+    image: alpine:3.22@sha256:61bb7a95b0f3650f3039c0fcabe07674458cf0d13afa51aade6188bab8215b07
+    steps:
+      - run: ./deploy.sh
+```
+
+### 12.4 Pull requests from forks
+
+- The run reads the file from the base commit, never from the fork, so a pull request cannot add jobs, open egress or change images.
+- The fork's head commit is checked out as data, and none of its settings are read.
+- By default the run waits until a Maintainer or above approves it (`POST .../runs/{runId}/approve`). An Admin can set the project's fork policy to `automatic`.
+- A job with `environment:` is skipped (`FORK_PR_NO_ENVIRONMENT`), a job that asks for a secret fails (`FORK_PR_NO_SECRETS`), and the cache is read-only.
+
+### 12.5 Images given by tag
+
+- When a run starts, the server asks the registry for the digest of every `image:` given by tag. Every job and every rerun of the run then pulls `name:tag@sha256:…`, even if the tag moves later. The run lists these pins under `ImagePins`.
+- The server reaches the registry through the same guard as Git: no loopback, link-local, metadata or private address unless `DHOW_GIT_ALLOW_PRIVATE_CIDRS` allows the range. It waits 15 seconds at most per image and 30 seconds for the whole run, asks for four images at a time and for each image once, follows no redirect and reads at most 4 MiB.
+- A token address from the registry must be `https` on the registry's own host, or on `auth.docker.io` or `ghcr.io`, on port 443 (or the registry's own port). The private ranges in `DHOW_GIT_ALLOW_PRIVATE_CIDRS` never apply to it.
+- Anonymous pull tokens (like Docker Hub's) work. A registry that needs a password does not work yet (M5), so pin those images by digest in the file.
+- A tag the registry does not know fails the run with `IMAGE_PIN_FAILED` at `jobs.<id>.image`.
+- `dhow lint` still warns about a tag (`IMAGE_NOT_PINNED`), because a digest in the file is still the best way.
+
+### 12.6 Generic Git repositories
+
+- Gitea, Forgejo and plain Git servers have no API for files, so a small job on a runner checks the commit out and reads the file (a discovery job, `dhow.discovery` in the run's jobs). For a pull request from a fork it checks out the base commit.
+- It goes only to a runner with the `checkout` feature, like every checkout job. Until one is online it waits in the queue, and after the queue timeout it fails and the run ends `failed` with `DISCOVERY_FAILED`.
+- When the commit is not in the history of its ref, the run ends `failed` with `SHA_NOT_ON_REF` before any of your jobs runs.
+- The file reaches the server through the job's log with its SHA-256 in the job's outputs, and the server refuses it when they do not match. A missing file (or a symlink, or a path outside the repository) gives a `skipped` run with `DEFINITION_NOT_FOUND`.
+- Every job of the run then checks out the run's commit with the repository's deploy key over SSH (only the host key an admin confirmed is accepted), or without a credential over HTTPS.
+- A server built without the checkout image ends such runs `failed` with `CHECKOUT_UNAVAILABLE`.

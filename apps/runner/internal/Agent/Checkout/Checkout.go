@@ -48,7 +48,7 @@ const (
 
 var (
 	ErrInput    = errors.New("the checkout settings are not valid")
-	ErrRefMoved = errors.New("the commit is no longer reachable from the ref, and fetching it by id failed")
+	ErrRefMoved = errors.New("the commit is not in the history of the ref")
 )
 
 type Options struct {
@@ -129,7 +129,7 @@ func Run(ctx context.Context, o Options) int {
 		_, _ = fmt.Fprintln(o.Stderr, "dhow: CHECKOUT_DISK_FULL: the workspace ran out of space")
 		return ExitDiskFull
 	case errors.Is(err, ErrRefMoved):
-		_, _ = fmt.Fprintf(o.Stderr, "dhow: CHECKOUT_REF_MOVED: %s no longer leads to %s\n", p.ref, p.sha)
+		_, _ = fmt.Fprintf(o.Stderr, "dhow: CHECKOUT_REF_MOVED: %s is not in the history of %s\n", p.sha, p.ref)
 		return ExitRefMoved
 	default:
 		_, _ = fmt.Fprintf(o.Stderr, "dhow: checkout: %v\n", err)
@@ -194,18 +194,24 @@ func (r *repo) checkout(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := r.git(ctx, fetch, r.o.Stdout); err != nil && !r.refGone {
+	if err := r.git(ctx, fetch, r.o.Stdout); err != nil {
+		if r.refGone {
+			return ErrRefMoved
+		}
 		return fmt.Errorf("git fetch: %w", err)
 	}
-	if r.refGone || !r.reaches(ctx) {
-		_, _ = fmt.Fprintf(r.o.Stdout, "dhow: %s moved away from %s, so the commit is fetched by its id\n", r.p.ref, r.p.sha)
-		bySha, err := gitsource.FetchArgsWith(r.config, r.p.url, r.p.sha, r.p.depth)
+	if !r.reaches(ctx) && r.p.depth < gitsource.MaxDepth {
+		_, _ = fmt.Fprintf(r.o.Stdout, "dhow: %s is not the tip of %s, so more of its history is fetched\n", r.p.sha, r.p.ref)
+		deeper, err := gitsource.FetchArgsWith(r.config, r.p.url, r.p.ref, gitsource.MaxDepth)
 		if err != nil {
 			return err
 		}
-		if err := r.git(ctx, bySha, r.o.Stdout); err != nil || !r.reaches(ctx) {
-			return ErrRefMoved
+		if err := r.git(ctx, deeper, r.o.Stdout); err != nil {
+			return fmt.Errorf("git fetch: %w", err)
 		}
+	}
+	if !r.reaches(ctx) {
+		return ErrRefMoved
 	}
 	co, err := gitsource.CheckoutArgs(r.config, r.p.sha)
 	if err != nil {

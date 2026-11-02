@@ -36,6 +36,7 @@ export const AdminAr = {
   'audit.target.team': 'فريق',
   'audit.target.invitation': 'دعوة',
   'audit.target.api_token': 'مفتاح API',
+  'audit.target.run': 'تنفيذ لخطوات النشر',
   'audit.target.identity': 'حساب دخول خارجي',
   'audit.target.job': 'تشغيل',
   'audit.target.runner': 'جهاز تشغيل',

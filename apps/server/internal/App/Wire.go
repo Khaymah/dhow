@@ -32,6 +32,7 @@ import (
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	overview "github.com/Khaymah/dhow/apps/server/internal/Modules/Overview"
+	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
 	preferences "github.com/Khaymah/dhow/apps/server/internal/Modules/Preferences"
 	projects "github.com/Khaymah/dhow/apps/server/internal/Modules/Projects"
 	runners "github.com/Khaymah/dhow/apps/server/internal/Modules/Runners"
@@ -65,6 +66,12 @@ type Infra struct {
 	Triggers           triggers.Sink
 	GitLookup          netguard.Lookup
 	GitDial            netguard.DialFunc
+	Definitions        pipelines.Definitions
+	Images             pipelines.ImageResolver
+	CheckoutImage      string
+	RegistryTLS        *tls.Config
+	ManualJobs         bool
+	PinBudget          time.Duration
 }
 
 type Wired struct {
@@ -76,6 +83,7 @@ type Wired struct {
 	JobQueue      jobqueue.Queue
 	Projects      *projects.Service
 	Sources       *sources.Service
+	Pipelines     *pipelines.Service
 	LogPool       *pgxpool.Pool
 	Retention     *retention.Runner
 	Alerts        *alerts.Service
@@ -142,11 +150,12 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		DB: in.Pool, Tokens: external.apiTokens, Factors: sessionService, Bus: bus, Log: in.Log, Now: in.Now,
 	})
 	gate := runnerauth.NewGate(runnerauth.GateOptions{Verifier: runnersService, Log: in.Log, Now: in.Now})
-	jobsService, logPool, err := buildJobs(ctx, in, runnerKeys, bus, store)
+	secrets := newCheckoutSecrets(in)
+	jobsService, logPool, err := buildJobs(ctx, in, runnerKeys, bus, store, secrets)
 	if err != nil {
 		return nil, err
 	}
-	sourcesService, err := sourcesFor(in, bus, limiter)
+	pipelinesService, sourcesService, err := runsFor(in, bus, limiter, jobsService, secrets)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +174,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Jobs:      jobsService,
 		Projects:  projects.NewService(projects.Options{DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now}),
 		Sources:   sourcesService,
+		Pipelines: pipelinesService,
 		Overview:  overview.NewService(overview.Options{Counter: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
 		Tokens:    tokensService,
 		Prefs:     preferences.NewService(in.Pool, in.Log, in.Now),
@@ -180,7 +190,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	}
 	wired := &Wired{
 		Options: opts, Handler: NewRouter(opts), Identity: identityService, Jobs: jobsService, JobQueue: jobsService.Queue(),
-		Projects: opts.Projects, Sources: sourcesService, LogPool: logPool, Settings: store, Alerts: alertsService,
+		Projects: opts.Projects, Sources: sourcesService, Pipelines: pipelinesService, LogPool: logPool, Settings: store, Alerts: alertsService,
 		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now}),
 	}
 	if in.Config.RunnerPlaneSeparate() {
@@ -230,16 +240,16 @@ func settingsFor(
 }
 
 func buildJobs(
-	ctx context.Context, in Infra, keys *runnerauth.Keys, bus *eventbus.Bus, store *instancesettings.Store,
+	ctx context.Context, in Infra, keys *runnerauth.Keys, bus *eventbus.Bus, store *instancesettings.Store, secrets jobs.SecretResolver,
 ) (*jobs.Service, *pgxpool.Pool, error) {
 	logPool, err := logReadPool(ctx, in.Pool, in.Config.Logs)
 	if err != nil {
 		return nil, nil, err
 	}
 	opts := jobs.Options{
-		DB: in.Pool, Keys: keys, Secrets: in.Secrets, Bus: bus, Listen: listener(in.Pool),
+		DB: in.Pool, Keys: keys, Secrets: secrets, Bus: bus, Listen: listener(in.Pool),
 		MaxPolls: in.Config.RunnerMaxPolls, Logs: in.Config.Logs, StreamWriteWait: in.LogStreamWriteWait,
-		ReadWait: in.LogReadWait, Log: in.Log,
+		ReadWait: in.LogReadWait, Log: in.Log, ManualJobs: in.Config.Dev || in.ManualJobs,
 		LogSettings: func() config.LogSettings { return store.Current().Values.Logs },
 	}
 	if logPool != nil {

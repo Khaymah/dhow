@@ -13,10 +13,21 @@ export const SCOPES: readonly TApiTokenScope[] = [
   'job.cancel',
   'project.read',
   'project.manage',
+  'run.read',
+  'run.trigger',
+  'run.cancel',
 ];
 
-const DEVELOPER: readonly TApiTokenScope[] = ['org.read', 'member.read', 'runner.read', 'job.read', 'project.read'];
-const MAINTAINER: readonly TApiTokenScope[] = [...DEVELOPER, 'job.cancel', 'project.manage'];
+const DEVELOPER: readonly TApiTokenScope[] = [
+  'org.read',
+  'member.read',
+  'runner.read',
+  'job.read',
+  'project.read',
+  'run.read',
+  'run.trigger',
+];
+const MAINTAINER: readonly TApiTokenScope[] = [...DEVELOPER, 'job.cancel', 'project.manage', 'run.cancel'];
 
 export const scopesFor = (role: TRole): readonly TApiTokenScope[] => {
   switch (role) {
@@ -28,7 +39,7 @@ export const scopesFor = (role: TRole): readonly TApiTokenScope[] => {
     case 'developer':
       return DEVELOPER;
     case 'viewer':
-      return ['org.read', 'job.read', 'project.read'];
+      return ['org.read', 'job.read', 'project.read', 'run.read'];
     default:
       return [];
   }

@@ -12,13 +12,14 @@ const (
 	SupportedVersion = 1
 	MaxNameLength    = 100
 
-	MaxJobs        = 64
-	MaxRunJobs     = 256
-	MaxMatrixJobs  = 256
-	MaxMatrixRaw   = 4096
-	MaxMatrixAxes  = 16
-	MaxMatrixValue = 128
-	MaxNeeds       = 64
+	MaxJobs            = 64
+	MaxRunJobs         = 256
+	MaxMatrixJobs      = 256
+	MaxMatrixRaw       = 4096
+	MaxMatrixAxes      = 16
+	MaxMatrixValue     = 128
+	MaxMatrixNameRunes = 512
+	MaxNeeds           = 64
 
 	MaxPatterns      = 50
 	MaxPatternLength = 256

@@ -254,6 +254,9 @@ export const WorkspaceAr = {
   'scope.job.cancel': 'يلغي التشغيلات',
   'scope.project.read': 'يشاهد المشاريع',
   'scope.project.manage': 'ينشئ المشاريع ويعدّلها ويؤرشفها',
+  'scope.run.read': 'يشاهد تنفيذات خطوات النشر',
+  'scope.run.trigger': 'يبدأ تنفيذ خطوات النشر ويعيد التشغيلات التي فشلت',
+  'scope.run.cancel': 'يلغي تنفيذات خطوات النشر',
 
   'sessions.current': 'هذا الجهاز',
   'sessions.device': '{browser} على {os}',

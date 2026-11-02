@@ -1327,7 +1327,7 @@ export interface paths {
         put?: never;
         /**
          * Create a job from a job spec
-         * @description Needs `job.create`. The spec is validated and normalized (defaults filled in) and the job is queued. The image must be pinned by digest. A spec that references secrets is refused with 422 `SECRETS_UNAVAILABLE` while no secret store is configured, and an organization with 1000 queued jobs gets 429 `JOB_QUEUE_FULL`. API tokens cannot create jobs.
+         * @description A development tool: a server started without `DHOW_DEV` answers 404, because in production every job comes from a pipeline file in a repository (`POST /organizations/{id}/projects/{projectId}/runs` with `on: manual`). Needs `job.create`. The spec is validated and normalized (defaults filled in) and the job is queued. The image must be pinned by digest. A spec that references secrets is refused with 422 `SECRETS_UNAVAILABLE` while no secret store is configured, and an organization with 1000 queued jobs gets 429 `JOB_QUEUE_FULL`. API tokens cannot create jobs.
          */
         post: operations["createJob"];
         delete?: never;
@@ -1345,7 +1345,7 @@ export interface paths {
         };
         /**
          * Read a job with its spec, attempts and steps
-         * @description Needs `job.read`. A queued job that no active runner of the organization can take carries `QueuedReason` `NO_MATCHING_RUNNER`. A job of another organization gets 404.
+         * @description Needs `job.read`, and for a job that a pipeline run made, `job.read` with the caller's role on that run's project, after its role bindings. A queued job that no active runner of the organization can take carries `QueuedReason` `NO_MATCHING_RUNNER`. A job of another organization gets 404.
          */
         get: operations["getJob"];
         put?: never;
@@ -1367,7 +1367,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel a job
-         * @description Needs `job.cancel`. Idempotent. A queued job is canceled at once. A leased or running job is marked, its runner sees the request on its next heartbeat and no step may begin after it. A job that already finished in another state answers 409 `JOB_FINISHED`.
+         * @description Needs `job.cancel`, and for a job that a pipeline run made, `job.cancel` with the caller's role on that run's project too, so a binding that lowers the role on the project also holds here. Idempotent. A queued job is canceled at once. A leased or running job is marked, its runner sees the request on its next heartbeat and no step may begin after it. A job that already finished in another state answers 409 `JOB_FINISHED`.
          */
         post: operations["cancelJob"];
         delete?: never;
@@ -1385,7 +1385,7 @@ export interface paths {
         };
         /**
          * Read a page of the log of a job attempt
-         * @description Needs `log.read`, which a viewer does not have. Reads the chunks of one attempt (the latest without `Attempt`) from `FromSeq` on, in order. A page holds at most `Limit` chunks and about 1 MiB of text, and `NextSeq` is set while more chunks follow. `Text` is the stored bytes as UTF-8, with every invalid byte replaced by U+FFFD. A job without that attempt answers 404 `ATTEMPT_NOT_FOUND`, and a job of another organization 404 `NOT_FOUND`. More than about 5 pages a second from one user answers 429 `RATE_LIMITED` with `Retry-After`.
+         * @description Needs `log.read`, which a viewer does not have, with the caller's role on the run's project for a job that a pipeline run made. Reads the chunks of one attempt (the latest without `Attempt`) from `FromSeq` on, in order. A page holds at most `Limit` chunks and about 1 MiB of text, and `NextSeq` is set while more chunks follow. `Text` is the stored bytes as UTF-8, with every invalid byte replaced by U+FFFD. A job without that attempt answers 404 `ATTEMPT_NOT_FOUND`, and a job of another organization 404 `NOT_FOUND`. More than about 5 pages a second from one user answers 429 `RATE_LIMITED` with `Retry-After`.
          */
         get: operations["getJobLogs"];
         put?: never;
@@ -1405,7 +1405,7 @@ export interface paths {
         };
         /**
          * Follow the log of a job attempt as server-sent events
-         * @description Needs `log.read`. Streams the chunks of one attempt (the latest without `Attempt`) after `Last-Event-ID`, or from `FromSeq`, or from the start. Events: `chunk` (its `id` is `<attempt>:<seq>` and its data a `JobLogChunk`), `status` (data `JobLogStatus`, sent first and on every change of the attempt) and `end` (data `JobLogStatus`, after the last chunk of a finished attempt; the stream then closes). A comment arrives every 15 seconds, and the session is checked again each time, so a signed-out or revoked session ends the stream within 15 seconds; the check never extends the session. One user may hold 10 streams, one organization a tenth of `DHOW_SSE_MAX_STREAMS` (at least 20) and one server instance `DHOW_SSE_MAX_STREAMS`; more answer 429 `TOO_MANY_STREAMS` with `Retry-After`. Opening streams quickly one after another answers 429 `RATE_LIMITED`. A client that cannot keep up is disconnected and resumes with `Last-Event-ID`.
+         * @description Needs `log.read`, with the caller's role on the run's project for a job that a pipeline run made. Streams the chunks of one attempt (the latest without `Attempt`) after `Last-Event-ID`, or from `FromSeq`, or from the start. Events: `chunk` (its `id` is `<attempt>:<seq>` and its data a `JobLogChunk`), `status` (data `JobLogStatus`, sent first and on every change of the attempt) and `end` (data `JobLogStatus`, after the last chunk of a finished attempt; the stream then closes). A comment arrives every 15 seconds, and the session is checked again each time, so a signed-out or revoked session ends the stream within 15 seconds; the check never extends the session. One user may hold 10 streams, one organization a tenth of `DHOW_SSE_MAX_STREAMS` (at least 20) and one server instance `DHOW_SSE_MAX_STREAMS`; more answer 429 `TOO_MANY_STREAMS` with `Retry-After`. Opening streams quickly one after another answers 429 `RATE_LIMITED`. A client that cannot keep up is disconnected and resumes with `Last-Event-ID`.
          */
         get: operations["streamJobLogs"];
         put?: never;
@@ -1582,6 +1582,110 @@ export interface paths {
          * @description Needs `project.manage` on the project. The answer shows the new secret once. The previous secret stops working at once.
          */
         post: operations["rotateWebhookSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the runs of a project
+         * @description Needs `run.read` on the project, after its role bindings. Newest first, optionally filtered by one or more states and by ref. A project of another organization is 404.
+         */
+        get: operations["listRuns"];
+        put?: never;
+        /**
+         * Start a run by hand or from an API token
+         * @description Needs `run.trigger` on the project. A session starts a `manual` run and an API token starts an `api` run, and the pipeline must allow that trigger in `on:`. `Ref` is a branch (`main` or `refs/heads/main`) or a tag (`refs/tags/v1`). The commit must be one a webhook already brought for that ref from the repository itself (not from a fork): a `Sha` that did not answers 422 `SHA_NOT_ON_REF`, and without `Sha` the run takes the latest such commit, or answers 422 `REF_HEAD_UNKNOWN` when no webhook brought one yet. `Inputs` are checked against `on.manual.inputs` when the run starts, and a wrong input fails the run with `INPUTS_INVALID`. A project without a repository answers 404 `REPOSITORY_NOT_LINKED`, and an archived project 409 `PROJECT_ARCHIVED`. One user starts at most 60 runs and one project 240 runs in ten minutes (429 `RATE_LIMITED`).
+         */
+        post: operations["triggerRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a run with its jobs and the problems found in its pipeline file
+         * @description Needs `run.read` on the project. A run whose pipeline file is wrong has `FailureReason` `PIPELINE_INVALID` and lists every problem in `Issues`, with its line and column. A run of another project is 404.
+         */
+        get: operations["getRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/runs/{runId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a run
+         * @description Needs `run.cancel` on the project. Idempotent. Jobs that have not started are canceled at once, and a running job sees the request on its runner's next heartbeat. A run that already finished is returned as it is.
+         */
+        post: operations["cancelRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/runs/{runId}/rerun-failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the failed and canceled jobs of a finished run again
+         * @description Needs `run.trigger` on the project. Only a run that ended `failed` or `canceled` can be run again (409 `RUN_NOT_RERUNNABLE` otherwise). Every job that failed, was canceled or was skipped because of them waits again and gets a new job; the jobs that succeeded keep their result. The run uses the same pipeline file and the same image digests as before.
+         */
+        post: operations["rerunFailedRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/runs/{runId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a run from a fork's pull request
+         * @description Needs `run.approve` on the project (Maintainer and above). Only a run that waits for approval can be approved (409 `RUN_NOT_AWAITING_APPROVAL` otherwise). The run still has no secrets and no environments, and reads its pipeline file from the base branch.
+         */
+        post: operations["approveRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2817,7 +2921,7 @@ export interface components {
             Data?: components["schemas"]["LinkedIdentityChange"];
         };
         /** @enum {string} */
-        ApiTokenScope: "org.read" | "org.update" | "member.read" | "member.manage" | "audit.read" | "runner.read" | "runner.manage" | "job.read" | "job.cancel" | "project.read" | "project.manage";
+        ApiTokenScope: "org.read" | "org.update" | "member.read" | "member.manage" | "audit.read" | "runner.read" | "runner.manage" | "job.read" | "job.cancel" | "project.read" | "project.manage" | "run.read" | "run.trigger" | "run.cancel";
         /**
          * @description `inactive` means the creator is no longer a member of the organization, so the token does nothing until it expires or is revoked.
          * @enum {string}
@@ -3011,8 +3115,11 @@ export interface components {
             CancelRequestedAt?: string;
             /** Format: date-time */
             CreatedAt: string;
-            /** Format: uuid */
-            CreatedByUserId: string;
+            /**
+             * Format: uuid
+             * @description Empty for a job that a webhook's run made.
+             */
+            CreatedByUserId?: string | null;
         };
         JobAttemptStep: {
             Index: number;
@@ -3151,6 +3258,124 @@ export interface components {
             Name?: string;
             PipelinePath?: string;
             ForkPolicy?: components["schemas"]["ForkPolicy"];
+        };
+        /**
+         * @description `awaiting_approval`: a pull request from a fork waits for a Maintainer. `pending`: the server reads the pipeline file and pins its images. `queued`: the run waits for an older run of its concurrency group. `skipped`: the pipeline file is missing or does not run on this trigger.
+         * @enum {string}
+         */
+        RunState: "awaiting_approval" | "pending" | "queued" | "running" | "succeeded" | "failed" | "canceled" | "skipped";
+        /** @enum {string} */
+        RunTrigger: "push" | "tag" | "pull_request" | "manual" | "api";
+        /** @enum {string} */
+        RunJobState: "waiting" | "active" | "succeeded" | "failed" | "canceled" | "skipped";
+        RunIssue: {
+            /** @description A stable code such as `UNKNOWN_KEY` or `IMAGE_NOT_PINNED`, the same that `dhow lint` prints. */
+            Code: string;
+            /** @enum {string} */
+            Severity: "error" | "warning";
+            Path: string;
+            Line: number;
+            Column: number;
+            Message: string;
+        };
+        RunImagePin: {
+            /** @description The image as the pipeline file names it, by tag. */
+            Image: string;
+            /** @description The same image by digest, as every job and every rerun of this run pulls it. */
+            Pinned: string;
+        };
+        Run: {
+            /** Format: uuid */
+            Id: string;
+            /** Format: uuid */
+            ProjectId: string;
+            /** Format: int64 */
+            Number: number;
+            Trigger: components["schemas"]["RunTrigger"];
+            Ref: string;
+            Sha?: string;
+            BaseRef?: string;
+            BaseSha?: string;
+            IsFork: boolean;
+            PrNumber?: number;
+            Actor?: string;
+            State: components["schemas"]["RunState"];
+            /** @description Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs), `RUN_STATE_INVALID` (a stored value of the run could not be read), `SHA_NOT_ON_REF` (the commit is not in the history of its ref), `DISCOVERY_FAILED` (the job that reads the file of a generic repository failed) or `REPOSITORY_UNAVAILABLE`. */
+            FailureReason?: string;
+            DefinitionPath: string;
+            /** @description The commit the pipeline file was read from. For a fork's pull request it is the base. */
+            DefinitionSha?: string;
+            /** @description Hex SHA-256 of the pipeline file the run uses. */
+            DefinitionDigest?: string;
+            ConcurrencyGroup?: string;
+            /** Format: uuid */
+            TriggeredByUserId?: string;
+            /** Format: uuid */
+            ApprovedByUserId?: string;
+            /** Format: date-time */
+            ApprovedAt?: string;
+            /** Format: date-time */
+            CancelRequestedAt?: string;
+            /** Format: date-time */
+            StartedAt?: string;
+            /** Format: date-time */
+            FinishedAt?: string;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            UpdatedAt: string;
+        };
+        RunJob: {
+            /** Format: uuid */
+            Id: string;
+            /** @description The job's id, with its matrix values for a matrix job, such as `build (node=20, os=debian)`. */
+            Key: string;
+            /** @description The id of the job in the pipeline file. */
+            JobId: string;
+            Name: string;
+            Matrix: {
+                [key: string]: string;
+            };
+            Needs: string[];
+            State: components["schemas"]["RunJobState"];
+            /** @description For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`. */
+            FailureReason?: string;
+            /**
+             * Format: uuid
+             * @description The job that runs this entry now, or ran it last. Its logs are under `/jobs/{jobId}`.
+             */
+            CurrentJobId?: string;
+            /** @description How many jobs this entry has had, reruns included. */
+            Attempts: number;
+            /** Format: date-time */
+            StartedAt?: string;
+            /** Format: date-time */
+            FinishedAt?: string;
+        };
+        RunDetail: {
+            Run: components["schemas"]["Run"];
+            /** @description In the order of the pipeline, every job after the jobs it needs. */
+            Jobs: components["schemas"]["RunJob"][];
+            Issues: components["schemas"]["RunIssue"][];
+            ImagePins: components["schemas"]["RunImagePin"][];
+        };
+        RunResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Run"];
+        };
+        RunDetailResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["RunDetail"];
+        };
+        RunListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Run"][];
+        };
+        TriggerRunRequest: {
+            Ref: string;
+            /** @description The full commit hash. Optional. */
+            Sha?: string;
+            /** @description Values for `on.manual.inputs`, each a string or a boolean. */
+            Inputs?: {
+                [key: string]: unknown;
+            };
         };
         /** @enum {string} */
         GitProvider: "github" | "gitlab" | "generic";
@@ -3291,6 +3516,7 @@ export interface components {
         InvitationId: string;
         BindingId: string;
         ProjectId: string;
+        RunId: string;
         Page: number;
         Limit: number;
     };
@@ -5684,6 +5910,164 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebhookSecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRuns: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+                /** @description One or more run states, repeated or comma-separated. */
+                State?: string[];
+                Ref?: string;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    triggerRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerRunRequest"];
+            };
+        };
+        responses: {
+            /** @description The new run, still pending. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetailResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    cancelRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run after the request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetailResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    rerunFailedRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run, running again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetailResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    approveRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The approved run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetailResponse"];
                 };
             };
             default: components["responses"]["Error"];

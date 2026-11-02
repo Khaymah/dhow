@@ -113,14 +113,9 @@ func TestCompileIsDeterministic(t *testing.T) {
 func TestCompileSpecsPassJobSpecValidation(t *testing.T) {
 	plan := compileSource(t, fullExample(t))
 	for _, j := range plan.Jobs {
-		hasPlugin := false
-		for _, s := range j.Steps {
-			hasPlugin = hasPlugin || s.Plugin != nil
+		if len(j.Expressions) == 0 {
+			assert.NoError(t, jobspec.Validate(j.Spec), j.Key)
 		}
-		if hasPlugin {
-			continue
-		}
-		assert.NoError(t, jobspec.Validate(j.Spec), j.Key)
 		assert.Equal(t, runnerv1.Isolation_ISOLATION_CONTAINER, j.Spec.GetIsolation())
 	}
 }
@@ -151,4 +146,21 @@ jobs:
 	require.Len(t, j.Spec.GetSecrets(), 1)
 	assert.Empty(t, j.Spec.GetSecrets()[0].GetStepIndexes())
 	assert.Equal(t, map[string]string{"PLAIN": "1"}, j.Spec.GetEnv())
+}
+
+func TestAPluginStepCarriesItsImageInputsAndStepScopedSecrets(t *testing.T) {
+	plugin := "ghcr.io/team/notify@sha256:" + digest
+	plan := compileSource(t, []byte(pipeline("  a:\n    image: "+img+"\n    steps:\n      - run: make\n      - uses: "+plugin+
+		"\n        with:\n          channel: ops\n          token: ${{ secrets.SLACK_TOKEN }}\n")))
+	a := jobByKey(t, plan, "a")
+	step := a.Spec.GetSteps()[1]
+	require.NotNil(t, step.GetPlugin(), "the job spec carries the plugin")
+	assert.Equal(t, plugin, step.GetPlugin().GetImage())
+	assert.Equal(t, map[string]string{"channel": "ops"}, step.GetPlugin().GetInputs())
+	require.Len(t, a.Spec.GetSecrets(), 1)
+	ref := a.Spec.GetSecrets()[0]
+	assert.Equal(t, "SLACK_TOKEN", ref.GetName())
+	assert.Equal(t, "DHOW_INPUT_TOKEN", ref.GetAsEnv())
+	assert.Equal(t, []int32{1}, ref.GetStepIndexes(), "only the plugin step gets the secret")
+	assert.NoError(t, jobspec.Validate(a.Spec))
 }

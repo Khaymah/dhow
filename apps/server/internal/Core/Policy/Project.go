@@ -2,7 +2,9 @@ package policy
 
 import "slices"
 
-func ProjectActions() []Action { return []Action{ProjectRead, ProjectManage} }
+func ProjectActions() []Action {
+	return []Action{ProjectRead, ProjectManage, RunRead, RunTrigger, RunCancel, RunApprove}
+}
 
 func IsProjectAction(a Action) bool { return slices.Contains(ProjectActions(), a) }
 

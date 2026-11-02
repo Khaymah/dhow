@@ -18,22 +18,27 @@ func TestMatrix(t *testing.T) {
 			policy.MemberRead: true, policy.MemberManage: true, policy.AuditRead: true, policy.RunnerRead: true, policy.RunnerManage: true,
 			policy.TokenCreate: true, policy.TokenManage: true, policy.JobRead: true, policy.JobCreate: true, policy.JobCancel: true,
 			policy.LogRead: true, policy.ProjectRead: true, policy.ProjectManage: true,
+			policy.RunRead: true, policy.RunTrigger: true, policy.RunCancel: true, policy.RunApprove: true,
 		},
 		policy.RoleAdmin: {
 			policy.OrgRead: true, policy.OrgUpdate: true, policy.OrgLeave: true, policy.MemberRead: true, policy.MemberManage: true,
 			policy.AuditRead: true, policy.RunnerRead: true, policy.RunnerManage: true, policy.TokenCreate: true, policy.TokenManage: true,
 			policy.JobRead: true, policy.JobCreate: true, policy.JobCancel: true, policy.LogRead: true, policy.ProjectRead: true,
-			policy.ProjectManage: true,
+			policy.ProjectManage: true, policy.RunRead: true, policy.RunTrigger: true, policy.RunCancel: true, policy.RunApprove: true,
 		},
 		policy.RoleMaintainer: {
 			policy.OrgRead: true, policy.OrgLeave: true, policy.MemberRead: true, policy.RunnerRead: true, policy.JobRead: true,
 			policy.JobCancel: true, policy.LogRead: true, policy.TokenCreate: true, policy.ProjectRead: true, policy.ProjectManage: true,
+			policy.RunRead: true, policy.RunTrigger: true, policy.RunCancel: true, policy.RunApprove: true,
 		},
 		policy.RoleDeveloper: {
 			policy.OrgRead: true, policy.OrgLeave: true, policy.MemberRead: true, policy.RunnerRead: true, policy.JobRead: true,
-			policy.LogRead: true, policy.TokenCreate: true, policy.ProjectRead: true,
+			policy.LogRead: true, policy.TokenCreate: true, policy.ProjectRead: true, policy.RunRead: true, policy.RunTrigger: true,
 		},
-		policy.RoleViewer: {policy.OrgRead: true, policy.OrgLeave: true, policy.JobRead: true, policy.TokenCreate: true, policy.ProjectRead: true},
+		policy.RoleViewer: {
+			policy.OrgRead: true, policy.OrgLeave: true, policy.JobRead: true, policy.TokenCreate: true, policy.ProjectRead: true,
+			policy.RunRead: true,
+		},
 	}
 	for _, role := range policy.Roles() {
 		subject := policy.Subject{UserID: uuid.New(), Memberships: []policy.Membership{{OrganizationID: org, Role: role}}}

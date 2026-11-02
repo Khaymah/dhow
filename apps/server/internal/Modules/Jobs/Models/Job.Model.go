@@ -29,7 +29,7 @@ type Job struct {
 	QueueDeadline     time.Time
 	CancelRequestedAt *time.Time
 	CreatedAt         time.Time
-	CreatedByUserID   uuid.UUID
+	CreatedByUserID   *uuid.UUID
 }
 
 type Step struct {
@@ -77,4 +77,5 @@ type Outcome struct {
 	ExitCode      *int32
 	Digest        []byte
 	LeaseState    string
+	Outputs       map[string]string
 }

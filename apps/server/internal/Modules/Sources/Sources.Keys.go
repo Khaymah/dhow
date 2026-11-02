@@ -155,3 +155,18 @@ func expiresAfter(now time.Time) *time.Time {
 	t := now.Add(config.DeployKeyRotationGrace)
 	return &t
 }
+
+func (s *Service) CheckoutCredential(ctx context.Context, org, project, repo uuid.UUID) (Credential, error) {
+	row, err := s.queries().GetRepositoryByProject(ctx, sqlc.GetRepositoryByProjectParams{ProjectID: project, OrganizationID: org})
+	if err != nil {
+		return Credential{}, err
+	}
+	if row.Id != repo {
+		return Credential{}, errors.New("the repository of the run is no longer linked to its project")
+	}
+	p, ok := s.providers[row.Provider]
+	if !ok {
+		return Credential{}, ErrUnsupported
+	}
+	return p.MintCheckoutCredential(ctx, s.repositoryOf(row))
+}

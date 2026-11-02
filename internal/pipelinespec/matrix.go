@@ -200,6 +200,10 @@ func (e *matrixExpansion) finish(combos []combination) ([]combination, bool) {
 	seen := make(map[string]bool, len(combos))
 	for _, c := range combos {
 		key := runJobKey("", c)
+		if utf8.RuneCountInString(key) > MaxMatrixNameRunes {
+			e.issues.add(CodeMatrixNameTooLong, e.path)
+			return nil, false
+		}
 		if seen[key] {
 			e.issues.add(CodeMatrixDuplicate, e.path)
 			return nil, false

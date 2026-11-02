@@ -26,7 +26,7 @@ func TestTheJobsMigrationRollsBackCompletely(t *testing.T) {
 			(SELECT count(*) FROM pg_tables WHERE schemaname = current_schema()
 			   AND tablename IN ('Jobs', 'JobAttempts', 'Leases', 'AttemptSteps')) +
 			(SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-			   WHERE n.nspname = current_schema() AND p.proname LIKE 'Guard%State') +
+			   WHERE n.nspname = current_schema() AND p.proname IN ('GuardJobState', 'GuardAttemptState', 'GuardLeaseState', 'GuardStepState')) +
 			(SELECT count(*) FROM pg_sequences WHERE schemaname = current_schema() AND sequencename = 'FencingTokens')`).Scan(&n))
 		return n
 	}

@@ -78,6 +78,28 @@ func TestEnqueueCommitsWithTheCallerAndRecordsTheOrigin(t *testing.T) {
 	assert.Equal(t, jobqueue.OriginManual, kind, "a job from the API is manual")
 }
 
+func TestAJobFromAWebhookRunHasNoCreatorAndASystemCancelHasNoRequester(t *testing.T) {
+	w := newWorld(t)
+	req := pipelineRequest(w)
+	req.CreatedByUserID = uuid.Nil
+	var queued jobqueue.Enqueued
+	require.NoError(t, dbtx.Run(context.Background(), w.env.Pool, func(q *sqlc.Queries) error {
+		var err error
+		queued, err = w.env.Wired.JobQueue.Enqueue(context.Background(), q, req)
+		return err
+	}))
+	var creator *uuid.UUID
+	require.NoError(t, w.env.Pool.QueryRow(context.Background(), `SELECT "CreatedByUserId" FROM "Jobs" WHERE "Id" = $1`, queued.JobID).Scan(&creator))
+	assert.Nil(t, creator)
+	require.NoError(t, dbtx.Run(context.Background(), w.env.Pool, func(q *sqlc.Queries) error {
+		changed, err := w.env.Wired.JobQueue.Cancel(context.Background(), q, jobqueue.Cancellation{OrganizationID: w.org, JobID: queued.JobID})
+		assert.True(t, changed)
+		return err
+	}))
+	state, _ := w.env.JobState(queued.JobID)
+	assert.Equal(t, "canceled", state)
+}
+
 func TestAJobThatNeedsAFeatureIsNeverLeasedToARunnerWithoutIt(t *testing.T) {
 	w := newWorld(t)
 	r := w.runner(apptest.SeedRunnerSpec{})
@@ -177,7 +199,6 @@ func TestEnqueueRefusesWhatOnlyTheAPIMayQueue(t *testing.T) {
 	}{
 		{"a manual origin", func(r *jobqueue.Request) { r.OriginKind = jobqueue.OriginManual }, ""},
 		{"no origin", func(r *jobqueue.Request) { r.OriginID = uuid.Nil }, ""},
-		{"no creator", func(r *jobqueue.Request) { r.CreatedByUserID = uuid.Nil }, ""},
 		{"an unknown feature", func(r *jobqueue.Request) { r.RequiredFeatures = []string{"docker"} }, apperrors.CodeValidationFailed},
 		{"an empty name", func(r *jobqueue.Request) { r.Name = "" }, apperrors.CodeValidationFailed},
 		{"an unpinned image", func(r *jobqueue.Request) { r.Spec.Image = "alpine" }, apperrors.CodeValidationFailed},

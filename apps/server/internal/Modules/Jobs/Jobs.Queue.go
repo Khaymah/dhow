@@ -46,8 +46,8 @@ func features(in []string) ([]string, bool) {
 }
 
 func checkRequest(r jobqueue.Request) (int, []string, error) {
-	if r.OriginKind != jobqueue.OriginPipeline || r.OriginID == uuid.Nil || r.OrganizationID == uuid.Nil || r.CreatedByUserID == uuid.Nil {
-		return 0, nil, fmt.Errorf("%w: a queued job needs a pipeline origin, an organization and a creator", ErrInvalidEnqueue)
+	if r.OriginKind != jobqueue.OriginPipeline || r.OriginID == uuid.Nil || r.OrganizationID == uuid.Nil {
+		return 0, nil, fmt.Errorf("%w: a queued job needs a pipeline origin and an organization", ErrInvalidEnqueue)
 	}
 	if !auth.ValidDisplayName(r.Name, config.JobNameMaxLength) {
 		return 0, nil, apperrors.ValidationFailed(invalid("Name"))
@@ -71,12 +71,14 @@ func userSecrets(spec *runnerv1.JobSpec) []string {
 }
 
 func checkOwnership(ctx context.Context, tx *sqlc.Queries, r jobqueue.Request) error {
-	member, err := tx.IsEnabledMemberOf(ctx, sqlc.IsEnabledMemberOfParams{UserID: r.CreatedByUserID, OrganizationID: r.OrganizationID})
-	if err != nil {
-		return err
-	}
-	if !member {
-		return fmt.Errorf("%w: the creator is not an active member of the organization", ErrInvalidEnqueue)
+	if r.CreatedByUserID != uuid.Nil {
+		member, err := tx.IsEnabledMemberOf(ctx, sqlc.IsEnabledMemberOfParams{UserID: r.CreatedByUserID, OrganizationID: r.OrganizationID})
+		if err != nil {
+			return err
+		}
+		if !member {
+			return fmt.Errorf("%w: the creator is not an active member of the organization", ErrInvalidEnqueue)
+		}
 	}
 	elsewhere, err := tx.OriginUsedElsewhere(ctx, sqlc.OriginUsedElsewhereParams{OriginID: &r.OriginID, OrganizationID: r.OrganizationID})
 	if err != nil {
@@ -114,7 +116,7 @@ func (qu queue) Enqueue(ctx context.Context, tx *sqlc.Queries, r jobqueue.Reques
 	}
 	origin := r.OriginID
 	row, digest, err := insertJob(ctx, tx, newJob{
-		org: r.OrganizationID, user: r.CreatedByUserID, name: r.Name, spec: spec, priority: r.Priority, retries: retries,
+		org: r.OrganizationID, user: requester(r.CreatedByUserID), name: r.Name, spec: spec, priority: r.Priority, retries: retries,
 		origin: jobqueue.OriginPipeline, originID: &origin, features: wanted,
 	})
 	if err != nil {
@@ -124,10 +126,10 @@ func (qu queue) Enqueue(ctx context.Context, tx *sqlc.Queries, r jobqueue.Reques
 }
 
 func (qu queue) Cancel(ctx context.Context, tx *sqlc.Queries, c jobqueue.Cancellation) (bool, error) {
-	if c.OrganizationID == uuid.Nil || c.JobID == uuid.Nil || c.RequestedBy == uuid.Nil {
-		return false, fmt.Errorf("%w: a cancellation needs an organization, a job and who asked", ErrInvalidEnqueue)
+	if c.OrganizationID == uuid.Nil || c.JobID == uuid.Nil {
+		return false, fmt.Errorf("%w: a cancellation needs an organization and a job", ErrInvalidEnqueue)
 	}
-	out, err := cancelJob(ctx, tx, c.OrganizationID, c.JobID, c.RequestedBy)
+	out, err := qu.service.cancelJob(ctx, tx, c.OrganizationID, c.JobID, c.RequestedBy)
 	if err != nil {
 		return false, err
 	}
