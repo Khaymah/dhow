@@ -1,0 +1,15 @@
+FROM golang:1.27.3-trixie@sha256:c65ecfe613b539ac74c62a4c3b2c27e8f8a6076384c8f27e8a3c0f3be17cc385
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates crun git podman socat uidmap \
+    && rm -rf /var/lib/apt/lists/* \
+    && dpkg --compare-versions "$(dpkg-query --show --showformat '${Version}' podman)" ge 5.4
+
+RUN useradd --system --user-group --home-dir /var/lib/dhow-runner --shell /usr/sbin/nologin dhow-runner \
+    && touch /etc/subuid /etc/subgid \
+    && sed -i '/^dhow-runner:/d' /etc/subuid /etc/subgid \
+    && printf 'dhow-runner:1300000:1048576\n' | tee -a /etc/subuid >>/etc/subgid \
+    && install -d -m 0700 -o dhow-runner -g dhow-runner /var/lib/dhow-runner \
+    && install -d -m 0755 /opt/dhow-dev \
+    && printf '#!/bin/sh\nexec bash /src/deploy/dev/stack/runner-register.sh "$@"\n' >/usr/local/bin/dhow-dev-register \
+    && chmod 0755 /usr/local/bin/dhow-dev-register

@@ -5,6 +5,18 @@ x-repo: &repo
   source: ../..
   target: /src
 
+x-runner: &runner
+  image: dhow-dev-runner:local
+  build:
+    context: ./runner
+  init: true
+  working_dir: /src
+  entrypoint: ["bash", "/src/deploy/dev/stack/runner.sh"]
+  stop_grace_period: 30s
+  depends_on:
+    server:
+      condition: service_started
+
 services:
   db:
     image: ${DHOW_DEV_POSTGRES_IMAGE:-postgres:18}
@@ -74,9 +86,46 @@ services:
       - node_modules:/src/apps/web/node_modules
       - pnpm:/pnpm
 
+  runner:
+    <<: *runner
+    privileged: true
+    cgroup: private
+    environment:
+      DHOW_DEV_RUNNER_MODE: podman
+      DHOW_DEV_WEB_PORT: ${DHOW_DEV_WEB_PORT:-5173}
+      DHOW_DEV_RUNNER_MAX_MEMORY: ${DHOW_DEV_RUNNER_MAX_MEMORY:-}
+      DHOW_DEV_RUNNER_MAX_DISK: ${DHOW_DEV_RUNNER_MAX_DISK:-}
+      DHOW_DEV_POLL_SECONDS: ${DHOW_DEV_POLL_SECONDS:-1}
+      GOTOOLCHAIN: auto
+      GOFLAGS: -buildvcs=false
+    volumes:
+      - *repo
+      - gomod:/go/pkg/mod
+      - gocache:/root/.cache/go-build
+      - runner-state:/var/lib/dhow-runner
+
+  fake-runner:
+    <<: *runner
+    profiles: [fake-runner]
+    environment:
+      DHOW_DEV_RUNNER_MODE: fake
+      DHOW_DEV_WEB_PORT: ${DHOW_DEV_WEB_PORT:-5173}
+      DHOW_DEV_RUNNER_MAX_MEMORY: ${DHOW_DEV_RUNNER_MAX_MEMORY:-}
+      DHOW_DEV_RUNNER_MAX_DISK: ${DHOW_DEV_RUNNER_MAX_DISK:-}
+      DHOW_DEV_POLL_SECONDS: ${DHOW_DEV_POLL_SECONDS:-1}
+      GOTOOLCHAIN: auto
+      GOFLAGS: -buildvcs=false
+    volumes:
+      - *repo
+      - gomod:/go/pkg/mod
+      - gocache:/root/.cache/go-build
+      - fake-runner-state:/var/lib/dhow-runner
+
 volumes:
   pgdata: {}
   gomod: {}
   gocache: {}
   node_modules: {}
   pnpm: {}
+  runner-state: {}
+  fake-runner-state: {}
