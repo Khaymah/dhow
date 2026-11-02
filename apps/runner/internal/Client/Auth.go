@@ -32,6 +32,7 @@ type tokens struct {
 	mu        sync.Mutex
 	auth      runnerv1connect.AuthServiceClient
 	id        *identity.Identity
+	features  []runnerv1.RunnerFeature
 	now       func() time.Time
 	token     string
 	renewAt   time.Time
@@ -103,9 +104,16 @@ func (t *tokens) authenticate(ctx context.Context) (string, time.Time, time.Time
 	if err := proto.Unmarshal(issued.GetChallengeBytes(), &parsed); err != nil || parsed.GetRunnerId() != t.id.RunnerID {
 		return "", time.Time{}, time.Time{}, ErrBadChallenge
 	}
-	signature := t.id.Sign(runnersig.AuthMessage(t.id.ServerOrigin, t.id.ServerKeyVersion, issued.GetChallengeBytes()))
+	names, err := runnersig.FeatureNames(t.features)
+	if err != nil {
+		return "", time.Time{}, time.Time{}, err
+	}
+	message := runnersig.AuthMessage(t.id.ServerOrigin, t.id.ServerKeyVersion, issued.GetChallengeBytes())
+	if len(names) > 0 {
+		message = runnersig.AuthFeaturesMessage(t.id.ServerOrigin, t.id.ServerKeyVersion, issued.GetChallengeBytes(), names)
+	}
 	res, err := t.auth.Authenticate(ctx, connect.NewRequest(&runnerv1.AuthenticateRequest{
-		Runner: ref, Challenge: issued, Signature: signature,
+		Runner: ref, Challenge: issued, Signature: t.id.Sign(message), Features: t.features,
 	}))
 	if err != nil {
 		err = mapAuthError(err)

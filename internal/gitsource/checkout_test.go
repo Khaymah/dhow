@@ -66,8 +66,10 @@ func (w *gitWorld) plain(args ...string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Env = []string{"HOME=" + w.home, "PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=T", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=T", "GIT_COMMITTER_EMAIL=t@example.com"}
+	cmd.Env = []string{
+		"HOME=" + w.home, "PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1",
+		"GIT_AUTHOR_NAME=T", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=T", "GIT_COMMITTER_EMAIL=t@example.com",
+	}
 	out, err := cmd.CombinedOutput()
 	require.NoError(w.t, err, string(out))
 	return strings.TrimSpace(string(out))

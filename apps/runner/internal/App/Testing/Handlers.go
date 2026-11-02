@@ -35,8 +35,13 @@ func (h handlers) Register(_ context.Context, req *connect.Request[runnerv1.Regi
 	if !runnersig.Verify(m.GetSigningPublicKey(), msg, m.GetProof()) {
 		return nil, rpcError(connect.CodeInvalidArgument, "VALIDATION_FAILED: Proof")
 	}
+	registered, err := runnersig.FeatureNames(m.GetFeatures())
+	if err != nil {
+		return nil, rpcError(connect.CodeInvalidArgument, "VALIDATION_FAILED: Features")
+	}
 	s.runner = &runnerRecord{
 		id: uuid.NewString(), org: s.OrgID, signing: m.GetSigningPublicKey(), encryption: m.GetEncryptionPublicKey(), keyVersion: 1,
+		registered: registered,
 	}
 	return connect.NewResponse(&runnerv1.RegisterResponse{
 		RunnerId: s.runner.id, OrganizationId: s.OrgID, Labels: []string{"dhow.os=" + m.GetOs()},
@@ -64,9 +69,18 @@ func (h handlers) Authenticate(_ context.Context, req *connect.Request[runnerv1.
 	if s.runner == nil || req.Msg.GetRunner().GetRunnerId() != s.runner.id || s.nonces[string(raw)] {
 		return nil, rpcError(connect.CodeUnauthenticated, "INVALID_RUNNER_CREDENTIALS")
 	}
-	if !ed25519.Verify(s.runner.signing, runnersig.AuthMessage(Origin, 1, raw), req.Msg.GetSignature()) {
+	names, err := runnersig.FeatureNames(req.Msg.GetFeatures())
+	if err != nil {
 		return nil, rpcError(connect.CodeUnauthenticated, "INVALID_RUNNER_CREDENTIALS")
 	}
+	message := runnersig.AuthMessage(Origin, 1, raw)
+	if len(names) > 0 {
+		message = runnersig.AuthFeaturesMessage(Origin, 1, raw, names)
+	}
+	if !ed25519.Verify(s.runner.signing, message, req.Msg.GetSignature()) {
+		return nil, rpcError(connect.CodeUnauthenticated, "INVALID_RUNNER_CREDENTIALS")
+	}
+	s.runner.features = names
 	if s.runner.revoked {
 		return nil, rpcError(connect.CodePermissionDenied, "RUNNER_REVOKED")
 	}

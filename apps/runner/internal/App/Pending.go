@@ -42,7 +42,7 @@ func clientFor(cfg config.Config, id *identity.Identity, log *slog.Logger) (*cli
 	if err != nil {
 		return nil, err
 	}
-	return client.New(client.Options{BaseURL: u, CAFile: cfg.CAFile, Dev: cfg.Dev, Version: buildinfo.Get().Version, Identity: id, Log: log})
+	return client.New(client.Options{BaseURL: u, CAFile: cfg.CAFile, Dev: cfg.Dev, Version: buildinfo.Get().Version, Identity: id, Log: log, Features: runnerFeatures(cfg)})
 }
 
 func loadPending(store identity.Store, current *identity.Identity) (*identity.Identity, error) {

@@ -80,6 +80,14 @@ func runRegister(ctx context.Context, args []string, env Env) error {
 	return err
 }
 
+func runnerFeatures(cfg config.Config) []runnerv1.RunnerFeature {
+	features := []runnerv1.RunnerFeature{runnerv1.RunnerFeature_RUNNER_FEATURE_PLUGINS}
+	if cfg.CheckoutImage != "" {
+		features = append(features, runnerv1.RunnerFeature_RUNNER_FEATURE_CHECKOUT)
+	}
+	return features
+}
+
 func register(ctx context.Context, cfg config.Config, token, name string) (*identity.Identity, error) {
 	if err := config.EnsurePrivateDir(cfg.StateDir); err != nil {
 		return nil, err
@@ -107,6 +115,7 @@ func RegisterWith(ctx context.Context, cfg config.Config, token, name string, st
 		Token: token, Name: name, Os: runtime.GOOS, Arch: runtime.GOARCH, Version: buildinfo.Get().Version,
 		IsolationLevels: driverIsolation(cfg), Capacity: int32(cfg.Capacity), //nolint:gosec // Capacity is at most 16.
 		SigningPublicKey: keys.SigningPublicKey(), EncryptionPublicKey: keys.EncryptionPublicKey(), Proof: keys.RegisterProof(cfg.Origin),
+		Features: runnerFeatures(cfg),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("register with %s: %w", cfg.URL, err)

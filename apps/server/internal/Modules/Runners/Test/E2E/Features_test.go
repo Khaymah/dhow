@@ -72,8 +72,10 @@ func TestSignedAuthenticationSetsTheFeaturesAndNothingElseCan(t *testing.T) {
 		{"a signature over another origin", func(c *runnerv1.IssuedChallenge) []byte {
 			return ed25519.Sign(id.Signing, runnersig.AuthFeaturesMessage("https://evil.example", 1, c.GetChallengeBytes(), names))
 		}, checkoutAndPlugins},
-		{"an unknown feature", func(c *runnerv1.IssuedChallenge) []byte { return id.SignWithFeatures(c, names) },
-			[]runnerv1.RunnerFeature{runnerv1.RunnerFeature(42)}},
+		{
+			"an unknown feature", func(c *runnerv1.IssuedChallenge) []byte { return id.SignWithFeatures(c, names) },
+			[]runnerv1.RunnerFeature{runnerv1.RunnerFeature(42)},
+		},
 	}
 	for _, f := range forgeries {
 		t.Run(f.name, func(t *testing.T) {

@@ -9,8 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	agent "github.com/Khaymah/dhow/apps/runner/internal/Agent"
 	client "github.com/Khaymah/dhow/apps/runner/internal/Client"
+	plugin "github.com/Khaymah/dhow/apps/runner/internal/Plugin"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
+	"github.com/Khaymah/dhow/internal/jobspec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -27,26 +30,16 @@ type stepEnd struct {
 	ok  bool
 }
 
-func (a *attempt) steps(ctx context.Context) result {
-	spec := a.grant.GetSpec()
-	jobCtx, cancel := context.WithTimeout(ctx, time.Duration(spec.GetTimeoutSeconds())*time.Second)
-	defer cancel()
-	for i, step := range spec.GetSteps() {
-		idx := int32(i)
-		if r, stop := a.interrupted(jobCtx); stop {
-			return r
-		}
-		if r, ok := a.beginStep(ctx, idx, step.GetMutating()); !ok {
-			return r
-		}
-		if r, ok := a.runStep(ctx, jobCtx, idx, step); !ok {
-			return r
-		}
-	}
-	if a.fenced() {
-		return a.lostResult()
-	}
-	return succeeded()
+type execPlan struct {
+	argv    []string
+	env     map[string]string
+	files   map[string][]byte
+	allowed []string
+	silent  bool
+}
+
+func jobContext(ctx context.Context, spec *runnerv1.JobSpec) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, time.Duration(spec.GetTimeoutSeconds())*time.Second)
 }
 
 func (a *attempt) interrupted(jobCtx context.Context) (result, bool) {
@@ -91,10 +84,15 @@ func (a *attempt) beginStep(ctx context.Context, idx int32, mutating bool) (resu
 	}
 }
 
-func (a *attempt) runStep(ctx, jobCtx context.Context, idx int32, step *runnerv1.Step) (result, bool) {
-	a.pipe.Systemf(&idx, "dhow: step %d: %s", idx+1, step.GetName())
-	stdout := a.pipe.Writer(runnerv1.LogStream_LOG_STREAM_STDOUT, &idx)
-	stderr := a.pipe.Writer(runnerv1.LogStream_LOG_STREAM_STDERR, &idx)
+func (a *attempt) runStep(ctx, jobCtx context.Context, idx int32, step *runnerv1.Step, plan execPlan) (result, bool) {
+	logIdx := &idx
+	if plan.silent {
+		logIdx = nil
+	} else {
+		a.pipe.Systemf(logIdx, "dhow: step %d: %s", idx+1, step.GetName())
+	}
+	stdout := a.pipe.Writer(runnerv1.LogStream_LOG_STREAM_STDOUT, logIdx)
+	stderr := a.pipe.Writer(runnerv1.LogStream_LOG_STREAM_STDERR, logIdx)
 	stepCtx := jobCtx
 	if t := step.GetTimeoutSeconds(); t > 0 {
 		var cancel context.CancelFunc
@@ -103,12 +101,16 @@ func (a *attempt) runStep(ctx, jobCtx context.Context, idx int32, step *runnerv1
 	}
 	execCtx, stopExec := context.WithCancel(ctx)
 	defer stopExec()
-	env, files := a.stepEnv(idx)
+	env, files := plan.env, plan.files
+	if !plan.silent {
+		env, files = a.stepEnv(idx)
+		maps.Copy(env, plan.env)
+	}
 	done := make(chan stepEnd, 1)
 	box := a.currentBox()
 	go func() {
 		res, err := box.Exec(execCtx, sandbox.StepSpec{
-			Index: idx, Name: step.GetName(), Script: step.GetRun(), Env: env, Files: files, Stdout: stdout, Stderr: stderr,
+			Index: idx, Name: step.GetName(), Script: step.GetRun(), Argv: plan.argv, Env: env, Files: files, Stdout: stdout, Stderr: stderr,
 		})
 		done <- stepEnd{res: res, err: err, ok: true}
 	}()
@@ -124,6 +126,12 @@ func (a *attempt) runStep(ctx, jobCtx context.Context, idx int32, step *runnerv1
 	if end.ok {
 		clear(env)
 		clear(files)
+	}
+	if plan.silent {
+		return a.silentOutcome(end, why, stopped)
+	}
+	if !stopped && end.err == nil && end.res.ExitCode == 0 {
+		end = a.collectOutputs(end, plan.allowed)
 	}
 	stepReason := stepReasonOf(end, why, stopped)
 	if !stopped || (why.state != runnerv1.AttemptResult_ATTEMPT_RESULT_LOST && !why.silent) {
@@ -170,6 +178,8 @@ func stepReasonOf(end stepEnd, why result, stopped bool) runnerv1.FailureReason 
 		return runnerv1.FailureReason_FAILURE_REASON_TIMED_OUT
 	case end.err != nil && errors.Is(end.err, sandbox.ErrShellMissing):
 		return runnerv1.FailureReason_FAILURE_REASON_SHELL_NOT_FOUND
+	case end.err != nil && errors.Is(end.err, sandbox.ErrOutputs):
+		return runnerv1.FailureReason_FAILURE_REASON_STEP_FAILED
 	case end.res.ExitCode == 0 && end.err == nil:
 		return runnerv1.FailureReason_FAILURE_REASON_UNSPECIFIED
 	case end.res.Reason != runnerv1.FailureReason_FAILURE_REASON_UNSPECIFIED:
@@ -184,6 +194,9 @@ func (a *attempt) stepOutcome(idx int32, end stepEnd) (result, bool) {
 	case end.err != nil && errors.Is(end.err, sandbox.ErrShellMissing):
 		a.pipe.Systemf(&idx, "dhow: SHELL_NOT_FOUND: the job image has no /bin/sh")
 		return failed(runnerv1.FailureReason_FAILURE_REASON_SHELL_NOT_FOUND, 0), false
+	case end.err != nil && errors.Is(end.err, sandbox.ErrOutputs):
+		a.pipe.Systemf(&idx, "dhow: step %d wrote $DHOW_OUTPUT outside the limits (key=value lines, %d keys, %d bytes a value)", idx+1, plugin.MaxOutputs, plugin.MaxOutputValue)
+		return failed(runnerv1.FailureReason_FAILURE_REASON_STEP_FAILED, 1), false
 	case end.err != nil:
 		a.log.Error("a step could not run", "step", idx, "error", a.masked(end.err))
 		return failed(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, 0), false
@@ -284,8 +297,12 @@ func (a *attempt) stepEnv(idx int32) (map[string]string, map[string][]byte) {
 	env[EnvJobID] = a.grant.GetJobId()
 	env[EnvAttemptID] = a.grant.GetAttemptId()
 	env[EnvStepIndex] = strconv.Itoa(int(idx))
+	env[plugin.EnvOutput] = agent.OutputPath
 	files := map[string][]byte{}
 	for _, ref := range spec.GetSecrets() {
+		if ref.GetName() == jobspec.CheckoutSecret {
+			continue
+		}
 		if len(ref.GetStepIndexes()) > 0 && !slices.Contains(ref.GetStepIndexes(), idx) {
 			continue
 		}

@@ -3,9 +3,12 @@ package buildinfo
 import "runtime/debug"
 
 var (
-	version = "dev"
-	commit  = ""
+	version       = "dev"
+	commit        = ""
+	checkoutImage = ""
 )
+
+func CheckoutImage() string { return checkoutImage }
 
 type Info struct {
 	Version   string `json:"Version"`

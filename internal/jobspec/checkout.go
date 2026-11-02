@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	CheckoutSecret       = "dhow.git.checkout"
-	CheckoutSecretFile   = "git-credential"
+	CheckoutSecret       = "dhow.git.checkout" //nolint:gosec // The reserved name of the checkout secret, not its value.
+	CheckoutSecretFile   = "git-credential"    //nolint:gosec // The file name the checkout secret gets, not its value.
 	DefaultCheckoutDepth = 1
 	MaxPluginInputs      = 32
 	MaxPluginInputBytes  = 32 << 10

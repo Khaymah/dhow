@@ -65,6 +65,12 @@ func Main(ctx context.Context, args []string, env Env) error {
 		return runAgent(ctx, env)
 	case CommandConnect:
 		return runConnect(ctx, args[1:], env)
+	case CommandCheckout:
+		return runCheckout(ctx, env)
+	case CommandGitSSH:
+		return runGitSSH(ctx, args[1:], env)
+	case CommandGitAskpass:
+		return runGitAskpass(args[1:], env)
 	case CommandRegister:
 		return runRegister(ctx, args[1:], env)
 	case CommandRun:

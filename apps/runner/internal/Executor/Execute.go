@@ -37,13 +37,17 @@ func (a *attempt) execute(ctx context.Context) result {
 		a.pipe.Systemf(nil, "dhow: %s: %s", reasonName(reason), why)
 		return failed(reason, 0)
 	}
-	if r, ok := a.prepare(ctx); !ok {
+	segs := segments(spec, a.e.o.Config.CheckoutImage)
+	if r, ok := a.openWorkspace(ctx); !ok {
+		return r
+	}
+	if r, ok := a.prepare(ctx, 0, segs[0]); !ok {
 		return r
 	}
 	if r, ok := a.start(ctx); !ok {
 		return r
 	}
-	return a.steps(ctx)
+	return a.runSegments(ctx, segs)
 }
 
 func (a *attempt) lostResult() result {
@@ -58,25 +62,29 @@ type prepared struct {
 	err error
 }
 
-func (a *attempt) prepare(ctx context.Context) (result, bool) {
+func (a *attempt) prepare(ctx context.Context, seq int, seg segment) (result, bool) {
 	spec := a.grant.GetSpec()
-	a.pipe.Systemf(nil, "dhow: preparing the sandbox for %s", spec.GetImage())
+	a.pipe.Systemf(nil, "dhow: preparing the sandbox for %s", seg.image)
 	pctx, cancel := context.WithTimeout(ctx, a.e.o.Timing.ImagePull)
 	defer cancel()
+	a.mu.Lock()
+	ws := a.workspace
+	a.mu.Unlock()
 	ch := make(chan prepared, 1)
 	go func() {
 		r := spec.GetResources()
 		box, err := a.e.o.Driver.Prepare(pctx, sandbox.PrepareSpec{
-			RunnerID: a.e.o.Identity.RunnerID, AttemptID: a.grant.GetAttemptId(), Image: spec.GetImage(), Isolation: spec.GetIsolation(),
+			RunnerID: a.e.o.Identity.RunnerID, AttemptID: a.grant.GetAttemptId(), Seq: seq, Kind: seg.kind, Image: seg.image,
+			Isolation: spec.GetIsolation(),
 			Resources: sandbox.Resources{CPUMillis: r.GetCpuMillis(), MemoryBytes: r.GetMemoryBytes(), Pids: r.GetPids(), DiskBytes: r.GetDiskBytes()},
-			Dir:       a.dir, DiskMode: a.e.o.Config.DiskMode, Egress: spec.GetNetwork().GetEgress(),
+			Dir:       a.dir, DiskMode: a.e.o.Config.DiskMode, Egress: seg.egress, Workspace: ws,
 		})
 		ch <- prepared{box: box, err: err}
 	}()
 	var why result
 	select {
 	case p := <-ch:
-		return a.prepared(ctx, pctx, p)
+		return a.prepared(ctx, pctx, p, seg.egress)
 	case <-a.fence.Lost():
 		why = a.lostResult()
 	case <-a.fence.Canceled():
@@ -91,7 +99,7 @@ func (a *attempt) prepare(ctx context.Context) (result, bool) {
 	return why, false
 }
 
-func (a *attempt) prepared(ctx, pctx context.Context, p prepared) (result, bool) {
+func (a *attempt) prepared(ctx, pctx context.Context, p prepared, allow []string) (result, bool) {
 	if p.err != nil {
 		reason := runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED
 		if errors.Is(p.err, sandbox.ErrImagePull) || errors.Is(pctx.Err(), context.DeadlineExceeded) {
@@ -104,7 +112,7 @@ func (a *attempt) prepared(ctx, pctx context.Context, p prepared) (result, bool)
 	if !a.setBox(ctx, p.box) {
 		return a.lostResult(), false
 	}
-	if err := a.startEgress(ctx, p.box); err != nil {
+	if err := a.startEgress(ctx, p.box, allow); err != nil {
 		a.log.Error("could not start the egress proxy", "error", a.masked(err))
 		a.pipe.Systemf(nil, "dhow: %s: the egress proxy could not start", reasonName(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED))
 		return failed(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, 0), false
