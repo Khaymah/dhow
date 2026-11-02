@@ -151,11 +151,15 @@ func (a *Agent) dispatch(ctx context.Context, steps *sync.WaitGroup, step job) e
 		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_START_FAILED, nil))
 	}
 	steps.Go(func() {
-		if err := a.runStep(ctx, step); err != nil {
+		exit, err := a.runStep(ctx, step)
+		if err != nil {
 			_ = a.conn.Close()
 			return
 		}
 		a.release()
+		if err := a.conn.Write(exit); err != nil {
+			_ = a.conn.Close()
+		}
 	})
 	return nil
 }

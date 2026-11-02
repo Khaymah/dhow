@@ -96,3 +96,16 @@ func TestAnOutputPathThatCannotBeClearedStopsTheNextStep(t *testing.T) {
 		t.Fatal("the step ran even though its output file could not be cleared")
 	}
 }
+
+func TestTheNextStepStartsAsSoonAsThePreviousExitArrives(t *testing.T) {
+	conn, _ := startAgentWith(t, Options{SecretsDir: t.TempDir(), OutputPath: filepath.Join(t.TempDir(), "out")})
+	for i := range int32(200) {
+		step := &agentv1.Frame{Body: &agentv1.Frame_RunStep{RunStep: &agentv1.RunStep{Index: i, Script: "true\n"}}}
+		if err := conn.Write(step); err != nil {
+			t.Fatal(err)
+		}
+		if e := stepExitOf(t, conn, 5*time.Second); e.GetFailure() != agentv1.StepFailure_STEP_FAILURE_UNSPECIFIED || e.GetExitCode() != 0 {
+			t.Fatalf("step %d sent right after the previous exit did not run: %+v", i, e)
+		}
+	}
+}

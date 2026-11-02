@@ -52,28 +52,28 @@ func execOf(e *agentv1.RunExec) job {
 	return job{index: e.GetIndex(), argv: e.GetArgv(), env: e.GetEnv(), secrets: e.GetSecretFiles()}
 }
 
-func (a *Agent) runStep(ctx context.Context, step job) error {
+func (a *Agent) runStep(ctx context.Context, step job) (*agentv1.Frame, error) {
 	if len(step.argv) == 0 || step.argv[0] == "" {
-		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_START_FAILED, nil))
+		return stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_START_FAILED, nil), nil
 	}
 	secrets, err := writeSecretFiles(a.secretsDir, step.secrets)
 	if err != nil {
-		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_SECRET_FILES, nil))
+		return stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_SECRET_FILES, nil), nil
 	}
 	if !clearOutput(a.outputPath) {
 		wipeSecretFiles(a.secretsDir, secrets)
-		return a.conn.Write(stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_OUTPUTS, nil))
+		return stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_OUTPUTS, nil), nil
 	}
 	code, sig, failure, err := a.runProcess(ctx, step)
 	wipeSecretFiles(a.secretsDir, secrets)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	outputs, ok := readOutput(a.outputPath)
 	if !ok && failure == agentv1.StepFailure_STEP_FAILURE_UNSPECIFIED {
 		failure = agentv1.StepFailure_STEP_FAILURE_OUTPUTS
 	}
-	return a.conn.Write(stepExit(step.index, code, sig, failure, outputs))
+	return stepExit(step.index, code, sig, failure, outputs), nil
 }
 
 func (a *Agent) runProcess(ctx context.Context, step job) (int32, int32, agentv1.StepFailure, error) {
