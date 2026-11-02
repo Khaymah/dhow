@@ -192,6 +192,20 @@ Every step, `run:` or `uses:`, gets the variable `DHOW_OUTPUT`, a file where it 
 - **Who sees them:** an output, and every other value an expression made (`env: VERSION: ${{ needs.build.outputs.version }}`, a `git.*` value), reaches the job's steps as is, but the job's details in the API and the UI show `[REDACTED]` in its place, for every role.
 - **Masking:** the masker checks each value and also the values joined together (every run of keys in name order, and every pair in either order). A secret inside a value becomes `***`; a secret that only appears once values are joined drops every key it spans. A secret shorter than 4 characters cannot be masked anywhere (the job log says so), so it can leave in an output.
 
+### Artifacts and the cache
+
+An artifact keeps files of one job for the jobs that need it, and for people to download. The cache keeps files, like a package manager's folder, from one run to the next.
+
+- **Archives:** the runner packs each artifact and the cache as a tar.gz that is the same for the same files: sorted entries, zero times, no owners, and modes `0644` or `0755`. Symbolic links that stay inside the workspace are kept; a link that leaves it, a device, a FIFO or a socket fails the job with `ARTIFACT_UNSAFE`. The archive is named by its SHA-256, so the same files give the same digest.
+- **Where it runs:** packing, unpacking and `hash_files()` run in a sandbox of their own, from the runner's checkout image, with no network, on the job's workspace and in the job's user namespace. The runner itself never reads or writes the workspace.
+- **Uploads:** after every step succeeded, each artifact is packed and uploaded. A path that does not exist fails the job (`ARTIFACT_UPLOAD_FAILED`), and an archive larger than `DHOW_ARTIFACT_MAX_BYTES` stops in the middle (`ARTIFACT_TOO_LARGE`). A failed job uploads nothing.
+- **`needs`:** before the first step, the artifacts of the jobs in `needs` are downloaded, their SHA-256 is checked on the runner, and only then they are unpacked into `/workspace`. A digest that does not match fails the job with `ARTIFACT_DOWNLOAD_FAILED` and nothing is unpacked. The unpacker refuses `..`, absolute paths, links that leave the workspace, devices, FIFOs and hard links to files outside the archive (`ARTIFACT_UNSAFE`).
+- **Retention:** artifacts are kept for `retention` (1 to 30 days, and never longer than `DHOW_ARTIFACT_RETENTION_DAYS`), then removed. A Developer and above can list a run's artifacts and download them (`GET .../runs/{runId}/artifacts`, `GET .../artifacts/{artifactId}/download`).
+- **Cache key:** the server evaluates `cache.key`; each `hash_files()` call is left for the runner, which fills it with a SHA-256 of the matching files (sorted by path, each with its own SHA-256) at the start of the job. `hash_files()` takes glob patterns (`*`, `**`, `?`) relative to the workspace; a key may use its result only as text, so `size(hash_files(...))` or a condition on it is refused. The final key is 1 to 512 characters.
+- **Cache scope:** a push or a manual run of a branch writes into the scope of that branch, a tag into its tag, and a pull request from the same repository into the scope of that pull request. A lookup tries the run's own scope, then the default branch. A pull request from a fork reads the default branch and never writes. A pull request can never write into the scope of `main`.
+- **Saving:** the cache is saved only when the job succeeded and the key was not found at the start. An existing key is never replaced. When a project's entries pass `DHOW_CACHE_MAX_BYTES_PER_PROJECT`, the least recently used ones are removed. A cache that cannot be read or saved is a warning in the job log, not a failure.
+- **Forks:** the artifacts of a run from a fork's pull request are marked `Untrusted` and can never feed a deploy.
+
 ## 4. Expressions
 
 - **Where:** `if` (job and step), `concurrency.group`, `cache.key`, `env` and `with` values, and an artifact `name` (only text and `matrix.*` joined with `+` there, so the names are known without running anything). Every other field is plain text, and `${{` in it is an error.

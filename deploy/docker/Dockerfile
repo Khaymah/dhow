@@ -36,6 +36,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -X github.com/Khaymah/dhow/internal/buildinfo.version=${VERSION} \
         -X github.com/Khaymah/dhow/internal/buildinfo.commit=${COMMIT}" \
       -o /out/dhow-server ./apps/server/cmd/dhow-server
+RUN mkdir -p /out/state/blobs
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 
@@ -50,8 +51,10 @@ LABEL org.opencontainers.image.title="Dhow" \
       org.opencontainers.image.revision="${COMMIT}"
 
 COPY --from=build /out/dhow-server /dhow-server
+COPY --from=build --chown=65532:65532 --chmod=0700 /out/state /var/lib/dhow
 
 ENV DHOW_LISTEN_ADDR=0.0.0.0:8080
+ENV DHOW_BLOB_DIR=/var/lib/dhow/blobs
 EXPOSE 8080
 USER 65532:65532
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 CMD ["/dhow-server", "healthcheck"]

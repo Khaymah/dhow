@@ -112,7 +112,7 @@ journalctl -u dhow | grep setup_url
 | الإعداد | الأثر |
 |---|---|
 | `User=dhow`، `NoNewPrivileges=yes`، `CapabilityBoundingSet=` (فارغ)، `AmbientCapabilities=` | تعمل العملية بلا صلاحيات خاصة، ولا تستطيع أبدًا الحصول على capability، ولا حتى عبر ملف setuid. المنفذ 8080 لا يحتاج إلى أي منها. |
-| `ProtectSystem=strict`، `ProtectHome=yes`، `PrivateTmp=yes`، `StateDirectory=dhow` | نظام الملفات كله للقراءة فقط عند داو، و`/home` و`/root` و`/run/user` مخفية، و`/tmp` خاص، و`/var/lib/dhow` وحده قابل للكتابة. |
+| `ProtectSystem=strict`، `ProtectHome=yes`، `PrivateTmp=yes`، `StateDirectory=dhow dhow/blobs` | نظام الملفات كله للقراءة فقط عند داو، و`/home` و`/root` و`/run/user` مخفية، و`/tmp` خاص، و`/var/lib/dhow` وحده قابل للكتابة. وsystemd ينشئ `/var/lib/dhow/blobs` (`0700`) للملفات الناتجة والذاكرة المؤقتة. |
 | `PrivateDevices=yes`، `DevicePolicy=closed`، `PrivateUsers=yes`، `PrivateIPC=yes` | لا أجهزة فعلية، وuser namespace فيه `dhow` وroot فقط، وSystem V IPC خاص. |
 | `ProtectKernelTunables=yes`، `ProtectKernelModules=yes`، `ProtectKernelLogs=yes`، `ProtectControlGroups=yes`، `ProtectClock=yes`، `ProtectHostname=yes`، `ProtectProc=invisible`، `ProcSubset=pid` | لا يمكن تغيير النواة (kernel) ولا cgroups ولا الساعة ولا اسم الجهاز، والعمليات الأخرى غير مرئية. |
 | `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX` | IP وUnix sockets فقط، بلا netlink ولا raw packets. |

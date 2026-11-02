@@ -112,7 +112,7 @@ journalctl -u dhow | grep setup_url
 | Setting | Effect |
 |---|---|
 | `User=dhow`, `NoNewPrivileges=yes`, `CapabilityBoundingSet=` (empty), `AmbientCapabilities=` | The process runs unprivileged and can never gain a capability, not even through a setuid binary. Port 8080 needs none. |
-| `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`, `StateDirectory=dhow` | The whole file system is read-only for Dhow, `/home`, `/root` and `/run/user` are hidden, `/tmp` is private, and only `/var/lib/dhow` is writable. |
+| `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`, `StateDirectory=dhow dhow/blobs` | The whole file system is read-only for Dhow, `/home`, `/root` and `/run/user` are hidden, `/tmp` is private, and only `/var/lib/dhow` is writable. systemd creates `/var/lib/dhow/blobs` (`0700`) for artifacts and the cache. |
 | `PrivateDevices=yes`, `DevicePolicy=closed`, `PrivateUsers=yes`, `PrivateIPC=yes` | No physical devices, a user namespace with only `dhow` and root mapped, and private System V IPC. |
 | `ProtectKernelTunables=yes`, `ProtectKernelModules=yes`, `ProtectKernelLogs=yes`, `ProtectControlGroups=yes`, `ProtectClock=yes`, `ProtectHostname=yes`, `ProtectProc=invisible`, `ProcSubset=pid` | The kernel, cgroups, the clock and the host name cannot be changed, and other processes are invisible. |
 | `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX` | Only IP and Unix sockets, no netlink or raw packets. |
