@@ -1,6 +1,6 @@
 # خطة الترقيات والـ migrations والمساعدة جوه التطبيق (Upgrades, migrations & in-app help)
 
-**الحالة:** مسودة للمراجعة. قرارات Sabry يوم 2026-11-02 ملزمة ومكتوبة في [ADR-0077](ADR/0077-upgrades-migrations-and-update-policy.md)، وقاعدة الـ migrations (expand/contract) شغّالة من النهارده على أي migration جديد، حتى قبل الـ hook. الباقي مفوَّض ومكتوب بالتوصية، و[الأسئلة](#أسئلة-لـ-sabry) مستنية إجابة · **التاريخ:** 2026-11-02
+**الحالة:** مقبولة. Sabry جاوب الأسئلة الـ 11 كلها يوم 2026-11-02 ([قراراته](#قرارات-sabry-2026-11-02))، والقرارات مكتوبة في [ADR-0077](ADR/0077-upgrades-migrations-and-update-policy.md). وقاعدة الـ migrations (expand/contract) شغّالة من النهارده على أي migration جديد، حتى قبل الـ hook. الباقي مفوَّض ومكتوب بالتوصية، ومفيش سؤال مفتوح · **التاريخ:** 2026-11-02
 
 ## الهدف
 Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخطة دي بتغطّي تلات حاجات:
@@ -41,7 +41,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 | `.dhow.yml` | `version: 1` إجباري، وغيره بيطلّع `VERSION_UNSUPPORTED` | `internal/pipelinespec` |
 | M11 | «ضمانات الترقية، والإصدارات الموقّعة، والإعلانات الأمنية» من غير تفاصيل | `docs/roadmap.md` |
 
-## قرارات Sabry (2026-11-02، ملزمة)
+## القرارات اللي بدأت بيها الخطة (Sabry، 2026-11-02، ملزمة)
 1. **الخطة دي بتتكتب دلوقتي بالتوازي مع M4**، وأي migration من النهارده بيمشي على قاعدة expand/contract.
 2. **سياسة التحديث الافتراضية «إشعار + الأمني أوتوماتيك»:**
    - الـ patch الأمني بيتثبّت لوحده جوه نافذة الصيانة، بنسخة احتياطية أوتوماتيك قبله، ورجوع أوتوماتيك لو فحص الصحة فشل.
@@ -49,6 +49,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
    - المالك يقدر يغيّر السياسة: إشعار بس، أو الأمني أوتوماتيك، أو كله أوتوماتيك جوه النافذة.
    - التنصيب المعزول (air-gapped) بيقفل الفحص.
 3. **M5:** قاعدة البيئة بتربط الـ branches أو الـ tags المسموح لها تنشر عليها، والتحقق في السيرفر. مكتوبة في branch تاني، والخطة دي مابتلمسش البيئات.
+4. **كله ببلاش:** مفيش خدمة مدفوعة ولا جهاز بفلوس. يعني مفيش دومين، ولا hardware keys، ولا CDN أو خدمة مدفوعة. الـ feed على GitHub Pages والأرشيفات على GitHub Releases بتوع نفس الريبو (مجانيين للريبوهات العامة)، والمفاتيح ملفات مشفّرة على USB، والـ CI على runners GitHub المجانية.
 
 ## النطاق
 1. **فحص التحديثات:** feed ثابت وموقّع (TUF)، بمفاتيح متثبّتة في الـ binary، وحماية من الرجوع لنسخة أقدم ومن التجميد، وcache وbackoff، ومفتاح قفل للمعزول.
@@ -64,11 +65,13 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 - **ترقية أكتر من instance بالتدريج (rolling) أوتوماتيك:** مع HA في M8. في أول نسخة الـ updater بيشتغل على instance واحدة، ولو لقى أكتر بيرجع للإشعار بس.
 - **تحديث PostgreSQL نفسه** (major) أو صورته في Compose: بره داو. الـ preflight بيتأكد إنه 18، والصفحة بتقول لو فيه digest أحدث موصى بيه.
 - **telemetry وإحصاءات الاستخدام:** مش هتتعمل، ولا حتى اختيارية.
-- **نسخ احتياطية بره الجهاز أوتوماتيك** (S3 وغيره): الأوامر بتطلّع ملف مشفّر، ونقله مسؤولية المشغّل، وحسب [السؤال 7](#7-تشفير-النسخ-الاحتياطية-ونقلها-بره-الجهاز).
+- **نسخ احتياطية بره الجهاز أوتوماتيك** (S3 وغيره): الأوامر بتطلّع ملف مشفّر (وبمفتاح `age` عام للتصدير، [قرار 7](#قرارات-sabry-2026-11-02))، ونقله مسؤولية المشغّل.
+- **أي خدمة أو جهاز مدفوع** (دومين، أو CDN، أو hardware key، أو خدمة توقيع): ممنوع بقرار Sabry.
 
 ## المعمارية
 ```
- updates.<domain>/v1/   static TUF repo: root.json, timestamp.json, snapshot.json, targets.json, releases/<v>.json
+ https://khaymah.github.io/dhow/updates/   TUF metadata on the repo's GitHub Pages: root, timestamp, snapshot, targets
+ https://github.com/Khaymah/dhow/releases/download/v<X.Y.Z>/   TUF targets = the release assets
         ▲   GET only, fixed User-Agent "Dhow", no query string, no cookie, no instance id
         │
  ┌──────┴──────────────── dhow-server (User=dhow, no root, read-only binary) ────────────────────────┐
@@ -81,7 +84,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
         ▼
  dhow-update.service  Type=oneshot, root, hardened = the INSTALLED /usr/local/bin/dhow-server update apply
    0 lock /var/lib/dhow-update/lock (flock), read journal, refuse anything but a newer signed version
-   1 fetch + verify the feed itself (TUF, pinned root) and the artifact (sha256 + cosign bundle)
+   1 fetch + verify the feed itself (TUF, pinned root) and the artifact (length + sha256 from targets)
    2 preflight: disk, PostgreSQL 18, pg_dump, new binary `migrate dry-run` as User=dhow
    3 backup: pg_dump -Fc + /etc/dhow  ──► AES-256-GCM  ──► /var/lib/dhow-update/backups (budget, rotation)
    4 journal (fsync) ─► rename new binary over /usr/local/bin/dhow-server ─► systemctl restart dhow
@@ -113,17 +116,19 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 | 15 | ملاحظات الإصدار في `docs/releases/X.Y.Z.md` و`docs/en/releases/X.Y.Z.md` بعناوين ثابتة، ومنها JSON بيتضمّن في الـ binary | «الجديد» بيشتغل في المعزول، وملف Markdown في الـ root ممنوع (CLAUDE.md) | U7 |
 | 16 | الإيقاف من الـ API بـ `Deprecation` (RFC 9745) و`Sunset` (RFC 8594) و`Link: rel="deprecation"`، وجوه `/api/v1` إضافات بس | معايير، والـ clients تقدر تكتشفها لوحدها | U12 |
 | 17 | الـ runner بيعلن `Dhow-Protocol-Max`، والسيرفر بيقبل N وN-1 | الـ runner الأحدث والأقدم الاتنين بيشتغلوا | U11 |
-| 18 | الـ runner بينزّل التحديث من السيرفر (mirror)، والـ helper بتاعه بيتحقق من الـ TUF والتوقيع بنفسه | أجهزة كتير مالهاش internet غير للسيرفر، والسيرفر مخزن غبي مش مصدر ثقة | U11 |
+| 18 | الـ runner بينزّل التحديث من السيرفر (mirror)، والـ helper بتاعه بيتحقق من الـ TUF والطول والـ hash بنفسه | أجهزة كتير مالهاش internet غير للسيرفر، والسيرفر مخزن غبي مش مصدر ثقة | U11 |
 | 19 | شكل قيمة الإعداد في `"InstanceSettings"` مابيتغيّرش. الشكل الجديد = مفتاح جديد، والقديم بيتشال بـ contract | الـ binary القديم بيقفل لو لقى قيمة مش فاهمها (fail closed في ADR-0063) | U12 |
 | 20 | الواجهة بتعرف إن السيرفر اتحدّث من `ServerBuild` في رد `/me` (مش header عام)، وبتقول «أعد تحميل الصفحة» | المتصفح بيفضل شايل الـ JS القديم بعد الترقية، ومش عايزين نكشف النسخة لغير المسجّلين | U6 |
 
 ## 1. فحص التحديثات
 
 ### الـ feed
-**الشكل:** TUF repository ثابت (ملفات static) على `https://updates.<domain>/v1/` ([السؤال 1](#1-نظام-توقيع-الـ-feed) و[السؤال 5](#5-مكان-الـ-feed)):
-- **`root.json`:** المفاتيح والـ thresholds. بيتوقّع بمفتاحين offline (threshold 1 من 2 في الأول)، والنسخة الأولى متضمّنة في الـ binary (`internal/updatefeed/root/1.root.json`). تغيير الـ root بيبقى سلسلة `N+1.root.json` موقّعة بالقديم والجديد، زي TUF بالظبط.
-- **`targets.json`:** مفتاح release offline، بيتوقّع مرة مع كل release (خطوة بشرية، [السؤال 2](#2-مين-ماسك-المفاتيح-وتوقيع-كل-release-بإيد))، وصلاحيته 180 يوم. فيه لكل ملف الطول والـ sha256.
-- **`snapshot.json` و`timestamp.json`:** مفتاح online في GitHub environment محمي (`release-feed`)، و`timestamp` بيتعاد توقيعه كل يوم بـ workflow مجدول، وصلاحيته 7 أيام.
+**الشكل:** TUF repository ([قرار 1 و2 و5](#قرارات-sabry-2026-11-02)). كله على ريبو `Khaymah/dhow` نفسه، من غير ريبو جديد ولا دومين:
+- **الـ metadata** (`root` و`targets` و`snapshot` و`timestamp`، كلها صغيرة) على GitHub Pages بتاع الريبو تحت `/updates/`: `https://khaymah.github.io/dhow/updates/`. GitHub بيكتب host الـ Pages بحروف صغيرة (`<owner>.github.io`)، والـ URL ده هو اللي بيتثبّت في الـ binary (`internal/updatefeed`). الـ Pages لسه مش متفعّل على الريبو (`404` يوم 2026-11-02)، وتفعيله ببلاش للريبو العام في U7.
+- **الـ targets** هي الـ release assets الموجودة النهارده: الـ base `https://github.com/Khaymah/dhow/releases/download/`، والـ target path `vX.Y.Z/<file>`، نفس اللي `get.sh` بينزّله. ومستند النسخة `vX.Y.Z/dhow-release.json` بيترفع asset مع الأرشيفات.
+- **`root.json`:** مفتاحين root (threshold 1 من 2 في الأول)، والنسخة الأولى متضمّنة في الـ binary (`internal/updatefeed/root/1.root.json`). تغيير الـ root بيبقى سلسلة `N+1.root.json` موقّعة بالقديم والجديد، زي TUF بالظبط.
+- **`targets.json`:** مفتاح targets offline، Sabry بيوقّع بيه مرة مع كل release على جهازه ([الـ ceremony](#مفاتيح-الـ-feed-والـ-ceremony))، وصلاحيته 180 يوم. فيه لكل ملف الطول والـ sha256.
+- **`snapshot.json` و`timestamp.json`:** مفاتيح online في GitHub environment محمي (`release-feed`)، وصلاحيتهم 7 أيام، و`timestamp` بيتعاد توقيعه كل أسبوع ([النشر](#النشر-على-github-pages)).
 - **`releases/<version>.json`** (target)، 64 KiB بالكتير:
 
 | الحقل | المعنى |
@@ -139,11 +144,11 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 | `Notes` | `{Ar, En}`، نص عادي لحد 2 KiB لكل لغة، من غير HTML. والتفاصيل في `NotesPath` (صفحة الوثائق) |
 | `Actions[]` | خطوات لازم المالك يعملها (مفتاح i18n ومعاه رابط)، زي «غيّر `DHOW_X` لـ `DHOW_Y`» |
 
-**الأرشيفات نفسها** بتفضل على GitHub Releases (`DHOW_DOWNLOAD_URL` زي `get.sh`). الـ feed بيربطها بالـ sha256 والطول، فأي mirror مايقدرش يبدّلها.
+**الأرشيفات نفسها** بتفضل على GitHub Releases زي النهارده. الـ feed بيربطها بالطول والـ sha256، وده التحقق الوحيد في الـ updater ([قرار 3](#قرارات-sabry-2026-11-02)): مفيش تحقق من cosign جواه. `release.yml` بيفضل يوقّع بـ cosign للناس اللي بتتحقق بإيدها و`get.sh`. وأي mirror (`DHOW_DOWNLOAD_URL`) مايقدرش يبدّل الأرشيف.
 
 ### الطلب بيكشف إيه
 بالظبط ولا حاجة زيادة:
-- **عنوان الـ IP** (أو عنوان الـ proxy لو `HTTPS_PROXY` متحدد)، و**وقت** الطلب، و**اسم الـ host** في الـ SNI. ده بيقول لصاحب الـ host إن فيه instance داو على العنوان ده. مفيش طريقة نخبّيها غير الـ proxy أو القفل.
+- **عنوان الـ IP** (أو عنوان الـ proxy لو `HTTPS_PROXY` متحدد)، و**وقت** الطلب، و**اسم الـ host** في الـ SNI (`khaymah.github.io`، ولما بينزّل أرشيف `github.com` والـ CDN بتاع الـ assets بتاعهم). ده بيقول لـ GitHub إن فيه instance داو على العنوان ده، وإحنا مابنشوفش حاجة (مفيش logs عندنا أصلًا). مفيش طريقة نخبّيها غير الـ proxy أو القفل.
 - **مفيش:** instance id، ولا cookie، ولا query string، ولا رقم النسخة، ولا عدد المستخدمين. الـ User-Agent ثابت `Dhow` لكل الـ instances، والملفات اللي بتتطلب واحدة للكل.
 - **الإيقاع:** كل 6 ساعات ± 30 دقيقة عشوائي. `snapshot` و`targets` و`releases/*` بيتطلبوا بس لما `timestamp` يتغيّر، فالنمط ممكن يقول «الـ instance دي ماشافتش 1.4.2 لسه»، ودي معلومة ضعيفة ومقبولة.
 - **مكتوب للمستخدم** في `docs/install/updates.md` (بالنسختين) وفي صفحة «عن داو».
@@ -153,7 +158,48 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 - **الحماية من الرجوع (rollback):** أرقام الـ metadata الموثوقة متخزنة في `"UpdateFeedState"`، وأي رقم أقل بيترفض. والـ client كمان مابيقبلش `timestamp` وقت توقيعه أقدم من آخر واحد اتشاف، عشان ساعة الجهاز لو رجعت لورا ماتفتحش الباب.
 - **الحماية من التجميد (freeze):** `timestamp` بيخلص بعد 7 أيام. من غير تحقق ناجح لـ 3 أيام، صفحة «عن داو» بتحذّر. وبعد ما يخلص: بانر للمالك «لم نتمكن من التأكد من التحديثات منذ ...»، وfinding في `doctor`، **وأي تثبيت أوتوماتيك بيقف**.
 - **ساعة الجهاز:** الـ client بيقارن بالـ `Date` header في رد الـ feed. فرق أكتر من 5 دقايق بيطلّع finding «ساعة الجهاز غير مضبوطة» في `doctor`.
-- **الحدود:** `timestamp` 16 KiB، و`snapshot` 64 KiB، و`targets` 1 MiB، وكل طلب 30 ثانية، وTLS 1.2 على الأقل، ومفيش redirects لـ host تاني، والاتصال من `internal/netguard` (مفيش عناوين داخلية إلا لو `DHOW_UPDATE_URL` على نطاق مسموح).
+- **الحدود:** `timestamp` 16 KiB، و`snapshot` 64 KiB، و`targets` 1 MiB، وكل طلب 30 ثانية، وTLS 1.2 على الأقل، والاتصال من `internal/netguard` (مفيش عناوين داخلية إلا لو `DHOW_UPDATE_URL` على نطاق مسموح).
+- **الـ redirects:** الـ metadata من غير redirects خالص. والأرشيف: GitHub بيعمل redirect من `github.com` للـ CDN بتاع الـ assets، فالمسموح قايمة ثابتة من hosts GitHub بس، والسلامة أصلًا من الطول والـ hash.
+
+### مفاتيح الـ feed والـ ceremony
+كل المفاتيح ملفات، ومفيش hardware ([قرار 2](#قرارات-sabry-2026-11-02)).
+
+| المفتاح | فين | بيوقّع إيه |
+|---|---|---|
+| root (2 مفاتيح) | offline، ملفات مشفّرة على USBين | `root.json` بس، عند الإنشاء والتغيير |
+| targets | offline، ملف مشفّر على نفس الـ USBين | `targets.json` مع كل release |
+| snapshot وtimestamp | GitHub environment `release-feed` (secrets) | كل أسبوع ومع كل release |
+
+**الإنشاء (مرة واحدة، في U7):**
+1. Sabry بيعمل boot لجهازه من USB عليه Debian Live (ببلاش، والـ checksum والتوقيع بتوع الـ ISO متراجعين من جهاز تاني)، والشبكة مقفولة (من غير Wi-Fi ولا كابل).
+2. `dhow-feed keys init` (من `deploy/release/feed`، binary متبني ومتراجع قبلها) بيعمل مفتاحين root ومفتاح targets (ed25519)، وبيشفّر كل واحد بـ passphrase بـ `age` (scrypt)، وبيطلّع `1.root.json` والمفاتيح العامة.
+3. **الـ passphrase:** 7 كلمات diceware أو أكتر، Sabry حافظها، ونسخة على ورقة في مكان **غير** مكان الـ USB الاحتياطي. عمرها ما بتتكتب على أي قرص.
+4. الملفات المشفّرة و`1.root.json` و`SHA256SUMS` بتتنسخ على USBين: **الأساسي** مع Sabry، و**الاحتياطي** في مكان تاني (بيت تاني أو حد موثوق). والملف المشفّر مابيتنسخش على أي جهاز متوصّل بالإنترنت.
+5. `1.root.json` (عام) بيتعمله commit في `internal/updatefeed/root/` بـ PR عادي، والـ snapshot والـ timestamp بيتعملوا online في الـ environment.
+
+**توقيع release:**
+1. `release.yml` بيبني ويرفع الأرشيفات و`dhow-release.json` كـ assets، وبيطلّع `targets.json` مش موقّع كـ artifact، وبيطبع ملخّص الـ hashes في الـ log.
+2. Sabry على جهازه العادي: بينزّل الـ artifact، ويتأكد بـ `cosign verify-blob` من `SHA256SUMS` (اختياري ومفيد، cosign ببلاش)، وينقله لـ USB نقل.
+3. boot من Debian Live من غير شبكة، و`dhow-feed sign-targets` بيعرض النسخة وكل ملف بالـ hash. Sabry بيقارن الملخّص ده بالـ log من جهاز تاني (الموبايل)، وبعدين بيكتب الـ passphrase.
+4. `targets.json` الموقّع بيرجع على USB النقل، وبيترفع لـ branch `tuf-metadata` (القسم الجاي)، والـ CI بيوقّع snapshot وtimestamp وبينشر.
+
+**التغيير بعد فقد:**
+| اللي حصل | العمل |
+|---|---|
+| USB ضاع أو باظ ومحدش خده | نسخة جديدة من الـ USB التاني، ومفيش rotate |
+| USB اتسرق أو ممكن يكون اتنسخ | rotate لـ targets والـ root: `2.root.json` موقّع بالـ root القديم والجديد، ومفتاح targets جديد، وrelease patch عادي. الـ passphrase بيدّي وقت، والـ rotate في نفس الأسبوع |
+| جهاز Sabry ممكن يكون اتخترق وقت توقيع | نفس الـ rotate، ومراجعة كل `targets.json` من وقت الشك قدّام `SHA256SUMS` الموقّع بـ cosign، وإعلان أمني لو فيه فرق |
+| مفتاح snapshot أو timestamp اتسرّب | rotate في `root.json` (بالمفتاح الـ offline) وsecrets جديدة في الـ environment |
+| الـ passphrase اتنست والورقة ضاعت، أو الـ USBين راحوا | مفيش طريقة نوقّع root جديد: release بـ root جديد متضمّن، وإعلان بالترقية اليدوي بـ `get.sh` (اللي بيتحقق بـ cosign). ده أسوأ حالة، وعشان كده الورقة والـ USB الاحتياطي في مكانين |
+
+الـ ceremony كله مكتوب في `docs/security/release-keys.md` بالنسختين (U7).
+
+### النشر على GitHub Pages
+- **مصدر الـ metadata:** branch يتيم `tuf-metadata` في نفس الريبو، فيه الملفات الموقّعة بس. بيكتب فيه Sabry (`targets.json` و`root.json`) وjobs الـ environment `release-feed` (`snapshot` و`timestamp`). محمي (من غير force push ولا مسح). وده branch بيانات مش شغل، فمالوش PR، و`delete-merged-branch.yml` مابيلمسوش لأنه عمره ما بيتدمج.
+- **workflow واحد للـ Pages** (`.github/workflows/pages.yml`): بيبني الموقع كله في كل مرة من مصدرين: موقع الوثائق (M10) على `/dhow/` من `main`، والـ metadata على `/dhow/updates/` من `tuf-metadata`. بيشتغل مع أي push على الاتنين، ومن `release.yml`، ومن job الـ timestamp. لأن نشر Pages بيستبدل الموقع كله، مفيش workflow تاني ينشر لوحده.
+- **تجديد الـ timestamp:** job مجدول كل أسبوع بيعيد توقيع `timestamp.json` (وصلاحيته 7 أيام) وبينشر. ولو فشل: الـ job بيفتح issue بـ label `feed-expiry` (بالـ `GITHUB_TOKEN`)، وGitHub بيبعت إيميل الفشل.
+- **هامش الأمان:** الأسبوع والـ 7 أيام قريبين من بعض، وGitHub ممكن يأخّر الـ jobs المجدولة ساعات أو يوقفها في الريبو اللي مافيهوش نشاط 60 يوم. فـ job تاني يومي بيفحص بس: لو الصلاحية فاضلها أقل من 48 ساعة بيعيد التوقيع على طول وبيفتح الـ issue. العملاء كمان بيستحملوا: بيحذّروا بعد 3 أيام من غير تحقق ناجح، والأوتوماتيك بيقف بس بعد ما الصلاحية تخلص.
+- **تغيير الـ URL بعدين** (لو اتنقلنا لدومين في يوم): محتاج release بالـ URL الجديد، والنسخ القديمة هتفضل تقرا القديم. فالـ URL القديم لازم يفضل يتجدّد لحد ما آخر نسخة بتقراه تبطّل تبقى مدعومة.
 
 ### الـ cache والـ backoff
 - `If-None-Match` و`ETag`، والـ `304` مابيغيّرش حاجة غير `LastCheckAt`.
@@ -175,7 +221,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 | `Check` | `on` أو `off` | `on` | `DHOW_UPDATE_CHECK` |
 | `Policy` | `notify` أو `security` أو `all` | `security` | `DHOW_UPDATE_POLICY` |
 | `Window` | أيام الأسبوع، والبداية `HH:MM`، والمدة 60 لـ 480 دقيقة، والمنطقة الزمنية IANA | كل يوم 03:00 لمدة 120 دقيقة بتوقيت UTC، لحد ما المالك يختار | `DHOW_UPDATE_WINDOW` (مثلًا `mon-fri 03:00/120 Africa/Cairo`) |
-| `CriticalOutsideWindow` | `true` أو `false` | `false` ([السؤال 6](#6-التحديث-الحرج-بره-النافذة)) | — |
+| `CriticalOutsideWindow` | `true` أو `false` | `false` ([قرار 6](#قرارات-sabry-2026-11-02)) | — |
 | `Channel` | `stable` أو `rc` | `stable` | `DHOW_UPDATE_CHANNEL` |
 
 `DHOW_UPDATE_URL` في env بس (mirror داخلي)، وبيتحقق بنفس الـ TUF.
@@ -208,7 +254,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 |---|---|---|---|
 | **binary وsystemd** (`dhow-server install`) | `dhow-update.service` (oneshot، root)، بيشغّله `dhow-update.path` (على `request.json`) و`dhow-update.timer` (كل 15 دقيقة للحاجات المتأخرة)، و`dhow-update-recover.service` قبل `dhow.service` | `/usr/local/bin/dhow-server` و`/etc/systemd/system/dhow*.service` و`/var/lib/dhow-update/` | مفيش ثمن جديد: الـ installer أصلًا بيشتغل root. الـ unit نفسها بـ `ProtectHome=yes` و`PrivateTmp=yes` و`NoNewPrivileges=yes` و`ReadWritePaths=` للمسارات دي بس و`RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX` و`SystemCallFilter=@system-service` |
 | **Compose بالـ installer** | نفس الـ units على الـ host (مش جوه container)، والـ swap = تغيير `DHOW_IMAGE` في `.env` لـ `ghcr.io/khaymah/dhow@sha256:<digest>` و`docker compose up -d dhow` بـ argv | `.env` بس، وبـ rename ذرّي بيحافظ على باقي السطور | الـ helper بيكلّم Docker كـ root على الـ host، زي ما المشغّل بيعمل بإيده. مفيش socket جوه أي container |
-| **Compose يدوي** | إشعار بس، والصفحة بتعرض الأوامر بالـ digest بالظبط. وملفين اختياريين (`deploy/compose/update/dhow-update.{service,timer}`) لو المشغّل عايز نفس الـ helper | — | [السؤال 4](#4-الـ-updater-في-compose): الـ sidecar بالـ Docker socket مش افتراضي |
+| **Compose يدوي** | إشعار بس، والصفحة بتعرض الأوامر بالـ digest بالظبط | — | [قرار 4](#قرارات-sabry-2026-11-02): مفيش sidecar بالـ Docker socket |
 | **مسار الـ installer** (`get.sh --version X`) | نفس `internal/updater`: الـ installer بقى بياخد نسخة احتياطية، ويعمل journal، ويفحص الصحة، ويرجع لو فشل | زي الـ binary | الترقية اليدوي والأوتوماتيك نفس الكود ونفس الاختبارات |
 | **Kubernetes** (بعد أول نسخة) | مفيش. إشعار بس | — | الـ GitOps هو اللي بيحدّث |
 
@@ -227,7 +273,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 |---|---|---|
 | 0 | `flock` على `/var/lib/dhow-update/lock`، وقراية الـ journal. لو فيه journal ناقص: `recover` الأول | تحديث شغّال: الطلب التاني بيستنى ومابيتعملّوش تكرار |
 | 1 | جلب الـ feed والتحقق (TUF)، واختيار الأرشيف حسب المعمارية | مفيش تغيير، `FEED_*` |
-| 2 | تنزيل لـ `/var/lib/dhow-update/stage/` (نفس filesystem الـ binary أو الـ rename بيبقى copy+fsync+rename)، والطول والـ sha256 من الـ feed، وتوقيع cosign على `SHA256SUMS` ([السؤال 3](#3-التحقق-من-توقيع-cosign-جوه-الـ-updater)) | مفيش تغيير، الـ stage بيتمسح |
+| 2 | تنزيل لـ `/var/lib/dhow-update/stage/` (نفس filesystem الـ binary أو الـ rename بيبقى copy+fsync+rename)، والطول والـ sha256 من `targets` بس، من غير cosign ([قرار 3](#قرارات-sabry-2026-11-02)) | مفيش تغيير، الـ stage بيتمسح |
 | 3 | **preflight:** المساحة (حجم القاعدة × 1.3 + الأرشيف + 512 MiB احتياطي)، وPostgreSQL 18 و`pg_dump` بنفس الـ major، والـ binary الجديد `migrate dry-run` كـ `User=dhow` (مش root) بـ `lock_timeout = 3s`، و`SchemaFloor` الجديد ≤ النسخة الجديدة، ومفيش instance تانية | مفيش تغيير، `PREFLIGHT_*` بالسبب |
 | 4 | **النسخة الاحتياطية** (U5) والتأكد منها (`pg_restore --list` على الملف بعد فك التشفير في الذاكرة) | مفيش تغيير، `BACKUP_FAILED` |
 | 5 | **quiesce** (القسم 2)، وبعدين الـ journal: `{from, to, backup, binary_previous, step: "swap"}` بـ fsync | الـ journal بيتمسح، والتأجيل للنافذة اللي بعدها |
@@ -339,7 +385,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 - **الإيقاف:** `deprecated: true` و`x-dhow-sunset` في `openapi.yaml`. والـ middleware بيضيف `Deprecation: @<unix>` و`Sunset: <date>` و`Link: <docs>; rel="deprecation"`. والـ audit بيعدّ الاستخدام لكل API token، و«عن داو» بتقول للمالك «3 مفاتيح بتستخدم API هيتشال».
 - **الشيل:** جوه `/api/v1` مفيش. الشيل في `/api/v2` بس، و`v1` بيفضل لحد major واحد بعد ما `v2` يطلع.
 - **قبل GA:** مفيش clients بره، فالتغيير ينفع في release واحد، بس بنفس الـ headers عشان الـ middleware يبقى متجرّب.
-- **`/meta` العام:** [السؤال 8](#8-النسخة-في-meta-العام).
+- **`/meta` العام** ([قرار 8](#قرارات-sabry-2026-11-02)): `Version` و`Commit` بيتشالوا منه في U6، ويظهروا في «عن داو» بعد الدخول بس. ده contract قبل GA، فبيمشي بالـ headers العادية لمدة release.
 - **أكواد الأخطاء:** `ErrorDetail` بياخد `Fix` (اختياري، مترجَم من السيرفر) و`DocsPath`. أي كود جديد لازم يكون ليه `Fix` بالعربي والإنجليزي، أو يبقى في allowlist مكتوب فيها السبب (زي `INTERNAL`)، واختبار بيتأكد من ده.
 
 ## 8. الـ runner
@@ -353,14 +399,14 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 ### التحديث لنفسه
 - **السياسة:** نفس سياسة السيرفر، والسيرفر بيقول لكل runner النسخة المطلوبة في رد `Heartbeat` (حقل جديد `TargetVersion`). والهدف = نسخة السيرفر.
 - **الـ drain:** الـ runner بيبطّل ياخد leases جديدة، ويستنى الشغّال يخلص (لحد أطول timeout للـ jobs اللي معاه، أو 6 ساعات)، وبعدين بيكتب `/var/lib/dhow-runner/update/request.json`. لو مخلصش: تأجيل للنافذة اللي بعدها.
-- **الـ helper:** `dhow-runner-update.path` و`dhow-runner-update.service` (root، oneshot)، بنفس `internal/updater` ونفس الـ journal. التنزيل من السيرفر (`/runner-api/updates/{version}/{file}`، mirror للأرشيفات اللي السيرفر اتحقق منها)، ولو مش متاح فمباشرة. والـ helper بيتحقق من الـ TUF والـ sha256 والتوقيع بنفسه، فالسيرفر مجرد مخزن.
+- **الـ helper:** `dhow-runner-update.path` و`dhow-runner-update.service` (root، oneshot)، بنفس `internal/updater` ونفس الـ journal. التنزيل من السيرفر (`/runner-api/updates/{version}/{file}`، mirror للأرشيفات اللي السيرفر اتحقق منها)، ولو مش متاح فمباشرة. والـ helper بيتحقق من الـ TUF والطول والـ sha256 بنفسه، فالسيرفر مجرد مخزن.
 - **الصحة:** الـ runner الجديد لازم يعمل `Authenticate` وينجح في 2 دقيقة (ملف حالة محلي)، وإلا رجوع للـ binary القديم. الهوية المشفّرة بـ `systemd-creds` (ADR-0066) زي ما هي.
 - **سياسة `notify`:** الواجهة بتعرض لكل runner الأمر بالظبط (`sudo dhow-runner update apply --version X`).
 
 ## 9. `.dhow.yml`
 - السيرفر و`dhow lint` بيقبلوا النسخة N وN-1 (`Spec` في الـ feed). النهارده N = 1.
 - **التحذير قبل الشيل:** ملف بـ N-1 بيعدّي، ومعاه warning (مش error) في `dhow lint` وفي صفحة الـ run: «نسخة الملف 1 ستتوقف في الإصدار X. شغّل `dhow migrate`». والإشعار لـ Maintainers المشروع مع M7.
-- **`dhow migrate`:** offline زي `dhow lint`. بيعيد كتابة الملف بتحويل حتمي على `yaml.Node` (بيحافظ على الكومنتات والترتيب)، و`--check` بيقول محتاج ولا لأ، و`--write` بيكتب، و`--branch NAME` بيعمل commit على branch جديد بـ `git` (argv). والـ PR حسب [السؤال 10](#10-dhow-migrate-وفتح-الـ-pr).
+- **`dhow migrate`:** offline زي `dhow lint`. بيعيد كتابة الملف بتحويل حتمي على `yaml.Node` (بيحافظ على الكومنتات والترتيب)، و`--check` بيقول محتاج ولا لأ، و`--write` بيكتب، و`--branch NAME` بيعمل commit على branch جديد بـ `git` (argv). و`--open-pr` بيشغّل `gh pr create` أو `glab mr create` بتوع المستخدم (argv) لو موجودين، بصلاحياته هو ([قرار 10](#قرارات-sabry-2026-11-02)).
 - **ملف بنسخة أحدث من السيرفر:** `VERSION_UNSUPPORTED` برسالة «حدّث السيرفر إلى الإصدار X أو أحدث».
 
 ## 10. جوه التطبيق
@@ -385,12 +431,12 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
   - **minor:** ميزات، وexpand، وcontract لحاجات اتعلن إيقافها في minor قبلها على الأقل.
   - **patch:** إصلاحات وexpand بس.
   - **`-rc.N`:** عمره ما بيتثبّت أوتوماتيك.
-- **الدعم:** حسب [السؤال 9](#9-نافذة-الدعم-والـ-backports).
+- **الدعم** ([قرار 9](#قرارات-sabry-2026-11-02)): آخر minor بس بياخد patches لحد GA، ونرجع للقرار بعد 3 شهور من GA. اللي على minor أقدم بياخد الإصلاح الأمني كتحديث minor بزرار.
 - **الـ changelog:** `deploy/release/changelog` (Go، من غير اعتماديات) بيقرا `git log` بين الـ tags بـ Conventional Commits، ويجمّع `feat` و`fix` و`perf` و`security` و`deprecate`، وبرقم الـ PR. ومنه body الـ GitHub Release.
 - **الملخّص البشري:** `docs/releases/X.Y.Z.md` (عربي مبسّط) و`docs/en/releases/X.Y.Z.md` بعناوين ثابتة: «أهم التغييرات»، و«إصلاحات أمنية»، و«إجراءات مطلوبة»، و«ما سيتوقف لاحقًا». و`make docs-check` بيتأكد إنهم متطابقين، و`release.yml` بيفشل لو مش موجودين، ومنهم JSON بيتضمّن في الـ binary («الجديد»).
 - **الـ release الأمني:** label `security` على الـ PR، وGHSA advisory، وحقل `Security` في الـ feed. والـ embargo: الـ feed بيقول الخطورة من غير تفاصيل لحد الإعلان.
-- **البوابات في `release.yml`:** النوع بيتحسب من الـ tag اللي قبله، والـ patch اللي فيه migration مش `expand` بيفشل، والـ `-- dhow:floor` لازم tag أقدم، واختبار الترقية (U3) أخضر على الـ commit نفسه، وبعدين الـ targets بيتوقّعوا offline والـ feed بيتنشر.
-- **مفاتيح الـ feed:** ceremony مكتوب في `docs/security/release-keys.md`: مين ماسك أنهي مفتاح، وإزاي بيتعمل rotate، وإيه اللي بيحصل لو اتسرّب.
+- **البوابات في `release.yml`:** النوع بيتحسب من الـ tag اللي قبله، والـ patch اللي فيه migration مش `expand` بيفشل، والـ `-- dhow:floor` لازم tag أقدم، واختبار الترقية (U3) أخضر على الـ commit نفسه، وتوقيع cosign keyless للـ assets والصورة زي النهارده. وبعدين Sabry بيوقّع targets offline والـ feed بيتنشر على الـ Pages.
+- **مفاتيح الـ feed:** [الـ ceremony](#مفاتيح-الـ-feed-والـ-ceremony) في القسم 1، ومكتوب للعامة في `docs/security/release-keys.md`.
 
 ## المراحل
 كل PR بيعدّي `make check` وCI أخضر، وفيه اختبارات سلبية لكل مسار أمني، وبيحدّث `Plan/Progress/` في يومه، وبيكتب ADR بتاع قراراته في أوله. والمراحل اللي بتلمس الـ updater أو الـ feed أو النسخ الاحتياطية عليها مراجعة أمنية مستقلة إجبارية.
@@ -462,19 +508,25 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 - **التحقق:** `pnpm lint` و`pnpm typecheck` و`pnpm test` و`pnpm build` و`pnpm size`، و`make gen && git diff --exit-code`، و`make docs-check`، و`make check`.
 
 ### U7: هندسة الـ releases والـ feed
-- **الحجم:** L. **الاعتماد:** U3، وإجابات الأسئلة 1 و2 و3 و5. **التوقيت:** M10، قبل أول نسخة تجريبية عامة.
+- **الحجم:** L. **الاعتماد:** U3. **التوقيت:** M10، قبل أول نسخة تجريبية عامة.
 - **المحتوى:**
   - `deploy/release/changelog` وملفات `docs/releases/` بالنسختين، والـ JSON المتضمّن.
   - البوابات في `release.yml`.
-  - `deploy/release/feed`: بيبني `releases/<v>.json` و`targets.json` للتوقيع offline (`make sign-targets` بالمفتاح على hardware key)، و`snapshot` و`timestamp` في CI.
-  - workflow مجدول بيعيد توقيع `timestamp` كل يوم في environment `release-feed` المحمي.
-  - النشر على الـ host.
-  - `docs/security/release-keys.md` والـ ceremony الأول (root v1 متضمّن في الـ binary).
+  - `deploy/release/feed` و`dhow-feed`: `keys init`، و`build` (بيعمل `dhow-release.json` و`targets.json` مش موقّع من الـ assets)، و`sign-targets` (offline، المفتاح ملف مشفّر بـ `age`)، و`sign-online` (snapshot وtimestamp في CI).
+  - `release.yml` بيرفع `dhow-release.json` كـ asset وبيطلّع `targets.json` كـ artifact، وبيفضل يوقّع بـ cosign.
+  - branch `tuf-metadata` وحمايته، وenvironment `release-feed` بالـ secrets.
+  - `.github/workflows/pages.yml` (نشر واحد للوثائق والـ metadata)، وتفعيل GitHub Pages بمصدر Actions.
+  - job الـ timestamp الأسبوعي، والفحص اليومي للصلاحية، والـ issue لو فشل.
+  - job مراقبة يومي بيقارن كل hash في `targets.json` المنشور بـ `SHA256SUMS` الموقّع بـ cosign في نفس الـ release، ويفتح issue `feed-mismatch` لو فيه فرق.
+  - `docs/security/release-keys.md` بالنسختين، والـ ceremony الأول (root v1 متضمّن في الـ binary).
 - **قبول:**
-  - release تجريبي (`v0.9.0-rc.1`) بيطلّع feed بيتحقق منه `go-tuf` client من الصفر.
+  - release تجريبي (`v0.9.0-rc.1`) بيطلّع feed على `https://khaymah.github.io/dhow/updates/` بيتحقق منه `go-tuf` client من الصفر، والأرشيفات من الـ release assets.
   - تبديل byte في أي ملف بيكسر التحقق.
   - `timestamp` قديم بيترفض.
   - patch فيه contract migration بيوقف الـ release.
+  - نشر الوثائق مابيمسحش `/updates/`، وتجديد الـ timestamp مابيمسحش الوثائق.
+  - job الصلاحية بيفتح issue لما الصلاحية أقل من 48 ساعة (اختبار بساعة وهمية).
+  - مفيش أي خطوة محتاجة خدمة أو جهاز مدفوع.
 - **التحقق:** `make lint-actions` و`go test -race -count=1 ./deploy/release/...` وrelease تجريبي على fork.
 
 ### U8: فحص التحديثات والسياسة والإشعارات
@@ -486,7 +538,8 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
   - الـ API (`GET /system/updates`، و`POST /system/updates/check`، و`PUT /instance/settings/updates`) بـ `can()` لمالك السيرفر، وصف لكل route في الـ route-table.
   - الـ audit والإشعارات، و«التحديثات» في الواجهة.
   - `doctor` (الـ feed والساعة).
-  - السؤال في الـ installer.
+  - سؤال «هل يصل السيرفر للإنترنت؟» والسياسة والنافذة في الـ installer.
+  - إيميل عاجل للمالك مع أي release أمني طول فترة البيتا (M10)، لأن الأوتوماتيك في M11 ([قرار 0](#قرارات-sabry-2026-11-02)).
 - **قبول:**
   - feed بتوقيع غلط، أو نسخة metadata أقل، أو `timestamp` منتهي، أو root مش في السلسلة، أو ملف أكبر من الحد: مرفوض بالكود الصح، والحالة القديمة ماتغيّرتش.
   - `DHOW_UPDATE_CHECK=off`: صفر اتصالات (dialer الاختبار).
@@ -520,7 +573,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
   - المسار الأوتوماتيك والخطوات المتعددة بـ `RequiresFrom`.
   - الـ helper لـ Compose على الـ host، والملفات الاختيارية للـ Compose اليدوي.
   - الحماية من أكتر من instance.
-  - `CriticalOutsideWindow` حسب السؤال 6.
+  - `CriticalOutsideWindow` ([قرار 6](#قرارات-sabry-2026-11-02)).
 - **قبول:**
   - patch أمني بيتثبّت جوه النافذة بس (ساعة وهمية حوالين الحدود والمنطقة الزمنية وتغيير التوقيت الصيفي).
   - النشر الشغّال بيأجّل.
@@ -612,29 +665,31 @@ M11:                            U9 ─┬─► U10
 ## جدول التهديدات
 | التهديد | اللي بيحصل | التخفيف |
 |---|---|---|
-| **feed خبيث** (host مخترَق، أو DNS، أو MITM، أو mirror) | ملفات بتقول فيه نسخة غير الحقيقية | TUF بـ root متضمّن في الـ binary، وكل ملف بطول وhash، والأرشيف بـ sha256 من `targets` المتوقّع offline، وTLS ومن غير redirects بره الـ host. مفيش ثقة في الـ host نفسه |
-| **مفتاح release (targets) اتسرّب** | المهاجم يعمل targets بأرشيف خبيث | التوقيع offline على hardware key، والأرشيف لازم كمان توقيع cosign من workflow الـ release (السؤال 3)، يعني محتاج الاتنين. والـ root بيلغي المفتاح بـ root جديد، والـ clients بتاخده في أول فحص |
-| **مفتاح الـ timestamp (online) اتسرّب** | تجميد أو replay | بيوقّع `timestamp` و`snapshot` بس، فمايقدرش يضيف نسخة. وصلاحية 7 أيام، والحماية بالأرقام وبآخر وقت اتشاف |
-| **مفتاح الـ root اتسرّب** | تحكّم كامل في الـ feed | offline في مكانين، وthreshold بيتكبّر لـ 2 من 3 لما يبقى فيه maintainer تاني. والتوقيع التاني (cosign) لسه مطلوب على الأرشيف. والخطة في `release-keys.md`: binary جديد بـ root جديد وإعلان أمني |
+| **feed خبيث** (حساب GitHub أو الـ Pages اتخترق، أو DNS، أو MITM، أو mirror) | ملفات بتقول فيه نسخة غير الحقيقية | TUF بـ root متضمّن في الـ binary، وكل ملف بطول وhash، والأرشيف بـ sha256 من `targets` المتوقّع offline، وTLS، والـ redirects للأرشيف لـ hosts GitHub بس. مفيش ثقة في GitHub نفسه: اللي بيتحكّم في الريبو أو الـ Pages من غير المفتاح الـ offline أقصاه تجميد |
+| **مفتاح targets اتسرّب** | المهاجم يعمل targets بأرشيف خبيث، و**ده لوحده كفاية لتحديث خبيث** لأن الـ updater مابيتحققش من cosign ([قرار 3](#قرارات-sabry-2026-11-02)) | **مقبول بقرار Sabry**: مفتاح واحد عمره ما بيخرج من الـ USBين المشفّرين، وبيتفك بس على Debian Live من غير شبكة، والـ passphrase مش على أي قرص، والبديل كان اعتمادية كبيرة (`sigstore-go`) جوه الـ helper. **الكشف:** job المراقبة اليومي بيقارن `targets.json` بـ `SHA256SUMS` الموقّع بـ cosign في نفس الـ release (الاتنين لازم يتخترقوا عشان مايبانش)، وأي حد يقدر يعمل نفس المقارنة بإيده. **الرد:** rotate بـ root جديد، والـ clients بتاخده في أول فحص، وإعلان أمني |
+| **مفتاح الـ timestamp أو snapshot (في CI) اتسرّب** | تجميد أو replay | بيوقّعوا `timestamp` و`snapshot` بس، فمايقدروش يضيفوا نسخة. وصلاحية 7 أيام، والحماية بالأرقام وبآخر وقت اتشاف، والـ environment المحمي بيقلّل مين يوصلهم |
+| **جهاز Sabry اتخترق وهو بيوقّع** | malware بيسرق المفتاح بعد فكّه أو بيبدّل الـ hashes قبل التوقيع. ده أضعف من hardware key، اللي كان هيمنع سرقة المفتاح نفسه | التوقيع عمره ما بيحصل على النظام العادي: boot من Debian Live متراجع، والشبكة مقفولة، والـ USB الأساسي بيتحط بس وقت التوقيع. والـ passphrase بيتكتب هناك بس وعمره ما بيتحفظ. والملخّص بيتقارن بالـ log من جهاز تاني قبل الـ passphrase. وjob المراقبة بيكشف الـ hash المبدّل. وبرضه رد الـ rotate لو فيه شك |
+| **USB المفاتيح اتسرق** | المهاجم معاه الملفات المشفّرة | `age` بـ scrypt وpassphrase طويل بيدّي وقت، والـ rotate في نفس الأسبوع، والـ USBين في مكانين |
+| **مفتاح الـ root اتسرّب** | تحكّم كامل في الـ feed | ملف مشفّر offline في مكانين، وthreshold بيتكبّر لـ 2 من 3 لما يبقى فيه maintainer تاني، وjob المراقبة بيكشف أي targets مش مطابق لـ cosign. والخطة في `release-keys.md`: binary جديد بـ root جديد وإعلان أمني والترقية اليدوي بـ `get.sh` |
 | **الرجوع لنسخة أقدم (downgrade)** | تثبيت نسخة فيها ثغرة معروفة | الـ helper بيرفض أي نسخة ≤ المتنصّبة إلا رجوعه هو من الـ journal بالـ binary المحفوظ عنده، والـ metadata بأرقام مابتنزلش |
 | **تحديث ناقص** | binary نص مكتوب، أو unit من نسخة وbinary من نسخة | التنزيل في stage والتحقق قبل أي لمسة، و`rename` ذرّي، والـ journal بيقول الخطوة، والـ recover بيكمّل أو يرجع |
 | **قطع الكهربا وقت الـ swap** | الجهاز بيقوم في حالة مش معروفة | fsync للملف والمجلد والـ journal، و`dhow-update-recover.service` قبل `dhow.service`، وكل migration في transaction أو idempotent، والاختبار بـ `kill -9` وreboot في كل خطوة |
-| **النسخة الاحتياطية بتسرّب الأسرار** | الملف فيه المفتاح السري والقاعدة كلها | AES-256-GCM بمفتاح منفصل، و`0700`/`0600` لـ root، ومش في volume بتاع container، والتدوير بيمسح، والسؤال 7 للنقل بره الجهاز بمفتاح عام |
+| **النسخة الاحتياطية بتسرّب الأسرار** | الملف فيه المفتاح السري والقاعدة كلها | AES-256-GCM بمفتاح منفصل على الجهاز، و`0700`/`0600` لـ root، ومش في volume بتاع container، والتدوير بيمسح. والتصدير بره الجهاز بمفتاح `age` عام، والجهاز مايقدرش يفكّه |
 | **تصعيد الصلاحيات من الـ updater** | process `dhow` مخترَق بيستغل الـ helper | الطلب رقم نسخة بس بـ schema صارم و`O_NOFOLLOW`، والـ helper هو الـ binary المتنصّب مش المنزّل، ومفيش shell (argv بس)، ومسارات ثابتة، و`TriggerLimitIntervalSec` على الـ path unit، وتقوية systemd للـ helper، وأقصى ضرر = ترقية لنسخة رسمية أحدث |
-| **الـ binary الجديد خبيث رغم التوقيع** (supply chain) | كود خبيث بيشتغل | البناء reproducible ومتراجع في CI، وSBOM وprovenance، والـ dry run بيشتغل كـ `dhow` مش root، والتوقيع البشري على targets بعد ما CI يخلص |
-| **Docker socket في sidecar** (لو اتختار) | أي ثغرة في الـ sidecar = root على الجهاز | مش الافتراضي (السؤال 4). الافتراضي helper على الـ host |
+| **الـ binary الجديد خبيث رغم التوقيع** (supply chain) | كود خبيث بيشتغل | البناء reproducible ومتراجع في CI، وSBOM وprovenance وcosign، والـ dry run بيشتغل كـ `dhow` مش root، والتوقيع البشري على targets بعد ما CI يخلص وبعد مقارنة الـ hashes |
+| **Docker socket في container** | أي ثغرة في الـ container = root على الجهاز | مفيش sidecar ([قرار 4](#قرارات-sabry-2026-11-02))، والـ helper على الـ host، والـ Compose اليدوي إشعار بس |
 | **إغراق الـ helper بطلبات** | إعادة تشغيل كتير (DoS) | `TriggerLimitBurst` على الـ path unit، ونفس النسخة بعد فشلها مابتتجرّبش، والـ audit |
-| **الـ runner بيتحدّث لنسخة مزوّرة من سيرفر مخترَق** | كود خبيث على أجهزة التشغيل | الـ helper بتاع الـ runner بيتحقق من الـ TUF والتوقيع بنفسه، والسيرفر mirror بس |
-| **الطلب للـ feed بيكشف الـ instance** | خصوصية | مفيش ids ولا نسخة، والـ proxy مدعوم، والقفل للمعزول، ومكتوب بالظبط في الوثائق |
+| **الـ runner بيتحدّث لنسخة مزوّرة من سيرفر مخترَق** | كود خبيث على أجهزة التشغيل | الـ helper بتاع الـ runner بيتحقق من الـ TUF والطول والـ hash بنفسه، والسيرفر mirror بس |
+| **الطلب للـ feed بيكشف الـ instance** | GitHub بيشوف عنوان الـ IP | مفيش ids ولا نسخة، والـ proxy مدعوم، والقفل للمعزول، ومكتوب بالظبط في الوثائق |
+| **الـ timestamp خلص لأن الـ job المجدول ماشتغلش** | كل الـ instances بتقول «لم نتمكن من التأكد» والأوتوماتيك بيقف (fail closed، مش ثغرة) | الفحص اليومي بيعيد التوقيع تحت 48 ساعة، والـ issue وإيميل GitHub، والعملاء بيكملوا شغل عادي |
 
 ## الاعتماديات المتوقعة (بنسخ مثبّتة)
 اتأكدت يوم 2026-11-02 من proxy.golang.org (التاريخ) وOSV (مفيش advisories)، وكلها أقدم من أسبوعين.
 
 | الاعتمادية | النسخة | تاريخها | ليه |
 |---|---|---|---|
-| `github.com/theupdateframework/go-tuf/v2` | v2.4.2 | 2026-05-19 | الـ client والـ repository tooling بتوع TUF (السؤال 1)، بدل بروتوكول بنكتبه بنفسنا |
-| `github.com/sigstore/sigstore-go` | v1.3.0 (مش v1.4.0 اللي نزلت 2026-10-29) | 2026-07-30 | التحقق من bundle الـ cosign offline بـ trusted root متضمّن (السؤال 3). بيجيب `go-tuf/v2` معاه |
-| `filippo.io/age` | v1.3.2 | 2026-08-29 | لو السؤال 7 اتجاوب بـ (ب) بس: تصدير النسخ بمفتاح عام |
+| `github.com/theupdateframework/go-tuf/v2` | v2.4.2 | 2026-05-19 | الـ client والـ repository tooling بتوع TUF ([قرار 1](#قرارات-sabry-2026-11-02))، open source وببلاش، بدل بروتوكول بنكتبه بنفسنا |
+| `filippo.io/age` | v1.3.2 | 2026-08-29 | تصدير النسخ الاحتياطية بمفتاح عام في U5 ([قرار 7](#قرارات-sabry-2026-11-02))، وتشفير مفاتيح الـ feed بـ passphrase في `dhow-feed` |
 | goose | v3.29.0 (موجودة) | — | زي ما هي |
 
 **مش هنضيف:**
@@ -642,69 +697,25 @@ M11:                            U9 ─┬─► U10
 - `git-cliff` أو أي أداة changelog: سكربت Go صغير بيكفي.
 - مكتبة Docker SDK: `docker compose` بـ argv من الـ helper.
 - مكتبة cron: النافذة أيام وساعة ومدة، و`time` بيكفي.
+- `sigstore-go`: الـ updater مابيتحققش من cosign ([قرار 3](#قرارات-sabry-2026-11-02))، وcosign بيفضل في `release.yml` و`get.sh` والتحقق اليدوي.
+- أي خدمة توقيع أو KMS أو hardware key: ممنوع بقرار «كله ببلاش».
 
-## أسئلة لـ Sabry
+## قرارات Sabry (2026-11-02)
+Sabry جاوب الأسئلة الـ 11 كلها، وضاف شرط ملزم: **كله ببلاش**، مفيش خدمة مدفوعة ولا جهاز بفلوس. التغييرات عن التوصية متعلّمة «اتغيّر».
 
-### 0. توقيت السياسة الافتراضية
-الافتراضي «الأمني أوتوماتيك» محتاج الـ updater والرجوع والنافذة كاملين.
-- **أ. الإشعار والتحديث بزرار في M10، والأوتوماتيك في M11 (GA):** النسخة التجريبية بتجرّب الـ updater بإيد الناس قبل ما يشتغل لوحده. بس مستخدمي البيتا لازم يدوسوا بنفسهم على التحديثات الأمنية.
-- **ب. كله في M10:** الأمان أسرع للبيتا، بس أول مرة الأوتوماتيك يشتغل بره هتبقى على أجهزة ناس حقيقية من غير فترة تجربة.
-- **التوصية:** (أ)، ومعاها إيميل عاجل للتحديث الأمني في البيتا.
+0. **التوقيت:** الإشعار والتحديث بزرار في M10، والأمني الأوتوماتيك في M11 (GA). وطول البيتا، إيميل عاجل للمالك مع أي release أمني (U8). (زي التوصية.)
+1. **التوقيع:** TUF حقيقي بـ `go-tuf/v2`، open source وببلاش. (زي التوصية.)
+2. **المفاتيح (اتغيّر):** Sabry بيوقّع كل release offline على جهازه. مفاتيح root وtargets **ملفات مشفّرة بـ passphrase على USBين offline**، واحد معاه وواحد احتياطي في مكان تاني، ومفيش hardware keys. وsnapshot وtimestamp في CI. الـ ceremony في [مفاتيح الـ feed والـ ceremony](#مفاتيح-الـ-feed-والـ-ceremony)، والتهديد الأضعف (جهاز Sabry وقت التوقيع) في [جدول التهديدات](#جدول-التهديدات).
+3. **cosign (اتغيّر):** **مفيش تحقق من cosign في الـ updater.** الطول والـ hash من TUF targets بس، و`sigstore-go` اتشال من الاعتماديات. مفتاح targets لوحده بقى كفاية لتحديث، ومقبول لأنه مفتاح واحد عمره ما بيخرج من الـ USBين المشفّرين، ومعاه job مراقبة بيكشف أي فرق. و`release.yml` بيفضل يوقّع بـ cosign للي بيتحقق بإيده.
+4. **Compose:** helper على الـ host بيركّبه الـ installer، والـ Compose اليدوي إشعار بس، ومفيش sidecar بالـ Docker socket. (زي التوصية.)
+5. **مكان الـ feed (اتغيّر):** نفس الريبو، من غير ريبو جديد ولا دومين. الأرشيفات release assets على `Khaymah/dhow` زي النهارده والـ targets بتشاور عليها، والـ metadata على GitHub Pages بتاع الريبو: `https://khaymah.github.io/dhow/updates/`. والـ timestamp بيتجدّد كل أسبوع بصلاحية 7 أيام وتنبيه لو فشل، ونفس نشر الـ Pages هيشيل موقع الوثائق في M10 ([النشر](#النشر-على-github-pages)).
+6. **التحديث الحرج بره النافذة:** إعداد `CriticalOutsideWindow`، مقفول افتراضيًا. (زي التوصية.)
+7. **النسخ الاحتياطية:** مفتاح على الجهاز لنسخة ما قبل التحديث (U9)، وتصدير بمفتاح `age` عام في U5. (زي التوصية.)
+8. **`/meta` العام:** `Version` و`Commit` بيتشالوا، ويظهروا في «عن داو» بعد الدخول بس (U6). (زي التوصية.)
+9. **الدعم:** آخر minor بس بياخد patches لحد GA، ونرجع للقرار بعد 3 شهور من GA. (زي التوصية.)
+10. **`dhow migrate --open-pr`:** بيشغّل `gh` أو `glab` بتوع المستخدم نفسه (argv)، ومفيش كود شبكة في `dhow`. (زي التوصية.)
 
-### 1. نظام توقيع الـ feed
-- **أ. TUF حقيقي بـ `go-tuf/v2`:** بروتوكول متراجع ومستخدَم (Sigstore وغيره)، وبيحل الـ rollback والـ freeze وتغيير المفاتيح. بس اعتمادية كبيرة ومفاهيم أكتر.
-- **ب. نظام بسيط بتاعنا بـ ed25519 من الـ standard library:** ملف واحد موقّع، فيه رقم بيزيد وتاريخ انتهاء. أبسط ومن غير اعتماديات، بس إحنا اللي بنصمّم بروتوكول أمني، وتغيير المفاتيح والتجميد لازم نحلّهم بإيدنا، وده بالظبط اللي الناس بتغلط فيه.
-- **التوصية:** (أ). الاعتمادية بتشيل تعقيد حقيقي، وده شرط الاعتماديات في `CLAUDE.md`.
-
-### 2. مين ماسك المفاتيح وتوقيع كل release بإيد
-- **أ. root offline على مفتاحين hardware** (واحد مع Sabry وواحد احتياطي في مكان آمن)، و**targets بيتوقّع offline من Sabry مع كل release** (خطوة بشرية)، وsnapshot وtimestamp في CI. اختراق CI لوحده مايكفيش لتحديث خبيث. بس كل release محتاج Sabry يقعد ويوقّع.
-- **ب. كله في CI:** release أوتوماتيك بالكامل، بس اختراق GitHub Actions = تحديث خبيث بيتثبّت لوحده عند كل الناس.
-- **التوصية:** (أ). والتكلفة دقايق مع كل release. ولو Sabry مش متاح، الـ patch الأمني بيستنى، فالـ ceremony بيحدد شخص تاني بمفتاح targets لما يبقى فيه.
-
-### 3. التحقق من توقيع cosign جوه الـ updater
-- **أ. الـ hash من الـ feed بس:** مفيش اعتمادية زيادة، بس مفتاح targets لوحده بقى كفاية.
-- **ب. الـ hash وكمان bundle الـ cosign بـ `sigstore-go`** بـ trusted root متضمّن ومتحدّث مع كل release، والتحقق offline: محتاج اختراق مفتاح targets **و**workflow الـ release مع بعض. بس اعتمادية كبيرة، في الـ helper بس.
-- **التوصية:** (ب).
-
-### 4. الـ updater في Compose
-- **أ. helper على الـ host** (الـ installer بيركّبه)، وإشعار بس للـ Compose اليدوي ومعاه ملفين اختياريين: مفيش Docker socket في أي container. بس اللي عمل Compose بإيده لازم يركّب الملفين.
-- **ب. sidecar بالـ Docker socket:** بيشتغل لكل الناس من غير تدخّل. بس الـ socket = root على الجهاز، وأي ثغرة في الـ sidecar بتبقى root.
-- **ج. إشعار بس لكل Compose:** أبسط، بس «الأمني أوتوماتيك» مش هيبقى حقيقي لأكتر طريقة تنصيب.
-- **التوصية:** (أ). والـ sidecar مايتعملش، ولو اتطلب بعدين يبقى اختياري بـ ADR.
-
-### 5. مكان الـ feed
-الـ URL متثبّت في الـ binary، وتغييره بعدين محتاج release.
-- **أ. GitHub Pages على ريبو `Khaymah/dhow-updates`:** مجاني وثابت، بس GitHub بيشوف عناوين الـ instances، والـ URL مربوط بـ GitHub.
-- **ب. دومين بتاعنا** (زي `updates.<domain>`) بـ CNAME على GitHub Pages دلوقتي: نفس التكلفة، ونقدر ننقل بعدين من غير ما نغيّر الـ binary. محتاج دومين.
-- **التوصية:** (ب)، لو Sabry عنده دومين أو هيشتري واحد قبل M10.
-
-### 6. التحديث الحرج بره النافذة
-- **أ. دايمًا في النافذة:** متوقّع، والتأخير يوم بالكتير مع النافذة اليومية.
-- **ب. `critical` بيتثبّت في ساعة مهما كانت النافذة:** أسرع لثغرة بتتستغل، بس إعادة تشغيل في وقت شغل.
-- **ج. إعداد `CriticalOutsideWindow` والافتراضي (أ).**
-- **التوصية:** (ج).
-
-### 7. تشفير النسخ الاحتياطية ونقلها بره الجهاز
-- **أ. مفتاح على الجهاز بس:** كفاية للرجوع على نفس الجهاز. بس لو الديسك راح، النسخة والمفتاح راحوا مع بعض.
-- **ب. ومعاه مفتاح عام اختياري (`age`) للتصدير:** الجهاز يقدر يشفّر نسخة للنقل ومايقدرش يفكّها، والمفتاح الخاص مع المالك. اعتمادية زيادة.
-- **التوصية:** (أ) في U9 للرجوع، و(ب) في U5 للتصدير، عشان تمرين M9 يغطّي الاسترجاع على جهاز جديد.
-
-### 8. النسخة في `/meta` العام
-`/meta` بيقول النسخة والـ commit لأي حد من غير دخول.
-- **أ. نسيبه:** مفيش تغيير، بس أي حد يعرف الـ instances اللي مش متحدّثة.
-- **ب. نشيل `Version` و`Commit` من `/meta` ويظهروا في «عن داو» بعد الدخول:** أقل كشف. بس صفحة الدخول مش هتعرض النسخة. وده contract لازم يتعمل قبل GA.
-- **التوصية:** (ب) في U6.
-
-### 9. نافذة الدعم والـ backports
-- **أ. آخر minor بس بياخد patches:** أرخص لفريق صغير، والتحديث بزرار بيخلّي البقاء على الأحدث سهل. بس اللي على minor قديم ياخد الإصلاح الأمني كـ minor بزرار مش أوتوماتيك.
-- **ب. آخر minor واللي قبله لـ 6 شهور:** أريح للمشغّلين، بس كل إصلاح أمني على branchين.
-- **التوصية:** (أ) لحد GA، ونرجع للسؤال بعد أول 3 شهور من GA.
-
-### 10. `dhow migrate` وفتح الـ PR
-- **أ. offline بس:** بيكتب الملف ويعمل commit على branch، ويطبع أمر الـ push والـ PR للمزوّد. مفيش شبكة، بس خطوة يدوي.
-- **ب. ومعاه `--open-pr`** بيشغّل `gh pr create` أو `glab mr create` (argv) لو موجودين على جهاز المستخدم وبصلاحياته هو: مفيش كود شبكة في `dhow`، والـ PR بيتفتح.
-- **ج. السيرفر يفتح الـ PR:** محتاج صلاحية كتابة على المستودع، وده ضد ADR-0074 (الوصول للقراية بس).
-- **التوصية:** (ب).
+**مفيش سؤال مفتوح.**
 
 ## قرارات تانية اتاخدت بالتوصية (Sabry يقدر يرجع فيها)
 1. **النافذة الافتراضية:** كل يوم 03:00 لمدة ساعتين بتوقيت UTC، لحد ما المالك يختار منطقته. والـ installer بيسأل.
