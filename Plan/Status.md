@@ -1,6 +1,6 @@
 # حالة داو: اللي اتعمل واللي لسه
 
-**آخر تحديث:** 2026-10-30 · **main:** PR التحديث ده
+**آخر تحديث:** 2026-11-02 · **main:** PR التحديث ده
 
 الوثيقة دي نقطة البداية لأي جلسة جديدة. التفاصيل في [سجل التقدّم](Progress/README.md) والقرارات في [`ADR/`](ADR/README.md) والخطة الكاملة في [`docs/roadmap.md`](../docs/roadmap.md).
 
@@ -69,6 +69,7 @@
 | الشغل | الـ branch | الـ PR | اللي فاضل |
 |---|---|---|---|
 | M4.4: موديول `Sources`: `internal/gitref` و`gitsource` و`netguard`، وربط Git عام بـ deploy key وhost key متثبّت بالتأكيد، و`/webhooks/git/{hookId}` بالتوقيعات الأربعة والـ dedupe و`Core/Triggers`، و`"WebhookDeliveries"` مقسّم، وworker الـ commit statuses (ADR-0072 وADR-0074) | `feat/sources-generic-git` | — | الـ PR (المراجعة الأمنية اتعملت وكل الـ findings اتصلّحت: Medium واحدة وخمسة Low) |
+| M4.8: موديول `Pipelines`: `"PipelineRuns"` و`"RunJobs"` والـ DAG والـ matrix، و`Core/RunEvents` و`Core/CommitStatus`، والـ triggers (webhook وmanual وapi)، والتزامن، والـ forks بالموافقة، وتثبيت الصور بالـ tag من الـ registry، والإلغاء و«أعد تشغيل الفاشل»، والـ reconciler، و`POST /jobs` بـ `404` من غير `DHOW_DEV`، والدور على المشروع في routes الـ jobs (ADR-0076) | `feat/pipelines-module` | — | **الحاجة الوحيدة اللي فاضلة في الربط:** تنفيذ `CheckoutSeam` بعد M4.7 (الـ discovery job لـ Git عام وcheckout كل job، ونقل الملف من الـ discovery job)، ولحد وقتها runs Git العام بتفشل `CHECKOUT_UNAVAILABLE`. وكمان مع M4.7: الـ outputs من `CompleteRequest`، ومتغيرات `DHOW_*` في الـ env. وبعدها المراجعة الأمنية والـ PR |
 | `runner.revoked` (إلغاء اللوحة وإلغاء الـ runner لنفسه) بيتنشر على الـ event bus بعد الـ commit، فلو الـ process وقع بينهم الـ audit بيضيع. الـ bus مافيهوش outbox | — | — | outbox للأحداث اللي بتتسجّل، أو نشرها جوه نفس الـ transaction |
 
 M2.6 وM3.6 والتطوير المحلي وإصلاحات مراجعة M3.6 وتغيير الاسم وM3.7 وتجهيز Windows وM3.9 اتدمجوا في 2026-10-28، ومن #35 لـ #59 اتدمجوا في 2026-10-28 و2026-10-29.
@@ -109,7 +110,7 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
 
 [ADR-0068](ADR/0068-first-production-release-scope.md) حدّد نطاق أول نسخة production: الـ runners على Debian وUbuntu بـ Podman rootless بس، والنشر على SSH/VPS وDocker Compose، وGitHub وGitLab وGit عام، ونسخة Community بس. الترتيب: M3.13 ← M4 ← M5 ← M6 ← M7 ← M9 ← M10 ← M11، واللي اتأجّل (SELinux وKubernetes وHelm وgVisor وBitbucket وStatic/CDN/SFTP والمحرر المرئي وTeams وWhatsApp وM8 ومكوّن GitLab CI) في قسم «بعد أول نسخة» في [`docs/roadmap.md`](../docs/roadmap.md).
 
-**M4 شغّال:** خطته في [`M4-Pipelines.md`](M4-Pipelines.md) اتقبلت، وSabry جاوب أسئلتها كلها بالتوصية يوم 2026-10-30. **M4.1** (`internal/pipelinespec`، [ADR-0069](ADR/0069-pipeline-spec-parser-and-validator.md)) اتدمج في #65، و**M4.2** (`dhow lint`) في #66، و**M4.3** (`Projects` والـ ports، [ADR-0070](ADR/0070-ports-in-core-and-project-permissions.md)) في #68. **M4.4** (`Sources` وGit عام، [ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) شغّال على `feat/sources-generic-git`. وقرار Sabry الجديد لربط Git (الـ OAuth للتجهيز بس والـ deploy keys للوصول) في [ADR-0074](ADR/0074-git-connection-oauth-for-setup-deploy-keys-for-access.md)، وفيه نقط لازم تتحسم في أول M4.6.
+**M4 شغّال:** خطته في [`M4-Pipelines.md`](M4-Pipelines.md) اتقبلت، وSabry جاوب أسئلتها كلها بالتوصية يوم 2026-10-30. **M4.1** (`internal/pipelinespec`، [ADR-0069](ADR/0069-pipeline-spec-parser-and-validator.md)) اتدمج في #65، و**M4.2** (`dhow lint`) في #66، و**M4.3** (`Projects` والـ ports، [ADR-0070](ADR/0070-ports-in-core-and-project-permissions.md)) في #68. **M4.4** (`Sources` وGit عام، [ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) شغّال على `feat/sources-generic-git`. وقرار Sabry الجديد لربط Git (الـ OAuth للتجهيز بس والـ deploy keys للوصول) في [ADR-0074](ADR/0074-git-connection-oauth-for-setup-deploy-keys-for-access.md)، وفيه نقط لازم تتحسم في أول M4.6. **M4.8** (`Pipelines`، [ADR-0076](ADR/0076-pipeline-runs-definitions-and-forks.md)) شغّال على `feat/pipelines-module`، ومستني M4.7 عشان الـ checkout.
 
 ## بنود مفتوحة اتأجلت
 
