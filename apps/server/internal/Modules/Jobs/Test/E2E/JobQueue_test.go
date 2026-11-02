@@ -124,6 +124,11 @@ func TestEnqueueTakesTheFeaturesFromTheSpecItself(t *testing.T) {
 		`SELECT "RequiredFeatures" FROM "Jobs" WHERE "OriginId" = $1`, req.OriginID).Scan(&features))
 	assert.Equal(t, []string{jobqueue.FeatureCheckout, jobqueue.FeaturePlugins}, features)
 	noLease(t, r)
+	partial := w.runner(apptest.SeedRunnerSpec{Features: []string{jobqueue.FeatureCheckout}})
+	noLease(t, partial)
+	full := w.runner(apptest.SeedRunnerSpec{Features: []string{jobqueue.FeatureCheckout, jobqueue.FeaturePlugins}})
+	g := leaseNow(t, full)
+	assert.Equal(t, "https://git.example.com/team/app.git", g.Grant.GetSpec().GetCheckout().GetRepositoryUrl())
 }
 
 func TestEnqueueValidatesTheEvaluatedSpecAgain(t *testing.T) {

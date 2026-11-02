@@ -277,6 +277,7 @@ type Querier interface {
 	SetMemberRole(ctx context.Context, arg SetMemberRoleParams) (int64, error)
 	SetMfaChallengeWebauthn(ctx context.Context, arg SetMfaChallengeWebauthnParams) (int64, error)
 	SetOrganizationSecondFactor(ctx context.Context, arg SetOrganizationSecondFactorParams) (SetOrganizationSecondFactorRow, error)
+	SetRunnerFeatures(ctx context.Context, arg SetRunnerFeaturesParams) error
 	SetTeamBindingRole(ctx context.Context, arg SetTeamBindingRoleParams) (int64, error)
 	SetUserLocale(ctx context.Context, arg SetUserLocaleParams) error
 	SetUserPassword(ctx context.Context, arg SetUserPasswordParams) error
