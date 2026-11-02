@@ -11,11 +11,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	commitstatus "github.com/Khaymah/dhow/apps/server/internal/Core/CommitStatus"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
+	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	runevents "github.com/Khaymah/dhow/apps/server/internal/Core/RunEvents"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
@@ -45,6 +47,8 @@ type Options struct {
 	Images      ImageResolver
 	Checkout    CheckoutSeam
 	PublicURL   string
+	Limiter     ratelimit.Limiter
+	PinBudget   time.Duration
 }
 
 type Service struct {
@@ -58,6 +62,8 @@ type Service struct {
 	images      ImageResolver
 	checkout    CheckoutSeam
 	publicURL   string
+	limiter     ratelimit.Limiter
+	pinBudget   time.Duration
 }
 
 var (
@@ -78,9 +84,13 @@ func NewService(o Options) *Service {
 	if checkout == nil {
 		checkout = CheckoutPending{}
 	}
+	budget := o.PinBudget
+	if budget <= 0 {
+		budget = config.PipelinePinBudget
+	}
 	return &Service{
 		db: o.DB, bus: o.Bus, log: o.Log, now: now, queue: o.Queue, statuses: o.Statuses, definitions: definitions,
-		images: o.Images, checkout: checkout, publicURL: strings.TrimSuffix(o.PublicURL, "/"),
+		images: o.Images, checkout: checkout, publicURL: strings.TrimSuffix(o.PublicURL, "/"), limiter: o.Limiter, pinBudget: budget,
 	}
 }
 

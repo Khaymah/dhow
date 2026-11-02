@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
+	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -147,7 +148,7 @@ jobs:
 func (w world) forkPR() uuid.UUID {
 	w.env.T.Helper()
 	tr := w.trigger("pull_request", "refs/pull/7/head", shaB)
-	tr.BaseRef, tr.BaseSha, tr.PrNumber, tr.IsFork = "refs/heads/main", shaA, 7, true
+	tr.BaseRef, tr.BaseSha, tr.PrNumber, tr.Origin = "refs/heads/main", shaA, 7, triggers.PullOriginFork
 	got := w.env.Deliver(tr)
 	require.True(w.env.T, got.Created)
 	return got.RunID
@@ -199,7 +200,7 @@ func TestAProjectThatTrustsForksRunsThemAtOnce(t *testing.T) {
 func TestATagIsPinnedOnceAndEveryRerunPullsTheSameDigest(t *testing.T) {
 	w := newWorld(t)
 	first := "docker.io/library/alpine:3@sha256:" + repeat("a", 64)
-	w.images.move("alpine:3", first)
+	w.images.move("docker.io/library/alpine:3", first)
 	w.defs.Put(shaA, "version: 1\non:\n  push: {}\njobs:\n  build:\n    image: alpine:3\n    steps:\n      - run: make\n")
 	run := w.push("refs/heads/main", shaA)
 	w.env.StartRuns()
@@ -209,7 +210,7 @@ func TestATagIsPinnedOnceAndEveryRerunPullsTheSameDigest(t *testing.T) {
 	assert.Equal(t, first, v.ImagePins[0].Pinned)
 	assert.Equal(t, first, w.jobImage(t, *w.env.RunJobs(run)["build"].Job))
 
-	w.images.move("alpine:3", "docker.io/library/alpine:3@sha256:"+repeat("b", 64))
+	w.images.move("docker.io/library/alpine:3", "docker.io/library/alpine:3@sha256:"+repeat("b", 64))
 	assert.Equal(t, []string{"build"}, w.finishN(t, 1, failed))
 	state, _ := w.env.RunState(run)
 	require.Equal(t, "failed", state)

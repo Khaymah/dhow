@@ -55,6 +55,9 @@ const (
 	ReasonJobSpecInvalid      = "JOB_SPEC_INVALID"
 	ReasonCreatorNotMember    = "CREATOR_NOT_MEMBER"
 	ReasonEnqueueRefused      = "ENQUEUE_REFUSED"
+	ReasonExpansionFailed     = "RUN_EXPANSION_FAILED"
+	ReasonStateInvalid        = "RUN_STATE_INVALID"
+	ReasonOutputsTruncated    = "OUTPUTS_TRUNCATED"
 )
 
 const (

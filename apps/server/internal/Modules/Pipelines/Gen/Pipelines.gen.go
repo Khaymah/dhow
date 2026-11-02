@@ -197,7 +197,7 @@ type Run struct {
 	// DefinitionSha The commit the pipeline file was read from. For a fork's pull request it is the base.
 	DefinitionSha *string `json:"DefinitionSha,omitempty"`
 
-	// FailureReason Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND` or `TRIGGER_NOT_ENABLED`.
+	// FailureReason Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs) or `RUN_STATE_INVALID` (a stored value of the run could not be read).
 	FailureReason *string            `json:"FailureReason,omitempty"`
 	FinishedAt    *time.Time         `json:"FinishedAt,omitempty"`
 	Id            openapi_types.UUID `json:"Id"`
@@ -270,7 +270,7 @@ type RunJob struct {
 	// CurrentJobId The job that runs this entry now, or ran it last. Its logs are under `/jobs/{jobId}`.
 	CurrentJobId *openapi_types.UUID `json:"CurrentJobId,omitempty"`
 
-	// FailureReason For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED`.
+	// FailureReason For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
 	FailureReason *string            `json:"FailureReason,omitempty"`
 	FinishedAt    *time.Time         `json:"FinishedAt,omitempty"`
 	Id            openapi_types.UUID `json:"Id"`

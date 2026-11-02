@@ -1,7 +1,6 @@
 package pipelines
 
 import (
-	"encoding/json"
 	"slices"
 	"strings"
 
@@ -52,12 +51,9 @@ func enabled(on *pipelinespec.Triggers, run sqlc.PipelineRun) bool {
 	}
 }
 
-func decodeInputs(raw []byte) map[string]any {
+func decodeInputs(raw []byte) (map[string]any, error) {
 	out := map[string]any{}
-	if len(raw) > 0 {
-		_ = json.Unmarshal(raw, &out)
-	}
-	return out
+	return out, decode(raw, &out, "inputs")
 }
 
 func inputIssue(name string) models.Issue {
@@ -135,36 +131,41 @@ func gitContext(run sqlc.PipelineRun) pipelinespec.Git {
 	return g
 }
 
-func evalContext(run sqlc.PipelineRun, project string, needs map[string]any) pipelinespec.Context {
+func evalContext(run sqlc.PipelineRun, project string, needs map[string]any) (pipelinespec.Context, error) {
+	inputs, err := decodeInputs(run.Inputs)
+	if err != nil {
+		return pipelinespec.Context{}, err
+	}
 	return pipelinespec.Context{
 		Git: gitContext(run), Project: pipelinespec.Project{ID: run.ProjectId.String(), Name: project},
-		Vars: map[string]string{}, Inputs: decodeInputs(run.Inputs), Needs: needs, Env: map[string]string{},
-	}
+		Vars: map[string]string{}, Inputs: inputs, Needs: needs, Env: map[string]string{},
+	}, nil
 }
 
-func outputsOf(raw []byte) map[string]string {
+func outputsOf(raw []byte) (map[string]string, error) {
 	out := map[string]string{}
-	if len(raw) > 0 {
-		_ = json.Unmarshal(raw, &out)
-	}
-	return out
+	return out, decode(raw, &out, "outputs")
 }
 
-func needsContext(rows []sqlc.RunJob) map[string]any {
+func needsContext(rows []sqlc.RunJob) (map[string]any, error) {
 	single := map[string]map[string]string{}
 	matrix := map[string]map[string]map[string]string{}
 	for _, rj := range rows {
 		if rj.Kind != models.KindJob || rj.State != models.JobSucceeded {
 			continue
 		}
+		outputs, err := outputsOf(rj.Outputs)
+		if err != nil {
+			return nil, err
+		}
 		if string(rj.Matrix) == "[]" || len(rj.Matrix) == 0 {
-			single[rj.JobId] = outputsOf(rj.Outputs)
+			single[rj.JobId] = outputs
 			continue
 		}
 		if matrix[rj.JobId] == nil {
 			matrix[rj.JobId] = map[string]map[string]string{}
 		}
-		matrix[rj.JobId][rj.Key] = outputsOf(rj.Outputs)
+		matrix[rj.JobId][rj.Key] = outputs
 	}
 	out := make(map[string]any, len(single)+len(matrix))
 	for id, v := range single {
@@ -173,5 +174,5 @@ func needsContext(rows []sqlc.RunJob) map[string]any {
 	for id, v := range matrix {
 		out[id] = v
 	}
-	return out
+	return out, nil
 }

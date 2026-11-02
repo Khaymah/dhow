@@ -23,7 +23,19 @@ const (
 	CodeRunNotAwaitingApproval = "RUN_NOT_AWAITING_APPROVAL"
 	KeyRunNotRerunnable        = "errors.runNotRerunnable"
 	KeyRunNotAwaitingApproval  = "errors.runNotAwaitingApproval"
+	CodeShaNotOnRef            = "SHA_NOT_ON_REF"
+	CodeRefHeadUnknown         = "REF_HEAD_UNKNOWN"
+	KeyShaNotOnRef             = "errors.shaNotOnRef"
+	KeyRefHeadUnknown          = "errors.refHeadUnknown"
 )
+
+func ShaNotOnRef() *AppError {
+	return New(http.StatusUnprocessableEntity, CodeShaNotOnRef, KeyShaNotOnRef)
+}
+
+func RefHeadUnknown() *AppError {
+	return New(http.StatusUnprocessableEntity, CodeRefHeadUnknown, KeyRefHeadUnknown)
+}
 
 func RunNotRerunnable() *AppError {
 	return New(http.StatusConflict, CodeRunNotRerunnable, KeyRunNotRerunnable)

@@ -143,17 +143,25 @@ func (q *Queries) CountRuns(ctx context.Context, arg CountRunsParams) (int64, er
 const findCommitRun = `-- name: FindCommitRun :one
 SELECT "Id"
 FROM "PipelineRuns"
-WHERE "RepositoryId" = $1 AND "Ref" = $2 AND "Sha" = $3 AND "Trigger" IN ('push', 'tag', 'pull_request')
+WHERE "RepositoryId" = $1 AND "Ref" = $2 AND "Sha" = $3 AND "Trigger" = $4 AND "IsFork" = $5
 `
 
 type FindCommitRunParams struct {
 	RepositoryID *uuid.UUID
 	Ref          string
 	Sha          pgtype.Text
+	Trigger      string
+	IsFork       bool
 }
 
 func (q *Queries) FindCommitRun(ctx context.Context, arg FindCommitRunParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, findCommitRun, arg.RepositoryID, arg.Ref, arg.Sha)
+	row := q.db.QueryRow(ctx, findCommitRun,
+		arg.RepositoryID,
+		arg.Ref,
+		arg.Sha,
+		arg.Trigger,
+		arg.IsFork,
+	)
 	var Id uuid.UUID
 	err := row.Scan(&Id)
 	return Id, err
@@ -525,8 +533,28 @@ func (q *Queries) InsertRunJob(ctx context.Context, arg InsertRunJobParams) (Run
 	return i, err
 }
 
+const latestTrustedSha = `-- name: LatestTrustedSha :one
+SELECT "Sha"::text
+FROM "PipelineRuns"
+WHERE "RepositoryId" = $1 AND "Ref" = $2 AND "Trigger" IN ('push', 'tag') AND NOT "IsFork" AND "Sha" IS NOT NULL
+ORDER BY "CreatedAt" DESC, "Number" DESC
+LIMIT 1
+`
+
+type LatestTrustedShaParams struct {
+	RepositoryID *uuid.UUID
+	Ref          string
+}
+
+func (q *Queries) LatestTrustedSha(ctx context.Context, arg LatestTrustedShaParams) (string, error) {
+	row := q.db.QueryRow(ctx, latestTrustedSha, arg.RepositoryID, arg.Ref)
+	var Sha string
+	err := row.Scan(&Sha)
+	return Sha, err
+}
+
 const listDriftedRunJobs = `-- name: ListDriftedRunJobs :many
-SELECT rj."Id", rj."OrganizationId", rj."CurrentJobId"::uuid AS "JobId", j."State" AS "JobState", j."FailureReason" AS "JobFailureReason"
+SELECT rj."Id", rj."RunId", rj."OrganizationId", rj."CurrentJobId"::uuid AS "JobId", j."State" AS "JobState", j."FailureReason" AS "JobFailureReason"
 FROM "RunJobs" rj
 JOIN "Jobs" j ON j."Id" = rj."CurrentJobId"
 WHERE rj."State" = 'active' AND NOT rj."IsDeleted" AND j."State" IN ('succeeded', 'failed', 'canceled', 'timed_out', 'lost')
@@ -542,6 +570,7 @@ type ListDriftedRunJobsParams struct {
 
 type ListDriftedRunJobsRow struct {
 	Id               uuid.UUID
+	RunId            uuid.UUID
 	OrganizationId   uuid.UUID
 	JobId            uuid.UUID
 	JobState         string
@@ -559,6 +588,7 @@ func (q *Queries) ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobs
 		var i ListDriftedRunJobsRow
 		if err := rows.Scan(
 			&i.Id,
+			&i.RunId,
 			&i.OrganizationId,
 			&i.JobId,
 			&i.JobState,
@@ -575,10 +605,16 @@ func (q *Queries) ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobs
 }
 
 const listQueuedRuns = `-- name: ListQueuedRuns :many
-SELECT "Id", "ProjectId", "ConcurrencyGroup"
-FROM "PipelineRuns"
-WHERE "State" = 'queued' AND NOT "IsDeleted"
-ORDER BY "Number"
+SELECT h."Id", h."ProjectId", h."ConcurrencyGroup"
+FROM (SELECT DISTINCT ON (r."ProjectId", r."ConcurrencyGroup") r."Id", r."ProjectId", r."ConcurrencyGroup", r."Number"
+      FROM "PipelineRuns" r
+      WHERE r."State" = 'queued' AND NOT r."IsDeleted"
+      ORDER BY r."ProjectId", r."ConcurrencyGroup", r."Number") h
+WHERE NOT EXISTS (SELECT 1
+                  FROM "PipelineRuns" o
+                  WHERE o."ProjectId" = h."ProjectId" AND o."ConcurrencyGroup" = h."ConcurrencyGroup" AND o."State" = 'running'
+                    AND NOT o."IsDeleted")
+ORDER BY h."Number", h."Id"
 LIMIT $1
 `
 
@@ -949,7 +985,7 @@ const olderGroupRuns = `-- name: OlderGroupRuns :many
 SELECT "Id"
 FROM "PipelineRuns"
 WHERE "ProjectId" = $1 AND "ConcurrencyGroup" = $2::text AND "Id" <> $3 AND "Number" < $4
-  AND "State" IN ('queued', 'running') AND NOT "IsDeleted"
+  AND "Ref" = $5 AND "State" IN ('queued', 'running') AND NOT "IsDeleted"
 ORDER BY "Number"
 `
 
@@ -958,6 +994,7 @@ type OlderGroupRunsParams struct {
 	ConcurrencyGroup string
 	ID               uuid.UUID
 	Number           int64
+	Ref              string
 }
 
 func (q *Queries) OlderGroupRuns(ctx context.Context, arg OlderGroupRunsParams) ([]uuid.UUID, error) {
@@ -966,6 +1003,7 @@ func (q *Queries) OlderGroupRuns(ctx context.Context, arg OlderGroupRunsParams) 
 		arg.ConcurrencyGroup,
 		arg.ID,
 		arg.Number,
+		arg.Ref,
 	)
 	if err != nil {
 		return nil, err
@@ -1149,4 +1187,35 @@ WHERE "Id" = $1 AND "State" IN ('pending', 'queued')
 func (q *Queries) StartRun(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, startRun, id)
 	return err
+}
+
+const touchRun = `-- name: TouchRun :exec
+UPDATE "PipelineRuns"
+SET "UpdatedAt" = now()
+WHERE "Id" = $1
+`
+
+func (q *Queries) TouchRun(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, touchRun, id)
+	return err
+}
+
+const trustedShaOnRef = `-- name: TrustedShaOnRef :one
+SELECT EXISTS (SELECT 1
+               FROM "PipelineRuns"
+               WHERE "RepositoryId" = $1 AND "Ref" = $2 AND "Sha" = $3 AND "Trigger" IN ('push', 'tag')
+                 AND NOT "IsFork")::boolean
+`
+
+type TrustedShaOnRefParams struct {
+	RepositoryID *uuid.UUID
+	Ref          string
+	Sha          pgtype.Text
+}
+
+func (q *Queries) TrustedShaOnRef(ctx context.Context, arg TrustedShaOnRefParams) (bool, error) {
+	row := q.db.QueryRow(ctx, trustedShaOnRef, arg.RepositoryID, arg.Ref, arg.Sha)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }

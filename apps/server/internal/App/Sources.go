@@ -61,7 +61,7 @@ func mountWebhooks(root chi.Router, o Options) {
 	})
 }
 
-func pipelinesFor(in Infra, bus *eventbus.Bus, queue jobqueue.Queue) *pipelines.Service {
+func pipelinesFor(in Infra, bus *eventbus.Bus, queue jobqueue.Queue, limiter ratelimit.Limiter) *pipelines.Service {
 	images := in.Images
 	if images == nil {
 		images = pipelines.Registry{Dialer: netguard.Dialer{
@@ -70,7 +70,7 @@ func pipelinesFor(in Infra, bus *eventbus.Bus, queue jobqueue.Queue) *pipelines.
 	}
 	return pipelines.NewService(pipelines.Options{
 		DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now, Queue: queue, Definitions: in.Definitions, Images: images,
-		Checkout: in.Checkout, PublicURL: in.Config.PublicURL.String(),
+		Checkout: in.Checkout, PublicURL: in.Config.PublicURL.String(), Limiter: limiter, PinBudget: in.PinBudget,
 	})
 }
 
@@ -83,7 +83,8 @@ func StartPipelines(ctx context.Context, p *pipelines.Service, log *slog.Logger)
 		"stalled", res.Stalled, "unsettled", res.Unsettled)
 	bgCtx, cancel := context.WithCancel(ctx)
 	var background sync.WaitGroup
-	background.Go(func() { p.RunWorker(bgCtx) })
+	background.Go(func() { p.RunStarter(bgCtx) })
+	background.Go(func() { p.RunReconciler(bgCtx) })
 	return func() {
 		cancel()
 		background.Wait()

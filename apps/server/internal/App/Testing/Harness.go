@@ -150,6 +150,7 @@ type Options struct {
 	Checkout      pipelines.CheckoutSeam
 	RegistryTLS   *tls.Config
 	NoManualJobs  bool
+	PinBudget     time.Duration
 
 	LogStreamWriteWait time.Duration
 	LogReadWait        time.Duration
@@ -208,6 +209,7 @@ func NewWithOptions(t *testing.T, o Options) *Env {
 		Breach: breach, HashParams: &params, Now: clock.Now, Mailer: o.Mailer, OidcTransport: o.OidcTransport,
 		LogStreamWriteWait: o.LogStreamWriteWait, LogReadWait: o.LogReadWait, Triggers: o.Triggers, GitLookup: o.GitLookup, GitDial: o.GitDial,
 		Definitions: o.Definitions, Images: o.Images, Checkout: o.Checkout, RegistryTLS: o.RegistryTLS, ManualJobs: !o.NoManualJobs,
+		PinBudget: o.PinBudget,
 	}
 	if o.Secrets != nil {
 		infra.Secrets = o.Secrets

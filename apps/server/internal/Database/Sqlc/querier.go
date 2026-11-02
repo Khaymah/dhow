@@ -155,6 +155,7 @@ type Querier interface {
 	IsMemberByEmail(ctx context.Context, arg IsMemberByEmailParams) (bool, error)
 	JobCancelRequestedAt(ctx context.Context, id uuid.UUID) (*time.Time, error)
 	JobExists(ctx context.Context, arg JobExistsParams) (bool, error)
+	LatestTrustedSha(ctx context.Context, arg LatestTrustedShaParams) (string, error)
 	ListAcceptedInvitations(ctx context.Context, arg ListAcceptedInvitationsParams) ([]ListAcceptedInvitationsRow, error)
 	ListActiveUserSessions(ctx context.Context, arg ListActiveUserSessionsParams) ([]ListActiveUserSessionsRow, error)
 	ListApiTokens(ctx context.Context, arg ListApiTokensParams) ([]ListApiTokensRow, error)
@@ -325,8 +326,10 @@ type Querier interface {
 	TouchIdentity(ctx context.Context, arg TouchIdentityParams) error
 	TouchMembership(ctx context.Context, arg TouchMembershipParams) error
 	TouchRepositoryDelivery(ctx context.Context, arg TouchRepositoryDeliveryParams) error
+	TouchRun(ctx context.Context, id uuid.UUID) error
 	TouchRunner(ctx context.Context, arg TouchRunnerParams) error
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
+	TrustedShaOnRef(ctx context.Context, arg TrustedShaOnRefParams) (bool, error)
 	TryLockLogPartitions(ctx context.Context) (bool, error)
 	TryLockWebhookPartitions(ctx context.Context) (bool, error)
 	TryRetentionLock(ctx context.Context, lockKey int64) (bool, error)

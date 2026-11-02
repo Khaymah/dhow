@@ -15,10 +15,20 @@ import (
 )
 
 type FakeDefinitions struct {
-	mu    sync.Mutex
-	files map[string][]byte
-	calls int
-	err   error
+	mu      sync.Mutex
+	files   map[string][]byte
+	blocked map[string]bool
+	calls   int
+	err     error
+}
+
+func (f *FakeDefinitions) Block(sha string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.blocked == nil {
+		f.blocked = map[string]bool{}
+	}
+	f.blocked[sha] = true
 }
 
 func NewFakeDefinitions() *FakeDefinitions { return &FakeDefinitions{files: map[string][]byte{}} }
@@ -41,10 +51,15 @@ func (f *FakeDefinitions) Calls() int {
 	return f.calls
 }
 
-func (f *FakeDefinitions) Fetch(_ context.Context, r pipelines.DefinitionRequest) (pipelines.Fetched, error) {
+func (f *FakeDefinitions) Fetch(ctx context.Context, r pipelines.DefinitionRequest) (pipelines.Fetched, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.calls++
+	if f.blocked[r.Sha] {
+		f.mu.Unlock()
+		<-ctx.Done()
+		return pipelines.Fetched{}, ctx.Err()
+	}
+	defer f.mu.Unlock()
 	if f.err != nil {
 		return pipelines.Fetched{}, f.err
 	}

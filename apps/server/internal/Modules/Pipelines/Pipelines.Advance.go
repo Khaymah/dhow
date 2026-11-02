@@ -127,7 +127,14 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 		}
 		return s.endRunJob(ctx, q, st, i, models.JobSkipped, reason)
 	}
-	evalCtx := evalContext(st.run, st.project, needsContext(st.rows))
+	needs, err := needsContext(st.rows)
+	if err != nil {
+		return err
+	}
+	evalCtx, err := evalContext(st.run, st.project, needs)
+	if err != nil {
+		return err
+	}
 	run, err := plan.EvalIf(ctx, evalCtx)
 	if err != nil {
 		return s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonExpressionFailed)

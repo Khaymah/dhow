@@ -11,9 +11,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	commitstatus "github.com/Khaymah/dhow/apps/server/internal/Core/CommitStatus"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
+	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
@@ -24,6 +26,8 @@ import (
 const (
 	messageInvalidValue = "errors.validationFailed"
 	maxActorBytes       = 255
+	limitTriggerUser    = "run-trigger-user"
+	limitTriggerProject = "run-trigger-project"
 )
 
 var (
@@ -96,16 +100,32 @@ func checkTrigger(t triggers.Trigger) error {
 	if t.RepositoryID == uuid.Nil || t.ProjectID == uuid.Nil || t.OrganizationID == uuid.Nil {
 		return fmt.Errorf("%w: no repository", ErrInvalidTrigger)
 	}
-	if _, err := gitref.Parse(t.Ref); err != nil || !gitref.ValidSha(t.Sha) || gitref.IsZeroSha(t.Sha) {
+	ref, err := gitref.Parse(t.Ref)
+	if err != nil || !gitref.ValidSha(t.Sha) || gitref.IsZeroSha(t.Sha) || !refFits(t.Event, ref.Kind) {
 		return fmt.Errorf("%w: ref or sha", ErrInvalidTrigger)
 	}
 	if t.Event == triggers.EventPullRequest && (t.PrNumber <= 0 || !gitref.ValidSha(t.BaseSha)) {
 		return fmt.Errorf("%w: pull request without a number or a base", ErrInvalidTrigger)
 	}
-	if t.IsFork && t.Event != triggers.EventPullRequest {
-		return fmt.Errorf("%w: only a pull request comes from a fork", ErrInvalidTrigger)
+	if t.Event != triggers.EventPullRequest && t.Origin != triggers.PullOriginUnknown {
+		return fmt.Errorf("%w: only a pull request has an origin", ErrInvalidTrigger)
 	}
 	return nil
+}
+
+func refFits(event string, kind gitref.Kind) bool {
+	switch event {
+	case triggers.EventPush:
+		return kind == gitref.KindBranch
+	case triggers.EventTag:
+		return kind == gitref.KindTag
+	default:
+		return kind == gitref.KindPullRequest || kind == gitref.KindMergeRequest
+	}
+}
+
+func fromFork(t triggers.Trigger) bool {
+	return t.Event == triggers.EventPullRequest && t.Origin != triggers.PullOriginSameRepository
 }
 
 func (s *Service) Deliver(ctx context.Context, q *sqlc.Queries, t triggers.Trigger) (triggers.Accepted, error) {
@@ -125,7 +145,10 @@ func (s *Service) Deliver(ctx context.Context, q *sqlc.Queries, t triggers.Trigg
 	if err := q.LockRunTrigger(ctx, sqlc.LockRunTriggerParams{RepositoryID: t.RepositoryID, Ref: t.Ref}); err != nil {
 		return triggers.Accepted{}, err
 	}
-	existing, err := q.FindCommitRun(ctx, sqlc.FindCommitRunParams{RepositoryID: &t.RepositoryID, Ref: t.Ref, Sha: text(t.Sha)})
+	fork := fromFork(t)
+	existing, err := q.FindCommitRun(ctx, sqlc.FindCommitRunParams{
+		RepositoryID: &t.RepositoryID, Ref: t.Ref, Sha: text(t.Sha), Trigger: t.Event, IsFork: fork,
+	})
 	switch {
 	case err == nil:
 		return triggers.Accepted{RunID: existing}, nil
@@ -135,14 +158,54 @@ func (s *Service) Deliver(ctx context.Context, q *sqlc.Queries, t triggers.Trigg
 	delivery := userRef(t.DeliveryID)
 	repo := t.RepositoryID
 	run, err := s.insertRun(ctx, q, newRun{
-		project: project, trigger: t.Event, ref: t.Ref, baseRef: t.BaseRef, sha: t.Sha, baseSha: t.BaseSha, isFork: t.IsFork,
+		project: project, trigger: t.Event, ref: t.Ref, baseRef: t.BaseRef, sha: t.Sha, baseSha: t.BaseSha, isFork: fork,
 		prNumber: t.PrNumber, actor: t.Actor, delivery: delivery, repoID: &repo, provider: t.Provider,
-		awaitsYou: t.IsFork && project.ForkPolicy != models.ForkPolicyAutomatic,
+		awaitsYou: fork && project.ForkPolicy != models.ForkPolicyAutomatic,
 	})
 	if err != nil {
 		return triggers.Accepted{}, err
 	}
 	return triggers.Accepted{RunID: run.Id, Created: true}, nil
+}
+
+func (s *Service) chargeTrigger(ctx context.Context, project, user uuid.UUID) error {
+	if s.limiter == nil {
+		return nil
+	}
+	for _, c := range []struct {
+		limit   ratelimit.Limit
+		subject string
+	}{
+		{ratelimit.Limit{Name: limitTriggerUser, Max: config.PipelineTriggerPerUser, Window: config.PipelineTriggerWindow}, user.String()},
+		{ratelimit.Limit{Name: limitTriggerProject, Max: config.PipelineTriggerPerProject, Window: config.PipelineTriggerWindow}, project.String()},
+	} {
+		d, err := s.limiter.Take(ctx, c.limit, c.subject)
+		if err != nil {
+			return err
+		}
+		if err := d.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func trustedSha(ctx context.Context, q *sqlc.Queries, repo uuid.UUID, ref, sha string) (string, error) {
+	if sha != "" {
+		known, err := q.TrustedShaOnRef(ctx, sqlc.TrustedShaOnRefParams{RepositoryID: &repo, Ref: ref, Sha: text(sha)})
+		if err != nil {
+			return "", err
+		}
+		if !known {
+			return "", apperrors.ShaNotOnRef()
+		}
+		return sha, nil
+	}
+	head, err := q.LatestTrustedSha(ctx, sqlc.LatestTrustedShaParams{RepositoryID: &repo, Ref: ref})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", apperrors.RefHeadUnknown()
+	}
+	return head, err
 }
 
 func normalizeRef(ref string) (string, bool) {
@@ -201,6 +264,9 @@ func (s *Service) Trigger(ctx context.Context, org, projectID uuid.UUID, in mode
 	if len(details) > 0 {
 		return models.Run{}, apperrors.ValidationFailed(details...)
 	}
+	if err := s.chargeTrigger(ctx, projectID, p.UserID); err != nil {
+		return models.Run{}, err
+	}
 	event := triggers.EventManual
 	if p.ViaToken() {
 		event = triggers.EventAPI
@@ -218,8 +284,12 @@ func (s *Service) Trigger(ctx context.Context, org, projectID uuid.UUID, in mode
 		case project.RepositoryId == nil:
 			return apperrors.RepositoryNotLinked()
 		}
+		sha, err := trustedSha(ctx, q, *project.RepositoryId, ref, in.Sha)
+		if err != nil {
+			return err
+		}
 		run, err = s.insertRun(ctx, q, newRun{
-			project: project, trigger: event, ref: ref, sha: in.Sha, actor: p.Name, inputs: inputs, userID: &p.UserID,
+			project: project, trigger: event, ref: ref, sha: sha, actor: p.Name, inputs: inputs, userID: &p.UserID,
 			repoID: project.RepositoryId, provider: project.Provider.String,
 		})
 		return err

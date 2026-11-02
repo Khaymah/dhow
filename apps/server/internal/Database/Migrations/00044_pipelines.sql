@@ -61,8 +61,10 @@ CREATE TABLE "PipelineRuns" (
 
 CREATE UNIQUE INDEX "UX_PipelineRuns_Project_Number" ON "PipelineRuns" ("ProjectId", "Number");
 CREATE UNIQUE INDEX "UX_PipelineRuns_Delivery" ON "PipelineRuns" ("DeliveryId") WHERE "DeliveryId" IS NOT NULL;
-CREATE UNIQUE INDEX "UX_PipelineRuns_Commit" ON "PipelineRuns" ("RepositoryId", "Ref", "Sha")
+CREATE UNIQUE INDEX "UX_PipelineRuns_Commit" ON "PipelineRuns" ("RepositoryId", "Ref", "Sha", "Trigger", "IsFork")
     WHERE "Trigger" IN ('push', 'tag', 'pull_request');
+CREATE INDEX "IX_PipelineRuns_RefHead" ON "PipelineRuns" ("RepositoryId", "Ref", "CreatedAt" DESC)
+    WHERE "Trigger" IN ('push', 'tag') AND NOT "IsFork";
 CREATE UNIQUE INDEX "UX_PipelineRuns_Id_Organization" ON "PipelineRuns" ("Id", "OrganizationId");
 CREATE INDEX "IX_PipelineRuns_Project" ON "PipelineRuns" ("ProjectId", "Number" DESC) WHERE NOT "IsDeleted";
 CREATE INDEX "IX_PipelineRuns_Open" ON "PipelineRuns" ("State", "CreatedAt")

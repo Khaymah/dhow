@@ -9,4 +9,9 @@ const (
 	PipelineReconcileInterval = 5 * time.Second
 	PipelineDriftGrace        = 5 * time.Second
 	PipelineDefinitionTimeout = 2 * time.Minute
+	PipelinePinBudget         = 30 * time.Second
+	PipelineFetchTimeout      = 30 * time.Second
+	PipelineTriggerPerUser    = 60
+	PipelineTriggerPerProject = 240
+	PipelineTriggerWindow     = 10 * time.Minute
 )

@@ -17,12 +17,16 @@ import (
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
 )
 
-func runJobOf(rj sqlc.RunJob) models.RunJob {
+func runJobOf(rj sqlc.RunJob) (models.RunJob, error) {
+	matrix, err := matrixMap(rj.Matrix)
+	if err != nil {
+		return models.RunJob{}, err
+	}
 	return models.RunJob{
-		ID: rj.Id, Key: rj.Key, JobID: rj.JobId, Name: rj.JobName, Matrix: matrixMap(rj.Matrix), Needs: rj.Needs, State: rj.State,
+		ID: rj.Id, Key: rj.Key, JobID: rj.JobId, Name: rj.JobName, Matrix: matrix, Needs: rj.Needs, State: rj.State,
 		FailureReason: rj.FailureReason, CurrentJobID: rj.CurrentJobId, Attempts: int(rj.Attempts), StartedAt: rj.StartedAt,
 		FinishedAt: rj.FinishedAt,
-	}
+	}, nil
 }
 
 func (s *Service) detail(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun) (models.Detail, error) {
@@ -30,14 +34,21 @@ func (s *Service) detail(ctx context.Context, q *sqlc.Queries, run sqlc.Pipeline
 	if err != nil {
 		return models.Detail{}, err
 	}
-	out := models.Detail{
-		Run: runOf(run), Jobs: make([]models.RunJob, 0, len(rows)), Issues: decodeIssues(run.Issues), ImagePins: pinList(decodePins(run.ImagePins)),
+	issues, err := decodeIssues(run.Issues)
+	if err != nil {
+		return models.Detail{}, err
 	}
-	if out.Issues == nil {
-		out.Issues = []models.Issue{}
+	pins, err := decodePins(run.ImagePins)
+	if err != nil {
+		return models.Detail{}, err
 	}
+	out := models.Detail{Run: runOf(run), Jobs: make([]models.RunJob, 0, len(rows)), Issues: issues, ImagePins: pinList(pins)}
 	for _, rj := range rows {
-		out.Jobs = append(out.Jobs, runJobOf(rj))
+		j, err := runJobOf(rj)
+		if err != nil {
+			return models.Detail{}, err
+		}
+		out.Jobs = append(out.Jobs, j)
 	}
 	return out, nil
 }
@@ -156,8 +167,9 @@ func (s *Service) afterCancel(ctx context.Context) error {
 			_, err := s.queue.Cancel(ctx, q, jobqueue.Cancellation{OrganizationID: row.OrganizationId, JobID: row.JobId, RequestedBy: by})
 			return err
 		})
-		if err != nil {
-			return err
+		if err != nil && ctx.Err() == nil {
+			s.log.ErrorContext(ctx, "a job of a canceled run was not canceled yet; the reconciler tries again",
+				"job_id", row.JobId.String(), "error", err)
 		}
 	}
 	return nil

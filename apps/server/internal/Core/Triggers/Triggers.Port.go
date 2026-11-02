@@ -22,6 +22,14 @@ const (
 	ProviderGeneric = "generic"
 )
 
+type PullOrigin uint8
+
+const (
+	PullOriginUnknown PullOrigin = iota
+	PullOriginSameRepository
+	PullOriginFork
+)
+
 type Trigger struct {
 	OrganizationID uuid.UUID
 	ProjectID      uuid.UUID
@@ -34,7 +42,7 @@ type Trigger struct {
 	BaseRef        string
 	BaseSha        string
 	PrNumber       int
-	IsFork         bool
+	Origin         PullOrigin
 	Actor          string
 }
 

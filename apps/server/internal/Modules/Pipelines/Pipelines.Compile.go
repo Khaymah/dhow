@@ -3,9 +3,11 @@ package pipelines
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
 	"github.com/Khaymah/dhow/internal/jobspec"
 	"github.com/Khaymah/dhow/internal/pipelinespec"
@@ -45,20 +47,24 @@ func encodeIssues(in []models.Issue) []byte {
 	return raw
 }
 
-func decodeIssues(raw []byte) []models.Issue {
-	var out []models.Issue
-	if len(raw) > 0 {
-		_ = json.Unmarshal(raw, &out)
+func decode(raw []byte, into any, what string) error {
+	if len(raw) == 0 {
+		return nil
 	}
-	return out
+	if err := json.Unmarshal(raw, into); err != nil {
+		return fmt.Errorf("%w: %s: %w", errStoredState, what, err)
+	}
+	return nil
 }
 
-func decodePins(raw []byte) map[string]string {
+func decodeIssues(raw []byte) ([]models.Issue, error) {
+	out := []models.Issue{}
+	return out, decode(raw, &out, "issues")
+}
+
+func decodePins(raw []byte) (map[string]string, error) {
 	out := map[string]string{}
-	if len(raw) > 0 {
-		_ = json.Unmarshal(raw, &out)
-	}
-	return out
+	return out, decode(raw, &out, "image pins")
 }
 
 func encodePins(pins map[string]string) []byte {
@@ -128,6 +134,14 @@ func compileSpec(spec *pipelinespec.Spec, pins map[string]string) (compiled, []m
 	return out, issuesOf(plan.Warnings), nil
 }
 
+func (s *Service) compileRun(run sqlc.PipelineRun) (compiled, error) {
+	pins, err := decodePins(run.ImagePins)
+	if err != nil {
+		return compiled{}, err
+	}
+	return compileSource([]byte(run.DefinitionSource.String), pins)
+}
+
 func compileSource(src []byte, pins map[string]string) (compiled, error) {
 	spec, _, err := checkSource(src)
 	if err != nil {
@@ -149,12 +163,14 @@ func matrixOf(rj *pipelinespec.RunJob) []byte {
 	return raw
 }
 
-func matrixMap(raw []byte) map[string]string {
+func matrixMap(raw []byte) (map[string]string, error) {
 	var entries []matrixEntry
-	_ = json.Unmarshal(raw, &entries)
+	if err := decode(raw, &entries, "matrix"); err != nil {
+		return nil, err
+	}
 	out := make(map[string]string, len(entries))
 	for _, e := range entries {
 		out[e.Key] = e.Value
 	}
-	return out
+	return out, nil
 }

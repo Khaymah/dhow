@@ -71,6 +71,7 @@ type Infra struct {
 	Checkout           pipelines.CheckoutSeam
 	RegistryTLS        *tls.Config
 	ManualJobs         bool
+	PinBudget          time.Duration
 }
 
 type Wired struct {
@@ -153,7 +154,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	pipelinesService := pipelinesFor(in, bus, jobsService.Queue())
+	pipelinesService := pipelinesFor(in, bus, jobsService.Queue(), limiter)
 	jobsService.UseRunEvents(pipelinesService)
 	sourcesService, err := sourcesFor(in, bus, limiter, pipelinesService)
 	if err != nil {

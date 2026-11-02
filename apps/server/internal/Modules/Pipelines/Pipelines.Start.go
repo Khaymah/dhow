@@ -46,8 +46,8 @@ func (s *Service) StartPending(ctx context.Context) (int, error) {
 			return done, err
 		}
 		done++
-		if err := s.startRun(ctx, run); err != nil && s.log != nil {
-			s.log.WarnContext(ctx, "a run could not start yet; it is tried again when its claim ends", "run_id", run.Id.String(), "error", err)
+		if err := s.startRun(ctx, run); err != nil {
+			s.isolate(ctx, run.Id, "start", err, nil)
 		}
 	}
 	return done, nil
@@ -79,7 +79,11 @@ func (s *Service) startRun(ctx context.Context, run sqlc.PipelineRun) error {
 }
 
 func (s *Service) prepare(ctx context.Context, run sqlc.PipelineRun, project sqlc.GetRunProjectRow) (*prepared, error) {
-	p := &prepared{pins: decodePins(run.ImagePins), sha: run.Sha.String}
+	pins, err := decodePins(run.ImagePins)
+	if err != nil {
+		return nil, err
+	}
+	p := &prepared{pins: pins, sha: run.Sha.String}
 	if project.State != projectActive {
 		return p.finish(models.RunCanceled, models.ReasonProjectArchived), nil
 	}
@@ -99,7 +103,11 @@ func (s *Service) prepare(ctx context.Context, run sqlc.PipelineRun, project sql
 	if !enabled(spec.On, run) {
 		return p.finish(models.RunSkipped, models.ReasonTriggerNotEnabled), nil
 	}
-	inputs, bad := checkInputs(spec, decodeInputs(run.Inputs))
+	given, err := decodeInputs(run.Inputs)
+	if err != nil {
+		return nil, err
+	}
+	inputs, bad := checkInputs(spec, given)
 	if len(bad) > 0 {
 		p.issues = append(p.issues, bad...)
 		return p.finish(models.RunFailed, models.ReasonInputsInvalid), nil
@@ -118,7 +126,11 @@ func (s *Service) prepare(ctx context.Context, run sqlc.PipelineRun, project sql
 	}
 	p.compiled = c
 	run.Inputs = encodeInputs(inputs)
-	group, err := c.plan.EvalGroup(ctx, evalContext(run, project.Name, nil))
+	groupCtx, err := evalContext(run, project.Name, nil)
+	if err != nil {
+		return nil, err
+	}
+	group, err := c.plan.EvalGroup(ctx, groupCtx)
 	if err != nil {
 		return p.finish(models.RunFailed, models.ReasonExpressionFailed), nil
 	}
@@ -134,7 +146,9 @@ func (s *Service) fetch(ctx context.Context, run sqlc.PipelineRun, p *prepared) 
 	if run.RepositoryId != nil {
 		req.RepositoryID = *run.RepositoryId
 	}
-	got, err := s.definitions.Fetch(ctx, req)
+	fetchCtx, cancel := context.WithTimeout(ctx, config.PipelineFetchTimeout)
+	defer cancel()
+	got, err := s.definitions.Fetch(fetchCtx, req)
 	switch {
 	case errors.Is(err, ErrNeedsDiscovery):
 		p.discover = true
@@ -157,39 +171,6 @@ func (s *Service) fetch(ctx context.Context, run sqlc.PipelineRun, p *prepared) 
 		p.sha = got.Sha
 	}
 	return false, nil
-}
-
-func (s *Service) pin(ctx context.Context, spec *pipelinespec.Spec, p *prepared) bool {
-	failed := false
-	for _, image := range taggedImages(spec) {
-		if _, ok := p.pins[image]; ok {
-			continue
-		}
-		var pinned string
-		err := ErrRegistry
-		if s.images != nil {
-			pinned, err = s.images.Resolve(ctx, image)
-		}
-		if err != nil {
-			failed = true
-			p.issues = append(p.issues, pinIssue(spec, image))
-			continue
-		}
-		p.pins[image] = pinned
-	}
-	return failed
-}
-
-func pinIssue(spec *pipelinespec.Spec, image string) models.Issue {
-	for id, job := range spec.Jobs {
-		if job.Image == image {
-			return models.Issue{
-				Code: models.ReasonImagePinFailed, Severity: string(pipelinespec.SeverityError), Path: "jobs." + id + ".image",
-				Message: "the registry did not give a digest for this image tag; pin the image by digest or check the registry",
-			}
-		}
-	}
-	return models.Issue{Code: models.ReasonImagePinFailed, Severity: string(pipelinespec.SeverityError)}
 }
 
 func encodeInputs(in map[string]any) []byte {
@@ -270,7 +251,7 @@ func (s *Service) admit(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineR
 		}
 		if run.CancelInProgress {
 			older, err := q.OlderGroupRuns(ctx, sqlc.OlderGroupRunsParams{
-				ProjectID: run.ProjectId, ConcurrencyGroup: group, ID: run.Id, Number: run.Number,
+				ProjectID: run.ProjectId, ConcurrencyGroup: group, ID: run.Id, Number: run.Number, Ref: run.Ref,
 			})
 			if err != nil {
 				return false, err

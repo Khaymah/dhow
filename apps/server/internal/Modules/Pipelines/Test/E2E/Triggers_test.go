@@ -138,6 +138,9 @@ func TestAGenericRepositoryWaitsForTheCheckoutAndFailsClosed(t *testing.T) {
 func TestPeopleAndTokensStartRunsWithInputs(t *testing.T) {
 	w := newWorld(t)
 	w.defs.Put(shaA, pipeline(simplePipeline))
+	w.push("refs/heads/main", shaA)
+	tag := w.env.Deliver(w.trigger(triggers.EventTag, "refs/tags/v1", shaA))
+	require.True(t, tag.Created)
 	path := apptest.OrgPath(w.org, "/projects/"+w.project.String()+"/runs")
 	res := w.owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{
 		"Ref": "main", "Sha": shaA, "Inputs": map[string]any{"target": "production", "dry": true},
@@ -157,7 +160,7 @@ func TestPeopleAndTokensStartRunsWithInputs(t *testing.T) {
 	assert.Equal(t, "production", env["TARGET"], "an input reaches the job as data in its environment")
 
 	bad := w.owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{
-		"Ref": "main", "Sha": shaA, "Inputs": map[string]any{"target": "moon"},
+		"Ref": "main", "Inputs": map[string]any{"target": "moon"},
 	}})
 	require.Equal(t, http.StatusCreated, bad.Status, string(bad.Raw))
 	var badRun struct{ Id string }
@@ -165,6 +168,21 @@ func TestPeopleAndTokensStartRunsWithInputs(t *testing.T) {
 	w.env.StartRuns()
 	state, reason := w.env.RunState(uuid.MustParse(badRun.Id))
 	assert.Equal(t, []string{"failed", "INPUTS_INVALID"}, []string{state, reason})
+	assert.Equal(t, shaA, w.view(t, uuid.MustParse(badRun.Id)).Run.DefinitionSha, "without a sha the run takes the latest pushed head")
+
+	for _, c := range []struct {
+		body map[string]any
+		code string
+	}{
+		{map[string]any{"Ref": "main", "Sha": shaB}, "SHA_NOT_ON_REF"},
+		{map[string]any{"Ref": "refs/tags/v1", "Sha": shaB}, "SHA_NOT_ON_REF"},
+		{map[string]any{"Ref": "never-pushed"}, "REF_HEAD_UNKNOWN"},
+		{map[string]any{"Ref": "never-pushed", "Sha": shaA}, "SHA_NOT_ON_REF"},
+	} {
+		res := w.owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: c.body})
+		require.Equal(t, http.StatusUnprocessableEntity, res.Status, string(res.Raw))
+		assert.Equal(t, c.code, res.Error.Code, "%v", c.body)
+	}
 
 	token := w.env.SeedAPIToken(w.ownerID, w.org, "run.trigger", "run.read")
 	viaToken := w.env.Bearer(token.Value, apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{"Ref": "refs/tags/v1", "Sha": shaA}})
@@ -179,4 +197,20 @@ func TestPeopleAndTokensStartRunsWithInputs(t *testing.T) {
 	}
 	audit := w.env.CountRows(`SELECT count(*) FROM "AuditEvents" WHERE "Action" IN ('project.run_created', 'project.run_started')`)
 	assert.GreaterOrEqual(t, audit, 2, "every run that people start and every run that starts leaves an audit event")
+}
+
+func TestStartingRunsByHandIsRateLimited(t *testing.T) {
+	w := newWorld(t)
+	w.push("refs/heads/main", shaA)
+	path := apptest.OrgPath(w.org, "/projects/"+w.project.String()+"/runs")
+	limited := 0
+	for range 61 {
+		res := w.owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{"Ref": "main"}})
+		if res.Status == http.StatusTooManyRequests {
+			limited++
+			continue
+		}
+		require.Equal(t, http.StatusCreated, res.Status, string(res.Raw))
+	}
+	assert.Equal(t, 1, limited, "a user starts at most 60 runs in ten minutes")
 }

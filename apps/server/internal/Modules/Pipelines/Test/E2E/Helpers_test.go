@@ -68,9 +68,18 @@ type world struct {
 
 func newWorld(t *testing.T) world {
 	t.Helper()
+	return newWorldWith(t, apptest.Options{})
+}
+
+func newWorldWith(t *testing.T, o apptest.Options) world {
+	t.Helper()
 	defs := apptest.NewFakeDefinitions()
 	images := &fakeImages{pinned: map[string]string{}}
-	env := apptest.NewWithOptions(t, apptest.Options{Definitions: defs, Images: images})
+	o.Definitions = defs
+	if o.Images == nil {
+		o.Images = images
+	}
+	env := apptest.NewWithOptions(t, o)
 	owner, d := env.SetupAndLogin()
 	org := env.OrganizationID(d.OrgSlug)
 	ownerID := uuid.MustParse(owner.UserID)

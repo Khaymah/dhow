@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"sort"
 
 	"github.com/jackc/pgx/v5"
 
@@ -18,11 +19,12 @@ import (
 )
 
 const (
-	jobSucceeded  = "succeeded"
-	jobCanceled   = "canceled"
-	maxOutputs    = 64
-	maxOutputSize = 1 << 10
-	foundFalse    = "false"
+	jobSucceeded   = "succeeded"
+	jobCanceled    = "canceled"
+	maxOutputs     = 64
+	maxOutputSize  = 1 << 10
+	maxOutputsJSON = 60 << 10
+	foundFalse     = "false"
 )
 
 func runJobOutcome(f runevents.Finished) (string, string) {
@@ -40,19 +42,32 @@ func runJobOutcome(f runevents.Finished) (string, string) {
 	}
 }
 
-func boundedOutputs(in map[string]string) []byte {
+func boundedOutputs(in map[string]string) ([]byte, bool) {
+	keys := make([]string, 0, len(in))
+	for k := range in {
+		if k != OutputDefinition && k != OutputSha && k != OutputFound {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
 	out := map[string]string{}
-	for k, v := range in {
-		if len(out) >= maxOutputs || k == OutputDefinition || len(k) > pipelinespec.MaxContextTextBytes || len(v) > maxOutputSize {
+	size, dropped := 2, false
+	for _, k := range keys {
+		v := in[k]
+		entry, err := json.Marshal(map[string]string{k: v})
+		if err != nil || len(out) >= maxOutputs || len(k) > pipelinespec.MaxContextTextBytes || len(v) > maxOutputSize ||
+			size+len(entry) > maxOutputsJSON {
+			dropped = true
 			continue
 		}
+		size += len(entry)
 		out[k] = v
 	}
 	raw, err := json.Marshal(out)
-	if err != nil {
-		return []byte("{}")
+	if err != nil || len(raw) > maxOutputsJSON {
+		return []byte("{}"), true
 	}
-	return raw
+	return raw, dropped
 }
 
 func (s *Service) JobFinished(ctx context.Context, q *sqlc.Queries, f runevents.Finished) error {
@@ -74,8 +89,12 @@ func (s *Service) JobFinished(ctx context.Context, q *sqlc.Queries, f runevents.
 		return nil
 	}
 	state, reason := runJobOutcome(f)
+	outputs, dropped := boundedOutputs(f.Outputs)
+	if dropped && reason == "" {
+		reason = models.ReasonOutputsTruncated
+	}
 	if _, err := q.FinishRunJob(ctx, sqlc.FinishRunJobParams{
-		ID: rj.Id, State: state, FailureReason: reason, Outputs: boundedOutputs(f.Outputs),
+		ID: rj.Id, State: state, FailureReason: reason, Outputs: outputs,
 	}); err != nil {
 		return err
 	}
@@ -93,11 +112,13 @@ func (s *Service) resume(ctx context.Context, q *sqlc.Queries, run sqlc.Pipeline
 	if err != nil {
 		return err
 	}
-	c, err := compileSource([]byte(run.DefinitionSource.String), decodePins(run.ImagePins))
-	if err != nil {
-		if errors.Is(err, errInvalidPipeline) {
-			return s.abandon(ctx, q, run, models.ReasonDefinitionChanged)
-		}
+	c, err := s.compileRun(run)
+	switch {
+	case errors.Is(err, errInvalidPipeline):
+		return s.abandon(ctx, q, run, models.ReasonDefinitionChanged)
+	case errors.Is(err, errStoredState):
+		return s.abandon(ctx, q, run, models.ReasonStateInvalid)
+	case err != nil:
 		return err
 	}
 	return s.advance(ctx, q, run, project.Name, c)

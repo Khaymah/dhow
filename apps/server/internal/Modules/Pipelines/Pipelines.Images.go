@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -86,30 +88,35 @@ func (r Registry) Resolve(ctx context.Context, image string) (string, error) {
 	defer cancel()
 	dialer := r.Dialer
 	dialer.Timeout = timeout
-	client := dialer.HTTPClient(netguard.ClientOptions{TLS: r.TLS})
 	host := ref.host
 	if host == dockerHubIndex {
 		host = dockerHubRegistry
 	}
+	public := dialer
+	public.Policy = netguard.Policy{}
+	s := session{
+		client: dialer.HTTPClient(netguard.ClientOptions{TLS: r.TLS}), realms: public.HTTPClient(netguard.ClientOptions{TLS: r.TLS}),
+		registry: host,
+	}
 	target := url.URL{Scheme: "https", Host: host, Path: "/v2/" + ref.repo + "/manifests/" + ref.tag}
-	digest, err := r.manifestDigest(ctx, client, target.String())
+	digest, err := s.manifestDigest(ctx, target.String())
 	if err != nil {
 		return "", err
 	}
 	return ref.name + "@" + digest, nil
 }
 
-func (r Registry) manifestDigest(ctx context.Context, client *http.Client, target string) (string, error) {
+func (s session) manifestDigest(ctx context.Context, target string) (string, error) {
 	token := ""
 	for range 2 {
-		res, err := r.request(ctx, client, http.MethodHead, target, token)
+		res, err := request(ctx, s.client, http.MethodHead, target, token)
 		if err != nil {
 			return "", err
 		}
 		_ = res.Body.Close()
 		switch {
 		case res.StatusCode == http.StatusUnauthorized && token == "":
-			if token, err = r.token(ctx, client, res.Header.Get("WWW-Authenticate")); err != nil {
+			if token, err = s.token(ctx, res.Header.Get("WWW-Authenticate")); err != nil {
 				return "", err
 			}
 			continue
@@ -121,13 +128,13 @@ func (r Registry) manifestDigest(ctx context.Context, client *http.Client, targe
 		if d := res.Header.Get("Docker-Content-Digest"); digestPattern.MatchString(d) {
 			return d, nil
 		}
-		return r.hashManifest(ctx, client, target, token)
+		return s.hashManifest(ctx, target, token)
 	}
 	return "", fmt.Errorf("%w: the registry refused the token", ErrRegistry)
 }
 
-func (r Registry) hashManifest(ctx context.Context, client *http.Client, target, token string) (string, error) {
-	res, err := r.request(ctx, client, http.MethodGet, target, token)
+func (s session) hashManifest(ctx context.Context, target, token string) (string, error) {
+	res, err := request(ctx, s.client, http.MethodGet, target, token)
 	if err != nil {
 		return "", err
 	}
@@ -143,7 +150,7 @@ func (r Registry) hashManifest(ctx context.Context, client *http.Client, target,
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
 }
 
-func (r Registry) request(ctx context.Context, client *http.Client, method, target, token string) (*http.Response, error) {
+func request(ctx context.Context, client *http.Client, method, target, token string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, target, http.NoBody)
 	if err != nil {
 		return nil, err
@@ -159,7 +166,34 @@ func (r Registry) request(ctx context.Context, client *http.Client, method, targ
 	return res, nil
 }
 
-func (r Registry) token(ctx context.Context, client *http.Client, challenge string) (string, error) {
+type session struct {
+	client   *http.Client
+	realms   *http.Client
+	registry string
+}
+
+func realmHosts() []string { return []string{"auth.docker.io", "ghcr.io"} }
+
+func (s session) realmAllowed(realm *url.URL) bool {
+	if realm.Scheme != "https" || realm.User != nil || realm.Hostname() == "" {
+		return false
+	}
+	registryHost, registryPort := splitHostPort(s.registry)
+	if realm.Hostname() == registryHost {
+		return realm.Port() == "" || realm.Port() == "443" || realm.Port() == registryPort
+	}
+	return slices.Contains(realmHosts(), realm.Hostname()) && (realm.Port() == "" || realm.Port() == "443")
+}
+
+func splitHostPort(hostport string) (string, string) {
+	host, port, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return hostport, ""
+	}
+	return host, port
+}
+
+func (s session) token(ctx context.Context, challenge string) (string, error) {
 	scheme, params, _ := strings.Cut(challenge, " ")
 	if !strings.EqualFold(scheme, "Bearer") {
 		return "", fmt.Errorf("%w: the registry needs credentials", ErrRegistry)
@@ -169,8 +203,8 @@ func (r Registry) token(ctx context.Context, client *http.Client, challenge stri
 		fields[m[1]] = m[2]
 	}
 	realm, err := url.Parse(fields["realm"])
-	if err != nil || realm.Scheme != "https" || realm.Host == "" {
-		return "", fmt.Errorf("%w: the token address is not https", ErrRegistry)
+	if err != nil || !s.realmAllowed(realm) {
+		return "", fmt.Errorf("%w: the token address is not https on the registry host or a known token service", ErrRegistry)
 	}
 	q := realm.Query()
 	for _, k := range []string{"service", "scope"} {
@@ -183,7 +217,7 @@ func (r Registry) token(ctx context.Context, client *http.Client, challenge stri
 	if err != nil {
 		return "", err
 	}
-	res, err := client.Do(req)
+	res, err := s.realms.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrRegistry, err)
 	}
