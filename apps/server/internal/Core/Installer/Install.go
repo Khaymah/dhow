@@ -67,10 +67,14 @@ func (app App) Install(ctx context.Context, opts InstallOptions) error {
 	if err != nil {
 		return fmt.Errorf("find the running binary: %w", err)
 	}
-	b := &Builder{Sys: app.Sys, Det: det, A: a, M: m, Version: app.Version, Exe: exe, Sleep: app.Sleep}
+	pgdg := CheckPGDG(ctx, app.Sys, det, a)
+	b := &Builder{Sys: app.Sys, Det: det, A: a, M: m, Version: app.Version, Exe: exe, Sleep: app.Sleep, PGDG: pgdg}
 	plan := b.Build()
 	app.printPlan(ctx, plan, m)
 	if len(plan.Blockers) > 0 {
+		if pgdg.Support == PGDGMissing {
+			return fmt.Errorf("%w: %w", ErrBlocked, ErrPGDGUnsupported)
+		}
 		return ErrBlocked
 	}
 	if opts.DryRun {
