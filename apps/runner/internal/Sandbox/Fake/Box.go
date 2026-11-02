@@ -20,6 +20,7 @@ import (
 type box struct {
 	d       *Driver
 	attempt string
+	labels  map[string]string
 	mu      sync.Mutex
 	killed  chan struct{}
 	gone    bool
@@ -38,8 +39,13 @@ func (b *box) Start(_ context.Context) error {
 	return nil
 }
 
+func (b *box) ImageLabels() map[string]string { return b.labels }
+
 func (b *box) step(i int32) Step {
-	if int(i) < len(b.d.rec.Steps) {
+	if i == sandbox.CheckoutStepIndex && b.d.rec.Checkout != nil {
+		return *b.d.rec.Checkout
+	}
+	if i >= 0 && int(i) < len(b.d.rec.Steps) {
 		return b.d.rec.Steps[i]
 	}
 	return Step{}
@@ -72,7 +78,7 @@ func (b *box) Exec(ctx context.Context, spec sandbox.StepSpec) (sandbox.StepResu
 	}
 	b.d.record(Event{
 		Kind: EventExec, AttemptID: b.attempt, Step: spec.Index, EnvNames: envNames, FileNames: fileNames,
-		FileData: fileData, Env: env,
+		FileData: fileData, Env: env, Argv: slices.Clone(spec.Argv),
 	})
 	if spec.Started != nil {
 		spec.Started()
@@ -96,7 +102,10 @@ func (b *box) Exec(ctx context.Context, spec sandbox.StepSpec) (sandbox.StepResu
 	if r, ok := <-result; ok && r.Signal != 0 {
 		return b.finish(spec.Index, r), nil
 	}
-	return b.finish(spec.Index, sandbox.StepResult{ExitCode: rec.ExitCode, Reason: reasonOf(rec.Reason)}), nil
+	if rec.BadOutputs {
+		return b.finish(spec.Index, sandbox.StepResult{ExitCode: rec.ExitCode}), sandbox.ErrOutputs
+	}
+	return b.finish(spec.Index, sandbox.StepResult{ExitCode: rec.ExitCode, Reason: reasonOf(rec.Reason), Outputs: []byte(rec.Outputs)}), nil
 }
 
 func (b *box) watch(ctx context.Context, signals chan syscall.Signal, stop <-chan struct{}, halt func(), rec Step, result chan<- sandbox.StepResult) {

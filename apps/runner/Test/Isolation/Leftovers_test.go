@@ -91,6 +91,7 @@ func TestImageAnnotationsCannotReachTheRuntime(t *testing.T) {
 	box, err := shared.driver.Prepare(ctx, sandbox.PrepareSpec{
 		RunnerID: runnerID, AttemptID: id, Image: annotatedImage, Isolation: runnerv1.Isolation_ISOLATION_CONTAINER,
 		Resources: defaultResources(), Dir: attempt, DiskMode: config.DiskModeTmpfs,
+		Workspace: workspaceFor(ctx, t, id, attempt, defaultResources()),
 	})
 	if err != nil {
 		assert.ErrorIs(t, err, podman.ErrPolicyMismatch, "a refused annotated image is refused by verify")
