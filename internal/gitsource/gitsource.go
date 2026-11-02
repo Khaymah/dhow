@@ -2,7 +2,6 @@ package gitsource
 
 import (
 	"errors"
-	"net"
 	"strconv"
 	"strings"
 
@@ -238,7 +237,7 @@ func (u URL) EffectivePort() int {
 }
 
 func (u URL) HostPort() string {
-	return net.JoinHostPort(u.Host, strconv.Itoa(u.EffectivePort()))
+	return u.Host + ":" + strconv.Itoa(u.EffectivePort())
 }
 
 func (u URL) String() string {

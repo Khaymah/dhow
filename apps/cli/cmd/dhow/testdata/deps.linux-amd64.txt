@@ -53,6 +53,9 @@ github.com/Khaymah/dhow/apps/cli/internal/App
 github.com/Khaymah/dhow/apps/cli/internal/Lint
 github.com/Khaymah/dhow/apps/cli/internal/Output
 github.com/Khaymah/dhow/internal/buildinfo
+github.com/Khaymah/dhow/internal/gitref
+github.com/Khaymah/dhow/internal/gitsource
+github.com/Khaymah/dhow/internal/hostname
 github.com/Khaymah/dhow/internal/jobspec
 github.com/Khaymah/dhow/internal/pipelinespec
 github.com/Khaymah/dhow/internal/safefile
