@@ -3056,7 +3056,7 @@ export interface components {
             /** @description An image reference pinned by digest (`name@sha256:...`). A name without a registry host is completed the way Docker does it, so `node:22@sha256:...` becomes `docker.io/library/node:22@sha256:...`. */
             Image: string;
             Steps: components["schemas"]["JobStep"][];
-            /** @description Plain environment for every step. Names that start with `DHOW_` are reserved. Every member who can read the job sees these values, viewers included, so never put a credential here: reference it from Secrets. */
+            /** @description Plain environment for every step. Names that start with `DHOW_` are reserved. Every member who can read the job sees these values, viewers included, so never put a credential here: reference it from Secrets. In a job of a pipeline run, a value that an expression made (a `needs` output, a `git` value) reads `[REDACTED]` here and in step environments; the runner still gets the value. */
             Env?: {
                 [key: string]: string;
             };
@@ -3300,7 +3300,7 @@ export interface components {
             PrNumber?: number;
             Actor?: string;
             State: components["schemas"]["RunState"];
-            /** @description Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs), `RUN_STATE_INVALID` (a stored value of the run could not be read), `SHA_NOT_ON_REF` (the commit is not in the history of its ref), `DISCOVERY_FAILED` (the job that reads the file of a generic repository failed) or `REPOSITORY_UNAVAILABLE`. */
+            /** @description Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs), `RUN_STATE_INVALID` (a stored value of the run could not be read), `SHA_NOT_ON_REF` (the commit is not in the history of its ref), `DISCOVERY_FAILED` (the job that reads the file of a generic repository failed), `DEFINITION_UNVERIFIED` (the git objects that job handed over do not prove the file is in the run's commit) or `REPOSITORY_UNAVAILABLE`. */
             FailureReason?: string;
             DefinitionPath: string;
             /** @description The commit the pipeline file was read from. For a fork's pull request it is the base. */

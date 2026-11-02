@@ -125,6 +125,46 @@ func TestARefThatMovedOnStillFindsTheCommitInItsHistory(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(w.work, "second"))
 }
 
+func (w *world) commits(n int) {
+	w.t.Helper()
+	for i := range n {
+		require.NoError(w.t, os.WriteFile(filepath.Join(w.seed, "counter"), []byte(strings.Repeat("x", i+1)), 0o600))
+		w.plain("-C", w.seed, "add", "--", "counter")
+		w.plain("-C", w.seed, "commit", "--quiet", "-m", "step")
+	}
+	w.plain("-C", w.seed, "push", "--quiet", "--force", w.origin, "main")
+}
+
+func TestADeepCommitIsFoundStepByStepWithoutTheTreesOfItsHistory(t *testing.T) {
+	w := newWorld(t)
+	w.plain("-C", w.origin, "config", "uploadpack.allowFilter", "true")
+	old := w.plain("-C", w.seed, "rev-parse", "HEAD")
+	w.commits(100)
+	between := w.plain("-C", w.seed, "rev-parse", "HEAD~50^{tree}")
+	code, out := w.run(old, nil)
+	require.Equal(t, ExitOK, code, out)
+	assert.Equal(t, 2, strings.Count(out, "more of its history is fetched"), "64 commits, then 1024: %s", out)
+	assert.Equal(t, old, w.plain("-C", w.work, "rev-parse", "HEAD"))
+	assert.FileExists(t, filepath.Join(w.work, "README"))
+	assert.NoFileExists(t, filepath.Join(w.work, "counter"))
+	missing := w.plain("-C", w.work, "rev-list", "--objects", "--missing=print", "--no-walk", "HEAD~0", strings.TrimSpace(w.plain("-C", w.seed, "rev-parse", "HEAD~50")))
+	assert.Contains(t, missing, "?"+between, "the history is fetched without its trees")
+}
+
+func TestTheSearchThroughHistoryHasATimeBudget(t *testing.T) {
+	w := newWorld(t)
+	old := w.plain("-C", w.seed, "rev-parse", "HEAD")
+	w.commits(70)
+	vars := map[string]string{EnvURL: repoURL, EnvRef: "refs/heads/main", EnvSha: old, EnvDepth: "1", "PATH": os.Getenv("PATH")}
+	var out lockedBuffer
+	code := Run(context.Background(), Options{
+		Getenv: func(k string) string { return vars[k] }, Stdout: &out, Stderr: &out, Dir: w.work,
+		Git: w.git, SSHHelper: w.ssh, ScratchDir: w.scratch, DeepenBudget: time.Nanosecond,
+	})
+	assert.Equal(t, ExitFailed, code, out.String())
+	assert.Contains(t, out.String(), "searching the history")
+}
+
 func TestACommitThatIsGoneIsRefMoved(t *testing.T) {
 	w := newWorld(t)
 	code, out := w.run(strings.Repeat("ab", 20), nil)

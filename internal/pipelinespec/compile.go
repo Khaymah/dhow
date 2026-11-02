@@ -55,9 +55,10 @@ type RunJob struct {
 }
 
 type StepPlan struct {
-	ID     string
-	If     string
-	Plugin *PluginPlan
+	ID      string
+	If      string
+	Secrets map[string]string
+	Plugin  *PluginPlan
 }
 
 type PluginPlan struct {
@@ -167,7 +168,12 @@ func (a *analysis) jobSpec(ja *jobAnalysis, rj *RunJob) *runnerv1.JobSpec {
 		for _, name := range sortedNames(sa.env) {
 			place(spec, rj, sa.env[name], name, prefix+"Env."+name, step.Env, []int32{int32(i)})
 		}
-		plan := StepPlan{ID: s.ID, If: sa.ifExpr}
+		plan := StepPlan{ID: s.ID, If: sa.ifExpr, Secrets: map[string]string{}}
+		for name, v := range sa.env {
+			if v.secret != "" {
+				plan.Secrets[name] = v.secret
+			}
+		}
 		if s.Uses != "" {
 			plan.Plugin = pluginPlan(rj, s, sa, prefix)
 			step.Plugin = pluginStep(spec, plan.Plugin, int32(i))

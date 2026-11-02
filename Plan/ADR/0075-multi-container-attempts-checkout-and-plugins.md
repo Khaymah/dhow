@@ -108,3 +108,8 @@
   - تخزين `CompleteRequest.outputs` في السيرفر و`"RunJobs"."Outputs"` (M4.8). السيرفر دلوقتي مابيقراهاش.
   - أسماء أسباب الفشل الجديدة في الواجهة (M4.10).
   - حدود الـ cgroup v2 مع الـ workspace المشترك بتتأكد في job `isolation` في الـ CI بس.
+
+## تعديلات من M4.8 (التفاصيل في ADR-0076)
+- **§2 الـ ancestry:** الـ checkout مابقاش يجيب بالـ sha أبدًا. لو الـ sha مش رأس الـ ref، الـ runner بيعمّق تاريخ الـ ref على خطوات (64 ثم 1024 ثم 65536) بـ `--filter=tree:0` (`gitsource.DeepenArgs`) جوه ميزانية دقيقتين، وبيتأكد بـ `merge-base --is-ancestor`، وغير كده `CHECKOUT_REF_MOVED`. والـ checkout بيجيب trees وملفات الـ commit المطلوب بس، فالمستودع بيبقى partial clone: أمر git في خطوة بيحتاج كائن من تاريخ قديم هيحاول يجيبه من الشبكة.
+- **§4 الـ outputs بعد إعادة التشغيل:** الـ journal بقى بيحفظ الـ outputs (بعد الـ masking، 64 مفتاح و128 KiB بالكتير) مع النتيجة، وبيبعتها في `CompleteRequest` اللي بيتبعت تاني بعد ما الـ runner يقوم. فالـ journal مابقاش فيه IDs بس.
+- **§6 `JobSpec.derived_values`:** حقل جديد (رقم 11) فيه مسارات القيم اللي عملها تعبير في الـ pipeline (`Env.X` و`Steps[i].Env.X` و`Steps[i].With.X`). الـ runner مابيستخدموش، بس `jobspec.Validate` في الناحيتين بيرفض أي مسار مش بيشاور على قيمة موجودة. والسيرفر بيعرض القيم دي `[REDACTED]` في تفاصيل الـ job.

@@ -129,6 +129,7 @@ type JobSpec struct {
 	Isolation      Isolation              `protobuf:"varint,8,opt,name=isolation,proto3,enum=dhow.runner.v1.Isolation" json:"isolation,omitempty"`
 	Labels         []string               `protobuf:"bytes,9,rep,name=labels,proto3" json:"labels,omitempty"`
 	Checkout       *Checkout              `protobuf:"bytes,10,opt,name=checkout,proto3" json:"checkout,omitempty"`
+	DerivedValues  []string               `protobuf:"bytes,11,rep,name=derived_values,json=derivedValues,proto3" json:"derived_values,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -229,6 +230,13 @@ func (x *JobSpec) GetLabels() []string {
 func (x *JobSpec) GetCheckout() *Checkout {
 	if x != nil {
 		return x.Checkout
+	}
+	return nil
+}
+
+func (x *JobSpec) GetDerivedValues() []string {
+	if x != nil {
+		return x.DerivedValues
 	}
 	return nil
 }
@@ -1007,7 +1015,7 @@ var File_dhow_runner_v1_job_proto protoreflect.FileDescriptor
 
 const file_dhow_runner_v1_job_proto_rawDesc = "" +
 	"\n" +
-	"\x18dhow/runner/v1/job.proto\x12\x0edhow.runner.v1\x1a\x1bdhow/runner/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x88\x04\n" +
+	"\x18dhow/runner/v1/job.proto\x12\x0edhow.runner.v1\x1a\x1bdhow/runner/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaf\x04\n" +
 	"\aJobSpec\x12\x14\n" +
 	"\x05image\x18\x01 \x01(\tR\x05image\x12*\n" +
 	"\x05steps\x18\x02 \x03(\v2\x14.dhow.runner.v1.StepR\x05steps\x122\n" +
@@ -1019,7 +1027,8 @@ const file_dhow_runner_v1_job_proto_rawDesc = "" +
 	"\tisolation\x18\b \x01(\x0e2\x19.dhow.runner.v1.IsolationR\tisolation\x12\x16\n" +
 	"\x06labels\x18\t \x03(\tR\x06labels\x124\n" +
 	"\bcheckout\x18\n" +
-	" \x01(\v2\x18.dhow.runner.v1.CheckoutR\bcheckout\x1a6\n" +
+	" \x01(\v2\x18.dhow.runner.v1.CheckoutR\bcheckout\x12%\n" +
+	"\x0ederived_values\x18\v \x03(\tR\rderivedValues\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9a\x02\n" +

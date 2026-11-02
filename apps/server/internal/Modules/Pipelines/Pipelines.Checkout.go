@@ -3,9 +3,6 @@ package pipelines
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -13,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
+	"github.com/Khaymah/dhow/internal/gitproof"
 	"github.com/Khaymah/dhow/internal/gitsource"
 	"github.com/Khaymah/dhow/internal/jobspec"
 	"github.com/Khaymah/dhow/internal/pipelinespec"
@@ -20,34 +18,16 @@ import (
 )
 
 const (
-	discoveryPathEnv  = "PIPELINE_PATH"
-	discoveryPrefix   = "dhow-definition:"
-	discoveryTimeout  = 300
-	discoveryLogBytes = 512 << 10
-	discoveryMemory   = 256 << 20
-	discoveryDisk     = 512 << 20
-	discoveryCPU      = 500
-	discoveryPids     = 256
-	foundTrue         = "true"
+	discoveryTimeout = 300
+	discoveryMemory  = 256 << 20
+	discoveryDisk    = 512 << 20
+	discoveryCPU     = 500
+	discoveryPids    = 256
+	foundTrue        = "true"
+	foundFalse       = "false"
 )
 
-var (
-	errRepositoryUnavailable = errors.New("the repository of the run cannot be checked out")
-	errDiscoveryOutput       = errors.New("the discovery job did not hand over the pipeline file")
-)
-
-const discoveryScript = `set -eu
-f="$PIPELINE_PATH"
-real=$(readlink -f -- "$f" 2>/dev/null || true)
-case "$real" in
-"$PWD"/*) ;;
-*) printf 'dhow_found=false\n' >> "$DHOW_OUTPUT"; exit 0 ;;
-esac
-if [ -L "$f" ] || [ ! -f "$real" ]; then printf 'dhow_found=false\n' >> "$DHOW_OUTPUT"; exit 0; fi
-if [ "$(wc -c < "$real")" -gt 262144 ]; then echo 'dhow: the pipeline file is larger than 256 KiB' >&2; exit 3; fi
-printf 'dhow_found=true\ndhow_sha256=%s\n' "$(sha256sum < "$real" | cut -d ' ' -f 1)" >> "$DHOW_OUTPUT"
-base64 < "$real" | sed 's/^/dhow-definition:/'
-`
+var errRepositoryUnavailable = errors.New("the repository of the run cannot be checked out")
 
 func transportOf(u gitsource.URL) runnerv1.CheckoutTransport {
 	if u.Transport == gitsource.TransportSSH {
@@ -110,41 +90,28 @@ func (s *Service) discoverySpec(ctx context.Context, q *sqlc.Queries, run sqlc.P
 	return &runnerv1.JobSpec{
 		Image: s.checkoutImage, Checkout: co, Secrets: secrets, TimeoutSeconds: discoveryTimeout, Network: &runnerv1.Network{},
 		Resources: &runnerv1.Resources{CpuMillis: discoveryCPU, MemoryBytes: discoveryMemory, DiskBytes: discoveryDisk, Pids: discoveryPids},
-		Steps:     []*runnerv1.Step{{Name: discoveryName, Run: discoveryScript, Env: map[string]string{discoveryPathEnv: run.DefinitionPath}}},
+		Steps:     []*runnerv1.Step{{Name: discoveryName, Run: gitproof.Script, Env: map[string]string{gitproof.EnvPath: run.DefinitionPath}}},
 	}, nil
 }
 
-func (s *Service) readDiscovered(ctx context.Context, q *sqlc.Queries, job uuid.UUID, digest string) ([]byte, error) {
-	want, err := hex.DecodeString(digest)
-	if err != nil || len(want) != sha256.Size {
-		return nil, errDiscoveryOutput
-	}
+func (s *Service) readDiscovered(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, job uuid.UUID) (gitproof.Proof, error) {
 	chunks, err := q.DiscoveryLog(ctx, job)
 	if err != nil {
-		return nil, err
+		return gitproof.Proof{}, err
 	}
 	var log bytes.Buffer
 	for _, c := range chunks {
-		if log.Len()+len(c) > discoveryLogBytes {
-			return nil, errDiscoveryOutput
+		if log.Len()+len(c) > gitproof.MaxLogBytes {
+			return gitproof.Proof{}, fmt.Errorf("%w: the discovery log is too large", gitproof.ErrUnverified)
 		}
 		log.Write(c)
 	}
-	var encoded bytes.Buffer
-	for line := range bytes.SplitSeq(log.Bytes(), []byte("\n")) {
-		if rest, ok := bytes.CutPrefix(bytes.TrimRight(line, "\r"), []byte(discoveryPrefix)); ok {
-			encoded.Write(rest)
-		}
+	objects, err := gitproof.ParseLog(log.Bytes())
+	if err != nil {
+		return gitproof.Proof{}, err
 	}
-	source, err := base64.StdEncoding.DecodeString(encoded.String())
-	if err != nil || len(source) == 0 || len(source) > pipelinespec.MaxFileBytes {
-		return nil, errDiscoveryOutput
-	}
-	sum := sha256.Sum256(source)
-	if !bytes.Equal(sum[:], want) {
-		return nil, errDiscoveryOutput
-	}
-	return source, nil
+	_, sha := definitionTarget(run)
+	return gitproof.Prove(sha, run.DefinitionPath, objects, pipelinespec.MaxFileBytes)
 }
 
 type CheckoutSource struct {

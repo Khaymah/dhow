@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
 	"github.com/Khaymah/dhow/internal/gitref"
@@ -46,6 +47,8 @@ const (
 	ExitDiskFull        = sandbox.CheckoutExitDiskFull
 )
 
+const DefaultDeepenBudget = 2 * time.Minute
+
 var (
 	ErrInput    = errors.New("the checkout settings are not valid")
 	ErrRefMoved = errors.New("the commit is not in the history of the ref")
@@ -60,6 +63,8 @@ type Options struct {
 	SSHHelper  string
 	Askpass    string
 	ScratchDir string
+
+	DeepenBudget time.Duration
 }
 
 type plan struct {
@@ -102,6 +107,9 @@ func (o *Options) defaults() {
 	}
 	if o.ScratchDir == "" {
 		o.ScratchDir = ScratchDir
+	}
+	if o.DeepenBudget <= 0 {
+		o.DeepenBudget = DefaultDeepenBudget
 	}
 }
 
@@ -200,18 +208,10 @@ func (r *repo) checkout(ctx context.Context) error {
 		}
 		return fmt.Errorf("git fetch: %w", err)
 	}
-	if !r.reaches(ctx) && r.p.depth < gitsource.MaxDepth {
-		_, _ = fmt.Fprintf(r.o.Stdout, "dhow: %s is not the tip of %s, so more of its history is fetched\n", r.p.sha, r.p.ref)
-		deeper, err := gitsource.FetchArgsWith(r.config, r.p.url, r.p.ref, gitsource.MaxDepth)
-		if err != nil {
+	if !r.reaches(ctx) {
+		if err := r.deepen(ctx); err != nil {
 			return err
 		}
-		if err := r.git(ctx, deeper, r.o.Stdout); err != nil {
-			return fmt.Errorf("git fetch: %w", err)
-		}
-	}
-	if !r.reaches(ctx) {
-		return ErrRefMoved
 	}
 	co, err := gitsource.CheckoutArgs(r.config, r.p.sha)
 	if err != nil {
@@ -221,6 +221,33 @@ func (r *repo) checkout(ctx context.Context) error {
 		return fmt.Errorf("git checkout: %w", err)
 	}
 	return nil
+}
+
+func (r *repo) deepen(ctx context.Context) error {
+	dctx, cancel := context.WithTimeout(ctx, r.o.DeepenBudget)
+	defer cancel()
+	for _, depth := range gitsource.DeepenSteps() {
+		if depth <= r.p.depth {
+			continue
+		}
+		_, _ = fmt.Fprintf(r.o.Stdout, "dhow: %s is not the tip of %s, so more of its history is fetched (%d commits, without file contents)\n",
+			r.p.sha, r.p.ref, depth)
+		args, err := gitsource.DeepenArgs(r.config, r.p.url, r.p.ref, depth)
+		if err != nil {
+			return err
+		}
+		err = r.git(dctx, args, r.o.Stdout)
+		if dctx.Err() != nil && ctx.Err() == nil {
+			return fmt.Errorf("searching the history of %s took longer than %s", r.p.ref, r.o.DeepenBudget)
+		}
+		if err != nil {
+			return fmt.Errorf("git fetch: %w", err)
+		}
+		if r.reaches(dctx) {
+			return nil
+		}
+	}
+	return ErrRefMoved
 }
 
 func (r *repo) reaches(ctx context.Context) bool {

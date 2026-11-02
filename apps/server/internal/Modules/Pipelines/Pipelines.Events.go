@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/jackc/pgx/v5"
@@ -14,6 +15,7 @@ import (
 	runevents "github.com/Khaymah/dhow/apps/server/internal/Core/RunEvents"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
+	"github.com/Khaymah/dhow/internal/gitproof"
 	"github.com/Khaymah/dhow/internal/pipelinespec"
 )
 
@@ -44,7 +46,7 @@ func runJobOutcome(f runevents.Finished) (string, string) {
 func boundedOutputs(in map[string]string) ([]byte, bool) {
 	keys := make([]string, 0, len(in))
 	for k := range in {
-		if k != OutputFound && k != OutputDigest {
+		if k != OutputFound {
 			keys = append(keys, k)
 		}
 	}
@@ -155,18 +157,27 @@ func (s *Service) discovered(ctx context.Context, q *sqlc.Queries, run sqlc.Pipe
 		return s.endPending(ctx, q, run, models.RunFailed, models.ReasonShaNotOnRef)
 	case f.State != jobSucceeded:
 		return s.endPending(ctx, q, run, models.RunFailed, models.ReasonDiscoveryFailed)
-	case f.Outputs[OutputFound] != foundTrue:
-		return s.endPending(ctx, q, run, models.RunSkipped, models.ReasonDefinitionNotFound)
 	}
-	source, err := s.readDiscovered(ctx, q, f.JobID, f.Outputs[OutputDigest])
-	if errors.Is(err, errDiscoveryOutput) {
+	claim := f.Outputs[OutputFound]
+	if claim != foundTrue && claim != foundFalse {
 		return s.endPending(ctx, q, run, models.RunFailed, models.ReasonDiscoveryFailed)
+	}
+	proof, err := s.readDiscovered(ctx, q, run, f.JobID)
+	if err == nil && proof.Found != (claim == foundTrue) {
+		err = fmt.Errorf("%w: the job reported dhow_found=%s", gitproof.ErrUnverified, claim)
+	}
+	if errors.Is(err, gitproof.ErrUnverified) {
+		s.log.WarnContext(ctx, "a discovery job handed over git objects that do not prove the pipeline file", "run_id", run.Id.String(), "error", err)
+		return s.endPending(ctx, q, run, models.RunFailed, models.ReasonDefinitionUnverified)
 	}
 	if err != nil {
 		return err
 	}
-	digest := sha256.Sum256(source)
-	return q.SetRunSource(ctx, sqlc.SetRunSourceParams{ID: run.Id, DefinitionSource: text(string(source)), DefinitionDigest: digest[:]})
+	if !proof.Found {
+		return s.endPending(ctx, q, run, models.RunSkipped, models.ReasonDefinitionNotFound)
+	}
+	digest := sha256.Sum256(proof.Source)
+	return q.SetRunSource(ctx, sqlc.SetRunSourceParams{ID: run.Id, DefinitionSource: text(string(proof.Source)), DefinitionDigest: digest[:]})
 }
 
 func (s *Service) endPending(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, state, reason string) error {

@@ -16,6 +16,7 @@ message JobSpec {
   Isolation isolation = 8;
   repeated string labels = 9;
   Checkout checkout = 10;
+  repeated string derived_values = 11;
 }
 
 message Step {

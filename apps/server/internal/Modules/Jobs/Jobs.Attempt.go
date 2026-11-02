@@ -151,7 +151,9 @@ func (s *Service) resolveSecrets(ctx context.Context, l sqlc.LockActiveLeaseRow,
 	if len(names) == 0 {
 		return nil, nil
 	}
-	values, err := s.secrets.Resolve(ctx, SecretRequest{OrganizationID: l.OrganizationId, JobID: l.JobId, AttemptID: l.AttemptId, Names: names})
+	values, err := s.secrets.Resolve(ctx, SecretRequest{
+		OrganizationID: l.OrganizationId, JobID: l.JobId, AttemptID: l.AttemptId, Names: names, Checkout: spec.GetCheckout(),
+	})
 	if err == nil {
 		for _, n := range names {
 			if _, ok := values[n]; !ok {
