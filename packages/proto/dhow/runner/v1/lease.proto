@@ -68,6 +68,7 @@ message CompleteRequest {
   int32 exit_code = 3;
   FailureReason failure_reason = 4;
   bytes digest = 5;
+  map<string, string> outputs = 6;
 }
 
 message CompleteResponse {}

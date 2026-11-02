@@ -33,6 +33,7 @@ type RegisterRequest struct {
 	SigningPublicKey    []byte                 `protobuf:"bytes,8,opt,name=signing_public_key,json=signingPublicKey,proto3" json:"signing_public_key,omitempty"`
 	EncryptionPublicKey []byte                 `protobuf:"bytes,9,opt,name=encryption_public_key,json=encryptionPublicKey,proto3" json:"encryption_public_key,omitempty"`
 	Proof               []byte                 `protobuf:"bytes,10,opt,name=proof,proto3" json:"proof,omitempty"`
+	Features            []RunnerFeature        `protobuf:"varint,11,rep,packed,name=features,proto3,enum=dhow.runner.v1.RunnerFeature" json:"features,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -137,6 +138,13 @@ func (x *RegisterRequest) GetProof() []byte {
 	return nil
 }
 
+func (x *RegisterRequest) GetFeatures() []RunnerFeature {
+	if x != nil {
+		return x.Features
+	}
+	return nil
+}
+
 type RegisterResponse struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	RunnerId               string                 `protobuf:"bytes,1,opt,name=runner_id,json=runnerId,proto3" json:"runner_id,omitempty"`
@@ -217,7 +225,7 @@ var File_dhow_runner_v1_registration_proto protoreflect.FileDescriptor
 
 const file_dhow_runner_v1_registration_proto_rawDesc = "" +
 	"\n" +
-	"!dhow/runner/v1/registration.proto\x12\x0edhow.runner.v1\x1a\x1bdhow/runner/v1/common.proto\"\xd3\x02\n" +
+	"!dhow/runner/v1/registration.proto\x12\x0edhow.runner.v1\x1a\x1bdhow/runner/v1/common.proto\"\x8e\x03\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
@@ -229,7 +237,8 @@ const file_dhow_runner_v1_registration_proto_rawDesc = "" +
 	"\x12signing_public_key\x18\b \x01(\fR\x10signingPublicKey\x122\n" +
 	"\x15encryption_public_key\x18\t \x01(\fR\x13encryptionPublicKey\x12\x14\n" +
 	"\x05proof\x18\n" +
-	" \x01(\fR\x05proof\"\xd9\x01\n" +
+	" \x01(\fR\x05proof\x129\n" +
+	"\bfeatures\x18\v \x03(\x0e2\x1d.dhow.runner.v1.RunnerFeatureR\bfeatures\"\xd9\x01\n" +
 	"\x10RegisterResponse\x12\x1b\n" +
 	"\trunner_id\x18\x01 \x01(\tR\brunnerId\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x16\n" +
@@ -257,16 +266,18 @@ var file_dhow_runner_v1_registration_proto_goTypes = []any{
 	(*RegisterRequest)(nil),  // 0: dhow.runner.v1.RegisterRequest
 	(*RegisterResponse)(nil), // 1: dhow.runner.v1.RegisterResponse
 	(Isolation)(0),           // 2: dhow.runner.v1.Isolation
+	(RunnerFeature)(0),       // 3: dhow.runner.v1.RunnerFeature
 }
 var file_dhow_runner_v1_registration_proto_depIdxs = []int32{
 	2, // 0: dhow.runner.v1.RegisterRequest.isolation_levels:type_name -> dhow.runner.v1.Isolation
-	0, // 1: dhow.runner.v1.RegistrationService.Register:input_type -> dhow.runner.v1.RegisterRequest
-	1, // 2: dhow.runner.v1.RegistrationService.Register:output_type -> dhow.runner.v1.RegisterResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	3, // 1: dhow.runner.v1.RegisterRequest.features:type_name -> dhow.runner.v1.RunnerFeature
+	0, // 2: dhow.runner.v1.RegistrationService.Register:input_type -> dhow.runner.v1.RegisterRequest
+	1, // 3: dhow.runner.v1.RegistrationService.Register:output_type -> dhow.runner.v1.RegisterResponse
+	3, // [3:4] is the sub-list for method output_type
+	2, // [2:3] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_dhow_runner_v1_registration_proto_init() }
