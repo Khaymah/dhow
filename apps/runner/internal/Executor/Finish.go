@@ -81,16 +81,16 @@ func (a *attempt) complete(ctx context.Context, r result) bool {
 	}
 	cctx, cancel := context.WithTimeout(ctx, window)
 	defer cancel()
-	if err := a.e.o.Journal.SetCompletion(a.ref.GetLeaseId(), journal.Completion{
-		Result: int32(r.state), ExitCode: r.exitCode, FailureReason: int32(r.reason),
-	}); err != nil {
-		a.log.Error("could not record the result in the journal", "error", a.masked(err))
-	}
 	req := CompleteRequest(a.grant.GetAttemptId(), a.ref, r.state, r.exitCode, r.reason)
 	if r.state == runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED && len(a.outputs) > 0 {
 		req.Outputs = maskOutputs(a.masker, a.outputs)
 	}
 	clear(a.outputs)
+	if err := a.e.o.Journal.SetCompletion(a.ref.GetLeaseId(), journal.Completion{
+		Result: int32(r.state), ExitCode: r.exitCode, FailureReason: int32(r.reason), Outputs: req.GetOutputs(),
+	}); err != nil {
+		a.log.Error("could not record the result in the journal", "error", a.masked(err))
+	}
 	acked, definitive := sendComplete(cctx, a.e.o.API, a.e.o.Backoff, req, a.log, 0)
 	if definitive {
 		a.forget()
@@ -146,12 +146,18 @@ func (e *Executor) recover(ctx context.Context, entries []journal.Entry, tries i
 	for _, entry := range entries {
 		ref := &runnerv1.LeaseRef{LeaseId: entry.LeaseID, FencingToken: entry.FencingToken}
 		res, exit, reason := runnerv1.AttemptResult_ATTEMPT_RESULT_LOST, int32(0), runnerv1.FailureReason_FAILURE_REASON_RUNNER_RESTARTED
+		var outputs map[string]string
 		if c := entry.Completion; c != nil {
 			res, exit, reason = runnerv1.AttemptResult(c.Result), c.ExitCode, runnerv1.FailureReason(c.FailureReason)
+			if res == runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED {
+				outputs = c.Outputs
+			}
 		}
 		log := e.o.Log.With("lease_id", entry.LeaseID, "attempt_id", entry.AttemptID, "job_id", entry.JobID)
 		log.Info("reporting an attempt that the last run of the runner left open", "result", res.String())
-		_, definitive := sendComplete(ctx, e.o.API, e.o.Backoff, CompleteRequest(entry.AttemptID, ref, res, exit, reason), log, tries)
+		req := CompleteRequest(entry.AttemptID, ref, res, exit, reason)
+		req.Outputs = outputs
+		_, definitive := sendComplete(ctx, e.o.API, e.o.Backoff, req, log, tries)
 		if !definitive {
 			if err := ctx.Err(); err != nil {
 				return nil, err

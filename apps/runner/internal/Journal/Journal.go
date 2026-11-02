@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -15,19 +16,24 @@ import (
 	config "github.com/Khaymah/dhow/apps/runner/internal/Config"
 )
 
-const fileVersion = 1
+const (
+	fileVersion    = 1
+	MaxOutputs     = 64
+	MaxOutputBytes = 128 << 10
+)
 
 var (
-	ErrCorrupt = errors.New("the lease journal is damaged; it lists only lease and attempt IDs, so inspect it and remove it to start over")
+	ErrCorrupt = errors.New("the lease journal is damaged; it lists lease and attempt IDs and unreported results, so inspect it and remove it to start over")
 	ErrInvalid = errors.New("a journal entry needs a lease id, an attempt id, a job id and a positive fencing token")
 	ErrReplay  = errors.New("the fencing token is not above the highest one this runner has seen, so the grant is a replay")
 	ErrExists  = errors.New("the lease is already in the journal")
 )
 
 type Completion struct {
-	Result        int32 `json:"Result"`
-	ExitCode      int32 `json:"ExitCode"`
-	FailureReason int32 `json:"FailureReason"`
+	Result        int32             `json:"Result"`
+	ExitCode      int32             `json:"ExitCode"`
+	FailureReason int32             `json:"FailureReason"`
+	Outputs       map[string]string `json:"Outputs,omitempty"`
 }
 
 type Entry struct {
@@ -87,7 +93,18 @@ func (e Entry) validate() error {
 	if e.FencingToken < 1 {
 		return ErrInvalid
 	}
+	if c := e.Completion; c != nil && (len(c.Outputs) > MaxOutputs || outputBytes(c.Outputs) > MaxOutputBytes) {
+		return ErrInvalid
+	}
 	return nil
+}
+
+func outputBytes(outputs map[string]string) int {
+	n := 0
+	for k, v := range outputs {
+		n += len(k) + len(v)
+	}
+	return n
 }
 
 func (j *Journal) Add(e Entry) error {
@@ -121,7 +138,11 @@ func (j *Journal) SetCompletion(leaseID string, c Completion) error {
 	if !ok {
 		return nil
 	}
+	c.Outputs = maps.Clone(c.Outputs)
 	e.Completion = &c
+	if err := e.validate(); err != nil {
+		return err
+	}
 	next := j.copyEntries()
 	next[leaseID] = e
 	return j.write(next)

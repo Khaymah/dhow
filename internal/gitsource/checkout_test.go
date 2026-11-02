@@ -272,6 +272,22 @@ func TestFetchArgsWithChecksTheWant(t *testing.T) {
 	assert.Equal(t, []string{"--", u.String(), strings.Repeat("a", 40)}, args[len(args)-3:])
 }
 
+func TestDeepenArgsFetchOnlyCommitsBeforeTheAddress(t *testing.T) {
+	u, err := Parse("ssh://git@git.example.com/app.git")
+	require.NoError(t, err)
+	args, err := DeepenArgs(SafeConfig(), u, "refs/heads/main", 1024)
+	require.NoError(t, err)
+	tail := args[len(SafeConfig()):]
+	assert.Equal(t, []string{"fetch", "--quiet", "--depth=1024", "--filter=tree:0", "--no-tags", "--", u.String(), "refs/heads/main"}, tail)
+	for _, depth := range []int{0, MaxDepth + 1} {
+		_, err := DeepenArgs(SafeConfig(), u, "refs/heads/main", depth)
+		require.ErrorIs(t, err, ErrDepth)
+	}
+	_, err = DeepenArgs(SafeConfig(), u, "--upload-pack=x", 64)
+	require.Error(t, err)
+	assert.Equal(t, MaxDepth, DeepenSteps()[len(DeepenSteps())-1])
+}
+
 func knownHostKey(typ string) string {
 	blob := binary.BigEndian.AppendUint32(nil, uint32(len(typ)))
 	blob = append(blob, typ...)

@@ -3,6 +3,7 @@ package journal_test
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -48,6 +49,28 @@ func TestEntriesSurviveAReopen(t *testing.T) {
 	require.NoError(t, again.Remove(a.LeaseID))
 	require.NoError(t, again.Remove(a.LeaseID), "removing twice is fine")
 	assert.Len(t, again.Entries(), 1)
+}
+
+func TestAResultKeepsItsOutputsWithinBounds(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "journal")
+	j, err := journal.Open(path)
+	require.NoError(t, err)
+	e := entry()
+	require.NoError(t, j.Add(e))
+	outputs := map[string]string{"version": "1.2.3"}
+	require.NoError(t, j.SetCompletion(e.LeaseID, journal.Completion{Result: 1, Outputs: outputs}))
+	outputs["version"] = "changed"
+	again, err := journal.Open(path)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"version": "1.2.3"}, again.Entries()[0].Completion.Outputs)
+
+	many := map[string]string{}
+	for i := range journal.MaxOutputs + 1 {
+		many[uuid.NewString()] = strconv.Itoa(i)
+	}
+	require.ErrorIs(t, j.SetCompletion(e.LeaseID, journal.Completion{Result: 1, Outputs: many}), journal.ErrInvalid)
+	big := map[string]string{"big": strings.Repeat("a", journal.MaxOutputBytes)}
+	require.ErrorIs(t, j.SetCompletion(e.LeaseID, journal.Completion{Result: 1, Outputs: big}), journal.ErrInvalid)
 }
 
 func TestTheJournalHoldsOnlyIDsAndFencing(t *testing.T) {

@@ -13,6 +13,8 @@ import (
 
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
+	"github.com/Khaymah/dhow/internal/gitproof"
+	"github.com/Khaymah/dhow/internal/gitproof/gitprooftest"
 	"github.com/Khaymah/dhow/internal/runnersig"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
@@ -90,7 +92,17 @@ func (g gitWorld) assertCheckout(t *testing.T, job uuid.UUID, ref, sha string) {
 	assert.Contains(t, features, "checkout")
 }
 
-func (g gitWorld) assertNoKey(t *testing.T) {
+func keyQueries() []string {
+	return []string{
+		`SELECT count(*) FROM "Jobs" t WHERE position($1 in t::text) > 0`,
+		`SELECT count(*) FROM "LogChunks" t WHERE position(convert_to($1, 'UTF8') in t."Data") > 0`,
+		`SELECT count(*) FROM "AuditEvents" t WHERE position($1 in t::text) > 0`,
+		`SELECT count(*) FROM "PipelineRuns" t WHERE position($1 in t::text) > 0`,
+		`SELECT count(*) FROM "RunJobs" t WHERE position($1 in t::text) > 0`,
+	}
+}
+
+func (g gitWorld) keyForms(t *testing.T) []string {
 	t.Helper()
 	key := string(g.repo.PrivateKey)
 	var body []string
@@ -100,27 +112,42 @@ func (g gitWorld) assertNoKey(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, body)
-	for _, form := range append(body, key) {
-		for _, query := range []string{
-			`SELECT count(*) FROM "Jobs" t WHERE position($1 in t::text) > 0`,
-			`SELECT count(*) FROM "LogChunks" t WHERE position($1 in t::text) > 0`,
-			`SELECT count(*) FROM "AuditEvents" t WHERE position($1 in t::text) > 0`,
-			`SELECT count(*) FROM "PipelineRuns" t WHERE position($1 in t::text) > 0`,
-			`SELECT count(*) FROM "RunJobs" t WHERE position($1 in t::text) > 0`,
-		} {
+	return append(body, key)
+}
+
+func (g gitWorld) assertNoKey(t *testing.T) {
+	t.Helper()
+	for _, form := range g.keyForms(t) {
+		for _, query := range keyQueries() {
 			assert.Zero(t, g.env.CountRows(query, form), "the deploy key appears: %s", query)
 		}
 		assert.NotContains(t, g.env.Logs.String(), form, "the deploy key appears in the server log")
 	}
 }
 
+func TestTheKeyCheckFindsAKeyPlantedInALogChunk(t *testing.T) {
+	g := newGitWorld(t)
+	g.env.Deliver(g.trigger(triggers.EventPush, "refs/heads/main", shaA))
+	g.env.StartRuns()
+	lease := g.runner.MustLease(0)
+	_, err := g.runner.Start(lease)
+	require.NoError(t, err)
+	g.runner.AppendStdout(lease.Ref, "leaked: "+string(g.repo.PrivateKey))
+	query := keyQueries()[1]
+	require.Contains(t, query, `"LogChunks"`)
+	for _, form := range g.keyForms(t) {
+		assert.NotZero(t, g.env.CountRows(query, form), "a key in a log chunk is missed")
+	}
+}
+
 func TestAGenericRunReadsItsFileOnARunnerAndChecksEveryJobOut(t *testing.T) {
 	g := newGitWorld(t)
-	run := g.env.Deliver(g.trigger(triggers.EventPush, "refs/heads/main", shaA)).RunID
+	sha := apptest.DiscoveryCommit(pipeline(outputsPipeline)).Sha
+	run := g.env.Deliver(g.trigger(triggers.EventPush, "refs/heads/main", sha)).RunID
 	g.env.StartRuns()
 	discovery := g.env.RunJobs(run)["dhow.discovery"]
 	require.Equal(t, "active", discovery.State)
-	g.assertCheckout(t, *discovery.Job, "refs/heads/main", shaA)
+	g.assertCheckout(t, *discovery.Job, "refs/heads/main", sha)
 	grant, err := g.plain.Lease(context.Background(), 1, 0)
 	require.NoError(t, err)
 	assert.Nil(t, grant, "a runner without the checkout feature never takes a checkout job")
@@ -132,7 +159,7 @@ func TestAGenericRunReadsItsFileOnARunnerAndChecksEveryJobOut(t *testing.T) {
 	require.Equal(t, "running", state)
 	build := g.env.RunJobs(run)["build"]
 	require.Equal(t, "active", build.State)
-	g.assertCheckout(t, *build.Job, "refs/heads/main", shaA)
+	g.assertCheckout(t, *build.Job, "refs/heads/main", sha)
 
 	lease := g.runner.MustLease(0)
 	start, err := g.runner.Start(lease)
@@ -188,27 +215,20 @@ func TestADiscoveryThatCannotFindTheCommitOnTheRefStopsTheRun(t *testing.T) {
 	assert.Equal(t, 1, g.env.CountRows(`SELECT count(*) FROM "Jobs"`), "nothing runs after the discovery job")
 }
 
-func TestADiscoveryOutputThatDoesNotMatchItsDigestIsRefused(t *testing.T) {
+func TestADiscoveryWithoutAClearClaimFailsAndOnlyAProvenAbsenceSkips(t *testing.T) {
 	g := newGitWorld(t)
-	run := g.env.Deliver(g.trigger(triggers.EventPush, "refs/heads/main", shaA)).RunID
-	g.env.StartRuns()
-	lease := g.runner.MustLease(0)
-	_, err := g.runner.Start(lease)
-	require.NoError(t, err)
-	step := int32(0)
-	g.runner.MustAppend(lease.Ref, &runnerv1.LogChunk{
-		Seq: 1, Stream: runnerv1.LogStream_LOG_STREAM_STDOUT, StepIndex: &step, Data: []byte(apptest.DiscoveryLog("version: 1\n")),
-	})
-	require.NoError(t, g.runner.CompleteOutputs(lease, apptest.DiscoveryOutputs("something else")))
-	state, reason := g.env.RunState(run)
-	assert.Equal(t, []string{"failed", "DISCOVERY_FAILED"}, []string{state, reason})
-
-	missing := g.env.Deliver(g.trigger(triggers.EventPush, "refs/heads/main", shaB)).RunID
-	g.env.StartRuns()
-	lease = g.runner.MustLease(0)
-	_, err = g.runner.Start(lease)
-	require.NoError(t, err)
-	require.NoError(t, g.runner.CompleteOutputs(lease, map[string]string{"dhow_found": "false"}))
-	state, reason = g.env.RunState(missing)
-	assert.Equal(t, []string{"skipped", "DEFINITION_NOT_FOUND"}, []string{state, reason})
+	honest := apptest.DiscoveryCommit(pipeline(outputsPipeline))
+	for name, outputs := range map[string]map[string]string{
+		"outputs lost":   {},
+		"an empty claim": {"dhow_found": ""},
+		"an odd claim":   {"dhow_found": "TRUE"},
+	} {
+		got := g.discoverRun(t, honest.Sha, gitprooftest.Log(honest.Objects), outputs)
+		assert.Equal(t, []string{"failed", "DISCOVERY_FAILED"}, got, name)
+	}
+	empty := gitprooftest.Empty(gitproof.SHA1)
+	got := g.discoverRun(t, empty.Sha, gitprooftest.Log(empty.Objects), map[string]string{"dhow_found": "false"})
+	assert.Equal(t, []string{"skipped", "DEFINITION_NOT_FOUND"}, got)
+	got = g.discoverRun(t, empty.Sha, "", map[string]string{"dhow_found": "false"})
+	assert.Equal(t, []string{"failed", "DEFINITION_UNVERIFIED"}, got, "a missing file must be proven missing")
 }

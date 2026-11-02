@@ -412,7 +412,7 @@ type JobSecretRef struct {
 
 // JobSpec defines model for JobSpec.
 type JobSpec struct {
-	// Env Plain environment for every step. Names that start with `DHOW_` are reserved. Every member who can read the job sees these values, viewers included, so never put a credential here: reference it from Secrets.
+	// Env Plain environment for every step. Names that start with `DHOW_` are reserved. Every member who can read the job sees these values, viewers included, so never put a credential here: reference it from Secrets. In a job of a pipeline run, a value that an expression made (a `needs` output, a `git` value) reads `[REDACTED]` here and in step environments; the runner still gets the value.
 	Env *map[string]string `json:"Env,omitempty"`
 
 	// Image An image reference pinned by digest (`name@sha256:...`). A name without a registry host is completed the way Docker does it, so `node:22@sha256:...` becomes `docker.io/library/node:22@sha256:...`.

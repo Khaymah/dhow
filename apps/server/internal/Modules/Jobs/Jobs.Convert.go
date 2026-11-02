@@ -109,7 +109,8 @@ func nonNil(v []string) []string {
 	return v
 }
 
-func specToGen(s *runnerv1.JobSpec) gen.JobSpec {
+func specToGen(stored *runnerv1.JobSpec) gen.JobSpec {
+	s := jobspec.Redact(stored)
 	out := gen.JobSpec{
 		Image: s.GetImage(), TimeoutSeconds: ptrOf(int(s.GetTimeoutSeconds())), Labels: ptrOf(nonNil(s.GetLabels())),
 		Isolation: ptrOf(gen.JobIsolation(jobspec.IsolationName(s.GetIsolation()))), Env: ptrOf(mapOf(s.GetEnv())),

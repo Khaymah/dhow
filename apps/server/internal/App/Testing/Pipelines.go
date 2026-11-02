@@ -4,9 +4,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/pem"
 	"strings"
 	"sync"
@@ -23,6 +20,8 @@ import (
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
+	"github.com/Khaymah/dhow/internal/gitproof"
+	"github.com/Khaymah/dhow/internal/gitproof/gitprooftest"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -244,37 +243,9 @@ func (e *Env) SeedSSHRepository(org, project, creator uuid.UUID) SSHRepository {
 	return out
 }
 
-func DiscoveryLog(source string) string {
-	encoded := base64.StdEncoding.EncodeToString([]byte(source))
-	var b strings.Builder
-	for len(encoded) > 0 {
-		n := min(76, len(encoded))
-		b.WriteString("dhow-definition:" + encoded[:n] + "\n")
-		encoded = encoded[n:]
-	}
-	return b.String()
-}
-
-func DiscoveryOutputs(source string) map[string]string {
-	sum := sha256.Sum256([]byte(source))
-	return map[string]string{"dhow_found": "true", "dhow_sha256": hex.EncodeToString(sum[:])}
-}
-
 func (r *TestRunner) Discover(source string) (*Grant, bool) {
 	r.T.Helper()
-	g, err := r.Lease(context.Background(), 1, 0)
-	require.NoError(r.T, err)
-	if g == nil {
-		return nil, false
-	}
-	_, err = r.Start(g)
-	require.NoError(r.T, err)
-	require.NoError(r.T, r.BeginStep(g.Ref, 0, false))
-	step := int32(0)
-	r.MustAppend(g.Ref, &runnerv1.LogChunk{Seq: 1, Stream: runnerv1.LogStream_LOG_STREAM_STDOUT, StepIndex: &step, Data: []byte(DiscoveryLog(source))})
-	require.NoError(r.T, r.EndStep(g.Ref, 0, 0))
-	require.NoError(r.T, r.CompleteOutputs(g, DiscoveryOutputs(source)))
-	return g, true
+	return r.DiscoverWith(gitprooftest.Log(DiscoveryCommit(source).Objects), map[string]string{pipelines.OutputFound: "true"})
 }
 
 func (r *TestRunner) CompleteOutputs(g *Grant, outputs map[string]string) error {
@@ -284,4 +255,34 @@ func (r *TestRunner) CompleteOutputs(g *Grant, outputs map[string]string) error 
 		Lease: g.Ref, Result: result, FailureReason: reason, Digest: Digest(g, result, 0, reason), Outputs: outputs,
 	}))
 	return err
+}
+
+func DiscoveryCommit(source string) gitprooftest.Commit {
+	return gitprooftest.File(gitproof.SHA1, ".dhow.yml", source)
+}
+
+func (r *TestRunner) AppendStdout(ref *runnerv1.LeaseRef, data string) {
+	r.T.Helper()
+	step, seq := int32(0), int64(1)
+	for len(data) > 0 {
+		n := min(len(data), config.LogChunkMaxBytes-1024)
+		r.MustAppend(ref, &runnerv1.LogChunk{Seq: seq, Stream: runnerv1.LogStream_LOG_STREAM_STDOUT, StepIndex: &step, Data: []byte(data[:n])})
+		data, seq = data[n:], seq+1
+	}
+}
+
+func (r *TestRunner) DiscoverWith(log string, outputs map[string]string) (*Grant, bool) {
+	r.T.Helper()
+	g, err := r.Lease(context.Background(), 1, 0)
+	require.NoError(r.T, err)
+	if g == nil {
+		return nil, false
+	}
+	_, err = r.Start(g)
+	require.NoError(r.T, err)
+	require.NoError(r.T, r.BeginStep(g.Ref, 0, false))
+	r.AppendStdout(g.Ref, log)
+	require.NoError(r.T, r.EndStep(g.Ref, 0, 0))
+	require.NoError(r.T, r.CompleteOutputs(g, outputs))
+	return g, true
 }

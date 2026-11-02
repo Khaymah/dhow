@@ -9,7 +9,6 @@ import (
 	"unicode"
 
 	"github.com/google/uuid"
-	"google.golang.org/protobuf/proto"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	commitstatus "github.com/Khaymah/dhow/apps/server/internal/Core/CommitStatus"
@@ -142,7 +141,11 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 	if !run {
 		return s.endRunJob(ctx, q, st, i, models.JobSkipped, models.ReasonConditionFalse)
 	}
-	spec, err := buildSpec(ctx, plan, evalCtx)
+	spec, err := plan.Build(ctx, evalCtx)
+	if errors.Is(err, pipelinespec.ErrSecretScope) {
+		s.log.ErrorContext(ctx, "a built job spec gives a step a secret it did not declare", "run_job_id", rj.Id.String())
+		return s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonJobSpecInvalid)
+	}
 	if err != nil {
 		return s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonExpressionFailed)
 	}
@@ -161,66 +164,6 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 
 func hasPluginSecrets(plan *pipelinespec.RunJob) bool {
 	return slices.ContainsFunc(plan.Steps, func(sp pipelinespec.StepPlan) bool { return sp.Plugin != nil && len(sp.Plugin.Secrets) > 0 })
-}
-
-func buildSpec(ctx context.Context, plan *pipelinespec.RunJob, evalCtx pipelinespec.Context) (*runnerv1.JobSpec, error) {
-	spec, ok := proto.Clone(plan.Spec).(*runnerv1.JobSpec)
-	if !ok {
-		return nil, pipelinespec.ErrExpression
-	}
-	if spec.Env == nil {
-		spec.Env = map[string]string{}
-	}
-	for ref := range plan.Expressions {
-		v, err := plan.EvalValue(ctx, ref, evalCtx)
-		if err != nil {
-			return nil, err
-		}
-		placeValue(spec, ref, v)
-	}
-	evalCtx.Env = spec.GetEnv()
-	kept := make([]*runnerv1.Step, 0, len(spec.GetSteps()))
-	for i, st := range spec.GetSteps() {
-		keep, err := plan.EvalStepIf(ctx, i, evalCtx)
-		if err != nil {
-			return nil, err
-		}
-		if keep {
-			kept = append(kept, st)
-		}
-	}
-	spec.Steps = kept
-	return spec, nil
-}
-
-func placeValue(spec *runnerv1.JobSpec, ref, v string) {
-	if name, found := strings.CutPrefix(ref, "Env."); found {
-		spec.Env[name] = v
-		return
-	}
-	rest, found := strings.CutPrefix(ref, "Steps[")
-	if !found {
-		return
-	}
-	index, field, found := strings.Cut(rest, "].")
-	i, err := strconv.Atoi(index)
-	if !found || err != nil || i < 0 || i >= len(spec.GetSteps()) {
-		return
-	}
-	step := spec.GetSteps()[i]
-	if name, ok := strings.CutPrefix(field, "Env."); ok {
-		if step.Env == nil {
-			step.Env = map[string]string{}
-		}
-		step.Env[name] = v
-		return
-	}
-	if name, ok := strings.CutPrefix(field, "With."); ok && step.GetPlugin() != nil {
-		if step.Plugin.Inputs == nil {
-			step.Plugin.Inputs = map[string]string{}
-		}
-		step.Plugin.Inputs[name] = v
-	}
 }
 
 func jobName(run sqlc.PipelineRun, rj sqlc.RunJob) string {

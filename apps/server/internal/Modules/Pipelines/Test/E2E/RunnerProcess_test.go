@@ -20,6 +20,7 @@ import (
 	app "github.com/Khaymah/dhow/apps/server/internal/App"
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
+	"github.com/Khaymah/dhow/internal/gitproof/gitprooftest"
 	"github.com/Khaymah/dhow/internal/logging"
 )
 
@@ -109,10 +110,10 @@ func TestARealRunnerTakesAGenericRunFromPushToTheLastJob(t *testing.T) {
 	project := env.SeedProject(org, ownerID)
 	repo := env.SeedSSHRepository(org, project, ownerID)
 	source := pipeline(strings.ReplaceAll(outputsPipeline, "    image: IMAGE\n", "    image: IMAGE\n    resources:\n      memory: 256Mi\n      disk: 256Mi\n      pids: 256\n"))
-	outputs := apptest.DiscoveryOutputs(source)
+	commit := apptest.DiscoveryCommit(source)
 	recording, err := json.Marshal(map[string]any{"Steps": []map[string]any{{
-		"Output":  []map[string]any{{"Data": apptest.DiscoveryLog(source)}},
-		"Outputs": "dhow_found=true\ndhow_sha256=" + outputs["dhow_sha256"] + "\nversion=4.5.6\n",
+		"Output":  []map[string]any{{"Data": gitprooftest.Log(commit.Objects)}},
+		"Outputs": "dhow_found=true\nversion=4.5.6\n",
 	}}})
 	require.NoError(t, err)
 
@@ -125,7 +126,7 @@ func TestARealRunnerTakesAGenericRunFromPushToTheLastJob(t *testing.T) {
 	})
 	run := env.Deliver(triggers.Trigger{
 		OrganizationID: org, ProjectID: project, RepositoryID: repo.ID, DeliveryID: uuid.New(), Provider: "generic",
-		Event: triggers.EventPush, Ref: "refs/heads/main", Sha: shaA,
+		Event: triggers.EventPush, Ref: "refs/heads/main", Sha: commit.Sha,
 	}).RunID
 	p := startRunner(t, env, owner, org, string(recording))
 	ended := assert.Eventually(t, func() bool {

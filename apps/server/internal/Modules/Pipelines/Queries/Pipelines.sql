@@ -271,5 +271,8 @@ ORDER BY c."Seq";
 SELECT r."RepositoryId"::uuid AS "RepositoryId", r."ProjectId"
 FROM "Jobs" j
 JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
+    AND rj."CurrentJobId" = j."Id" AND rj."State" = 'active' AND NOT rj."IsDeleted"
 JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
-WHERE j."Id" = @job_id AND j."OrganizationId" = @organization_id AND j."OriginKind" = 'pipeline' AND r."RepositoryId" IS NOT NULL;
+    AND r."State" IN ('pending', 'running') AND NOT r."IsDeleted"
+WHERE j."Id" = @job_id AND j."OrganizationId" = @organization_id AND j."OriginKind" = 'pipeline' AND NOT j."IsDeleted"
+  AND r."RepositoryId" IS NOT NULL;

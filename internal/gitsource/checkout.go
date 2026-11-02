@@ -128,6 +128,17 @@ func FetchArgsWith(config []string, u URL, want string, depth int) ([]string, er
 	return append(slices.Clone(config), "fetch", "--quiet", "--depth="+strconv.Itoa(depth), "--no-tags", "--", u.String(), want), nil
 }
 
+func DeepenArgs(config []string, u URL, want string, depth int) ([]string, error) {
+	args, err := FetchArgsWith(config, u, want, depth)
+	if err != nil {
+		return nil, err
+	}
+	i := slices.Index(args, "--no-tags")
+	return slices.Insert(args, i, "--filter=tree:0"), nil
+}
+
+func DeepenSteps() []int { return []int{64, 1024, MaxDepth} }
+
 func FetchArgs(u URL, ref string, depth int) ([]string, error) {
 	if _, err := gitref.Parse(ref); err != nil {
 		return nil, err
