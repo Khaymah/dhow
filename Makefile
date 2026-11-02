@@ -3,9 +3,11 @@ export GOTOOLCHAIN := $(shell awk '/^toolchain/ {print $$2}' go.mod)
 PKG      := ./...
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT   ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null)
+CHECKOUT_IMAGE ?=
 LDFLAGS  := -s -w \
 	-X github.com/Khaymah/dhow/internal/buildinfo.version=$(VERSION) \
-	-X github.com/Khaymah/dhow/internal/buildinfo.commit=$(COMMIT)
+	-X github.com/Khaymah/dhow/internal/buildinfo.commit=$(COMMIT) \
+	-X github.com/Khaymah/dhow/internal/buildinfo.checkoutImage=$(CHECKOUT_IMAGE)
 GOLANGCI_LINT_VERSION := v2.15.0
 GOVULNCHECK_VERSION   := v1.8.0
 ACTIONLINT_VERSION    := v1.7.12
@@ -21,6 +23,7 @@ PROTO_AGAINST_BRANCH  ?= main
 PROTO_AGAINST         ?= $(shell git rev-parse --git-common-dir 2>/dev/null)\#branch=$(PROTO_AGAINST_BRANCH),subdir=$(PROTO_DIR)
 WEB_DIST              := apps/server/internal/App/WebDist
 IMAGE                 ?= dhow:dev
+GIT_IMAGE             ?= dhow-git:dev
 E2E_BASE              ?= debian:12
 RUNNER_E2E_BASE       ?= debian:13
 DISTRO                ?=
@@ -54,8 +57,12 @@ release: ## Build bin/dhow-server with the web app embedded
 	$(MAKE) build
 
 .PHONY: dist
-dist: ## Build reproducible release archives and SHA256SUMS in dist/ (run make web first)
-	deploy/release/dist.sh $(VERSION) $(COMMIT)
+dist: ## Build reproducible release archives and SHA256SUMS in dist/ (run make web first; CHECKOUT_IMAGE=ghcr.io/khaymah/dhow-git@sha256:...)
+	CHECKOUT_IMAGE='$(CHECKOUT_IMAGE)' deploy/release/dist.sh $(VERSION) $(COMMIT)
+
+.PHONY: git-image
+git-image: ## Build the dhow-git checkout image locally (GIT_IMAGE=dhow-git:dev)
+	docker build --tag $(GIT_IMAGE) deploy/dhow-git
 
 .PHONY: installer-e2e
 installer-e2e: build ## Run the installer end to end in a systemd container (E2E_BASE=debian:12)
@@ -247,6 +254,8 @@ test-runner: ## Run the runner tests with the fake sandbox driver (dhowtest buil
 ISOLATION_DIR     ?= $(abspath bin/isolation)
 ISOLATION_BUSYBOX ?= /bin/busybox
 ISOLATION_RUN     ?=
+ISOLATION_GIT_ARCHIVE ?=
+ISOLATION_SSHD    ?=
 
 .PHONY: runner-isolation
 runner-isolation: ## Run the escape and limits suites on rootless Podman (Podman 5.4+, cgroup v2 delegation, subuids, busybox-static)
@@ -256,6 +265,7 @@ runner-isolation: ## Run the escape and limits suites on rootless Podman (Podman
 	$(GO) test -c -tags isolation -o $(ISOLATION_DIR)/isolation.test ./apps/runner/Test/Isolation
 	chmod 0755 $(ISOLATION_DIR) $(ISOLATION_DIR)/dhow-runner $(ISOLATION_DIR)/escape-probe $(ISOLATION_DIR)/isolation.test
 	$(ISOLATION_RUN) env DHOW_ISOLATION_BIN=$(ISOLATION_DIR) DHOW_ISOLATION_BUSYBOX=$(ISOLATION_BUSYBOX) \
+		DHOW_ISOLATION_GIT_ARCHIVE=$(ISOLATION_GIT_ARCHIVE) DHOW_ISOLATION_SSHD=$(ISOLATION_SSHD) \
 		$(ISOLATION_DIR)/isolation.test -test.v -test.count=1 -test.timeout 30m
 
 CHAOS_DIR     ?= $(abspath bin/chaos)

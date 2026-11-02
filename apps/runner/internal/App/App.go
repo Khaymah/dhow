@@ -81,8 +81,14 @@ func Main(ctx context.Context, args []string, env Env) error {
 		return runInstaller(ctx, args, env)
 	case CommandVersion:
 		info := buildinfo.Get()
-		_, err := fmt.Fprintf(env.Stdio.Out, "dhow-runner %s (%s, %s)\n", info.Version, info.Commit, info.GoVersion)
-		return err
+		if _, err := fmt.Fprintf(env.Stdio.Out, "dhow-runner %s (%s, %s)\n", info.Version, info.Commit, info.GoVersion); err != nil {
+			return err
+		}
+		if image := buildinfo.CheckoutImage(); image != "" {
+			_, err := fmt.Fprintf(env.Stdio.Out, "checkout image %s\n", image)
+			return err
+		}
+		return nil
 	default:
 		return fmt.Errorf("unknown command %q: %w", args[0], ErrUsage)
 	}
