@@ -16,7 +16,7 @@ const (
 
 var allowedDataKeys = map[string]struct{}{
 	"Arch": {}, "Disabled": {}, "Email": {}, "EmailDigest": {}, "EmailStatus": {}, "ExpiresAt": {}, "ExpiresInDays": {},
-	"DefaultBranch": {}, "Fields": {}, "Fingerprint": {}, "FirstMethod": {}, "ForkPolicy": {}, "From": {}, "Group": {}, "Host": {}, "Image": {}, "KeyVersion": {}, "Labels": {}, "MaxUses": {},
+	"DefaultBranch": {}, "Fields": {}, "Fingerprint": {}, "FirstMethod": {}, "ForkPolicy": {}, "From": {}, "Group": {}, "Host": {}, "Image": {}, "KeyVersion": {}, "Labels": {}, "LogRetentionDays": {}, "MaxUses": {},
 	"Method": {}, "Name": {}, "NewAccount": {}, "Number": {}, "ProjectId": {}, "Ref": {}, "Sha": {}, "Trigger": {}, "Operation": {}, "OrganizationSlug": {}, "Os": {}, "Owner": {}, "Passkeys": {}, "PipelinePath": {}, "Priority": {},
 	"Provider": {}, "Purpose": {}, "Reason": {}, "RecoveryCodes": {}, "RegisteredWith": {}, "Remaining": {}, "Replaced": {},
 	"Revoked": {}, "RevokedPats": {}, "RevokedSessions": {}, "Role": {}, "Scope": {}, "Scopes": {}, eventbus.SeverityKey: {},

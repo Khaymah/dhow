@@ -31,8 +31,8 @@ GO_POLICY_RULE = re.compile(r"\bpolicy\.(Public|Authenticated|Organization|Proje
 GO_RUNNER_RULE = re.compile(r"\bpolicy\.Runner\(")
 GO_CONNECT_HANDLER = re.compile(r"\b\w+connect\.New\w+Handler\(")
 GO_RUNNER_GATE = re.compile(r"\.RequestGate\(")
-CONNECT_ROUTE_FILES = ("Modules/Runners/Runners.Routes.go", "Modules/Jobs/Jobs.Routes.go")
-RUNNER_AUTH_IMPORTERS = (("App", None), ("Modules", "Runners"), ("Modules", "Jobs"), ("Core", "RunnerAuth"))
+CONNECT_ROUTE_FILES = ("Modules/Runners/Runners.Routes.go", "Modules/Jobs/Jobs.Routes.go", "Modules/Artifacts/Artifacts.Routes.go")
+RUNNER_AUTH_IMPORTERS = (("App", None), ("Modules", "Runners"), ("Modules", "Jobs"), ("Modules", "Artifacts"), ("Core", "RunnerAuth"))
 GO_POLICY_TABLE = re.compile(r"\bpolicy\.NewTable\(")
 GO_ROUTE_MIDDLEWARES = re.compile(r"\bMiddlewares\s*:")
 
@@ -245,7 +245,7 @@ def runner_auth_violation(src, dst):
         return ("Core/Auth and Core/RunnerAuth must not import each other. Browser sessions and runner sessions are "
                 "separate planes, so a credential of one never works on the other.")
     if dst == ("Core", "RunnerAuth") and src not in RUNNER_AUTH_IMPORTERS:
-        return ("only App, Modules/Runners and Modules/Jobs import Core/RunnerAuth. The runner plane and its "
+        return ("only App, Modules/Runners, Modules/Jobs and Modules/Artifacts import Core/RunnerAuth. The runner plane and its "
                 "principal stay out of every other layer.")
     return None
 
@@ -320,7 +320,8 @@ def check_connect_mounts(rel, added, old, final_content, **_):
     inner = rel[len(SERVER_INTERNAL):]
     if inner not in CONNECT_ROUTE_FILES:
         return (f"{rel}: Connect handlers of the runner plane are mounted only in "
-                "Modules/Runners/Runners.Routes.go and Modules/Jobs/Jobs.Routes.go, next to their policy rows.")
+                "Modules/Runners/Runners.Routes.go, Modules/Jobs/Jobs.Routes.go and Modules/Artifacts/Artifacts.Routes.go, "
+                "next to their policy rows.")
     if not (GO_RUNNER_RULE.search(text) and GO_POLICY_TABLE.search(text) and GO_RUNNER_GATE.search(text)):
         return (f"{rel}: every runner procedure needs a declared policy. Declare each procedure with policy.Runner, "
                 "build policy.NewTable(...) from them and pass gate.RequestGate(table) to every Connect handler.")

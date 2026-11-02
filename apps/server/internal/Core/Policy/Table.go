@@ -17,6 +17,8 @@ const (
 	ScopeWebhook
 )
 
+const RunnerBlobPrefix = "/blobs/"
+
 type RunnerAccess uint8
 
 const (
@@ -57,6 +59,10 @@ func Runner(procedure string, access RunnerAccess) Rule {
 	return Rule{Method: http.MethodPost, Path: procedure, Scope: ScopeRunner, Runner: access}
 }
 
+func RunnerHTTP(method, path string, access RunnerAccess) Rule {
+	return Rule{Method: method, Path: path, Scope: ScopeRunner, Runner: access}
+}
+
 func (r Rule) AllowTokens() Rule {
 	r.Tokens = true
 	return r
@@ -85,8 +91,9 @@ func (r Rule) Valid() bool {
 	case ScopeInstance:
 		return IsInstanceAction(r.Action) && r.OrgParam == "" && r.Runner == 0
 	case ScopeRunner:
-		return r.Method == http.MethodPost && r.Action == "" && r.OrgParam == "" &&
-			r.Runner >= RunnerRegistration && r.Runner <= RunnerSession && strings.HasPrefix(r.Path, "/")
+		return r.Action == "" && r.OrgParam == "" && r.Runner >= RunnerRegistration && r.Runner <= RunnerSession &&
+			strings.HasPrefix(r.Path, "/") && (r.Method == http.MethodPost ||
+			((r.Method == http.MethodGet || r.Method == http.MethodPut) && r.Runner == RunnerSession && strings.HasPrefix(r.Path, RunnerBlobPrefix)))
 	default:
 		return false
 	}

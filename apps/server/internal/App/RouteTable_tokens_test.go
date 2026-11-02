@@ -150,8 +150,8 @@ func TestTheRunnerPlaneRefusesAPITokens(t *testing.T) {
 		if rule.Runner != policy.RunnerSession {
 			continue
 		}
-		t.Run(rule.Path, func(t *testing.T) {
-			res := callProcedure(t, env.Handler, rule.Path, map[string]string{"Authorization": "Bearer " + token.Value})
+		t.Run(rule.Key(), func(t *testing.T) {
+			res := callRule(t, env.Handler, rule, map[string]string{"Authorization": "Bearer " + token.Value})
 			assert.Equal(t, "UNAUTHENTICATED", res.message, "status %d code %s", res.status, res.code)
 		})
 	}

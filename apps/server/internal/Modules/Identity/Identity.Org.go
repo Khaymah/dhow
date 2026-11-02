@@ -3,10 +3,13 @@ package identity
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
@@ -27,7 +30,45 @@ func (s *Service) GetOrganization(ctx context.Context, id uuid.UUID) (models.Org
 	if err != nil {
 		return models.Organization{}, err
 	}
-	return organizationOf(row.Id, row.Name, row.Slug, row.CreatedAt, row.RequireSecondFactor, row.RequireSecondFactorSince), nil
+	org := organizationOf(row.Id, row.Name, row.Slug, row.CreatedAt, row.RequireSecondFactor, row.RequireSecondFactorSince)
+	org.LogRetentionDays = daysOf(row.LogRetentionDays)
+	return org, nil
+}
+
+func (s *Service) UpdateLogRetention(ctx context.Context, id uuid.UUID, days *int) (models.Organization, error) {
+	p, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return models.Organization{}, apperrors.Unauthenticated()
+	}
+	var value pgtype.Int4
+	if days != nil {
+		if *days < 1 || *days > config.LogRetentionMax {
+			return models.Organization{}, apperrors.ValidationFailed(invalid("LogRetentionDays"))
+		}
+		value = pgtype.Int4{Int32: int32(*days), Valid: true}
+	}
+	row, err := s.queries().SetOrganizationLogRetention(ctx, sqlc.SetOrganizationLogRetentionParams{ID: id, Days: value, Now: s.now()})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return models.Organization{}, apperrors.NotFound()
+	}
+	if err != nil {
+		return models.Organization{}, err
+	}
+	shown := "server"
+	if value.Valid {
+		shown = strconv.Itoa(int(value.Int32))
+	}
+	actor := p.UserID
+	err = s.bus.Publish(ctx, eventbus.Event{Name: eventbus.IdentityOrganizationUpdated, Payload: eventbus.Audited{
+		OrganizationIDs: []uuid.UUID{id}, ActorUserID: &actor, TargetType: "organization", TargetID: id.String(),
+		IP: auth.RequestMetaFrom(ctx).IPString(), Data: map[string]string{"LogRetentionDays": shown},
+	}})
+	if err != nil {
+		return models.Organization{}, err
+	}
+	org := organizationOf(row.Id, row.Name, row.Slug, row.CreatedAt, row.RequireSecondFactor, row.RequireSecondFactorSince)
+	org.LogRetentionDays = daysOf(row.LogRetentionDays)
+	return org, nil
 }
 
 func (s *Service) UpdateOrganization(ctx context.Context, id uuid.UUID, name string) (models.Organization, error) {
@@ -113,4 +154,12 @@ func (s *Service) ListMembers(ctx context.Context, id uuid.UUID, page, limit int
 		out = append(out, m)
 	}
 	return out, total, nil
+}
+
+func daysOf(v pgtype.Int4) *int32 {
+	if !v.Valid {
+		return nil
+	}
+	d := v.Int32
+	return &d
 }

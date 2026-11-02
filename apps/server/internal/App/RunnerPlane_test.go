@@ -32,7 +32,17 @@ type rpcResult struct {
 
 func callProcedure(t *testing.T, h http.Handler, procedure string, headers map[string]string) rpcResult {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, config.RunnerAPIPrefix+procedure, bytes.NewReader(nil))
+	return callRunnerPlane(t, h, http.MethodPost, procedure, headers)
+}
+
+func callRule(t *testing.T, h http.Handler, rule policy.Rule, headers map[string]string) rpcResult {
+	t.Helper()
+	return callRunnerPlane(t, h, rule.Method, strings.ReplaceAll(rule.Path, "{digest}", strings.Repeat("a", 64)), headers)
+}
+
+func callRunnerPlane(t *testing.T, h http.Handler, method, path string, headers map[string]string) rpcResult {
+	t.Helper()
+	req := httptest.NewRequest(method, config.RunnerAPIPrefix+path, bytes.NewReader(nil))
 	req.RemoteAddr = "198.51.100.20:6000"
 	req.Header.Set("Content-Type", "application/proto")
 	req.Header.Set(config.RunnerProtocolHeader, config.RunnerProtocolVersion)
@@ -50,6 +60,9 @@ func callProcedure(t *testing.T, h http.Handler, procedure string, headers map[s
 		var body struct{ Code, Message string }
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body), rec.Body.String())
 		out.code, out.message = body.Code, body.Message
+		if out.message == "" {
+			out.message = body.Code
+		}
 	}
 	return out
 }
@@ -77,21 +90,34 @@ func TestEveryMountedRunnerProcedureDeclaresAPolicy(t *testing.T) {
 	for _, r := range app.RunnerPolicies() {
 		assert.True(t, r.Valid(), "invalid rule %s", r.Key())
 		assert.Equal(t, policy.ScopeRunner, r.Scope, r.Key())
-		assert.False(t, declared[r.Path], "duplicate rule %s", r.Key())
-		declared[r.Path] = true
+		assert.False(t, declared[r.Key()], "duplicate rule %s", r.Key())
+		declared[r.Key()] = true
 	}
 	mounted := map[string]bool{}
 	for _, p := range runnerProcedures(t) {
 		res := callProcedure(t, env.Handler, p, nil)
 		if res.status != http.StatusNotFound {
-			mounted[p] = true
-			assert.True(t, declared[p], "%s is mounted without a declared policy", p)
+			mounted[http.MethodPost+" "+p] = true
+			assert.True(t, declared[http.MethodPost+" "+p], "%s is mounted without a declared policy", p)
+		}
+	}
+	for _, r := range app.RunnerPolicies() {
+		if r.Method != http.MethodPost && callRule(t, env.Handler, r, nil).status != http.StatusNotFound {
+			mounted[r.Key()] = true
 		}
 	}
 	for p := range declared {
 		assert.True(t, mounted[p], "%s has a policy but is not mounted", p)
 	}
-	assert.Len(t, mounted, 12, "RegistrationService, AuthService, LeaseService and LogService are mounted")
+	assert.Len(t, mounted, 17, "RegistrationService, AuthService, LeaseService, LogService, ArtifactService, CacheService and the blob routes are mounted")
+}
+
+func TestTheBlobRoutesRefuseOtherMethods(t *testing.T) {
+	env := apptest.New(t)
+	for _, method := range []string{http.MethodPost, http.MethodDelete, http.MethodPatch} {
+		res := callRunnerPlane(t, env.Handler, method, "/blobs/"+strings.Repeat("a", 64), nil)
+		assert.Contains(t, []int{http.StatusMethodNotAllowed, http.StatusNotFound}, res.status, method)
+	}
 }
 
 type runnerCaller struct {
@@ -176,8 +202,8 @@ func TestRunnerProcedureTable(t *testing.T) {
 	fx := buildRunnerFixture(t, env)
 	for _, rule := range app.RunnerPolicies() {
 		for _, caller := range runnerCallers {
-			t.Run(rule.Path+"/"+caller.name, func(t *testing.T) {
-				res := callProcedure(t, env.Handler, rule.Path, caller.headers(&fx))
+			t.Run(rule.Key()+"/"+caller.name, func(t *testing.T) {
+				res := callRule(t, env.Handler, rule, caller.headers(&fx))
 				want := expectedGate(rule, caller.name)
 				if want == "" {
 					assert.False(t, gateMessages[res.message], "must pass the gate, got %d %s %s", res.status, res.code, res.message)

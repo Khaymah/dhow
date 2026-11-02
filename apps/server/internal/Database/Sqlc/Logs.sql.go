@@ -61,31 +61,33 @@ func (q *Queries) EnsureLogPartitions(ctx context.Context, daysAhead int32) (int
 }
 
 const getLogAttempt = `-- name: GetLogAttempt :one
-SELECT "Id", "Number", "State", "LastSeq", ("LogTruncatedAt" IS NOT NULL)::boolean AS "Truncated", "LeasedAt"
+SELECT "Id", "Number", "State", "LastSeq", ("LogTruncatedAt" IS NOT NULL)::boolean AS "Truncated", "LeasedAt",
+       (SELECT o."LogRetentionDays" FROM "Organizations" o WHERE o."Id" = $1) AS "OrgRetentionDays"
 FROM "JobAttempts"
-WHERE "JobId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+WHERE "JobId" = $2 AND "OrganizationId" = $1 AND NOT "IsDeleted"
   AND ($3::integer IS NULL OR "Number" = $3::integer)
 ORDER BY "Number" DESC
 LIMIT 1
 `
 
 type GetLogAttemptParams struct {
-	JobID          uuid.UUID
 	OrganizationID uuid.UUID
+	JobID          uuid.UUID
 	Number         pgtype.Int4
 }
 
 type GetLogAttemptRow struct {
-	Id        uuid.UUID
-	Number    int32
-	State     string
-	LastSeq   int64
-	Truncated bool
-	LeasedAt  time.Time
+	Id               uuid.UUID
+	Number           int32
+	State            string
+	LastSeq          int64
+	Truncated        bool
+	LeasedAt         time.Time
+	OrgRetentionDays pgtype.Int4
 }
 
 func (q *Queries) GetLogAttempt(ctx context.Context, arg GetLogAttemptParams) (GetLogAttemptRow, error) {
-	row := q.db.QueryRow(ctx, getLogAttempt, arg.JobID, arg.OrganizationID, arg.Number)
+	row := q.db.QueryRow(ctx, getLogAttempt, arg.OrganizationID, arg.JobID, arg.Number)
 	var i GetLogAttemptRow
 	err := row.Scan(
 		&i.Id,
@@ -94,6 +96,7 @@ func (q *Queries) GetLogAttempt(ctx context.Context, arg GetLogAttemptParams) (G
 		&i.LastSeq,
 		&i.Truncated,
 		&i.LeasedAt,
+		&i.OrgRetentionDays,
 	)
 	return i, err
 }
@@ -329,6 +332,60 @@ SELECT pg_notify('dhow_log_appended', $1::text)
 func (q *Queries) NotifyLogAppended(ctx context.Context, payload string) error {
 	_, err := q.db.Exec(ctx, notifyLogAppended, payload)
 	return err
+}
+
+const organizationsWithLogRetention = `-- name: OrganizationsWithLogRetention :many
+SELECT "Id", "LogRetentionDays"::integer AS "Days"
+FROM "Organizations"
+WHERE "LogRetentionDays" IS NOT NULL AND NOT "IsDeleted"
+`
+
+type OrganizationsWithLogRetentionRow struct {
+	Id   uuid.UUID
+	Days int32
+}
+
+func (q *Queries) OrganizationsWithLogRetention(ctx context.Context) ([]OrganizationsWithLogRetentionRow, error) {
+	rows, err := q.db.Query(ctx, organizationsWithLogRetention)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OrganizationsWithLogRetentionRow{}
+	for rows.Next() {
+		var i OrganizationsWithLogRetentionRow
+		if err := rows.Scan(&i.Id, &i.Days); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const scrubOrganizationLogs = `-- name: ScrubOrganizationLogs :execrows
+UPDATE "LogChunks"
+SET "IsDeleted" = true, "Data" = '\x00'::bytea, "UpdatedAt" = now()
+WHERE ("Id", "CreatedAt") IN (SELECT l."Id", l."CreatedAt"
+                              FROM "LogChunks" l
+                              WHERE l."OrganizationId" = $1 AND l."CreatedAt" < $2 AND NOT l."IsDeleted"
+                              LIMIT $3)
+`
+
+type ScrubOrganizationLogsParams struct {
+	OrganizationID uuid.UUID
+	Before         time.Time
+	Batch          int32
+}
+
+func (q *Queries) ScrubOrganizationLogs(ctx context.Context, arg ScrubOrganizationLogsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, scrubOrganizationLogs, arg.OrganizationID, arg.Before, arg.Batch)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setLocalLockTimeout = `-- name: SetLocalLockTimeout :exec

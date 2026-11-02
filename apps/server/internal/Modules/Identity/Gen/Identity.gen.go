@@ -533,7 +533,10 @@ type MfaState string
 type Organization struct {
 	CreatedAt time.Time          `json:"CreatedAt"`
 	Id        openapi_types.UUID `json:"Id"`
-	Name      string             `json:"Name"`
+
+	// LogRetentionDays Days this organization keeps its job logs. Absent when it follows the server setting.
+	LogRetentionDays *int   `json:"LogRetentionDays,omitempty"`
+	Name             string `json:"Name"`
 
 	// RequireSecondFactor Who must use two-step verification in the organization.
 	RequireSecondFactor SecondFactorRule `json:"RequireSecondFactor"`
@@ -716,6 +719,11 @@ type TransferOwnershipRequest struct {
 	UserId        openapi_types.UUID `json:"UserId"`
 }
 
+// UpdateLogRetentionRequest defines model for UpdateLogRetentionRequest.
+type UpdateLogRetentionRequest struct {
+	LogRetentionDays *int `json:"LogRetentionDays"`
+}
+
 // UpdateOrganizationRequest defines model for UpdateOrganizationRequest.
 type UpdateOrganizationRequest struct {
 	Name string `json:"Name"`
@@ -807,6 +815,9 @@ type UpdateOrganizationJSONRequestBody = UpdateOrganizationRequest
 // CreateInvitationJSONRequestBody defines body for CreateInvitation for application/json ContentType.
 type CreateInvitationJSONRequestBody = CreateInvitationRequest
 
+// UpdateLogRetentionJSONRequestBody defines body for UpdateLogRetention for application/json ContentType.
+type UpdateLogRetentionJSONRequestBody = UpdateLogRetentionRequest
+
 // ChangeMemberRoleJSONRequestBody defines body for ChangeMemberRole for application/json ContentType.
 type ChangeMemberRoleJSONRequestBody = ChangeMemberRoleRequest
 
@@ -872,6 +883,9 @@ type ServerInterface interface {
 	// LeaveOrganization Leave an organization
 	// (POST /organizations/{id}/leave)
 	LeaveOrganization(w http.ResponseWriter, r *http.Request, id Id)
+	// UpdateLogRetention Keep this organization's job logs for fewer days
+	// (PUT /organizations/{id}/log-retention)
+	UpdateLogRetention(w http.ResponseWriter, r *http.Request, id Id)
 	// ListMembers List the members of an organization
 	// (GET /organizations/{id}/members)
 	ListMembers(w http.ResponseWriter, r *http.Request, id Id, params ListMembersParams)
@@ -992,6 +1006,12 @@ func (_ Unimplemented) ResendInvitation(w http.ResponseWriter, r *http.Request, 
 // LeaveOrganization Leave an organization
 // (POST /organizations/{id}/leave)
 func (_ Unimplemented) LeaveOrganization(w http.ResponseWriter, r *http.Request, id Id) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateLogRetention Keep this organization's job logs for fewer days
+// (PUT /organizations/{id}/log-retention)
+func (_ Unimplemented) UpdateLogRetention(w http.ResponseWriter, r *http.Request, id Id) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1369,6 +1389,32 @@ func (siw *ServerInterfaceWrapper) LeaveOrganization(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.LeaveOrganization(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateLogRetention operation middleware
+func (siw *ServerInterfaceWrapper) UpdateLogRetention(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateLogRetention(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2092,6 +2138,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/organizations/{id}/second-factor-rule", wrapper.UpdateSecondFactorRule)
 	})
 	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/organizations/{id}/log-retention", wrapper.UpdateLogRetention)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/organizations/{id}/members", wrapper.ListMembers)
 	})
 	r.Group(func(r chi.Router) {
@@ -2589,6 +2638,46 @@ type LeaveOrganizationdefaultJSONResponse struct {
 }
 
 func (response LeaveOrganizationdefaultJSONResponse) VisitLeaveOrganizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateLogRetentionRequestObject struct {
+	Id   Id `json:"id"`
+	Body *UpdateLogRetentionJSONRequestBody
+}
+
+type UpdateLogRetentionResponseObject interface {
+	VisitUpdateLogRetentionResponse(w http.ResponseWriter) error
+}
+
+type UpdateLogRetention200JSONResponse OrganizationResponse
+
+func (response UpdateLogRetention200JSONResponse) VisitUpdateLogRetentionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateLogRetentiondefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response UpdateLogRetentiondefaultJSONResponse) VisitUpdateLogRetentionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3322,6 +3411,9 @@ type StrictServerInterface interface {
 	// LeaveOrganization Leave an organization
 	// (POST /organizations/{id}/leave)
 	LeaveOrganization(ctx context.Context, request LeaveOrganizationRequestObject) (LeaveOrganizationResponseObject, error)
+	// UpdateLogRetention Keep this organization's job logs for fewer days
+	// (PUT /organizations/{id}/log-retention)
+	UpdateLogRetention(ctx context.Context, request UpdateLogRetentionRequestObject) (UpdateLogRetentionResponseObject, error)
 	// ListMembers List the members of an organization
 	// (GET /organizations/{id}/members)
 	ListMembers(ctx context.Context, request ListMembersRequestObject) (ListMembersResponseObject, error)
@@ -3730,6 +3822,39 @@ func (sh *strictHandler) LeaveOrganization(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(LeaveOrganizationResponseObject); ok {
 		if err := validResponse.VisitLeaveOrganizationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateLogRetention operation middleware
+func (sh *strictHandler) UpdateLogRetention(w http.ResponseWriter, r *http.Request, id Id) {
+	var request UpdateLogRetentionRequestObject
+
+	request.Id = id
+
+	var body UpdateLogRetentionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateLogRetention(ctx, request.(UpdateLogRetentionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateLogRetention")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateLogRetentionResponseObject); ok {
+		if err := validResponse.VisitUpdateLogRetentionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

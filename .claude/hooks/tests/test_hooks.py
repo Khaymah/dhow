@@ -296,6 +296,8 @@ class RunnerPlaneRules(unittest.TestCase):
     def test_connect_mount_with_policies_and_gate_allowed(self):
         self.assertIsNone(edit(RUNNER_ROUTES, GOOD_CONNECT_ROUTES))
         self.assertIsNone(edit(SERVER + "Modules/Jobs/Jobs.Routes.go", GOOD_CONNECT_ROUTES.replace("package runners", "package jobs")))
+        self.assertIsNone(edit(SERVER + "Modules/Artifacts/Artifacts.Routes.go",
+                               GOOD_CONNECT_ROUTES.replace("package runners", "package artifacts")))
 
     def test_policy_runner_counts_as_a_declared_policy(self):
         src = GOOD_ROUTES.replace(
@@ -333,13 +335,14 @@ class RunnerPlaneRules(unittest.TestCase):
         self.assertIsNone(edit(SERVER + "Modules/Runners/Test/E2E/Gate_test.go", GOOD_CONNECT_ROUTES))
         self.assertIsNone(edit(SERVER + "Core/RunnerAuth/Gate_test.go", GOOD_CONNECT_ROUTES))
 
-    def test_only_app_runners_and_jobs_import_runner_auth(self):
+    def test_only_app_runners_jobs_and_artifacts_import_runner_auth(self):
         for path in ("App/App.go", "App/Wire.go", "Modules/Runners/Runners.Service.go", "Modules/Jobs/Jobs.Lease.go",
-                     "Core/RunnerAuth/Keys.go"):
+                     "Modules/Artifacts/Artifacts.Routes.go", "Core/RunnerAuth/Keys.go"):
             self.assertIsNone(edit(SERVER + path, imp("Core/RunnerAuth")), path)
         for path in ("Modules/Session/Session.Service.go", "Modules/Audit/Audit.Service.go", "Core/Response/Response.Helper.go",
                      "Core/Middleware/AccessLog.go"):
-            self.assertIn("only App, Modules/Runners and Modules/Jobs import Core/RunnerAuth", edit(SERVER + path, imp("Core/RunnerAuth")), path)
+            self.assertIn("only App, Modules/Runners, Modules/Jobs and Modules/Artifacts import Core/RunnerAuth",
+                          edit(SERVER + path, imp("Core/RunnerAuth")), path)
 
     def test_browser_and_runner_auth_never_import_each_other(self):
         self.assertIn("separate planes", edit(SERVER + "Core/RunnerAuth/Gate.go", imp("Core/Auth")))

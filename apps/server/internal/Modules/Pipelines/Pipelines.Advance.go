@@ -155,6 +155,12 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 	if st.run.IsFork && (len(spec.GetSecrets()) > 0 || hasPluginSecrets(plan)) {
 		return s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonForkSecrets)
 	}
+	if reason, err := s.attachTransfers(ctx, q, st, rj, plan, spec, evalCtx); err != nil || reason != "" {
+		if err != nil {
+			return err
+		}
+		return s.endRunJob(ctx, q, st, i, models.JobFailed, reason)
+	}
 	reason, err := s.enqueue(ctx, q, st, rj, plan, spec)
 	if err != nil || reason == "" {
 		return err

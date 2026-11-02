@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -81,11 +82,22 @@ func (s *Service) attemptState(ctx context.Context, org, attempt uuid.UUID) (sql
 	return s.readQueries().GetLogAttemptState(ctx, sqlc.GetLogAttemptStateParams{ID: attempt, OrganizationID: org})
 }
 
+func logsSince(a sqlc.GetLogAttemptRow, now time.Time) time.Time {
+	if !a.OrgRetentionDays.Valid || a.OrgRetentionDays.Int32 <= 0 {
+		return a.LeasedAt
+	}
+	cutoff := now.Add(-time.Duration(a.OrgRetentionDays.Int32) * 24 * time.Hour)
+	if cutoff.After(a.LeasedAt) {
+		return cutoff
+	}
+	return a.LeasedAt
+}
+
 func (s *Service) readChunks(ctx context.Context, org uuid.UUID, a sqlc.GetLogAttemptRow, from int64, rows int, maxBytes int64) ([]models.LogChunk, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.readWait)
 	defer cancel()
 	list, err := s.readQueries().ListLogChunks(ctx, sqlc.ListLogChunksParams{
-		AttemptID: a.Id, OrganizationID: org, FromSeq: from, Since: a.LeasedAt, RowLimit: int32(rows), MaxBytes: maxBytes, //nolint:gosec // Row limits are small constants.
+		AttemptID: a.Id, OrganizationID: org, FromSeq: from, Since: logsSince(a, time.Now()), RowLimit: int32(rows), MaxBytes: maxBytes, //nolint:gosec // Row limits are small constants.
 	})
 	if err != nil {
 		return nil, err

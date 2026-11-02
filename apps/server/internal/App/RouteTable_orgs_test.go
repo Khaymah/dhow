@@ -93,6 +93,9 @@ func organizationPath(env *apptest.Env, fx fixture, rule policy.Rule) string {
 		if strings.Contains(path, "{runId}") {
 			path = strings.ReplaceAll(path, "{runId}", env.SeedRun(project, "awaiting_approval").String())
 		}
+		if strings.Contains(path, "{artifactId}") {
+			path = strings.ReplaceAll(path, "{artifactId}", env.SeedArtifact(project, "web", []byte("archive"), false).ID.String())
+		}
 	}
 	if strings.Contains(path, "{invitationId}") {
 		path = strings.ReplaceAll(path, "{invitationId}", seedInvitation(env, fx.orgA, fx.byRole[policy.RoleOwner], string(policy.RoleViewer)))
@@ -123,6 +126,8 @@ func organizationBody(env *apptest.Env, fx fixture, rule policy.Rule) any {
 		return map[string]string{"Name": "Route table project", "Slug": "rt-" + randomSuffix(env.T)}
 	case "POST /organizations/{id}/projects/{projectId}/runs":
 		return map[string]string{"Ref": "main"}
+	case "PUT /organizations/{id}/log-retention":
+		return map[string]any{"LogRetentionDays": 7}
 	case "POST /organizations/{id}/invitations":
 		return map[string]string{"Email": randomEmail(env.T), "Role": string(policy.RoleViewer)}
 	case "POST /invitations/preview", "POST /me/invitations/accept":

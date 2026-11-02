@@ -70,6 +70,18 @@ func (c *Controller) UpdateOrganization(ctx context.Context, req gen.UpdateOrgan
 	return gen.UpdateOrganization200JSONResponse{Success: true, Message: ptr(messageOrgSave), Data: &data}, nil
 }
 
+func (c *Controller) UpdateLogRetention(ctx context.Context, req gen.UpdateLogRetentionRequestObject) (gen.UpdateLogRetentionResponseObject, error) {
+	if req.Body == nil {
+		return nil, apperrors.BadRequest()
+	}
+	org, err := c.service.UpdateLogRetention(ctx, req.Id, req.Body.LogRetentionDays)
+	if err != nil {
+		return nil, err
+	}
+	data := orgToGen(org)
+	return gen.UpdateLogRetention200JSONResponse{Success: true, Message: ptr(messageOrgSave), Data: &data}, nil
+}
+
 func (c *Controller) UpdateSecondFactorRule(ctx context.Context, req gen.UpdateSecondFactorRuleRequestObject) (gen.UpdateSecondFactorRuleResponseObject, error) {
 	if req.Body == nil {
 		return nil, apperrors.BadRequest()
@@ -111,10 +123,14 @@ func (c *Controller) ListMembers(ctx context.Context, req gen.ListMembersRequest
 }
 
 func orgToGen(o models.Organization) gen.Organization {
-	return gen.Organization{
+	out := gen.Organization{
 		Id: o.ID, Name: o.Name, Slug: o.Slug, CreatedAt: o.CreatedAt,
 		RequireSecondFactor: gen.SecondFactorRule(o.RequireSecondFactor), RequireSecondFactorSince: o.RequireSecondFactorSince,
 	}
+	if o.LogRetentionDays != nil {
+		out.LogRetentionDays = ptr(int(*o.LogRetentionDays))
+	}
+	return out
 }
 
 func ptr[T any](v T) *T { return &v }

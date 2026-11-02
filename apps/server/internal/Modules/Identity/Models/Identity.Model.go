@@ -20,6 +20,7 @@ type Organization struct {
 	CreatedAt                time.Time
 	RequireSecondFactor      string
 	RequireSecondFactorSince *time.Time
+	LogRetentionDays         *int32
 }
 
 type Member struct {

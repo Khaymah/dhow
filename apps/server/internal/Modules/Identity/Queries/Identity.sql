@@ -49,7 +49,7 @@ INSERT INTO "Memberships" ("UserId", "OrganizationId", "Role", "CreatedAt", "Upd
 VALUES (@user_id, @organization_id, @role, @now, @now);
 
 -- name: GetOrganizationForMember :one
-SELECT o."Id", o."Name", o."Slug", o."CreatedAt", o."RequireSecondFactor", o."RequireSecondFactorSince"
+SELECT o."Id", o."Name", o."Slug", o."CreatedAt", o."RequireSecondFactor", o."RequireSecondFactorSince", o."LogRetentionDays"
 FROM "Organizations" o
 JOIN "Memberships" m ON m."OrganizationId" = o."Id" AND m."UserId" = @user_id AND NOT m."IsDeleted"
 WHERE o."Id" = @id AND NOT o."IsDeleted";
@@ -102,3 +102,9 @@ SELECT count(*)
 FROM "Memberships" m
 JOIN "Users" u ON u."Id" = m."UserId" AND NOT u."IsDeleted"
 WHERE m."OrganizationId" = @organization_id AND NOT m."IsDeleted";
+
+-- name: SetOrganizationLogRetention :one
+UPDATE "Organizations"
+SET "LogRetentionDays" = sqlc.narg(days)::integer, "UpdatedAt" = @now
+WHERE "Id" = @id AND NOT "IsDeleted"
+RETURNING "Id", "Name", "Slug", "CreatedAt", "RequireSecondFactor", "RequireSecondFactorSince", "LogRetentionDays";

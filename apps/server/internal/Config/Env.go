@@ -46,6 +46,8 @@ type Config struct {
 
 	Sources Sources
 
+	Artifacts Artifacts
+
 	Settings settingspec.Raw
 
 	OIDCProviders []OIDCProvider
@@ -92,6 +94,10 @@ func Load(getenv func(string) string) (Config, error) {
 	var sourceErrs []error
 	if cfg.Sources, sourceErrs = loadSources(getenv); len(sourceErrs) > 0 {
 		errs = append(errs, sourceErrs...)
+	}
+	var artifactErrs []error
+	if cfg.Artifacts, artifactErrs = loadArtifacts(getenv, dev); len(artifactErrs) > 0 {
+		errs = append(errs, artifactErrs...)
 	}
 	if cfg.TrustedProxies, err = parseTrustedProxies(getenv(EnvTrustedProxies)); err != nil {
 		errs = append(errs, fmt.Errorf("%s: %w", EnvTrustedProxies, err))

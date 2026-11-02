@@ -2,6 +2,7 @@ package i18n
 
 var arMessages = map[string]string{ //nolint:gosec // This is a message catalog, not credentials.
 	"errors.internal":                              "حدث خطأ غير متوقع. حاول مرة أخرى بعد قليل.",
+	"errors.artifactGone":                          "لم يعد هذا الملف الناتج محفوظًا. أعد التشغيل لإنشائه من جديد.",
 	"errors.notFound":                              "المورد المطلوب غير موجود.",
 	"errors.methodNotAllowed":                      "هذه الطريقة غير مسموحة هنا.",
 	"errors.badRequest":                            "الطلب غير صالح. راجع البيانات وحاول مرة أخرى.",
@@ -182,6 +183,7 @@ var arMessages = map[string]string{ //nolint:gosec // This is a message catalog,
 	"errors.shaNotOnRef":                           "هذا الـ commit لم يصل إلى هذا الفرع أو الـ tag عبر الإشعارات، فلا يمكن تشغيله عليه.",
 	"errors.refHeadUnknown":                        "لا نعرف بعد آخر commit في هذا الفرع أو الـ tag. ادفع إليه مرة لكي يصل إشعار، ثم حاول مرة أخرى.",
 	"pipelines.runs.loaded":                        "حمّلنا التنفيذات.",
+	"artifacts.list.loaded":                        "حمّلنا الملفات الناتجة.",
 	"pipelines.run.loaded":                         "حمّلنا التنفيذ.",
 	"pipelines.run.created":                        "أنشأنا التنفيذ. سيبدأ بعد قراءة ملف خطوات النشر.",
 	"pipelines.run.cancelRequested":                "طلبنا إلغاء التنفيذ.",
