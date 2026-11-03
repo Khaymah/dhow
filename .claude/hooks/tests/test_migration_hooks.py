@@ -156,7 +156,8 @@ class Scope(unittest.TestCase):
         self.assertIn("[M2]", reason)
 
     def test_grandfathered_migrations_are_not_checked(self):
-        names = sorted(f for f in os.listdir(MIGRATIONS) if f.endswith(".sql"))
+        names = sorted(f for f in os.listdir(MIGRATIONS)
+                       if f.endswith(".sql") and int(f[:5]) <= migration_rules.GRANDFATHERED_THROUGH)
         self.assertEqual(len(names), 26)
         failing = 0
         for name in names:
