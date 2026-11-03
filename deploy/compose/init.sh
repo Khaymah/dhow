@@ -69,5 +69,5 @@ printf 'Wrote %s (mode 600).\n' "$env_file"
 printf 'Wrote the keyring %s (mode 600, owned by the container user %s).\n' "$keyring" "$container_uid"
 printf 'Public URL: %s\n' "$public_url"
 printf 'Back up .env and secrets/ together: without them the stored secrets cannot be decrypted.\n'
-printf 'Export the keyring and keep the copy off this machine: docker compose run --rm --no-deps dhow keys export --recipient age1... --out - > dhow-keyring.age\n'
+printf 'Export the keyring and keep the copy off this machine: docker compose run --rm --no-deps -T dhow keys export --recipient age1... --out - > dhow-keyring.age\n'
 printf 'Next: docker compose up -d\n'

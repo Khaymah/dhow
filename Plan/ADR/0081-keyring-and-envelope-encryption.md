@@ -15,7 +15,7 @@
    - **DEK** بـ 32 byte عشوائي لكل صاحب: `instance` و`organization:<id>` و`project:<id>` و`environment:<id>` و`user:<id>`. بيتعمل lazy أول ما الصاحب يختم قيمة (`INSERT ... ON CONFLICT DO NOTHING` وبعده `SELECT`)، وبيتخزّن في `"DataKeys"` ملفوف بـ AES-256-GCM و nonce عشوائي: `nonce (12) ‖ ciphertext (32) ‖ tag (16)`، يعني 60 byte بالظبط (CHECK).
    - **AAD لف الـ DEK:** `dhow/dek/v1 ‖ 0x00 ‖ DataKeyId ‖ len(OwnerKind) ‖ OwnerKind ‖ OwnerId (16) ‖ KekVersion (uint32)`. الـ DEK المتنقل لصف تاني أو صاحب تاني أو إصدار تاني مابيتفكّش. والـ `DataKeyId` بيتعمل في Go (UUIDv7) عشان يدخل الـ AAD قبل الـ INSERT.
    - **`Destroy(owner)`** بيصفّر `"Wrapped"` ويخلّي الحالة `destroyed` (مسح بالتشفير). القيم بعدها بترجع `ErrShredded`، وهو نوع من `ErrSealed`. والختم الجديد لنفس الصاحب بيعمل DEK جديد.
-2. **صيغة القيمة `0x02`** (القرار 2): `0x02 ‖ DataKeyId (16) ‖ nonce (12) ‖ ciphertext ‖ tag (16)`، يعني 45 byte زيادة. والـ AAD = `0x02 ‖ DataKeyId ‖ uint16(len(label)) ‖ label ‖ context`، والطول بيمنع إن label وcontext يتبادلوا حروف. و`Open` بياخد الصاحب المتوقع، ولو صاحب الـ `DataKeyId` مختلف بيرجّع `ErrSealed` حتى لو الـ context اتزوّر. الإصدار `0x01` بتاع `Sealer` بيتعرف من أول byte.
+2. **صيغة القيمة `0x03`** (القرار 2، واتعدّل بعد المراجعة الأمنية): `0x03 ‖ DataKeyId (16) ‖ salt (32) ‖ nonce (12) ‖ ciphertext ‖ tag (16)`، يعني 77 byte زيادة. كل قيمة بمفتاح فرعي = HKDF-SHA256(DEK، salt عشوائي، info = `dhow/value/v2` ‖ label)، و nonce عشوائي تحت مفتاح جديد كل مرة، فمفيش حد 2^32 لكل DEK (حد الـ nonce العشوائي في GCM). الـ `0x02` (من غير salt) ماطلعش في أي نسخة ومفيش قيم بيه، فالرقم اتغيّر من غير migration، و`0x01` بتاع `Sealer` بيفضل مختلف. والـ AAD = `0x03 ‖ DataKeyId ‖ uint16(len(label)) ‖ label ‖ context`، والطول بيمنع إن label وcontext يتبادلوا حروف، والـ context الفاضي مرفوض (`ErrBadContext`). و`Open` بياخد الصاحب المتوقع، ولو صاحب الـ `DataKeyId` مختلف بيرجّع `ErrSealed` حتى لو الـ context اتزوّر. القيود في M5.2: TOTP 20 byte بيبقى 97 (القيد 29 لـ 128).
 3. **قيمة فحص لكل إصدار والإقلاع بيقف** (القرار 3):
    - `"CheckValue"` = HMAC-SHA256(KEK، `dhow/kek-check/v1`)، والمقارنة بـ `hmac.Equal`.
    - عند الإقلاع وجوه transaction تحت advisory lock: كل إصدار مش `retired` لازم يبقى في الملف بنفس قيمة الفحص. الإصدار اللي في الملف ومش في القاعدة بيتسجّل `pending`، ولو مفيش إصدار `active` (تنصيب جديد)، أعلى إصدار في الملف بيبقى `active` في نفس الـ transaction.
@@ -37,12 +37,23 @@
 9. **مفيش cache للـ DEKs:** فك الـ DEK بالملف عملية AES واحدة. الـ cache بحد ووقت بييجي مع KMS.
 10. **الجداول** (`00052_keyring.sql`، expand): `"KeyEncryptionKeys"` (`"Version"` unique، وواحد بس `active` بـ partial unique index، و`"CheckValue"` 32 byte) و`"DataKeys"` (`"OwnerId"` NULL لـ `instance` بس، وunique على الصاحب `NULLS NOT DISTINCT WHERE "State" = 'active'`، وFK على إصدار الـ KEK، وindex للـ worker)، و`"ServerInstances"."KekVersions"` (`integer[] NOT NULL DEFAULT '{}'`)، فالـ binary القديم بيسجّل عادي.
 
+## بعد المراجعة الأمنية
+11. **الـ DEK الجديد مايتلفّش بإصدار اتقاعد وهو بيتعمل:** `InsertDataKey` بيعمل `INSERT ... SELECT ... FROM "KeyEncryptionKeys" WHERE "Version" = @v AND "State" = 'active' FOR SHARE`، فالتفعيل والتقاعد بيستنوا الإدراج، ولو الإصدار ماعادش active الإدراج مابيحصلش و`Seal` بيعيد بالإصدار الحالي (3 محاولات). و`Status.Removable()` ورسالة «احذف سطره» بيشترطوا صفر DEK على الإصدار.
+12. **`keys generate` بقفل:** `flock(LOCK_EX)` على الـ descriptor، و`fstat`، والـ parse، و`pwrite` عند الحجم القديم، و`fsync`، وقراية تانية وparse للتأكد، وأي فشل بيعمل `ftruncate` للحجم القديم و`fsync`. بيشتغل على secret الـ Compose (bind mount لملف واحد). والسطر الأخير البايظ رسالته بتقول «احذف السطر N».
+13. **`Register` بيفشل لو مفيش active:** لو التفعيل ماغيّرش أي صف (أحدث إصدار في الملف `retired`، زي استرجاع تصدير قديم) بيرجع `KEYRING_RETIRED` بالـ exit 79.
+14. **التدوير مابيحميش من سلسلة اتسرّبت لوحده:** السلسلة المسرّبة مع نسخة قاعدة من قبل التدوير بتفك DEKs لسه بتحمي القيم الحالية، و`Destroy` مابيمنعش نسخة أقدم مع سلسلتها. الحماية الكاملة محتاجة `keys rekey` (DEK جديد لكل صاحب وإعادة ختم كل قيمة)، وده شرط على M5.2 ومكتوب في الخطة، لأن مفيش قيم envelope قبل M5.2.
+15. **`--discard-unreadable`:** بيرفض (`KEYS_IN_USE`) لو instance حي بيقول إن معاه أي إصدار من اللي هيتمسحوا، ومابيعملش سلسلة لوحده لو `--file` اتكتب، والتأكيد مربوط بالخطة: `--confirm destroy-<عدد الـ DEKs>-keys`، ولو العدد اتغيّر جوه الـ transaction مفيش تغيير، وحدث الـ audit في نفس الـ transaction (`Audited.Tx`).
+16. **الصف البايظ مابيوقفش إعادة اللف:** الـ DEK اللي مابيتفكّش بيتعلّم `"UnwrapFailedAt"` ويتسجّل في الـ log (الـ id والإصدار بس)، والـ worker بيكمّل، والإصدار مابيتقاعدش طول ما عليه صف من دول. بيبانوا في `keys status` و`doctor`، والإقلاع بيمسح العلامة عشان يجرّبهم تاني بعد إصلاح السلسلة.
+17. **Compose و79:** `DHOW_ON_INCOMPATIBLE=wait` (الافتراضي في الصورة) بقى بيشمل أخطاء `KEYRING_*`: سطر log واحد وانتظار إشارة الإيقاف، والـ healthcheck فاشل. والسلسلة بتتقارن بالقاعدة قبل `PrepareSchema` لو الجدول موجود، فالسلسلة الغلط مابتطبّقش migration.
+18. **`doctor`** بيستخدم `Lstat` وبيرفض الـ symlink زي السيرفر، والـ parser بيشتغل على `[]byte` من غير تحويل لـ string وبيصفّر الـ buffers. و`filippo.io/age` v1.3.2 و`filippo.io/hpke` v0.4.0 نضاف في `govulncheck`.
+
 ## البدائل اللي اترفضت
 - **KEK مشتق من `DHOW_SECRET_KEY`:** مفيش تدوير حقيقي من غير ما كل التوكنات والـ runners تقع، والمفتاح في متغيّر بيئة ممكن يبان.
 - **DEK لكل سر:** صف `DataKeys` لكل قيمة من غير مكسب، لأن الاتنين بيتفكّوا في نفس الـ process بنفس الـ KEK.
 - **DEK لكل مؤسسة:** مسح بيئة مايقدرش يمسح مفتاحها.
 - **إعادة تشفير كل القيم مع التدوير:** ساعات بدل ثواني، وكل جدول فيه أسرار لازم يعرف التدوير. وبعد التسريب الحل الحقيقي تغيير القيمة.
 - **التفعيل أوتوماتيك أول ما الإصدار يظهر:** instance لسه ماخدش الملف الجديد مايقدرش يفك اللي اتلف بيه.
+- **DEK يشفّر القيم مباشرة بـ nonce عشوائي:** حد 2^32 قيمة لكل DEK قبل ما خطر تكرار الـ nonce يبقى مش مقبول، والـ DEK بيعيش طول عمر الصاحب.
 - **`ReplaceKeyringFile` بملف مؤقت و`rename`:** محتاج كتابة في المجلد، وده مش متاح في secret الـ Compose، والـ rename بيكسر الـ bind mount.
 - **الملف بصلاحية المجموعة زي `secretValue`:** السلسلة أهم من أي سر تاني، فالقاعدة أشد، والاستثناء الوحيد ACL الـ systemd.
 

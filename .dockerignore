@@ -18,3 +18,4 @@ Plan
 deploy
 *.md
 LICENSE
+.dhow-dev-keyring*
