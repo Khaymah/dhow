@@ -112,7 +112,7 @@ Rotation re-wraps the data keys only and does not change them, so it protects ag
 
 `dhow-server keys rekey` gives every owner a new data key, encrypts every stored value again with the new key of its owner, then destroys the old keys. After it, the old keyring together with a database copy from before the command opens no current value. The decisions and their reasons are in [ADR-0082](../../../Plan/ADR/0082-sealer-users-move-to-the-envelope.md).
 
-1. If the keyring leaked, rotate the key first as in [Rotate the key](#rotate-the-key), so the new data keys are wrapped with a version the leaker does not have.
+1. If the keyring leaked, the order is `keys generate`, then copy the file and restart every server, then `keys activate`, then `keys rekey`, as in [Rotate the key](#rotate-the-key). This way the new data keys are wrapped with a version the leaker does not have. If the active version was activated more than an hour before the command, the command prints a warning (`WARNING`) with this order.
 2. Run the command with the settings of the service:
 
    ```sh
@@ -122,9 +122,11 @@ Rotation re-wraps the data keys only and does not change them, so it protects ag
      /usr/local/bin/dhow-server keys rekey
    ```
 
-3. The command runs while the server runs. Reads never stop, because an old key stays readable in the `superseded` state until all its values have moved, and a new value is encrypted with the new key at once. After the first pass the command waits for `--grace` (10 seconds by default) so every write that started with an old key finishes, then counts the values left and passes over them again, then destroys the old keys.
+3. The command runs while the server runs. Reads never stop, because an old key stays readable in the `superseded` state until all its values have moved, and a new value is encrypted with the new key at once. After the first pass the command waits for `--grace` (10 seconds by default, and at least 5 seconds) so every write that started with an old key finishes, then counts the values left and passes over them again, then destroys the old keys.
 4. The command runs under an advisory lock, so a second run at the same time stops with `REKEY_RUNNING`. If it stops halfway, run it again and it resumes where it stopped. If it finds a value on an old key that does not open, it stops with `REKEY_UNREADABLE`, names the column and the row, and does not destroy the key that value uses. Fix or clear the value, then run the command again.
-5. The command writes the audit event `system.keys.rekeyed` with high severity, with the number of keys and values.
+5. The command writes `system.keys.rekey_started` to the audit log when it starts, then `system.keys.rekeyed` when it ends or `system.keys.rekey_failed` when it stops, with high severity and counts only.
+6. The command needs a direct connection to PostgreSQL, because its lock is tied to the session. Do not run it through PgBouncer in transaction mode, where the session changes between statements.
+7. The command changes the keys only, not the secret values themselves. Replacing a secret that leaked is a separate job: change it where it comes from, then save it in Dhow again.
 
 Every encrypted column is registered in the code as a value location: the table and column, the kind of owner, the label, and the context that binds the value to its row. The command passes over these locations only, and the tests check that every encrypted column in the database is registered.
 

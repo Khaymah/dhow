@@ -13,6 +13,8 @@ const (
 	SystemKeysExported           = "system.keys.exported"
 	SystemKeysDiscarded          = "system.keys.discarded"
 	SystemKeysRekeyed            = "system.keys.rekeyed"
+	SystemKeysRekeyStarted       = "system.keys.rekey_started"
+	SystemKeysRekeyFailed        = "system.keys.rekey_failed"
 
 	IdentityOrganizationUpdated = "identity.organization.updated"
 
@@ -104,6 +106,8 @@ func AuditedEvents() []string {
 		SystemKeysExported,
 		SystemKeysDiscarded,
 		SystemKeysRekeyed,
+		SystemKeysRekeyStarted,
+		SystemKeysRekeyFailed,
 		IdentityOrganizationUpdated,
 		IdentityOrganizationCreated,
 		IdentityOwnershipTransferred,

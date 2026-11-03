@@ -14,6 +14,8 @@ export const AuditEn: Record<keyof typeof AuditAr, string> = {
   'audit.action.system.keys.exported': 'Keyring exported',
   'audit.action.system.keys.discarded': 'Unreadable secrets discarded',
   'audit.action.system.keys.rekeyed': 'Data keys replaced and every value sealed again',
+  'audit.action.system.keys.rekey_started': 'Data key replacement started',
+  'audit.action.system.keys.rekey_failed': 'Data key replacement stopped before it finished',
   'audit.action.auth.mfa_pending': 'Password accepted, second step pending',
   'audit.action.auth.mfa_failed': 'Failed second step',
   'audit.action.auth.recovery_code_used': 'Recovery code used',

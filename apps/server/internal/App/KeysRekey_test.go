@@ -43,11 +43,41 @@ func TestKeysRekeyMovesEveryStoredValueToNewDataKeys(t *testing.T) {
 		assert.False(t, before[id], "no value keeps a data key from before the rekey")
 	}
 	w.everyValueWorks(t, w.env)
-	assert.Equal(t, []string{"system.keys.rekeyed"}, auditActions(t, w.env.Pool))
+	assert.Equal(t, []string{"system.keys.rekey_started", "system.keys.rekeyed"}, auditActions(t, w.env.Pool))
+	assert.Contains(t, out, "The secret values themselves did not change")
+	assert.NotContains(t, out, "WARNING")
 	var severity, destroyed string
 	require.NoError(t, w.env.Pool.QueryRow(t.Context(), `SELECT "Data"->>'Severity', "Data"->>'Destroyed' FROM "AuditEvents"
 		WHERE "Action" = 'system.keys.rekeyed'`).Scan(&severity, &destroyed))
 	assert.Equal(t, "high", severity)
 	assert.Equal(t, "4", destroyed)
 	assert.False(t, strings.Contains(out, "Resumed"))
+}
+
+func TestKeysRekeyWarnsWhenTheKekWasNotRotatedFirst(t *testing.T) {
+	w := newSealedWorld(t)
+	_, err := w.env.Pool.Exec(t.Context(), `UPDATE "KeyEncryptionKeys" SET "ActivatedAt" = now() - interval '30 days' WHERE "State" = 'active'`)
+	require.NoError(t, err)
+	cli := &keysCLI{t: t, pool: w.env.Pool, file: keyringFile(t, apptest.TestKeyring(t))}
+	require.NoError(t, cli.run("rekey", "--grace", "5s"))
+	out := cli.out.String()
+	assert.Contains(t, out, "WARNING")
+	assert.Contains(t, out, "keys generate")
+	assert.NotContains(t, out, "opens none of the current values")
+}
+
+func TestAFailedRekeyIsAudited(t *testing.T) {
+	w := newSealedWorld(t)
+	_, err := w.env.Pool.Exec(t.Context(), `UPDATE "TotpFactors" SET "SecretSealed" = set_byte("SecretSealed", 60, get_byte("SecretSealed", 60) # 255)`)
+	require.NoError(t, err)
+	cli := &keysCLI{t: t, pool: w.env.Pool, file: keyringFile(t, apptest.TestKeyring(t))}
+	err = cli.run("rekey", "--grace", "5s")
+	require.Error(t, err)
+	assert.Equal(t, keys.CodeRekeyUnreadable, keys.CodeOf(err))
+	assert.Equal(t, []string{"system.keys.rekey_started", "system.keys.rekey_failed"}, auditActions(t, w.env.Pool))
+	var code, superseded string
+	require.NoError(t, w.env.Pool.QueryRow(t.Context(), `SELECT "Data"->>'Reason', "Data"->>'Superseded' FROM "AuditEvents"
+		WHERE "Action" = 'system.keys.rekey_failed'`).Scan(&code, &superseded))
+	assert.Equal(t, keys.CodeRekeyUnreadable, code)
+	assert.Equal(t, "4", superseded)
 }
