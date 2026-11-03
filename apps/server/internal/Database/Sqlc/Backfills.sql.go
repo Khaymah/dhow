@@ -14,7 +14,8 @@ import (
 
 const advanceBackfill = `-- name: AdvanceBackfill :exec
 UPDATE "Backfills"
-SET "LastKey" = $1, "Processed" = "Processed" + $2, "Failed" = "Failed" + $3, "UpdatedAt" = now()
+SET "LastKey" = $1, "Processed" = "Processed" + $2,
+    "Failed" = CASE WHEN "LastKey" = '' THEN $3::bigint ELSE "Failed" + $3::bigint END, "UpdatedAt" = now()
 WHERE "Name" = $4
 `
 
@@ -38,6 +39,7 @@ func (q *Queries) AdvanceBackfill(ctx context.Context, arg AdvanceBackfillParams
 const endBackfillPass = `-- name: EndBackfillPass :exec
 UPDATE "Backfills"
 SET "LastKey" = '', "Passes" = "Passes" + 1, "Remaining" = $1::bigint,
+    "Failed" = CASE WHEN "LastKey" = '' THEN 0 ELSE "Failed" END,
     "DoneAt" = CASE WHEN $1::bigint = 0 THEN now() ELSE NULL END, "UpdatedAt" = now()
 WHERE "Name" = $2
 `
