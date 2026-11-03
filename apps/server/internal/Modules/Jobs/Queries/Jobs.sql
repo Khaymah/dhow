@@ -318,7 +318,7 @@ JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."Organi
 WHERE j."Id" = @id AND j."OrganizationId" = @organization_id AND j."OriginKind" = 'pipeline';
 
 -- name: GetJobRun :one
-SELECT p."Id" AS "ProjectId", p."Name" AS "ProjectName", r."Id" AS "RunId", r."Number" AS "RunNumber"
+SELECT p."Id" AS "ProjectId", p."Name" AS "ProjectName", r."Id" AS "RunId", r."Number" AS "RunNumber", rj."Kind"
 FROM "Jobs" j
 JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
 JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"

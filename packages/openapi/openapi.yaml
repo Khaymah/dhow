@@ -5873,9 +5873,11 @@ components:
     JobRun:
       type: object
       additionalProperties: false
-      required: [ProjectId, ProjectName, RunId, RunNumber]
+      required: [ProjectId, ProjectName, RunId, RunNumber, Kind]
       description: The pipeline run this job belongs to. Absent for a job that no run made.
       properties:
+        Kind:
+          $ref: "#/components/schemas/RunJobKind"
         ProjectId:
           type: string
           format: uuid

@@ -17,7 +17,7 @@ type kindView struct {
 
 type jobOriginView struct {
 	Run *struct {
-		ProjectId, ProjectName, RunId string
+		ProjectId, ProjectName, RunId, Kind string
 		RunNumber                     int64
 	}
 	Attempts []struct {
@@ -51,6 +51,7 @@ func TestARunNamesItsSystemJobAndAJobKnowsItsRunAndRunner(t *testing.T) {
 	assert.Equal(t, g.project.String(), o.Run.ProjectId)
 	assert.Equal(t, int64(1), o.Run.RunNumber)
 	assert.NotEmpty(t, o.Run.ProjectName)
+	assert.Equal(t, "discovery", o.Run.Kind)
 	require.Len(t, o.Attempts, 1)
 	require.NotNil(t, o.Attempts[0].RunnerName)
 	assert.NotEmpty(t, *o.Attempts[0].RunnerName)

@@ -19,7 +19,7 @@ func (s *Service) RunOf(ctx context.Context, org, job uuid.UUID) (*gen.JobRun, e
 	if err != nil {
 		return nil, err
 	}
-	return &gen.JobRun{ProjectId: row.ProjectId, ProjectName: row.ProjectName, RunId: row.RunId, RunNumber: row.RunNumber}, nil
+	return &gen.JobRun{ProjectId: row.ProjectId, ProjectName: row.ProjectName, RunId: row.RunId, RunNumber: row.RunNumber, Kind: gen.RunJobKind(row.Kind)}, nil
 }
 
 func (s *Service) RunnerNames(ctx context.Context, org uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]string, error) {

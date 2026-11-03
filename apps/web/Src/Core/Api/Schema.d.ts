@@ -3251,6 +3251,7 @@ export interface components {
         };
         /** @description The pipeline run this job belongs to. Absent for a job that no run made. */
         JobRun: {
+            Kind: components["schemas"]["RunJobKind"];
             /** Format: uuid */
             ProjectId: string;
             ProjectName: string;

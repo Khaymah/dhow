@@ -165,6 +165,24 @@ func (e JobStepState) Valid() bool {
 	}
 }
 
+// Defines values for RunJobKind.
+const (
+	RunJobKindDiscovery RunJobKind = "discovery"
+	RunJobKindJob       RunJobKind = "job"
+)
+
+// Valid indicates whether the value is a known member of the RunJobKind enum.
+func (e RunJobKind) Valid() bool {
+	switch e {
+	case RunJobKindDiscovery:
+		return true
+	case RunJobKindJob:
+		return true
+	default:
+		return false
+	}
+}
+
 // CreateJobRequest defines model for CreateJobRequest.
 type CreateJobRequest struct {
 	// MaxInfraRetries How many times a job that lost its runner before any mutating step is queued again.
@@ -405,6 +423,8 @@ type JobResponse struct {
 
 // JobRun The pipeline run this job belongs to. Absent for a job that no run made.
 type JobRun struct {
+	// Kind `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a client names it from the kind.
+	Kind        RunJobKind         `json:"Kind"`
 	ProjectId   openapi_types.UUID `json:"ProjectId"`
 	ProjectName string             `json:"ProjectName"`
 	RunId       openapi_types.UUID `json:"RunId"`
@@ -471,6 +491,9 @@ type PageMeta struct {
 	Page  int `json:"Page"`
 	Total int `json:"Total"`
 }
+
+// RunJobKind `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a client names it from the kind.
+type RunJobKind string
 
 // Id defines model for Id.
 type Id = openapi_types.UUID

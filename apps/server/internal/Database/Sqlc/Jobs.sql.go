@@ -501,7 +501,7 @@ func (q *Queries) GetJobProject(ctx context.Context, arg GetJobProjectParams) (u
 }
 
 const getJobRun = `-- name: GetJobRun :one
-SELECT p."Id" AS "ProjectId", p."Name" AS "ProjectName", r."Id" AS "RunId", r."Number" AS "RunNumber"
+SELECT p."Id" AS "ProjectId", p."Name" AS "ProjectName", r."Id" AS "RunId", r."Number" AS "RunNumber", rj."Kind"
 FROM "Jobs" j
 JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
 JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
@@ -520,6 +520,7 @@ type GetJobRunRow struct {
 	ProjectName string
 	RunId       uuid.UUID
 	RunNumber   int64
+	Kind        string
 }
 
 func (q *Queries) GetJobRun(ctx context.Context, arg GetJobRunParams) (GetJobRunRow, error) {
@@ -530,6 +531,7 @@ func (q *Queries) GetJobRun(ctx context.Context, arg GetJobRunParams) (GetJobRun
 		&i.ProjectName,
 		&i.RunId,
 		&i.RunNumber,
+		&i.Kind,
 	)
 	return i, err
 }
