@@ -7,6 +7,8 @@ owner_email=${owner_email:-owner@dev-stack.test}
 org_name=${org_name:-Dev Stack}
 org_slug=${org_slug:-dev-stack}
 session=()
+session_cookie=
+csrf_token=
 org_id=
 runner_id=
 job_id=
@@ -21,16 +23,36 @@ job_field() { sed 's/.*"Job":{//' "$1" | grep -o "\"$2\":\"[^\"]*\"" | head -1 |
 
 job_number() { sed 's/.*"Job":{//' "$1" | grep -o "\"$2\":[0-9]*" | head -1 | cut -d: -f2; }
 
+curl_quote() {
+  local v=${1//\\/\\\\}
+  printf '%s' "${v//\"/\\\"}"
+}
+
 api() {
-  local prefix=$1 method=$2 path=$3 body=$4
+  local prefix=$1 method=$2 path=$3 body=$4 config=() args=() status=0
   shift 4
-  "${stack_curl[@]}" --silent --show-error --max-time 30 --dump-header "$prefix.head" --output "$prefix.body" \
-    --write-out '%{http_code}' --request "$method" --header 'Content-Type: application/json' \
-    --header "Origin: $public_url" "$@" ${body:+--data "$body"} -- "$base$path" </dev/null
+  while (($# > 0)); do
+    if [[ $1 == --header && $# -ge 2 ]]; then
+      config+=("header = \"$(curl_quote "$2")\"")
+      shift 2
+    else
+      args+=("$1")
+      shift
+    fi
+  done
+  if [[ -n $body ]]; then
+    (umask 077 && printf '%s' "$body" >"$prefix.req")
+    args+=(--data-binary "@$prefix.req")
+  fi
+  printf '%s\n' "${config[@]}" | "${stack_curl[@]}" --config - --silent --show-error --max-time 30 --dump-header "$prefix.head" \
+    --output "$prefix.body" --write-out '%{http_code}' --request "$method" --header 'Content-Type: application/json' \
+    --header "Origin: $public_url" "${args[@]}" -- "$base$path" || status=$?
+  rm -f -- "$prefix.req"
+  return "$status"
 }
 
 setup_owner() {
-  local setup_token status cookie
+  local setup_token status
   setup_token=$(docker compose logs --no-color server | grep -o "$public_url/setup#[A-Za-z0-9_-]*" | tail -1 | cut -d'#' -f2)
   [[ -n $setup_token ]] || return 1
   status=$(api "$work/setup" POST /api/v1/setup "$(printf '{"SetupToken":"%s","OwnerName":"%s","Email":"%s","Password":"%s","OrganizationName":"%s","OrganizationSlug":"%s"}' \
@@ -38,8 +60,10 @@ setup_owner() {
   [[ $status == 200 ]] || return 1
   status=$(api "$work/login" POST /api/v1/sessions "$(printf '{"Email":"%s","Password":"%s"}' "$owner_email" "$password")")
   [[ $status == 200 ]] || return 1
-  cookie=$(sed -n 's/^[Ss]et-[Cc]ookie: \([^=;]*dhow_session=[^;]*\);.*/\1/p' "$work/login.head" | tr -d '\r' | head -1)
-  session=(--header "Cookie: $cookie" --header "X-CSRF-Token: $(json_field "$work/login.body" CsrfToken)")
+  session_cookie=$(sed -n 's/^[Ss]et-[Cc]ookie: \([^=;]*dhow_session=[^;]*\);.*/\1/p' "$work/login.head" | tr -d '\r' | head -1)
+  csrf_token=$(json_field "$work/login.body" CsrfToken)
+  [[ -n $session_cookie && -n $csrf_token ]] || return 1
+  session=(--header "Cookie: $session_cookie" --header "X-CSRF-Token: $csrf_token")
   api "$work/me" GET /api/v1/me '' "${session[@]}" >/dev/null
   org_id=$(json_field "$work/me.body" OrganizationId)
   [[ -n $org_id ]]

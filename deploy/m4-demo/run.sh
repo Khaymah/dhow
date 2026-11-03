@@ -16,7 +16,7 @@ usage() {
 . "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 
 forgejo_user=demo
-forgejo_password='a long forgejo demo password'
+forgejo_password=
 forgejo="http://git.dhow-demo.test:3000"
 clone_url="ssh://git@git.dhow-demo.test/demo/app.git"
 token=
@@ -26,17 +26,30 @@ hook_secret=
 run_ids=()
 
 forgejo_api() {
-  local prefix=$1 method=$2 path=$3 body=$4
-  docker compose exec -T tools curl --silent --show-error --max-time 30 --output "$prefix.body" --write-out '%{http_code}' \
-    --user "$forgejo_user:$forgejo_password" --request "$method" --header 'Content-Type: application/json' \
-    ${body:+--data "$body"} -- "$forgejo/api/v1$path" </dev/null
+  local prefix=$1 method=$2 path=$3 body=$4 args=() status=0
+  if [[ -n $body ]]; then
+    (umask 077 && printf '%s' "$body" >"$prefix.req")
+    args+=(--data-binary "@$prefix.req")
+  fi
+  printf 'user = "%s"\n' "$(curl_quote "$forgejo_user:$forgejo_password")" |
+    docker compose exec -T tools curl --config - --silent --show-error --max-time 30 --output "$prefix.body" \
+      --write-out '%{http_code}' --request "$method" --header 'Content-Type: application/json' "${args[@]}" \
+      -- "$forgejo/api/v1$path" || status=$?
+  rm -f -- "$prefix.req"
+  return "$status"
 }
 
 bearer() { printf 'Authorization: Bearer %s' "$token"; }
 
 git_in_tools() {
-  docker compose exec -T -w "$work/repo" tools git -c safe.directory='*' -c user.name='Demo' -c user.email=demo@dhow-demo.test \
-    -c http.extraHeader="Authorization: Basic $(printf '%s:%s' "$forgejo_user" "$forgejo_password" | base64 | tr -d '\n')" "$@"
+  docker compose exec -T -w "$work/repo" -e GIT_ASKPASS="$work/askpass" -e GIT_TERMINAL_PROMPT=0 tools \
+    git -c safe.directory='*' -c user.name='Demo' -c user.email=demo@dhow-demo.test "$@"
+}
+
+askpass() {
+  (umask 077 && printf '%s' "$forgejo_password" >"$work/forgejo-password")
+  printf '#!/bin/sh\ncat -- %s\n' "$work/forgejo-password" >"$work/askpass"
+  chmod 0700 "$work/askpass"
 }
 
 needle() { printf '%s=%s\n' "$1" "$2" >>"$work/needles"; }
@@ -56,8 +69,10 @@ checkout_image() {
 
 forgejo_repo() {
   wait_http "$forgejo/api/healthz" 300 || return 1
-  docker compose exec -T -u git forgejo forgejo admin user create --admin --username "$forgejo_user" \
-    --password "$forgejo_password" --email demo@dhow-demo.test --must-change-password=false >/dev/null || return 1
+  forgejo_password=$(docker compose exec -T -u git forgejo forgejo admin user create --admin --username "$forgejo_user" \
+    --random-password --email demo@dhow-demo.test --must-change-password=false | sed -n "s/.*random password is '\\(.*\\)'.*/\\1/p")
+  [[ -n $forgejo_password ]] || return 1
+  askpass
   [[ $(forgejo_api "$work/repo-create" POST /user/repos '{"name":"app","default_branch":"main","private":true}') == 2?? ]]
 }
 
@@ -129,7 +144,7 @@ push() {
 
 first_push() {
   write_pipeline
-  git_in_tools init --quiet -b main && git_in_tools remote add origin "$forgejo/demo/app.git" || return 1
+  git_in_tools init --quiet -b main && git_in_tools remote add origin "http://$forgejo_user@git.dhow-demo.test:3000/demo/app.git" || return 1
   push "Add the pipeline"
 }
 
@@ -183,6 +198,7 @@ wait_runs() {
     ((${#run_ids[@]} >= want)) && return 0
     sleep 1
   done
+  why "the project has ${#run_ids[@]} runs after $seconds seconds, not $want; the last webhook delivery: $(json_field "$work/runs.body" Message)"
   return 1
 }
 
@@ -221,20 +237,31 @@ saw() { grep -qF -- "$1" "$work/logs.txt"; }
 dag_and_matrix() {
   run_logs "$1"
   [[ $(grep -o '"JobId":"test"' "$work/run.body" | wc -l) == 2 ]] && saw 'dhow-demo shard=a artifact=app demo 1' &&
-    saw 'dhow-demo shard=b artifact=app demo 1' && saw 'dhow-demo every shard passed'
+    saw 'dhow-demo shard=b artifact=app demo 1' && saw 'dhow-demo every shard passed' && return 0
+  why "the jobs of the run: $(grep -o '"Key":"[^"]*"\|"State":"[^"]*"' "$work/run.body" | tr '\n' ' '); the demo lines seen: $(grep -o 'dhow-demo [^"\\]*' "$work/logs.txt" | sort -u | tr '\n' ';')"
+  return 1
 }
 
 artifact_kept() {
   api "$work/artifacts" GET "/api/v1/organizations/$org_id/projects/$project_id/runs/$1/artifacts" '' "${session[@]}" >/dev/null
-  grep -qF '"Name":"app"' "$work/artifacts.body"
+  grep -qF '"Name":"app"' "$work/artifacts.body" && return 0
+  why "the artifacts of the run: $(head -c 400 "$work/artifacts.body")"
+  return 1
 }
 
 cache_was() {
   run_logs "$1"
-  saw "dhow-demo cache=$2"
+  saw "dhow-demo cache=$2" && return 0
+  why "the cache lines seen: $(grep -o 'dhow[-:] [^"\\]*cache[^"\\]*' "$work/logs.txt" | sort -u | tr '\n' ';')"
+  return 1
 }
 
-hmac_hex() { docker compose exec -T tools openssl dgst -sha256 -hmac "$1" -r | cut -d' ' -f1; }
+hmac_hex() { docker compose exec -T tools go run ./deploy/m4-demo/hmac "$1"; }
+
+key_file() {
+  (umask 077 && printf '%s' "$2" >"$work/$1")
+  printf '%s' "$work/$1"
+}
 
 deliver() {
   local prefix=$1 body=$2 signature=$3 delivery=$4
@@ -247,7 +274,7 @@ forged_refused() {
   local before body status
   before=$(run_count)
   body=$(printf '{"ref":"refs/heads/main","after":"%s","pusher":{"login":"mallory"}}' "$(printf '%040d' 7)")
-  status=$(deliver "$work/forged" "$body" "$(printf '%s' "$body" | hmac_hex 'not the webhook secret of this repository')" forged-1)
+  status=$(deliver "$work/forged" "$body" "$(printf '%s' "$body" | hmac_hex "$(key_file forged-key 'not the webhook secret of this repository')")" forged-1)
   sleep 3
   printf '    forged delivery answered %s\n' "$status"
   [[ $status == 401 && $(run_count) == "$before" ]]
@@ -258,7 +285,7 @@ replay_ignored() {
   before=$(run_count)
   sha=$(git_in_tools rev-parse HEAD | tr -d '\r')
   body=$(printf '{"ref":"refs/heads/main","after":"%s","pusher":{"login":"demo"}}' "$sha")
-  signature=$(printf '%s' "$body" | hmac_hex "$hook_secret")
+  signature=$(printf '%s' "$body" | hmac_hex "$(key_file hook-key "$hook_secret")")
   first=$(deliver "$work/replay-1" "$body" "$signature" replay-1)
   second=$(deliver "$work/replay-2" "$body" "$signature" replay-1)
   sleep 3
@@ -284,6 +311,9 @@ say "Postgres, the server, Forgejo and the Podman runner (the first build takes 
 docker compose up --detach --build db server forgejo runner tools >/dev/null
 need "the server starts and prints its setup link" server_ready
 need "the owner and the organization are set up" setup_owner
+needle "session cookie" "${session_cookie#*=}"
+needle "CSRF token" "$csrf_token"
+needle "owner password" "$password"
 need "the Podman runner registers and comes online" runner_up
 needle "runner registration token" "$registration_token"
 need "an API token is made" api_token

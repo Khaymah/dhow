@@ -19,7 +19,7 @@ services:
     environment:
       DHOW_DEMO_PUBLIC_URL: http://localhost:${DHOW_DEV_WEB_PORT}
       DHOW_DEMO_CHECKOUT_IMAGE: ${DHOW_DEMO_CHECKOUT_IMAGE:-}
-      DHOW_GIT_ALLOW_PRIVATE_CIDRS: ${DHOW_DEMO_SUBNET}
+      DHOW_GIT_ALLOW_PRIVATE_CIDRS: ${DHOW_DEMO_FORGEJO_IP}/32
     volumes:
       - *repo-read-only
       - type: bind
@@ -31,7 +31,7 @@ services:
   runner:
     environment:
       DHOW_DEV_RUNNER_CHECKOUT_IMAGE: ${DHOW_DEMO_CHECKOUT_IMAGE:-}
-      DHOW_DEV_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS: ${DHOW_DEMO_SUBNET}
+      DHOW_DEV_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS: ${DHOW_DEMO_FORGEJO_IP}/32
     volumes:
       - type: bind
         source: ${DHOW_DEMO_WORK}/certs/ca.crt
@@ -54,6 +54,7 @@ services:
       FORGEJO__log__LEVEL: Warn
     networks:
       default:
+        ipv4_address: ${DHOW_DEMO_FORGEJO_IP}
         aliases: [git.dhow-demo.test]
 
   registry:

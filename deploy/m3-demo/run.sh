@@ -33,27 +33,41 @@ spec() {
 
 epoch() { date -d "$(job_field "$1" "$2")" +%s%N; }
 
+job_line() {
+  printf 'job %s is %s%s (attempts: %s)' "$1" "$(job_field "$work/job.body" State)" \
+    "$(job_field "$work/job.body" FailureReason | sed 's/^./ with &/')" "$(job_number "$work/job.body" AttemptCount)"
+}
+
 ends() {
   local id=$1 want=$2 seconds=${3:-600}
-  wait_job "$id" "$seconds" || return 1
-  printf '    job %s ended %s%s (attempts: %s)\n' "$id" "$job_state" \
-    "$(job_field "$work/job.body" FailureReason | sed 's/^./ with &/')" "$(job_number "$work/job.body" AttemptCount)"
-  [[ $job_state == "$want" ]]
+  if ! wait_job "$id" "$seconds"; then
+    why "$(job_line "$id") and did not end within $seconds seconds"
+    return 1
+  fi
+  printf '    %s\n' "$(job_line "$id")"
+  [[ $job_state == "$want" ]] || {
+    why "job $id should have ended $want"
+    return 1
+  }
 }
 
 isolated() {
-  create_job "isolation" "$(spec "$isolation_script")" && ends "$job_id" succeeded
+  create_job "isolation" "$(spec "$isolation_script")" || { why "the job was not created"; return 1; }
+  ends "$job_id" succeeded
 }
 
 in_order() {
   local first second
   create_job "first" "$(spec 'sleep 3; echo first')" && first=$job_id
   create_job "second" "$(spec 'echo second')" && second=$job_id
-  [[ -n $first && -n $second ]] || return 1
+  [[ -n $first && -n $second ]] || { why "the two jobs were not created"; return 1; }
   ends "$first" succeeded && cp -- "$work/job.body" "$work/first.json" || return 1
   ends "$second" succeeded && cp -- "$work/job.body" "$work/second.json" || return 1
-  (($(epoch "$work/first.json" StartedAt) < $(epoch "$work/second.json" StartedAt))) &&
-    (($(epoch "$work/first.json" FinishedAt) <= $(epoch "$work/second.json" StartedAt)))
+  if (($(epoch "$work/first.json" StartedAt) >= $(epoch "$work/second.json" StartedAt))) ||
+    (($(epoch "$work/first.json" FinishedAt) > $(epoch "$work/second.json" StartedAt))); then
+    why "the second job started before the first one finished"
+    return 1
+  fi
 }
 
 running() {
@@ -62,16 +76,23 @@ running() {
     [[ $(job_field "$work/job.body" State) == running ]] && return 0
     sleep 1
   done
+  why "$(job_line "$1") and never ran within 300 seconds"
   return 1
 }
 
 survives_a_killed_runner() {
-  local id
-  create_job "killed runner" "$(spec 'sleep 20; echo done')" ',"MaxInfraRetries":1' && id=$job_id || return 1
+  local id status=0 runners
+  create_job "killed runner" "$(spec 'sleep 20; echo done')" ',"MaxInfraRetries":1' || { why "the job was not created"; return 1; }
+  id=$job_id
   running "$id" || return 1
   sleep 3
-  docker compose exec -T runner pkill -KILL -x dhow-runner || return 1
-  ends "$id" succeeded 900 && [[ $(job_number "$work/job.body" AttemptCount) == 2 ]] && online
+  runners=$(docker compose exec -T runner pgrep -u dhow-runner -x dhow-runner </dev/null | tr -s '\r\n' ' ') || true
+  docker compose exec -T runner pkill -KILL -u dhow-runner -x dhow-runner </dev/null || status=$?
+  printf '    killed the runner process %s (pkill exit code %s)\n' "${runners:-none}" "$status"
+  ((status == 0)) || { why "pkill found no dhow-runner process to kill"; return 1; }
+  ends "$id" succeeded 900 || return 1
+  [[ $(job_number "$work/job.body" AttemptCount) == 2 ]] || { why "job $id should have needed exactly two attempts"; return 1; }
+  online || { why "the runner did not come back online"; return 1; }
 }
 
 prerequisites

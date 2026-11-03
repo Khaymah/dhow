@@ -8,8 +8,9 @@ export DHOW_DEV_WEB_PORT=$DHOW_DEV_HTTP_PORT
 export DHOW_DEV_DB_PORT=${DHOW_DEMO_DB_PORT:-55480}
 export DHOW_DEMO_REGISTRY_PORT=${DHOW_DEMO_REGISTRY_PORT:-55481}
 export DHOW_DEMO_SUBNET=${DHOW_DEMO_SUBNET:-10.231.80.0/24}
-export DHOW_DEV_POSTGRES_IMAGE=${DHOW_DEV_POSTGRES_IMAGE:-mirror.gcr.io/library/postgres:18}
-export DHOW_DEV_GO_IMAGE=${DHOW_DEV_GO_IMAGE:-mirror.gcr.io/library/golang:1.27.3-bookworm}
+export DHOW_DEMO_FORGEJO_IP=${DHOW_DEMO_FORGEJO_IP:-10.231.80.10}
+export DHOW_DEV_POSTGRES_IMAGE=${DHOW_DEV_POSTGRES_IMAGE:-mirror.gcr.io/library/postgres:18@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81}
+export DHOW_DEV_GO_IMAGE=${DHOW_DEV_GO_IMAGE:-mirror.gcr.io/library/golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9}
 export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-dhow-demo}
 export COMPOSE_FILE="$root/deploy/dev/compose.yaml:$root/deploy/m4-demo/compose.yaml${DHOW_DEMO_COMPOSE_EXTRA:+:$DHOW_DEMO_COMPOSE_EXTRA}"
 export COMPOSE_PROJECT_DIRECTORY=$root/deploy/dev
@@ -42,7 +43,16 @@ record() {
   else
     failed=$((failed + 1))
     printf '  FAIL  %s\n' "$what" >&2
+    evidence "after the failed check: $what"
   fi
+}
+
+why() { printf '    why: %s\n' "$*" >&2; }
+
+evidence() {
+  printf '\n--- the last 200 lines of the runner and server logs, %s ---\n' "$1" >&2
+  docker compose logs --no-color --tail 200 runner server >&2 2>&1 || true
+  printf -- '--- end of the logs ---\n\n' >&2
 }
 
 check() {
@@ -102,6 +112,9 @@ prepare_work() {
 
 teardown() {
   local status=$?
+  if [[ -n ${CI:-} ]]; then
+    evidence "before the teardown"
+  fi
   if [[ $keep == 1 ]]; then
     printf 'DHOW_DEMO_KEEP=1: the stack %s and %s are left for you\n' "$COMPOSE_PROJECT_NAME" "$DHOW_DEMO_WORK" >&2
     return "$status"
@@ -139,10 +152,16 @@ logged() {
 }
 
 server_ready() {
-  wait_http "$base/api/v1/health/ready" 900 && logged server '/setup#' 60
+  wait_http "$base/api/v1/health/ready" 900 || { why "the server never answered /api/v1/health/ready"; return 1; }
+  logged server '/setup#' 60 || { why "the server never printed its setup link"; return 1; }
 }
 
 runner_up() {
-  logged runner 'waiting for a registration token' 900 || return 1
-  register runner && online && ready runner
+  logged runner 'waiting for a registration token' 900 || {
+    why "the runner never asked for a registration token"
+    return 1
+  }
+  register runner || { why "dhow-dev-register failed"; return 1; }
+  online || { why "the runner $runner_id is not online"; return 1; }
+  ready runner || { why "the runner $runner_id never logged that it is ready"; return 1; }
 }
