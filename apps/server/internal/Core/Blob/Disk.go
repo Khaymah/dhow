@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,7 +94,11 @@ func freeBytes(dir string) (int64, error) {
 	if err := unix.Statfs(dir, &st); err != nil {
 		return 0, err
 	}
-	return int64(st.Bavail) * st.Bsize, nil //nolint:gosec // Free blocks times the block size fits in an int64 on any real file system.
+	free := st.Bavail * uint64(st.Bsize) //nolint:gosec // Bsize is a positive block size on every platform.
+	if free > math.MaxInt64 {
+		return math.MaxInt64, nil
+	}
+	return int64(free), nil
 }
 
 func (d *Disk) path(dg Digest) (string, string) {

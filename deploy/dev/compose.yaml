@@ -13,6 +13,7 @@ x-repo-read-only: &repo-read-only
 
 x-runner: &runner
   image: dhow-dev-runner:local
+  pull_policy: build
   build:
     context: ./runner
   init: true
