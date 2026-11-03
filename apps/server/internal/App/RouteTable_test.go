@@ -3,6 +3,7 @@ package app_test
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -327,7 +328,15 @@ func TestRouteTableCoversEveryRoleAndScope(t *testing.T) {
 	assert.Positive(t, scopes[policy.ScopeInstance])
 	assert.Positive(t, scopes[policy.ScopeProject])
 	for _, a := range policy.Actions() {
+		if slices.Contains(actionsAheadOfTheirRoutes(), a) {
+			assert.False(t, actions[a], "%s has a route now: drop it from actionsAheadOfTheirRoutes", a)
+			continue
+		}
 		assert.True(t, actions[a], "no route uses %s", a)
 	}
 	assert.Len(t, policy.Roles(), 5, fmt.Sprint(policy.Roles()))
+}
+
+func actionsAheadOfTheirRoutes() []policy.Action {
+	return []policy.Action{policy.DeploymentApprove, policy.EnvironmentBypass}
 }

@@ -30,6 +30,8 @@ func bindingCases() []bindingCase {
 		{"a maintainer lowered to viewer by a user binding", policy.RoleMaintainer, policy.RoleViewer, false, policy.RoleViewer},
 		{"a maintainer lowered to developer by a team binding", policy.RoleMaintainer, policy.RoleDeveloper, true, policy.RoleDeveloper},
 		{"an admin is not lowered by a viewer binding", policy.RoleAdmin, policy.RoleViewer, false, policy.RoleAdmin},
+		{"a developer raised to admin by a user binding", policy.RoleDeveloper, policy.RoleAdmin, false, policy.RoleAdmin},
+		{"a maintainer raised to admin by a team binding", policy.RoleMaintainer, policy.RoleAdmin, true, policy.RoleAdmin},
 	}
 }
 
@@ -50,6 +52,10 @@ func projectRequest(rule policy.Rule, org, project uuid.UUID, env *apptest.Env) 
 	}
 	if strings.Contains(path, "{artifactId}") {
 		path = strings.ReplaceAll(path, "{artifactId}", env.SeedArtifact(project, "web", []byte("archive"), false).ID.String())
+	}
+	if strings.Contains(path, "{environmentName}") {
+		env.SeedEnvironment(project, apptest.RouteTableEnvironment)
+		path = strings.ReplaceAll(path, "{environmentName}", apptest.RouteTableEnvironment)
 	}
 	req := apptest.Request{Method: rule.Method, Path: path}
 	switch {
