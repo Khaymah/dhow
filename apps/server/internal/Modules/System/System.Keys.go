@@ -8,6 +8,7 @@ import (
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	gen "github.com/Khaymah/dhow/apps/server/internal/Modules/System/Gen"
 )
 
@@ -63,10 +64,15 @@ func KeysExportedEvent(versions []int32) eventbus.Event {
 	return keysEvent(eventbus.SystemKeysExported, map[string]string{"KekVersions": versionsText(versions)})
 }
 
-func KeysDiscardedEvent(versions []int32, dataKeys int64) eventbus.Event {
-	return keysEvent(eventbus.SystemKeysDiscarded, map[string]string{
+func KeysDiscardedEvent(tx *sqlc.Queries, versions []int32, dataKeys int64) eventbus.Event {
+	ev := keysEvent(eventbus.SystemKeysDiscarded, map[string]string{
 		"KekVersions": versionsText(versions), "DataKeys": strconv.FormatInt(dataKeys, 10), eventbus.SeverityKey: eventbus.SeverityHigh,
 	})
+	if a, ok := ev.Payload.(eventbus.Audited); ok {
+		a.Tx = tx
+		ev.Payload = a
+	}
+	return ev
 }
 
 func keysEvent(name string, data map[string]string) eventbus.Event {

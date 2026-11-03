@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"syscall"
 )
 
@@ -124,26 +125,33 @@ func CreateKeyringFile(path string, ring *Keyring) error {
 	return syncDir(filepath.Dir(path))
 }
 
+type writeAtFunc func(f *os.File, data []byte, off int64) (int, error)
+
 func AppendKeyringVersion(path string, rules FileRules) (int32, error) {
-	f, err := openChecked(path, os.O_RDWR|os.O_APPEND, rules)
+	return appendKeyringVersion(path, rules, (*os.File).WriteAt)
+}
+
+func appendKeyringVersion(path string, rules FileRules, writeAt writeAtFunc) (int32, error) {
+	f, err := openChecked(path, os.O_RDWR, rules)
 	if err != nil {
 		return 0, err
 	}
-	data, err := readAll(f)
+	defer func() { _ = f.Close() }()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		return 0, fmt.Errorf("lock the keyring file: %w", err)
+	}
+	size, data, err := readLocked(f)
 	if err != nil {
-		_ = f.Close()
 		return 0, err
 	}
 	defer clear(data)
 	ring, err := ParseKeyring(data)
 	if err != nil {
-		_ = f.Close()
 		return 0, err
 	}
 	defer ring.Destroy()
 	next, version, err := ring.WithNextVersion()
 	if err != nil {
-		_ = f.Close()
 		return 0, err
 	}
 	defer next.Destroy()
@@ -152,10 +160,67 @@ func AppendKeyringVersion(path string, rules FileRules) (int32, error) {
 	if data[len(data)-1] != '\n' {
 		line = append([]byte{'\n'}, line...)
 	}
-	if err := writeAndSync(f, line); err != nil {
+	if err := writeVerified(f, writeAt, line, size, next.Versions()); err != nil {
+		if rollbackErr := rollback(f, size); rollbackErr != nil {
+			return 0, errors.Join(err, rollbackErr)
+		}
 		return 0, err
 	}
 	return version, nil
+}
+
+func readLocked(f *os.File) (int64, []byte, error) {
+	info, err := f.Stat()
+	if err != nil {
+		return 0, nil, fmt.Errorf("%s: %w", readKeyringPrefix, err)
+	}
+	size := info.Size()
+	if size > MaxKeyringBytes {
+		return 0, nil, newError(CodeKeyringInsecure, 0, fmt.Sprintf("the keyring file is larger than %d bytes", MaxKeyringBytes))
+	}
+	data := make([]byte, size)
+	if _, err := f.ReadAt(data, 0); err != nil && !errors.Is(err, io.EOF) {
+		clear(data)
+		return 0, nil, fmt.Errorf("%s: %w", readKeyringPrefix, err)
+	}
+	return size, data, nil
+}
+
+func writeVerified(f *os.File, writeAt writeAtFunc, line []byte, at int64, want []int32) error {
+	n, err := writeAt(f, line, at)
+	if err == nil && n != len(line) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		return fmt.Errorf("write the keyring file: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("sync the keyring file: %w", err)
+	}
+	_, written, err := readLocked(f)
+	if err != nil {
+		return err
+	}
+	defer clear(written)
+	check, err := ParseKeyring(written)
+	if err != nil {
+		return fmt.Errorf("the keyring file did not read back after the write: %w", err)
+	}
+	defer check.Destroy()
+	if !slices.Equal(check.Versions(), want) {
+		return newError(CodeKeyringMalformed, 0, "the keyring file did not read back as written")
+	}
+	return nil
+}
+
+func rollback(f *os.File, size int64) error {
+	if err := f.Truncate(size); err != nil {
+		return fmt.Errorf("restore the keyring file to its size before the write: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("sync the restored keyring file: %w", err)
+	}
+	return nil
 }
 
 func writeAndSync(f *os.File, data []byte) error {

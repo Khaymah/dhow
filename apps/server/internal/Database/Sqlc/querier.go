@@ -27,6 +27,7 @@ type Querier interface {
 	ClaimPendingRun(ctx context.Context, arg ClaimPendingRunParams) (PipelineRun, error)
 	ClaimQueuedJob(ctx context.Context, arg ClaimQueuedJobParams) (Job, error)
 	ClaimUpload(ctx context.Context, arg ClaimUploadParams) (uuid.UUID, error)
+	ClearDataKeyUnreadable(ctx context.Context) (int64, error)
 	ClearMfaReset(ctx context.Context, arg ClearMfaResetParams) error
 	CompleteInstanceSetup(ctx context.Context, completedAt time.Time) error
 	ConfirmTotpFactor(ctx context.Context, arg ConfirmTotpFactorParams) error
@@ -280,6 +281,7 @@ type Querier interface {
 	LogPartitionReady(ctx context.Context) (bool, error)
 	MarkCommitStatusFailed(ctx context.Context, arg MarkCommitStatusFailedParams) error
 	MarkCommitStatusSent(ctx context.Context, arg MarkCommitStatusSentParams) error
+	MarkDataKeyUnreadable(ctx context.Context, id uuid.UUID) (int64, error)
 	MarkInstanceOwner(ctx context.Context, arg MarkInstanceOwnerParams) error
 	MarkInvitationAccepted(ctx context.Context, arg MarkInvitationAcceptedParams) (int64, error)
 	MarkJobLeased(ctx context.Context, id uuid.UUID) (int32, error)

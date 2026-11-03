@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -37,24 +38,29 @@ func ParseKeyring(data []byte) (*Keyring, error) {
 	if len(data) > MaxKeyringBytes {
 		return nil, newError(CodeKeyringMalformed, 0, fmt.Sprintf("the keyring file is larger than %d bytes", MaxKeyringBytes))
 	}
-	body := bytes.TrimSuffix(data, []byte("\n"))
-	lines := strings.Split(string(body), "\n")
+	lines := bytes.Split(bytes.TrimSuffix(data, []byte("\n")), []byte("\n"))
 	if len(lines) > MaxVersions {
 		return nil, newError(CodeKeyringMalformed, 0, fmt.Sprintf("the keyring file has more than %d versions", MaxVersions))
 	}
 	ring := &Keyring{keys: make(map[int32][]byte, len(lines))}
 	for i, line := range lines {
 		version, key, err := parseLine(line)
+		if err == nil {
+			err = ring.add(version, key)
+		}
 		if err != nil {
 			ring.Destroy()
-			return nil, &Error{Code: CodeKeyringMalformed, Line: i + 1, Detail: err.Error()}
-		}
-		if err := ring.add(version, key); err != nil {
-			ring.Destroy()
-			return nil, &Error{Code: CodeKeyringMalformed, Version: version, Line: i + 1, Detail: err.Error()}
+			return nil, &Error{Code: CodeKeyringMalformed, Version: version, Line: i + 1, Detail: lineDetail(err, i+1, len(lines))}
 		}
 	}
 	return ring, nil
+}
+
+func lineDetail(err error, line, last int) string {
+	if line != last || last == 1 {
+		return err.Error()
+	}
+	return fmt.Sprintf("%s; this is the last line, so if a keys generate was cut off, delete line %d and run it again", err, line)
 }
 
 type lineError string
@@ -70,9 +76,9 @@ const (
 	errLineReused  = lineError("the same key appears under two versions")
 )
 
-func parseLine(line string) (int32, []byte, error) {
-	fields := strings.Split(line, " ")
-	if len(fields) != lineFields || fields[0] != lineKeyword {
+func parseLine(line []byte) (int32, []byte, error) {
+	fields := bytes.Split(line, []byte(" "))
+	if len(fields) != lineFields || !bytes.Equal(fields[0], []byte(lineKeyword)) {
 		return 0, nil, errLineShape
 	}
 	version, err := parseVersion(fields[1])
@@ -82,10 +88,13 @@ func parseLine(line string) (int32, []byte, error) {
 	if len(fields[2]) != encodedKeyLen {
 		return version, nil, errLineKey
 	}
-	key, err := keyEncoding.DecodeString(fields[2])
-	if err != nil || len(key) != KeyBytes {
+	key := make([]byte, keyEncoding.DecodedLen(encodedKeyLen))
+	n, err := keyEncoding.Decode(key, fields[2])
+	if err != nil || n != KeyBytes {
+		clear(key)
 		return version, nil, errLineKey
 	}
+	key = key[:n]
 	if !looksRandom(key) {
 		clear(key)
 		return version, nil, errLineRandom
@@ -93,18 +102,16 @@ func parseLine(line string) (int32, []byte, error) {
 	return version, key, nil
 }
 
-func parseVersion(s string) (int32, error) {
-	if s == "" || len(s) > maxVersionDigits || s[0] == '0' {
+func parseVersion(s []byte) (int32, error) {
+	if len(s) == 0 || len(s) > maxVersionDigits || s[0] == '0' {
 		return 0, errLineVersion
 	}
+	var n int64
 	for _, c := range s {
 		if c < '0' || c > '9' {
 			return 0, errLineVersion
 		}
-	}
-	n, err := strconv.ParseInt(s, 10, 32)
-	if err != nil || n < 1 {
-		return 0, errLineVersion
+		n = n*10 + int64(c-'0')
 	}
 	return int32(n), nil
 }
@@ -249,7 +256,11 @@ func (k *Keyring) String() string { return k.describe() }
 
 func (k *Keyring) GoString() string { return k.describe() }
 
-func (k *Keyring) Format(f fmt.State, _ rune) { _, _ = f.Write([]byte(k.describe())) }
+func (k *Keyring) Format(f fmt.State, _ rune) {
+	if _, err := io.WriteString(f, k.describe()); err != nil {
+		return
+	}
+}
 
 func (k *Keyring) LogValue() slog.Value { return slog.StringValue(k.describe()) }
 

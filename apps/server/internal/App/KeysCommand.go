@@ -25,23 +25,22 @@ import (
 )
 
 const (
-	CommandKeys         = "keys"
-	KeysInit            = "init"
-	KeysStatus          = "status"
-	KeysGenerate        = "generate"
-	KeysActivate        = "activate"
-	KeysExport          = "export"
-	DiscardConfirmation = "discard-unreadable-secrets"
-	stdoutPath          = "-"
-	exportFilePerm      = 0o600
-	keysUsage           = "usage: dhow-server keys init [--discard-unreadable [--confirm " + DiscardConfirmation + "]] | status | generate | " +
+	CommandKeys    = "keys"
+	KeysInit       = "init"
+	KeysStatus     = "status"
+	KeysGenerate   = "generate"
+	KeysActivate   = "activate"
+	KeysExport     = "export"
+	stdoutPath     = "-"
+	exportFilePerm = 0o600
+	keysUsage      = "usage: dhow-server keys init [--discard-unreadable [--confirm destroy-N-keys]] | status | generate | " +
 		"activate VERSION | export --recipient age1... --out FILE|-; every command takes --file PATH, and the default is " +
 		config.EnvKeyringFile + " or the systemd credential " + config.CredentialKeyring
 )
 
 var (
 	ErrKeysUsage        = errors.New(keysUsage)
-	ErrDiscardUnconfirm = errors.New("nothing changed; add --confirm " + DiscardConfirmation + " to discard these values for good")
+	ErrDiscardUnconfirm = errors.New("nothing changed; add the --confirm value shown above, which names the number of data keys to destroy")
 )
 
 type KeysOptions struct {

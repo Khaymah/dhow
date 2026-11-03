@@ -12,8 +12,22 @@ import (
 	"github.com/google/uuid"
 )
 
+const clearDataKeyUnreadable = `-- name: ClearDataKeyUnreadable :execrows
+UPDATE "DataKeys"
+SET "UnwrapFailedAt" = NULL, "UpdatedAt" = now()
+WHERE "UnwrapFailedAt" IS NOT NULL AND "State" = 'active'
+`
+
+func (q *Queries) ClearDataKeyUnreadable(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, clearDataKeyUnreadable)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countDataKeysByVersion = `-- name: CountDataKeysByVersion :many
-SELECT "KekVersion", count(*)::bigint AS "Count"
+SELECT "KekVersion", count(*)::bigint AS "Count", (count(*) FILTER (WHERE "UnwrapFailedAt" IS NOT NULL))::bigint AS "Unreadable"
 FROM "DataKeys"
 WHERE "State" = 'active'
 GROUP BY "KekVersion"
@@ -23,6 +37,7 @@ ORDER BY "KekVersion"
 type CountDataKeysByVersionRow struct {
 	KekVersion int32
 	Count      int64
+	Unreadable int64
 }
 
 func (q *Queries) CountDataKeysByVersion(ctx context.Context) ([]CountDataKeysByVersionRow, error) {
@@ -34,7 +49,7 @@ func (q *Queries) CountDataKeysByVersion(ctx context.Context) ([]CountDataKeysBy
 	items := []CountDataKeysByVersionRow{}
 	for rows.Next() {
 		var i CountDataKeysByVersionRow
-		if err := rows.Scan(&i.KekVersion, &i.Count); err != nil {
+		if err := rows.Scan(&i.KekVersion, &i.Count, &i.Unreadable); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -179,7 +194,10 @@ func (q *Queries) GetDataKey(ctx context.Context, id uuid.UUID) (GetDataKeyRow, 
 
 const insertDataKey = `-- name: InsertDataKey :execrows
 INSERT INTO "DataKeys" ("Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped")
-VALUES ($1, $2, $3::uuid, $4, $5)
+SELECT $1, $2, $3::uuid, k."Version", $4
+FROM "KeyEncryptionKeys" AS k
+WHERE k."Version" = $5 AND k."State" = 'active'
+FOR SHARE OF k
 ON CONFLICT DO NOTHING
 `
 
@@ -187,8 +205,8 @@ type InsertDataKeyParams struct {
 	ID         uuid.UUID
 	OwnerKind  string
 	OwnerID    *uuid.UUID
-	KekVersion int32
 	Wrapped    []byte
+	KekVersion int32
 }
 
 func (q *Queries) InsertDataKey(ctx context.Context, arg InsertDataKeyParams) (int64, error) {
@@ -196,8 +214,8 @@ func (q *Queries) InsertDataKey(ctx context.Context, arg InsertDataKeyParams) (i
 		arg.ID,
 		arg.OwnerKind,
 		arg.OwnerID,
-		arg.KekVersion,
 		arg.Wrapped,
+		arg.KekVersion,
 	)
 	if err != nil {
 		return 0, err
@@ -230,7 +248,7 @@ func (q *Queries) InsertKeyEncryptionKey(ctx context.Context, arg InsertKeyEncry
 const listDataKeysToRewrap = `-- name: ListDataKeysToRewrap :many
 SELECT "Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped"
 FROM "DataKeys"
-WHERE "State" = 'active' AND "KekVersion" <> $1
+WHERE "State" = 'active' AND "KekVersion" <> $1 AND "UnwrapFailedAt" IS NULL
 ORDER BY "Id"
 LIMIT $2
 FOR UPDATE SKIP LOCKED
@@ -359,6 +377,20 @@ SELECT pg_advisory_xact_lock(hashtextextended('dhow.keyring', 0))
 func (q *Queries) LockKeyring(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, lockKeyring)
 	return err
+}
+
+const markDataKeyUnreadable = `-- name: MarkDataKeyUnreadable :execrows
+UPDATE "DataKeys"
+SET "UnwrapFailedAt" = now(), "UpdatedAt" = now()
+WHERE "Id" = $1 AND "State" = 'active' AND "UnwrapFailedAt" IS NULL
+`
+
+func (q *Queries) MarkDataKeyUnreadable(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markDataKeyUnreadable, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const markKeyringExported = `-- name: MarkKeyringExported :execrows

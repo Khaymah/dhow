@@ -2,7 +2,10 @@ package keys
 
 import (
 	"context"
+	"crypto/cipher"
+	"crypto/hkdf"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -11,13 +14,18 @@ import (
 )
 
 const (
-	FormatVersion = byte(2)
-	idBytes       = 16
-	headerBytes   = 1 + idBytes + gcmNonce
-	Overhead      = headerBytes + gcmTag
-	MaxPlaintext  = 1 << 20
-	maxLabelBytes = 255
-	dekAADLabel   = "dhow/dek/v1"
+	FormatVersion  = byte(3)
+	idBytes        = 16
+	saltBytes      = 32
+	saltOffset     = 1 + idBytes
+	nonceOffset    = saltOffset + saltBytes
+	headerBytes    = nonceOffset + gcmNonce
+	Overhead       = headerBytes + gcmTag
+	MaxPlaintext   = 1 << 20
+	maxLabelBytes  = 255
+	dekAADLabel    = "dhow/dek/v1"
+	subkeyInfo     = "dhow/value/v2"
+	insertAttempts = 3
 )
 
 type Envelope struct {
@@ -30,7 +38,7 @@ func NewEnvelope(store Store, provider KeyProvider) *Envelope {
 }
 
 func (e *Envelope) Seal(ctx context.Context, owner Owner, label string, rowContext, plaintext []byte) ([]byte, error) {
-	if err := checkPurpose(owner, label); err != nil {
+	if err := checkPurpose(owner, label, rowContext); err != nil {
 		return nil, err
 	}
 	if len(plaintext) > MaxPlaintext {
@@ -40,32 +48,27 @@ func (e *Envelope) Seal(ctx context.Context, owner Owner, label string, rowConte
 	if err != nil {
 		return nil, err
 	}
-	dek, err := e.unwrap(ctx, dk)
-	if err != nil {
-		return nil, err
-	}
-	defer clear(dek)
-	aead, err := newAEAD(dek)
-	if err != nil {
-		return nil, err
-	}
 	out := make([]byte, headerBytes, headerBytes+len(plaintext)+gcmTag)
 	out[0] = FormatVersion
-	copy(out[1:1+idBytes], dk.ID[:])
-	if _, err := rand.Read(out[1+idBytes : headerBytes]); err != nil {
-		return nil, fmt.Errorf("read nonce: %w", err)
+	copy(out[1:saltOffset], dk.ID[:])
+	if _, err := rand.Read(out[saltOffset:headerBytes]); err != nil {
+		return nil, fmt.Errorf("read salt and nonce: %w", err)
 	}
-	return aead.Seal(out, out[1+idBytes:headerBytes], plaintext, valueAAD(dk.ID, label, rowContext)), nil
+	aead, err := e.valueAEAD(ctx, dk, out[saltOffset:nonceOffset], label)
+	if err != nil {
+		return nil, err
+	}
+	return aead.Seal(out, out[nonceOffset:headerBytes], plaintext, valueAAD(dk.ID, label, rowContext)), nil
 }
 
 func (e *Envelope) Open(ctx context.Context, owner Owner, label string, rowContext, sealed []byte) ([]byte, error) {
-	if err := checkPurpose(owner, label); err != nil {
+	if err := checkPurpose(owner, label, rowContext); err != nil {
 		return nil, err
 	}
 	if len(sealed) < Overhead || sealed[0] != FormatVersion {
 		return nil, ErrSealed
 	}
-	id, err := uuid.FromBytes(sealed[1 : 1+idBytes])
+	id, err := uuid.FromBytes(sealed[1:saltOffset])
 	if err != nil {
 		return nil, ErrSealed
 	}
@@ -82,20 +85,29 @@ func (e *Envelope) Open(ctx context.Context, owner Owner, label string, rowConte
 	if dk.Destroyed {
 		return nil, ErrShredded
 	}
+	aead, err := e.valueAEAD(ctx, dk, sealed[saltOffset:nonceOffset], label)
+	if err != nil {
+		return nil, err
+	}
+	plain, err := aead.Open(nil, sealed[nonceOffset:headerBytes], sealed[headerBytes:], valueAAD(id, label, rowContext))
+	if err != nil {
+		return nil, ErrSealed
+	}
+	return plain, nil
+}
+
+func (e *Envelope) valueAEAD(ctx context.Context, dk DataKey, salt []byte, label string) (cipher.AEAD, error) {
 	dek, err := e.unwrap(ctx, dk)
 	if err != nil {
 		return nil, err
 	}
 	defer clear(dek)
-	aead, err := newAEAD(dek)
+	subkey, err := hkdf.Key(sha256.New, dek, salt, subkeyInfo+label, KeyBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("derive the value key: %w", err)
 	}
-	plain, err := aead.Open(nil, sealed[1+idBytes:headerBytes], sealed[headerBytes:], valueAAD(id, label, rowContext))
-	if err != nil {
-		return nil, ErrSealed
-	}
-	return plain, nil
+	defer clear(subkey)
+	return newAEAD(subkey)
 }
 
 func (e *Envelope) Destroy(ctx context.Context, owner Owner) (int64, error) {
@@ -105,42 +117,51 @@ func (e *Envelope) Destroy(ctx context.Context, owner Owner) (int64, error) {
 	return e.store.DestroyOwner(ctx, owner)
 }
 
-func checkPurpose(owner Owner, label string) error {
+func checkPurpose(owner Owner, label string, rowContext []byte) error {
 	if !owner.Valid() {
 		return ErrBadOwner
 	}
 	if label == "" || len(label) > maxLabelBytes {
 		return ErrBadLabel
 	}
+	if len(rowContext) == 0 {
+		return ErrBadContext
+	}
 	return nil
 }
 
 func (e *Envelope) dataKeyFor(ctx context.Context, owner Owner) (DataKey, error) {
-	dk, err := e.store.ActiveDataKey(ctx, owner)
-	if !errors.Is(err, ErrNoDataKey) {
-		return dk, err
+	for range insertAttempts {
+		dk, err := e.store.ActiveDataKey(ctx, owner)
+		if !errors.Is(err, ErrNoDataKey) {
+			return dk, err
+		}
+		if err := e.newDataKey(ctx, owner); err != nil {
+			return DataKey{}, err
+		}
 	}
+	return e.store.ActiveDataKey(ctx, owner)
+}
+
+func (e *Envelope) newDataKey(ctx context.Context, owner Owner) error {
 	version, err := e.store.ActiveKekVersion(ctx)
 	if err != nil {
-		return DataKey{}, err
+		return err
 	}
 	id, err := uuid.NewV7()
 	if err != nil {
-		return DataKey{}, fmt.Errorf("make a data key id: %w", err)
+		return fmt.Errorf("make a data key id: %w", err)
 	}
 	dek, err := randomKey()
 	if err != nil {
-		return DataKey{}, err
+		return err
 	}
 	defer clear(dek)
 	wrapped, err := e.provider.Wrap(ctx, version, dek, dekAAD(id, owner, version))
 	if err != nil {
-		return DataKey{}, fmt.Errorf("wrap a new data key with KEK version %d: %w", version, err)
+		return fmt.Errorf("wrap a new data key with KEK version %d: %w", version, err)
 	}
-	if err := e.store.InsertDataKey(ctx, DataKey{ID: id, Owner: owner, KekVersion: version, Wrapped: wrapped}); err != nil {
-		return DataKey{}, err
-	}
-	return e.store.ActiveDataKey(ctx, owner)
+	return e.store.InsertDataKey(ctx, DataKey{ID: id, Owner: owner, KekVersion: version, Wrapped: wrapped})
 }
 
 func (e *Envelope) unwrap(ctx context.Context, dk DataKey) ([]byte, error) {

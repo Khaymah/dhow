@@ -24,7 +24,6 @@ func StartKeys(ctx context.Context, pool *pgxpool.Pool, provider keys.KeyProvide
 	manager := keys.NewManager(pool, provider, log)
 	reg, err := manager.Register(ctx)
 	if err != nil {
-		log.Error("the keyring does not fit this database; stopping", "code", keys.CodeOf(err), "error", err.Error())
 		return nil, nil, nil, err
 	}
 	log.Info("keyring loaded", "provider", provider.Name(), "kek_versions", reg.Versions, "active_kek_version", reg.Active,

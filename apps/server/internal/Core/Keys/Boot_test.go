@@ -194,3 +194,28 @@ func splitLines(data []byte) []keyLine {
 	}
 	return out
 }
+
+func TestBootFailsWhenRestoringAnOldExportLeavesNoActiveVersion(t *testing.T) {
+	pool := dbtest.NewPool(t)
+	ring, err := keys.GenerateKeyring(1, 2)
+	require.NoError(t, err)
+	_, err = managerFor(t, pool, ring).Register(t.Context())
+	require.NoError(t, err)
+	_, err = pool.Exec(t.Context(), `UPDATE "KeyEncryptionKeys" SET "State" = 'retired', "RetiredAt" = now(), "ActivatedAt" = coalesce("ActivatedAt", now())`)
+	require.NoError(t, err)
+
+	oldExport := keyringWithout(t, ring, 2)
+	reg, err := managerFor(t, pool, oldExport).Register(t.Context())
+	require.Error(t, err, "registered %+v with no active version", reg)
+	assert.Equal(t, keys.CodeKeyringRetired, keys.CodeOf(err))
+	assert.Contains(t, err.Error(), "KEK version 1")
+	var active int
+	require.NoError(t, pool.QueryRow(t.Context(), `SELECT count(*) FROM "KeyEncryptionKeys" WHERE "State" = 'active'`).Scan(&active))
+	assert.Zero(t, active)
+
+	newer, _, err := ring.WithNextVersion()
+	require.NoError(t, err)
+	reg, err = managerFor(t, pool, newer).Register(t.Context())
+	require.NoError(t, err, "a new version in the file becomes active")
+	assert.Equal(t, int32(3), reg.Active)
+}

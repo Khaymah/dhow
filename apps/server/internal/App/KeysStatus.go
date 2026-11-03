@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
+	audit "github.com/Khaymah/dhow/apps/server/internal/Modules/Audit"
 	system "github.com/Khaymah/dhow/apps/server/internal/Modules/System"
 )
 
@@ -47,18 +50,20 @@ func (k KeysRunner) printStatus(st keys.Status, now time.Time) {
 	p.row("Last rotation:\t%s", when(st.LastRotatedAt))
 	p.row("Last export:\t%s", when(st.LastExportedAt))
 	p.row("")
-	p.row("VERSION\tSTATE\tDATA KEYS\tIN THIS FILE\tACTIVATED\tRETIRED\tEXPORTED")
+	p.row("VERSION\tSTATE\tDATA KEYS\tUNREADABLE\tIN THIS FILE\tACTIVATED\tRETIRED\tEXPORTED")
 	for _, v := range st.Versions {
-		p.row("%d\t%s\t%d\t%s\t%s\t%s\t%s", v.Version, v.State, v.DataKeys, yesNo(v.Local), when(v.ActivatedAt), when(v.RetiredAt), when(v.LastExportedAt))
+		p.row("%d\t%s\t%d\t%d\t%s\t%s\t%s\t%s", v.Version, v.State, v.DataKeys, v.Unreadable, yesNo(v.Local),
+			when(v.ActivatedAt), when(v.RetiredAt), when(v.LastExportedAt))
 	}
 	if err := p.flush(); err != nil {
 		return
 	}
 	for _, v := range st.Versions {
-		if v.State == keys.KekRetired && v.Local {
-			k.say("Version %d is retired and no data key uses it. Remove its line from the keyring file once every backup taken before %s is gone,"+
-				" because each backup needs the keyring it was taken with.", v.Version, when(v.RetiredAt))
+		if !slices.Contains(st.Removable(), v.Version) {
+			continue
 		}
+		k.say("Version %d is retired and no data key uses it. Remove its line from the keyring file once every backup taken before %s is gone,"+
+			" because each backup needs the keyring it was taken with.", v.Version, when(v.RetiredAt))
 	}
 	for _, w := range statusWarnings(st, now) {
 		k.say("Warning: %s", w)
@@ -67,6 +72,10 @@ func (k KeysRunner) printStatus(st keys.Status, now time.Time) {
 
 func statusWarnings(st keys.Status, now time.Time) []string {
 	var out []string
+	if st.Unreadable > 0 {
+		out = append(out, fmt.Sprintf("%d data keys cannot be unwrapped with this keyring, so their KEK versions never retire; "+
+			"restore the keyring that wrapped them and restart the server, which tries them again", st.Unreadable))
+	}
 	if st.LastExportedAt == nil {
 		out = append(out, "the keyring was never exported; run dhow-server keys export --recipient age1... --out FILE and keep the copy off this server")
 	}
@@ -104,7 +113,7 @@ func (k KeysRunner) discard(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Lstat(kr.Path); errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Lstat(kr.Path); errors.Is(err, fs.ErrNotExist) && k.Opts.File == "" {
 		if err := k.init(); err != nil {
 			return err
 		}
@@ -128,13 +137,18 @@ func (k KeysRunner) discard(ctx context.Context) error {
 		return nil
 	}
 	k.describeDiscard(plan)
-	if k.Opts.Confirm != DiscardConfirmation {
+	if k.Opts.Confirm != plan.Confirmation() {
 		return ErrDiscardUnconfirm
 	}
-	if plan, err = manager.Discard(ctx); err != nil {
-		return err
-	}
-	if err := k.record(ctx, pool, system.KeysDiscardedEvent(plan.Versions(), plan.DataKeys)); err != nil {
+	auditor := audit.NewService(pool, k.logger(), time.Now)
+	plan, err = manager.Discard(ctx, k.Opts.Confirm, config.ServerInstanceStaleAfter.Seconds(),
+		func(ctx context.Context, q *sqlc.Queries, plan keys.DiscardPlan) error {
+			if err := auditor.Handle(ctx, system.KeysDiscardedEvent(q, plan.Versions(), plan.DataKeys)); err != nil {
+				return fmt.Errorf("write the audit entry: %w", err)
+			}
+			return nil
+		})
+	if err != nil {
 		return err
 	}
 	reg, err := manager.Register(ctx)
@@ -156,6 +170,7 @@ func (k KeysRunner) describeDiscard(plan keys.DiscardPlan) {
 	}
 	k.say("%d data keys can never be opened again. Every value sealed with them will count as erased.", plan.DataKeys)
 	k.say("If you still have the right keyring file, or its export, restore it instead and start dhow-server.")
+	k.say("To destroy them for good, run the command again with: --confirm %s", plan.Confirmation())
 }
 
 func joinVersions(vs []int32) string {

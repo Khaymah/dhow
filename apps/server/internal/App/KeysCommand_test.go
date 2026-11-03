@@ -69,7 +69,7 @@ func TestParseKeysArgs(t *testing.T) {
 		{"init"},
 		{"init", "--file", "/k"},
 		{"init", "--discard-unreadable"},
-		{"init", "--discard-unreadable", "--confirm", app.DiscardConfirmation},
+		{"init", "--discard-unreadable", "--confirm", "destroy-12-keys"},
 		{"status"},
 		{"generate"},
 		{"activate", "2"},
@@ -88,7 +88,7 @@ func TestParseKeysArgs(t *testing.T) {
 		{"activate", "two"},
 		{"activate", "-1"},
 		{"status", "extra"},
-		{"init", "--confirm", app.DiscardConfirmation},
+		{"init", "--confirm", "destroy-12-keys"},
 		{"export"},
 		{"export", "--recipient", "age1x"},
 		{"export", "--out", "x"},
@@ -174,7 +174,8 @@ func TestKeysCommandsRotateExportAndNeverPrintAKey(t *testing.T) {
 	assertNoKeys(t, cli.out.String()+string(data), first, both)
 }
 
-func TestDiscardUnreadableNeedsConfirmationAndShredsWhatTheKeyringCannotOpen(t *testing.T) {
+func discardSetup(t *testing.T) (*pgxpool.Pool, *keys.Manager, keys.Owner, []byte) {
+	t.Helper()
 	pool := dbtest.NewPool(t)
 	original, err := keys.GenerateKeyring(1)
 	require.NoError(t, err)
@@ -186,25 +187,80 @@ func TestDiscardUnreadableNeedsConfirmationAndShredsWhatTheKeyringCannotOpen(t *
 	user := keys.UserOwner(uuid.New())
 	sealed, err := server.Envelope().Seal(t.Context(), user, config.TotpSealLabel, []byte(user.ID.String()), []byte("JBSWY3DPEHPK3PXP"))
 	require.NoError(t, err)
+	return pool, server, user, sealed
+}
 
-	cli := &keysCLI{t: t, pool: pool, file: filepath.Join(apptest.PrivateDir(t), "dhow-keyring")}
-	err = cli.run("init", "--discard-unreadable")
-	require.ErrorIs(t, err, app.ErrDiscardUnconfirm)
-	assert.Contains(t, cli.out.String(), "1 data keys can never be opened again")
-	assert.Contains(t, cli.out.String(), "a different key under the same number: KEK versions 1")
-	var active int
-	require.NoError(t, pool.QueryRow(t.Context(), `SELECT count(*) FROM "DataKeys" WHERE "State" = 'active'`).Scan(&active))
-	assert.Equal(t, 1, active, "nothing changes without the confirmation")
-	_, err = server.Envelope().Open(t.Context(), user, config.TotpSealLabel, []byte(user.ID.String()), sealed)
+func activeDataKeys(t *testing.T, pool *pgxpool.Pool) int {
+	t.Helper()
+	var n int
+	require.NoError(t, pool.QueryRow(t.Context(), `SELECT count(*) FROM "DataKeys" WHERE "State" = 'active'`).Scan(&n))
+	return n
+}
+
+func newKeyringFile(t *testing.T) string {
+	t.Helper()
+	ring, err := keys.GenerateKeyring(1)
 	require.NoError(t, err)
-	assert.Empty(t, auditActions(t, pool))
+	return keyringFile(t, ring)
+}
 
-	require.NoError(t, cli.run("init", "--discard-unreadable", "--confirm", app.DiscardConfirmation))
+func TestDiscardNeverMakesAKeyringForAnExplicitFile(t *testing.T) {
+	pool, _, _, _ := discardSetup(t)
+	cli := &keysCLI{t: t, pool: pool, file: filepath.Join(apptest.PrivateDir(t), "dhow-keyring")}
+	err := cli.run("init", "--discard-unreadable")
+	require.Error(t, err)
+	assert.Equal(t, keys.CodeKeyringMissing, keys.CodeOf(err))
+	_, statErr := os.Stat(cli.file)
+	require.ErrorIs(t, statErr, os.ErrNotExist)
+	assert.Equal(t, 1, activeDataKeys(t, pool))
+}
+
+func TestDiscardIsRefusedWhileARunningServerHasTheVersions(t *testing.T) {
+	pool, _, _, _ := discardSetup(t)
+	_, err := pool.Exec(t.Context(), `INSERT INTO "ServerInstances" ("InstanceKey", "Hostname", "Version", "SchemaVersion", "KekVersions")
+		VALUES ('still-running', 'still-running', 'test', 52, '{1}')`)
+	require.NoError(t, err)
+	cli := &keysCLI{t: t, pool: pool, file: newKeyringFile(t)}
+	err = cli.run("init", "--discard-unreadable", "--confirm", "destroy-1-keys")
+	require.Error(t, err)
+	assert.Equal(t, keys.CodeKeysInUse, keys.CodeOf(err))
+	assert.Contains(t, err.Error(), "still-running")
+	assert.Equal(t, 1, activeDataKeys(t, pool))
+	assert.Empty(t, auditActions(t, pool))
+}
+
+func TestDiscardConfirmationNamesTheCountAndTheAuditCommitsWithIt(t *testing.T) {
+	pool, _, user, sealed := discardSetup(t)
+	cli := &keysCLI{t: t, pool: pool, file: newKeyringFile(t)}
+	for _, confirm := range []string{"", "discard-unreadable-secrets", "destroy-2-keys", "destroy-0-keys", "destroy-01-keys"} {
+		args := []string{"init", "--discard-unreadable"}
+		if confirm != "" {
+			args = append(args, "--confirm", confirm)
+		}
+		err := cli.run(args...)
+		require.ErrorIs(t, err, app.ErrDiscardUnconfirm, confirm)
+		assert.Equal(t, 1, activeDataKeys(t, pool), confirm)
+	}
+	assert.Contains(t, cli.out.String(), "--confirm destroy-1-keys")
+
+	_, err := pool.Exec(t.Context(), `CREATE FUNCTION refuse_discard() RETURNS trigger LANGUAGE plpgsql AS $$
+		BEGIN RAISE EXCEPTION 'audit refused'; END $$;
+		CREATE TRIGGER refuse_discard BEFORE INSERT ON "AuditEvents" FOR EACH ROW
+		WHEN (NEW."Action" = 'system.keys.discarded') EXECUTE FUNCTION refuse_discard()`)
+	require.NoError(t, err)
+	require.Error(t, cli.run("init", "--discard-unreadable", "--confirm", "destroy-1-keys"))
+	assert.Equal(t, 1, activeDataKeys(t, pool), "without its audit entry the discard does not happen")
+	_, err = pool.Exec(t.Context(), `DROP TRIGGER refuse_discard ON "AuditEvents"`)
+	require.NoError(t, err)
+
+	require.NoError(t, cli.run("init", "--discard-unreadable", "--confirm", "destroy-1-keys"))
+	assert.Zero(t, activeDataKeys(t, pool))
 	assert.Equal(t, []string{"system.keys.discarded"}, auditActions(t, pool))
-	var severity string
+	var severity, count string
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT "Data"->>'Severity' FROM "AuditEvents" WHERE "Action" = 'system.keys.discarded'`).Scan(&severity))
+		`SELECT "Data"->>'Severity', "Data"->>'DataKeys' FROM "AuditEvents" WHERE "Action" = 'system.keys.discarded'`).Scan(&severity, &count))
 	assert.Equal(t, "high", severity)
+	assert.Equal(t, "1", count)
 
 	replacement, err := keys.NewFileProvider(cli.ring())
 	require.NoError(t, err)
@@ -222,5 +278,5 @@ func TestDiscardUnreadableNeedsConfirmationAndShredsWhatTheKeyringCannotOpen(t *
 	cli.out.Reset()
 	require.NoError(t, cli.run("init", "--discard-unreadable"))
 	assert.Contains(t, cli.out.String(), "Nothing to discard")
-	assertNoKeys(t, cli.out.String(), original, cli.ring())
+	assertNoKeys(t, cli.out.String(), cli.ring())
 }

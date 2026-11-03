@@ -19,11 +19,13 @@ const (
 	CodeKeyringMissingVersion = "KEYRING_MISSING_VERSION"
 	CodeKeyringMismatch       = "KEYRING_MISMATCH"
 	CodeKeyringFull           = "KEYRING_FULL"
+	CodeKeyringRetired        = "KEYRING_RETIRED"
 	CodeKekNotEverywhere      = "KEK_NOT_EVERYWHERE"
 	CodeKekNotFound           = "KEK_NOT_FOUND"
 	CodeKekRetired            = "KEK_RETIRED"
 	CodeKekAlreadyActive      = "KEK_ALREADY_ACTIVE"
 	CodeKekNoActive           = "KEK_NO_ACTIVE"
+	CodeKeysInUse             = "KEYS_IN_USE"
 )
 
 var (
@@ -32,6 +34,7 @@ var (
 	ErrTooLarge    = errors.New("plaintext is larger than 1 MiB")
 	ErrBadOwner    = errors.New("the owner of a data key is not valid")
 	ErrBadLabel    = errors.New("the purpose label must be 1 to 255 bytes")
+	ErrBadContext  = errors.New("the row context must not be empty")
 	ErrNoDataKey   = errors.New("no active data key for this owner")
 	ErrUnknownKek  = errors.New("the key provider has no such KEK version")
 	ErrWrappedSize = errors.New("a wrapped data key has the wrong size")

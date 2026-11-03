@@ -147,24 +147,24 @@ func TestDataKeysAreMadeOncePerOwnerEvenUnderRace(t *testing.T) {
 
 func TestSealRejectsBadInput(t *testing.T) {
 	env, _ := newMemoryEnvelope(t)
-	_, err := env.Seal(t.Context(), keys.Owner{Kind: keys.OwnerProject}, "dhow/x/v1", nil, []byte("x"))
+	_, err := env.Seal(t.Context(), keys.Owner{Kind: keys.OwnerProject}, "dhow/x/v1", []byte("row"), []byte("x"))
 	require.ErrorIs(t, err, keys.ErrBadOwner)
-	_, err = env.Seal(t.Context(), keys.Owner{Kind: keys.OwnerInstance, ID: uuid.New()}, "dhow/x/v1", nil, []byte("x"))
+	_, err = env.Seal(t.Context(), keys.Owner{Kind: keys.OwnerInstance, ID: uuid.New()}, "dhow/x/v1", []byte("row"), []byte("x"))
 	require.ErrorIs(t, err, keys.ErrBadOwner)
-	_, err = env.Seal(t.Context(), keys.Owner{Kind: "team", ID: uuid.New()}, "dhow/x/v1", nil, []byte("x"))
+	_, err = env.Seal(t.Context(), keys.Owner{Kind: "team", ID: uuid.New()}, "dhow/x/v1", []byte("row"), []byte("x"))
 	require.ErrorIs(t, err, keys.ErrBadOwner)
-	_, err = env.Seal(t.Context(), keys.InstanceOwner(), "", nil, []byte("x"))
+	_, err = env.Seal(t.Context(), keys.InstanceOwner(), "", []byte("row"), []byte("x"))
 	require.ErrorIs(t, err, keys.ErrBadLabel)
-	_, err = env.Seal(t.Context(), keys.InstanceOwner(), string(bytes.Repeat([]byte("l"), 256)), nil, []byte("x"))
+	_, err = env.Seal(t.Context(), keys.InstanceOwner(), string(bytes.Repeat([]byte("l"), 256)), []byte("row"), []byte("x"))
 	require.ErrorIs(t, err, keys.ErrBadLabel)
-	_, err = env.Seal(t.Context(), keys.InstanceOwner(), "dhow/x/v1", nil, make([]byte, keys.MaxPlaintext+1))
+	_, err = env.Seal(t.Context(), keys.InstanceOwner(), "dhow/x/v1", []byte("row"), make([]byte, keys.MaxPlaintext+1))
 	require.ErrorIs(t, err, keys.ErrTooLarge)
 	_, err = env.Destroy(t.Context(), keys.Owner{Kind: keys.OwnerUser})
 	require.ErrorIs(t, err, keys.ErrBadOwner)
 
-	sealed, err := env.Seal(t.Context(), keys.InstanceOwner(), "dhow/x/v1", nil, nil)
+	sealed, err := env.Seal(t.Context(), keys.InstanceOwner(), "dhow/x/v1", []byte("row"), nil)
 	require.NoError(t, err)
-	got, err := env.Open(t.Context(), keys.InstanceOwner(), "dhow/x/v1", nil, sealed)
+	got, err := env.Open(t.Context(), keys.InstanceOwner(), "dhow/x/v1", []byte("row"), sealed)
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }
@@ -179,6 +179,10 @@ func FuzzOpen(f *testing.F) {
 	f.Add(append([]byte{keys.FormatVersion}, make([]byte, keys.Overhead)...), []byte("deploy-key:1"))
 	f.Fuzz(func(t *testing.T, value, rowContext []byte) {
 		got, err := env.Open(context.Background(), owner, labelDeployKey, rowContext, value)
+		if len(rowContext) == 0 {
+			assert.ErrorIs(t, err, keys.ErrBadContext)
+			return
+		}
 		if err != nil {
 			assert.ErrorIs(t, err, keys.ErrSealed)
 			return

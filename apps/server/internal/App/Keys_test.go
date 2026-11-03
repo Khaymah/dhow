@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
@@ -108,7 +109,7 @@ func TestServerStopsAtBootWhenTheKeyringDoesNotFit(t *testing.T) {
 	}{
 		{"a version the database needs is missing", withoutTwo, keys.CodeKeyringMissingVersion, 2},
 		{"another key under the same versions", keyringFile(t, other), keys.CodeKeyringMismatch, 1},
-		{"a malformed line", malformed, keys.CodeKeyringMalformed, 0},
+		{"a malformed line", malformed, keys.CodeKeyringMalformed, 3},
 		{"open to other users", shared, keys.CodeKeyringInsecure, 0},
 	}
 	for _, tt := range tests {
@@ -132,7 +133,40 @@ func TestServerStopsAtBootWhenTheKeyringDoesNotFit(t *testing.T) {
 			}
 			assert.Contains(t, logs, tt.code)
 			assert.NotContains(t, logs, "listening")
+			assert.NotContains(t, logs, "database schema is current", "the keyring is checked before any migration")
 			assertNoKeys(t, logs+runErr.Error(), ring, other)
+		})
+	}
+}
+
+func TestComposeWaitsInsteadOfExitingWhenTheKeyringDoesNotFit(t *testing.T) {
+	pool := dbtest.NewPool(t)
+	ring, err := keys.GenerateKeyring(1)
+	require.NoError(t, err)
+	provider, err := keys.NewFileProvider(ring)
+	require.NoError(t, err)
+	_, err = keys.NewManager(pool, provider, nil).Register(t.Context())
+	require.NoError(t, err)
+	other, err := keys.GenerateKeyring(1)
+	require.NoError(t, err)
+	t.Setenv(config.EnvDev, "true")
+	t.Setenv(config.EnvDatabaseURL, schemaURL(t, pool))
+	t.Setenv(config.EnvSecretKey, "9f1c4a7e2b8d06f35a1e9c7b4d2f80a6c3e5b7091d4f6a8e2c0b5d7f9a1e3c6b")
+	t.Setenv(config.EnvPublicURL, "http://localhost:58290")
+	t.Setenv(config.EnvListenAddr, "127.0.0.1:58290")
+	t.Setenv(config.EnvOnIncompatible, config.OnIncompatibleWait)
+	for name, path := range map[string]string{"mismatch": keyringFile(t, other), "missing": filepath.Join(apptest.PrivateDir(t), "none")} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv(config.EnvKeyringFile, path)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			var runErr error
+			start := time.Now()
+			logs := captureStdout(t, func() { runErr = app.Run(ctx) })
+			require.NoError(t, runErr, "it waits for the stop signal and then exits cleanly")
+			assert.GreaterOrEqual(t, time.Since(start), 1500*time.Millisecond)
+			assert.Equal(t, 1, strings.Count(logs, "waiting for a stop signal"), logs)
+			assert.NotContains(t, logs, "listening", "the healthcheck keeps failing")
 		})
 	}
 }

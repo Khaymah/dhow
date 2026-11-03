@@ -40,7 +40,10 @@ func NewFileProvider(ring *Keyring) (*FileProvider, error) {
 func newProvider(ring *Keyring, name string) (*FileProvider, error) {
 	p := &FileProvider{ring: ring, name: name, aeads: make(map[int32]cipher.AEAD, len(ring.versions))}
 	for _, v := range ring.versions {
-		key, _ := ring.key(v)
+		key, ok := ring.key(v)
+		if !ok {
+			return nil, fmt.Errorf("%w: %d", ErrUnknownKek, v)
+		}
 		aead, err := newAEAD(key)
 		if err != nil {
 			return nil, err

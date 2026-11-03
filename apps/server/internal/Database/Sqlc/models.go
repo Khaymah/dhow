@@ -164,16 +164,17 @@ type CommitStatusReport struct {
 }
 
 type DataKey struct {
-	Id          uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	IsDeleted   bool
-	OwnerKind   string
-	OwnerId     *uuid.UUID
-	KekVersion  int32
-	Wrapped     []byte
-	State       string
-	DestroyedAt *time.Time
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OwnerKind      string
+	OwnerId        *uuid.UUID
+	KekVersion     int32
+	Wrapped        []byte
+	State          string
+	DestroyedAt    *time.Time
+	UnwrapFailedAt *time.Time
 }
 
 type Environment struct {

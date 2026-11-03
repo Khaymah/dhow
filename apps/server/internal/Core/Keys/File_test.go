@@ -2,9 +2,11 @@ package keys_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 
@@ -189,4 +191,102 @@ func TestAppendKeyringVersionKeepsModeOwnerAndEveryKey(t *testing.T) {
 	require.NoError(t, os.Symlink(path, link))
 	_, err = keys.AppendKeyringVersion(link, keys.FileRules{})
 	assert.Equal(t, keys.CodeKeyringInsecure, keys.CodeOf(err))
+}
+
+func TestConcurrentGenerateNeverCorruptsTheKeyring(t *testing.T) {
+	ring, err := keys.GenerateKeyring(1)
+	require.NoError(t, err)
+	path := writeKeyring(t, privateDir(t), ring)
+	const runs = 200
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	added := map[int32]int{}
+	full := 0
+	var other []error
+	for range runs {
+		wg.Go(func() {
+			v, err := keys.AppendKeyringVersion(path, keys.FileRules{})
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case err == nil:
+				added[v]++
+			case keys.CodeOf(err) == keys.CodeKeyringFull:
+				full++
+			default:
+				other = append(other, err)
+			}
+		})
+	}
+	wg.Wait()
+	require.Empty(t, other)
+	assert.Len(t, added, keys.MaxVersions-1, "each new version is handed out once")
+	for v, n := range added {
+		assert.Equal(t, 1, n, "version %d", v)
+	}
+	assert.Equal(t, runs-(keys.MaxVersions-1), full)
+	got, err := keys.ReadKeyringFile(path, keys.FileRules{})
+	require.NoError(t, err)
+	assert.Len(t, got.Versions(), keys.MaxVersions)
+	assert.True(t, bytes.HasPrefix(got.Marshal(), ring.Marshal()))
+}
+
+func TestAFailedGenerateLeavesTheKeyringAsItWas(t *testing.T) {
+	errDisk := errors.New("disk full")
+	tests := []struct {
+		name    string
+		writeAt func(f *os.File, b []byte, off int64) (int, error)
+	}{
+		{"a short write with an error", func(f *os.File, b []byte, off int64) (int, error) {
+			n, _ := f.WriteAt(b[:len(b)/2], off)
+			return n, errDisk
+		}},
+		{"a short write without an error", func(f *os.File, b []byte, off int64) (int, error) {
+			n, err := f.WriteAt(b[:len(b)-1], off)
+			return n, err
+		}},
+		{"a write that reads back wrong", func(f *os.File, b []byte, off int64) (int, error) {
+			bad := bytes.Clone(b)
+			bad[10] = '!'
+			return f.WriteAt(bad, off)
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ring, err := keys.GenerateKeyring(1, 2)
+			require.NoError(t, err)
+			path := writeKeyring(t, privateDir(t), ring)
+			before, err := os.ReadFile(path)
+			require.NoError(t, err)
+			_, err = keys.AppendKeyringVersionWith(path, tt.writeAt)
+			require.Error(t, err)
+			after, err := os.ReadFile(path)
+			require.NoError(t, err)
+			assert.Equal(t, before, after, "the file is truncated back to its size before the write")
+			got, err := keys.ReadKeyringFile(path, keys.FileRules{})
+			require.NoError(t, err)
+			assert.Equal(t, []int32{1, 2}, got.Versions())
+			v, err := keys.AppendKeyringVersion(path, keys.FileRules{})
+			require.NoError(t, err, "the next generate works")
+			assert.Equal(t, int32(3), v)
+		})
+	}
+}
+
+func TestACutOffLastLineNamesTheLineToDelete(t *testing.T) {
+	ring, err := keys.GenerateKeyring(1, 2)
+	require.NoError(t, err)
+	path := writeKeyring(t, privateDir(t), ring)
+	data := ring.Marshal()
+	require.NoError(t, os.WriteFile(path, append(bytes.Clone(data), []byte("kek 3 abc")...), 0o600))
+	_, err = keys.AppendKeyringVersion(path, keys.FileRules{})
+	require.Error(t, err)
+	assert.Equal(t, keys.CodeKeyringMalformed, keys.CodeOf(err))
+	assert.Contains(t, err.Error(), "delete line 3")
+	_, err = keys.ReadKeyringFile(path, keys.FileRules{})
+	assert.Contains(t, err.Error(), "delete line 3", "the server names the same line at boot")
+
+	require.NoError(t, os.WriteFile(path, append([]byte("kek 1 abc\n"), data...), 0o600))
+	_, err = keys.ReadKeyringFile(path, keys.FileRules{})
+	assert.NotContains(t, err.Error(), "delete line", "only a cut-off last line is a leftover of generate")
 }

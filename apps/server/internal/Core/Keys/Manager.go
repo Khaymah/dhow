@@ -3,13 +3,18 @@ package keys
 import (
 	"context"
 	"crypto/hmac"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 )
+
+const undefinedTable = "42P01"
 
 const (
 	KekPending  = "pending"
@@ -53,8 +58,13 @@ func (m *Manager) Register(ctx context.Context) (Registration, error) {
 		if err := m.verifyRows(ctx, rows, true); err != nil {
 			return err
 		}
-		reg, err = m.registerMissing(ctx, q, rows)
-		return err
+		if reg, err = m.registerMissing(ctx, q, rows); err != nil {
+			return err
+		}
+		if _, err := q.ClearDataKeyUnreadable(ctx); err != nil {
+			return fmt.Errorf("retry unreadable data keys: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return Registration{}, err
@@ -95,8 +105,13 @@ func (m *Manager) registerMissing(ctx context.Context, q *sqlc.Queries, rows []s
 		return Registration{}, newError(CodeKeyringMalformed, 0, "the keyring holds no versions")
 	}
 	latest := versions[len(versions)-1]
-	if _, err := q.PromoteKeyEncryptionKey(ctx, latest); err != nil {
+	n, err := q.PromoteKeyEncryptionKey(ctx, latest)
+	if err != nil {
 		return Registration{}, fmt.Errorf("activate KEK version %d: %w", latest, err)
+	}
+	if n != 1 {
+		return Registration{}, newError(CodeKeyringRetired, latest,
+			"no version is active and the newest version in the keyring file is retired; add a new one with dhow-server keys generate and start again")
 	}
 	reg.Active, reg.Activated = latest, true
 	return reg, nil
@@ -126,6 +141,18 @@ func (m *Manager) verifyRows(ctx context.Context, rows []sqlc.ListKeyEncryptionK
 		}
 	}
 	return nil
+}
+
+func (m *Manager) Preflight(ctx context.Context) error {
+	rows, err := sqlc.New(m.db).ListKeyEncryptionKeys(ctx)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == undefinedTable {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read the KEK versions: %w", err)
+	}
+	return m.verifyRows(ctx, rows, true)
 }
 
 func (m *Manager) Verify(ctx context.Context) error {

@@ -60,7 +60,10 @@ WHERE "OwnerKind" = @owner_kind AND "OwnerId" IS NOT DISTINCT FROM sqlc.narg('ow
 
 -- name: InsertDataKey :execrows
 INSERT INTO "DataKeys" ("Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped")
-VALUES (@id, @owner_kind, sqlc.narg('owner_id')::uuid, @kek_version, @wrapped)
+SELECT @id, @owner_kind, sqlc.narg('owner_id')::uuid, k."Version", @wrapped
+FROM "KeyEncryptionKeys" AS k
+WHERE k."Version" = @kek_version AND k."State" = 'active'
+FOR SHARE OF k
 ON CONFLICT DO NOTHING;
 
 -- name: DestroyDataKeysOfOwner :execrows
@@ -76,7 +79,7 @@ WHERE "KekVersion" = ANY(@versions::integer[]) AND "State" = 'active';
 -- name: ListDataKeysToRewrap :many
 SELECT "Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped"
 FROM "DataKeys"
-WHERE "State" = 'active' AND "KekVersion" <> @active_version
+WHERE "State" = 'active' AND "KekVersion" <> @active_version AND "UnwrapFailedAt" IS NULL
 ORDER BY "Id"
 LIMIT @batch
 FOR UPDATE SKIP LOCKED;
@@ -87,7 +90,7 @@ SET "KekVersion" = @kek_version, "Wrapped" = @wrapped, "UpdatedAt" = now()
 WHERE "Id" = @id AND "State" = 'active' AND "KekVersion" = @from_version;
 
 -- name: CountDataKeysByVersion :many
-SELECT "KekVersion", count(*)::bigint AS "Count"
+SELECT "KekVersion", count(*)::bigint AS "Count", (count(*) FILTER (WHERE "UnwrapFailedAt" IS NOT NULL))::bigint AS "Unreadable"
 FROM "DataKeys"
 WHERE "State" = 'active'
 GROUP BY "KekVersion"
@@ -101,3 +104,13 @@ SELECT "InstanceKey", "Hostname", "KekVersions"
 FROM "ServerInstances"
 WHERE NOT "IsDeleted" AND "LastSeenAt" >= now() - make_interval(secs => @stale_after_seconds::double precision)
 ORDER BY "InstanceKey";
+
+-- name: MarkDataKeyUnreadable :execrows
+UPDATE "DataKeys"
+SET "UnwrapFailedAt" = now(), "UpdatedAt" = now()
+WHERE "Id" = @id AND "State" = 'active' AND "UnwrapFailedAt" IS NULL;
+
+-- name: ClearDataKeyUnreadable :execrows
+UPDATE "DataKeys"
+SET "UnwrapFailedAt" = NULL, "UpdatedAt" = now()
+WHERE "UnwrapFailedAt" IS NOT NULL AND "State" = 'active';

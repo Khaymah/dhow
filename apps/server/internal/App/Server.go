@@ -28,14 +28,13 @@ func Run(ctx context.Context) error {
 		log.Warn("DHOW_DEV=true: plain HTTP and unencrypted database connections are allowed. Never use this in production.")
 	}
 
-	provider, err := OpenKeyring(cfg.Keyring)
-	if err != nil {
-		log.Error("the keyring file cannot be used; stopping", "code", keys.CodeOf(err), "error", err.Error())
-		return err
-	}
-
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	provider, err := OpenKeyring(cfg.Keyring)
+	if err != nil {
+		return holdKeyring(ctx, err, cfg, log)
+	}
 
 	pool, err := config.OpenDatabase(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -52,12 +51,15 @@ func Run(ctx context.Context) error {
 			log.Warn("close migrator", "error", err)
 		}
 	}()
+	if err := keys.NewManager(pool, provider, log).Preflight(ctx); err != nil {
+		return holdKeyring(ctx, err, cfg, log)
+	}
 	if err := PrepareSchema(ctx, migrator, log); err != nil {
 		return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
 	}
 	keyManager, stopInstance, err := StartInstance(ctx, pool, provider, ServerIdentity(build, migrator.Latest(), cfg.InstanceID, os.Hostname, log), log)
 	if err != nil {
-		return err
+		return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
 	}
 	defer stopInstance()
 
@@ -165,4 +167,11 @@ func NewHTTPServer(cfg config.Config, handler http.Handler, log *slog.Logger) *h
 		MaxHeaderBytes:    config.MaxHeaderBytes,
 		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
 	}
+}
+
+func holdKeyring(ctx context.Context, err error, cfg config.Config, log *slog.Logger) error {
+	if cfg.OnIncompatible != config.OnIncompatibleWait {
+		log.Error("the keyring does not fit; stopping", "code", keys.CodeOf(err), "error", err.Error())
+	}
+	return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
 }

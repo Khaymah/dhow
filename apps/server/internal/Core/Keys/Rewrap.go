@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/jackc/pgx/v5"
 
@@ -15,9 +18,10 @@ import (
 const RewrapBatch = 500
 
 type RewrapResult struct {
-	Rewrapped int
-	Retired   []int32
-	Skipped   bool
+	Rewrapped  int
+	Retired    []int32
+	Unreadable []uuid.UUID
+	Skipped    bool
 }
 
 func (m *Manager) Rewrap(ctx context.Context) (RewrapResult, error) {
@@ -33,7 +37,8 @@ func (m *Manager) Rewrap(ctx context.Context) (RewrapResult, error) {
 			total.Skipped = true
 			return total, nil
 		}
-		if batch.Rewrapped == 0 {
+		total.Unreadable = append(total.Unreadable, batch.Unreadable...)
+		if batch.Rewrapped == 0 && len(batch.Unreadable) == 0 {
 			return total, nil
 		}
 	}
@@ -62,11 +67,16 @@ func (m *Manager) rewrapBatch(ctx context.Context) (RewrapResult, error) {
 			return fmt.Errorf("read the data keys to re-wrap: %w", err)
 		}
 		for _, r := range rows {
-			if err := m.rewrapOne(ctx, q, r, active); err != nil {
+			unreadable, err := m.rewrapOne(ctx, q, r, active)
+			if err != nil {
 				return err
 			}
+			if unreadable {
+				res.Unreadable = append(res.Unreadable, r.Id)
+				continue
+			}
+			res.Rewrapped++
 		}
-		res.Rewrapped = len(rows)
 		if len(rows) > 0 {
 			return nil
 		}
@@ -79,25 +89,40 @@ func (m *Manager) rewrapBatch(ctx context.Context) (RewrapResult, error) {
 	return res, err
 }
 
-func (m *Manager) rewrapOne(ctx context.Context, q *sqlc.Queries, r sqlc.ListDataKeysToRewrapRow, active int32) error {
+func (m *Manager) rewrapOne(ctx context.Context, q *sqlc.Queries, r sqlc.ListDataKeysToRewrapRow, active int32) (bool, error) {
 	owner := ownerFrom(r.OwnerKind, r.OwnerId)
 	dek, err := m.provider.Unwrap(ctx, r.KekVersion, r.Wrapped, dekAAD(r.Id, owner, r.KekVersion))
 	if err != nil {
-		return fmt.Errorf("unwrap data key %s with KEK version %d: %w", r.Id, r.KekVersion, err)
+		if ctx.Err() != nil {
+			return false, ctx.Err()
+		}
+		if _, markErr := q.MarkDataKeyUnreadable(ctx, r.Id); markErr != nil {
+			return false, fmt.Errorf("record data key %s as unreadable: %w", r.Id, markErr)
+		}
+		m.logger().WarnContext(ctx, "a data key cannot be unwrapped; it is skipped and keeps its KEK version from retiring",
+			"data_key_id", r.Id.String(), "kek_version", r.KekVersion, "owner_kind", r.OwnerKind)
+		return true, nil
 	}
 	defer clear(dek)
 	wrapped, err := m.provider.Wrap(ctx, active, dek, dekAAD(r.Id, owner, active))
 	if err != nil {
-		return fmt.Errorf("wrap data key %s with KEK version %d: %w", r.Id, active, err)
+		return false, fmt.Errorf("wrap data key %s with KEK version %d: %w", r.Id, active, err)
 	}
 	n, err := q.RewrapDataKey(ctx, sqlc.RewrapDataKeyParams{KekVersion: active, Wrapped: wrapped, ID: r.Id, FromVersion: r.KekVersion})
 	if err != nil {
-		return fmt.Errorf("store data key %s: %w", r.Id, err)
+		return false, fmt.Errorf("store data key %s: %w", r.Id, err)
 	}
 	if n != 1 {
-		return fmt.Errorf("data key %s changed while it was re-wrapped", r.Id)
+		return false, fmt.Errorf("data key %s changed while it was re-wrapped", r.Id)
 	}
-	return nil
+	return false, nil
+}
+
+func (m *Manager) logger() *slog.Logger {
+	if m.log == nil {
+		return slog.New(slog.DiscardHandler)
+	}
+	return m.log
 }
 
 func (m *Manager) RewrapLoop(ctx context.Context, every time.Duration) {
@@ -117,14 +142,18 @@ func (m *Manager) rewrapAndLog(ctx context.Context) {
 	res, err := m.Rewrap(ctx)
 	if err != nil {
 		if ctx.Err() == nil {
-			m.log.ErrorContext(ctx, "re-wrap of data keys failed; it will retry", "error", err, "rewrapped", res.Rewrapped)
+			m.logger().ErrorContext(ctx, "re-wrap of data keys failed; it will retry", "error", err, "rewrapped", res.Rewrapped)
 		}
 		return
 	}
+	if len(res.Unreadable) > 0 {
+		m.logger().ErrorContext(ctx, "some data keys cannot be unwrapped and block their KEK version from retiring; see dhow-server keys status",
+			"unreadable", len(res.Unreadable))
+	}
 	if res.Rewrapped > 0 {
-		m.log.InfoContext(ctx, "re-wrapped data keys with the active KEK version", "rewrapped", res.Rewrapped)
+		m.logger().InfoContext(ctx, "re-wrapped data keys with the active KEK version", "rewrapped", res.Rewrapped)
 	}
 	for _, v := range res.Retired {
-		m.log.InfoContext(ctx, "KEK version retired: no data key uses it any more", "kek_version", v)
+		m.logger().InfoContext(ctx, "KEK version retired: no data key uses it any more", "kek_version", v)
 	}
 }

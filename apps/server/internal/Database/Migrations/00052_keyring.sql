@@ -30,6 +30,7 @@ CREATE TABLE "DataKeys" (
     "Wrapped"     bytea       CHECK ("Wrapped" IS NULL OR octet_length("Wrapped") = 60),
     "State"       TEXT        NOT NULL DEFAULT 'active' CHECK ("State" IN ('active', 'destroyed')),
     "DestroyedAt" timestamptz,
+    "UnwrapFailedAt" timestamptz,
     CHECK (("OwnerKind" = 'instance') = ("OwnerId" IS NULL)),
     CHECK (("State" = 'destroyed') = ("Wrapped" IS NULL)),
     CHECK (("State" = 'destroyed') = ("DestroyedAt" IS NOT NULL))
