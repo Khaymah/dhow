@@ -11,6 +11,7 @@ import (
 
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -97,4 +98,33 @@ func TestArtifactsOfADeletedRunAreNotServed(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, res.Status, string(res.Raw))
 	list := w.owner.Get(apptest.OrgPath(w.org, "/projects/"+w.project.String()+"/runs/"+a.RunID.String()+"/artifacts"))
 	assert.Equal(t, http.StatusNotFound, list.Status)
+}
+
+func TestForkRunsShareATenthOfTheQuotaOfTheirProject(t *testing.T) {
+	w := newWorldWith(t, func(c *config.Config) { c.Artifacts.OrgMaxBytes = 1000 })
+	w.pullRequest(t, 12, shaB, triggers.PullOriginFork)
+	fork := w.next(t)
+	res := w.runner.PutBlob(fork.Ref, "artifact", "web", sized(150, 1))
+	assert.Equal(t, http.StatusRequestEntityTooLarge, res.Status, "a fork run gets a tenth of the quota, not all of it")
+	assert.Equal(t, "ARTIFACT_QUOTA_EXCEEDED", res.Code)
+	small := sized(60, 2)
+	require.Equal(t, http.StatusCreated, w.runner.PutBlob(fork.Ref, "artifact", "web", small).Status)
+	require.NoError(t, w.runner.CommitArtifact(fork.Ref, "web", small))
+
+	w.pullRequest(t, 13, shaC, triggers.PullOriginFork)
+	other := w.next(t)
+	res = w.runner.PutBlob(other.Ref, "artifact", "web", sized(60, 3))
+	assert.Equal(t, http.StatusRequestEntityTooLarge, res.Status)
+	assert.Equal(t, "ARTIFACT_QUOTA_EXCEEDED", res.Code, "the share counts every fork run of the project")
+
+	w.push(t, "refs/heads/main", shaA)
+	own := w.next(t)
+	for own.Grant.GetSpec().GetArtifacts() == nil || own.Grant.GetSpec().GetCache().GetReadOnly() {
+		w.succeed(t, own)
+		own = w.next(t)
+	}
+	big := sized(800, 4)
+	put := w.runner.PutBlob(own.Ref, "artifact", "web", big)
+	require.Equal(t, http.StatusCreated, put.Status, put.Code)
+	assert.NoError(t, w.runner.CommitArtifact(own.Ref, "web", big), "forks never eat the quota of the project's own runs")
 }

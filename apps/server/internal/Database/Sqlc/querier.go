@@ -282,6 +282,7 @@ type Querier interface {
 	PickRevokedRunnerLease(ctx context.Context) (uuid.UUID, error)
 	PickUnstartedLease(ctx context.Context, startSeconds float64) (uuid.UUID, error)
 	ProjectCacheBytes(ctx context.Context, projectID uuid.UUID) (int64, error)
+	ProjectUntrustedArtifactBytes(ctx context.Context, projectID uuid.UUID) (int64, error)
 	ProviderIdentityIssuers(ctx context.Context, arg ProviderIdentityIssuersParams) (ProviderIdentityIssuersRow, error)
 	PurgeAuthChallenges(ctx context.Context, arg PurgeAuthChallengesParams) (int64, error)
 	PurgeInvitations(ctx context.Context, arg PurgeInvitationsParams) (int64, error)

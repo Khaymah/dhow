@@ -75,6 +75,11 @@ SELECT COALESCE(sum("SizeBytes"), 0)::bigint AS "Bytes"
 FROM "Artifacts"
 WHERE "OrganizationId" = @organization_id AND NOT "IsDeleted" AND "ExpiresAt" > now();
 
+-- name: ProjectUntrustedArtifactBytes :one
+SELECT COALESCE(sum("SizeBytes"), 0)::bigint AS "Bytes"
+FROM "Artifacts"
+WHERE "ProjectId" = @project_id AND "Untrusted" AND NOT "IsDeleted" AND "ExpiresAt" > now();
+
 -- name: TouchBlob :one
 UPDATE "Blobs"
 SET "LastUsedAt" = now(), "UpdatedAt" = now()

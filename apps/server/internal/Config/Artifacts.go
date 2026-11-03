@@ -31,6 +31,7 @@ const (
 	ArtifactOrgMaxBytesDefault   = 50 << 30
 	ArtifactOrgMaxBytesMin       = 16 << 20
 	ArtifactOrgMaxBytesMax       = 1 << 50
+	ArtifactForkShareDivisor     = 10
 	BlobFreeSpaceReserve         = 512 << 20
 	BlobSpaceCheckEvery          = 64 << 20
 	BlobsPath                    = "/blobs/"
@@ -73,6 +74,8 @@ func DefaultArtifacts() Artifacts {
 		CacheMaxBytes: CacheMaxBytesDefault, OrgMaxBytes: ArtifactOrgMaxBytesDefault,
 	}
 }
+
+func (a Artifacts) ForkMaxBytes() int64 { return a.OrgMaxBytes / ArtifactForkShareDivisor }
 
 func (a Artifacts) Retention() time.Duration { return time.Duration(a.RetentionDays) * 24 * time.Hour }
 

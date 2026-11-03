@@ -86,7 +86,7 @@ func (s *Service) CommitArtifact(ctx context.Context, lease *runnerv1.LeaseRef, 
 		if err := touchBlob(ctx, q, l.row.OrganizationId, d, size); err != nil {
 			return err
 		}
-		if err := s.withinQuota(ctx, q, l.row.OrganizationId, name, *l.row.RunId, size); err != nil {
+		if err := s.withinQuota(ctx, q, l, name, size); err != nil {
 			return err
 		}
 		owner, err := q.ArtifactOwner(ctx, sqlc.ArtifactOwnerParams{RunID: *l.row.RunId, Name: name})
@@ -112,20 +112,37 @@ func (s *Service) CommitArtifact(ctx context.Context, lease *runnerv1.LeaseRef, 
 	})
 }
 
-func (s *Service) withinQuota(ctx context.Context, q *sqlc.Queries, org uuid.UUID, name string, run uuid.UUID, size int64) error {
+func (s *Service) withinQuota(ctx context.Context, q *sqlc.Queries, l scope, name string, size int64) error {
+	org := l.row.OrganizationId
 	if err := q.LockOrganizationArtifacts(ctx, org.String()); err != nil {
 		return err
 	}
-	used, err := q.OrganizationArtifactBytes(ctx, org)
+	replaced, err := q.ArtifactSize(ctx, sqlc.ArtifactSizeParams{RunID: *l.row.RunId, Name: name})
+	if errors.Is(err, pgx.ErrNoRows) {
+		replaced, err = 0, nil
+	}
 	if err != nil {
 		return err
 	}
-	if replaced, err := q.ArtifactSize(ctx, sqlc.ArtifactSizeParams{RunID: run, Name: name}); err == nil {
-		used -= replaced
-	} else if !errors.Is(err, pgx.ErrNoRows) {
+	return s.quotaFits(ctx, q, l, size-replaced)
+}
+
+func (s *Service) quotaFits(ctx context.Context, q *sqlc.Queries, l scope, extra int64) error {
+	used, err := q.OrganizationArtifactBytes(ctx, l.row.OrganizationId)
+	if err != nil {
 		return err
 	}
-	if used+size > s.cfg.OrgMaxBytes {
+	if used+extra > s.cfg.OrgMaxBytes {
+		return errQuota()
+	}
+	if !l.fork() {
+		return nil
+	}
+	forks, err := q.ProjectUntrustedArtifactBytes(ctx, *l.row.ProjectId)
+	if err != nil {
+		return err
+	}
+	if forks+extra > s.cfg.ForkMaxBytes() {
 		return errQuota()
 	}
 	return nil
