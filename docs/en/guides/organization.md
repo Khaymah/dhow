@@ -54,6 +54,7 @@ Every API key a member created in the organization, with its scopes, creator, cr
 
 - **General:** the name (owners and admins can change it), the short link (slug) and the creation date.
 - **Security:** who must use a second step. Only an owner can change the rule; everyone else sees it.
+- **Job log retention:** 7 to 3650 days, or empty to follow the server setting. Only an owner changes it, with their second step; everyone else sees it. Older logs stop showing at once, and the server setting wins when it is shorter.
 - **Danger zone:** transfer ownership (owners only) and leave the organization. Each opens a slide that asks you to confirm. If you are the last owner, the server refuses to let you leave until you transfer the ownership.
 
 ## Your account
