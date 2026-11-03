@@ -28,6 +28,7 @@ const (
 	maxActorBytes       = 255
 	limitTriggerUser    = "run-trigger-user"
 	limitTriggerProject = "run-trigger-project"
+	limitWebhookProject = "run-webhook-project"
 )
 
 var (
@@ -155,6 +156,9 @@ func (s *Service) Deliver(ctx context.Context, q *sqlc.Queries, t triggers.Trigg
 	case !errors.Is(err, pgx.ErrNoRows):
 		return triggers.Accepted{}, err
 	}
+	if err := s.chargeWebhook(ctx, project.Id); err != nil {
+		return triggers.Accepted{}, err
+	}
 	delivery := userRef(t.DeliveryID)
 	repo := t.RepositoryID
 	run, err := s.insertRun(ctx, q, newRun{
@@ -166,6 +170,18 @@ func (s *Service) Deliver(ctx context.Context, q *sqlc.Queries, t triggers.Trigg
 		return triggers.Accepted{}, err
 	}
 	return triggers.Accepted{RunID: run.Id, Created: true}, nil
+}
+
+func (s *Service) chargeWebhook(ctx context.Context, project uuid.UUID) error {
+	if s.limiter == nil {
+		return nil
+	}
+	limit := ratelimit.Limit{Name: limitWebhookProject, Max: config.PipelineWebhookRunsPerProject, Window: config.PipelineWebhookRunsWindow}
+	d, err := s.limiter.Take(ctx, limit, project.String())
+	if err != nil {
+		return err
+	}
+	return d.Err()
 }
 
 func (s *Service) chargeTrigger(ctx context.Context, project, user uuid.UUID) error {

@@ -307,7 +307,7 @@ A run is one pass of the pipeline over one commit. The server makes it from a tr
 
 ### 12.1 What starts a run
 
-- **`push` and `tag`:** a webhook. A commit runs once per ref: the same commit sent again for the same ref makes no new run, even after the webhook deliveries are deleted (they are kept 30 days).
+- **`push` and `tag`:** a webhook. A commit runs once per ref: the same commit sent again for the same ref makes no new run, even after the webhook deliveries are deleted (they are kept 30 days). Webhooks start at most 600 runs per project in an hour, far above a busy repository. Past that, the webhook answers `429` with `Retry-After`, nothing is recorded, and the provider can deliver it again later.
 - **`pull_request`:** a webhook from GitHub or GitLab (M4.5 and M4.6). The run uses the head commit, not a merge commit, so the check shows on the commit you pushed.
 - **`manual`:** a person with `run.trigger` on the project, through `POST /organizations/{id}/projects/{projectId}/runs` with `Ref`, an optional `Sha` and `Inputs`.
 - **`api`:** the same request with an API token that has the `run.trigger` scope.
