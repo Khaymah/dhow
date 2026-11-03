@@ -94,7 +94,7 @@
 - الـ migrations اللي اتعملها merge.
 - مكان ملفات Go في `apps/server/internal`، وتسمية PascalCase، واتجاه الاستيراد بين الطبقات.
 - قواعد الـ migrations (الأعمدة الأساسية، `timestamptz`، `TEXT`، ممنوع أعمدة `Ar`/`En`) وممنوع `DELETE FROM` في الـ queries.
-- قاعدة expand/contract لأي migration جديد بعد `00048` (ADR-0077، القواعد M1 لـ M9 في `migration_rules.py`). ونفس القواعد في `Database/Migrations/Compat_test.go` عشان الـ CI يطبّقها على أي PR، والاتنين بيمشوا على نفس الحالات في `Database/Migrations/testdata/compat/`.
+- قاعدة expand/contract لأي migration جديد بعد `00048` (ADR-0077، القواعد M1 لـ M11 في `migration_rules.py`). ونفس القواعد في `Database/Migrations/Compat_test.go` عشان الـ CI يطبّقها على أي PR، والاتنين بيمشوا على نفس الحالات في `Database/Migrations/testdata/compat/`.
 - مسارات `openapi.yaml` بـ kebab-case.
 - رسائل الـ commits (Conventional، إنجليزي، ومن غير أي إشارة لـ AI).
 - اسم المشروع: `github.com/Khaymah/dhow` والـ image `ghcr.io/khaymah/dhow`، وأي ذكر لاسم المنظمة القديم مرفوض.
