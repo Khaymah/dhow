@@ -3,8 +3,11 @@ package app_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +21,8 @@ import (
 func TestMigrateCommands(t *testing.T) {
 	ctx := context.Background()
 	pool := dbtest.NewPool(t)
-	stop, err := app.StartHeartbeat(ctx, pool, buildinfo.Info{Version: "1.2.3"}, 50, quietLog())
+	ident := app.ServerIdentity(buildinfo.Info{Version: "1.2.3"}, 50, "web-1", os.Hostname, quietLog())
+	stop, err := app.StartHeartbeat(ctx, pool, ident, quietLog())
 	require.NoError(t, err)
 	t.Cleanup(stop)
 	m := newMigrator(t, pool, migrationsWith(t, map[string]string{
@@ -37,7 +41,7 @@ func TestMigrateCommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.cmd, func(t *testing.T) {
 			var out bytes.Buffer
-			require.NoError(t, app.Migrate(ctx, m, pool, tt.cmd, &out))
+			require.NoError(t, app.Migrate(ctx, m, pool, app.MigrateOptions{Command: tt.cmd}, &out))
 			for _, want := range tt.want {
 				assert.Contains(t, out.String(), want)
 			}
@@ -46,14 +50,36 @@ func TestMigrateCommands(t *testing.T) {
 	state, err := m.State(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, migrations.SchemaPending, state, "the dry run applied nothing")
-	assert.ErrorIs(t, app.Migrate(ctx, m, pool, "up", io.Discard), app.ErrMigrateUsage)
-	assert.ErrorIs(t, app.RunMigrate(ctx, []string{"status", "extra"}, io.Discard), app.ErrMigrateUsage)
+	assert.ErrorIs(t, app.Migrate(ctx, m, pool, app.MigrateOptions{Command: "up"}, io.Discard), app.ErrMigrateUsage)
+	for _, args := range [][]string{{"status", "extra"}, {"status", "--timeout", "5s"}, {"dry-run", "--timeout", "soon"}, {"dry-run", "--timeout", "-1s"}} {
+		assert.ErrorIs(t, app.RunMigrate(ctx, args, io.Discard), app.ErrMigrateUsage, args)
+	}
+
+	for _, cmd := range []string{app.MigrateStatus, app.MigratePlan, app.MigrateDryRun} {
+		err := app.Migrate(ctx, m, pool, app.MigrateOptions{Command: cmd}, failingWriter{})
+		assert.ErrorIs(t, err, errNoSpace, "%s reports a write error", cmd)
+	}
 }
 
 func TestMigrateDryRunWithNothingPending(t *testing.T) {
 	ctx := context.Background()
 	pool := dbtest.NewPool(t)
 	var out bytes.Buffer
-	require.NoError(t, app.Migrate(ctx, newMigrator(t, pool, migrations.FS, migrations.Binary{}), pool, app.MigrateDryRun, &out))
+	require.NoError(t, app.Migrate(ctx, newMigrator(t, pool, migrations.FS, migrations.Binary{}), pool, app.MigrateOptions{Command: app.MigrateDryRun}, &out))
 	assert.Contains(t, out.String(), "no migration is pending")
+}
+
+var errNoSpace = errors.New("no space left on device")
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errNoSpace }
+
+func TestParseMigrateArgs(t *testing.T) {
+	opts, err := app.ParseMigrateArgs([]string{"dry-run", "--timeout", "90s"})
+	require.NoError(t, err)
+	assert.Equal(t, app.MigrateOptions{Command: app.MigrateDryRun, Timeout: 90 * time.Second}, opts)
+	opts, err = app.ParseMigrateArgs([]string{"dry-run"})
+	require.NoError(t, err)
+	assert.Equal(t, migrations.DefaultDryRunTimeout, opts.Timeout)
 }

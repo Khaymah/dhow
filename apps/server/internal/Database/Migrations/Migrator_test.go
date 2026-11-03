@@ -6,8 +6,10 @@ import (
 	"io/fs"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pressly/goose/v3/lock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -169,4 +171,54 @@ func TestStatusOfAnEmptyDatabase(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, migrations.Pending(entries), len(entries))
 	assert.False(t, errors.Is(err, migrations.ErrSchemaTooNew))
+}
+
+func TestApplyChecksTheFloorAgainUnderTheLock(t *testing.T) {
+	ctx := context.Background()
+	pool := dbtest.NewPool(t)
+	m := migrator(t, pool, migrations.FS, migrations.Binary{Version: "1.0.0"})
+	st, err := m.CheckCompatible(ctx)
+	require.NoError(t, err)
+	require.Equal(t, migrations.SchemaCurrent, st.State)
+
+	_, err = migrator(t, pool, withFiles(t, map[string]string{"99002_future_contract.sql": futureContract}), migrations.Binary{}).Up(ctx)
+	require.NoError(t, err, "another server raises the floor between the first check and Up")
+
+	st, err = m.Apply(ctx)
+	var incompatible *migrations.IncompatibleError
+	require.ErrorAs(t, err, &incompatible)
+	assert.Equal(t, 78, incompatible.ExitCode())
+	assert.Equal(t, migrations.SchemaIncompatible, st.State)
+	assert.Contains(t, err.Error(), "2.0.0")
+}
+
+func TestDownToTakesTheMigrationLock(t *testing.T) {
+	ctx := context.Background()
+	pool := dbtest.NewPool(t)
+	m := migrator(t, pool, migrations.FS, migrations.Binary{})
+	before := m.Latest()
+
+	holder, err := pool.Acquire(ctx)
+	require.NoError(t, err)
+	t.Cleanup(holder.Release)
+	_, err = holder.Exec(ctx, "SELECT pg_advisory_lock($1)", lock.DefaultLockID)
+	require.NoError(t, err)
+	unlocked := false
+	unlock := func() {
+		if !unlocked {
+			_, err := holder.Exec(ctx, "SELECT pg_advisory_unlock($1)", lock.DefaultLockID)
+			assert.NoError(t, err)
+			unlocked = true
+		}
+	}
+	t.Cleanup(unlock)
+
+	short, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	err = m.DownTo(short, before-1)
+	unlock()
+	require.Error(t, err, "DownTo waits for the lock another migrator holds")
+	state, err := m.State(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, migrations.SchemaCurrent, state, "nothing was rolled back while the lock was held")
 }

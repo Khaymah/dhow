@@ -55,6 +55,7 @@ COPY --from=build --chown=65532:65532 --chmod=0700 /out/state /var/lib/dhow
 
 ENV DHOW_LISTEN_ADDR=0.0.0.0:8080
 ENV DHOW_BLOB_DIR=/var/lib/dhow/blobs
+ENV DHOW_ON_INCOMPATIBLE=wait
 EXPOSE 8080
 USER 65532:65532
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 CMD ["/dhow-server", "healthcheck"]

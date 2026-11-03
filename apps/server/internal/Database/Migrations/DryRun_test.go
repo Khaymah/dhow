@@ -37,7 +37,7 @@ func TestDryRunAppliesNothing(t *testing.T) {
 	}), migrations.Binary{})
 	tables, version := countTables(t, ctx, pool), dbVersion(t, ctx, pool)
 
-	res, err := m.DryRun(ctx)
+	res, err := m.DryRun(ctx, migrations.DryRunOptions{})
 	require.NoError(t, err)
 	outcomes := map[string]migrations.DryRunOutcome{}
 	for _, s := range res.Steps {
@@ -62,7 +62,7 @@ func TestDryRunReportsAFailingMigrationAndChangesNothing(t *testing.T) {
 	}), migrations.Binary{})
 	tables, version := countTables(t, ctx, pool), dbVersion(t, ctx, pool)
 
-	res, err := m.DryRun(ctx)
+	res, err := m.DryRun(ctx, migrations.DryRunOptions{})
 	var preflight *migrations.PreflightError
 	require.ErrorAs(t, err, &preflight)
 	assert.Equal(t, migrations.CodeMigrationFailed, preflight.Code)
@@ -91,7 +91,7 @@ func TestDryRunGivesUpOnALockAfterThreeSeconds(t *testing.T) {
 	require.NoError(t, err)
 
 	started := time.Now()
-	_, err = m.DryRun(ctx)
+	_, err = m.DryRun(ctx, migrations.DryRunOptions{})
 	elapsed := time.Since(started)
 	var preflight *migrations.PreflightError
 	require.ErrorAs(t, err, &preflight)
@@ -99,4 +99,51 @@ func TestDryRunGivesUpOnALockAfterThreeSeconds(t *testing.T) {
 	assert.Contains(t, err.Error(), "PREFLIGHT_LOCK_TIMEOUT")
 	assert.GreaterOrEqual(t, elapsed, 2900*time.Millisecond, "the lock timeout is 3 seconds")
 	assert.Less(t, elapsed, 6*time.Second, "the dry run does not wait past the lock timeout")
+}
+
+func TestDryRunRefusesTransactionControl(t *testing.T) {
+	for name, body := range map[string]string{
+		"COMMIT in the middle": "CREATE TABLE \"DryC1\" (\"Id\" int);\nCOMMIT;\nCREATE TABLE \"DryC2\" (\"Id\" int);\n",
+		"END":                  "CREATE TABLE \"DryC1\" (\"Id\" int);\nEND;\nCREATE TABLE \"DryC2\" (\"Id\" int);\n",
+		"ROLLBACK in a block": "-- +goose StatementBegin\nCREATE TABLE \"DryC1\" (\"Id\" int); ROLLBACK; CREATE TABLE \"DryC2\" (\"Id\" int);\n" +
+			"-- +goose StatementEnd\n",
+		"a savepoint": "SAVEPOINT \"S\";\nCREATE TABLE \"DryC1\" (\"Id\" int);\nRELEASE SAVEPOINT \"S\";\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			pool := dbtest.NewPool(t)
+			ctx := context.Background()
+			m := migrator(t, pool, withFiles(t, map[string]string{
+				"99001_dry_ok.sql":      "-- dhow:phase expand\n-- +goose Up\nCREATE TABLE \"DryFirst\" (\"Id\" int);\n",
+				"99002_dry_control.sql": "-- dhow:phase expand\n-- +goose Up\n" + body,
+			}), migrations.Binary{})
+			tables, version := countTables(t, ctx, pool), dbVersion(t, ctx, pool)
+
+			_, err := m.DryRun(ctx, migrations.DryRunOptions{})
+			var preflight *migrations.PreflightError
+			require.ErrorAs(t, err, &preflight)
+			assert.Equal(t, migrations.CodeTransactionControl, preflight.Code)
+			assert.Equal(t, "99002_dry_control.sql", preflight.Name)
+			assert.Equal(t, tables, countTables(t, ctx, pool), "nothing was committed")
+			assert.Equal(t, version, dbVersion(t, ctx, pool))
+		})
+	}
+}
+
+func TestDryRunStopsAtItsDeadline(t *testing.T) {
+	ctx := context.Background()
+	pool := dbtest.NewPool(t)
+	m := migrator(t, pool, withFiles(t, map[string]string{
+		"99001_dry_slow.sql": "-- dhow:phase expand\n-- +goose Up\nSET statement_timeout = 0;\nSET lock_timeout = 0;\nCREATE TABLE \"DrySlow\" (\"Id\" int);\nSELECT pg_sleep(30);\n",
+	}), migrations.Binary{})
+	tables := countTables(t, ctx, pool)
+
+	started := time.Now()
+	_, err := m.DryRun(ctx, migrations.DryRunOptions{Timeout: 2 * time.Second})
+	elapsed := time.Since(started)
+	var preflight *migrations.PreflightError
+	require.ErrorAs(t, err, &preflight)
+	assert.Equal(t, migrations.CodeDeadline, preflight.Code)
+	assert.Less(t, elapsed, 8*time.Second, "a file's own SET statement_timeout = 0 does not outlive the deadline")
+	assert.Equal(t, tables, countTables(t, ctx, pool))
+	assert.Equal(t, time.Minute, migrations.DefaultDryRunTimeout)
 }

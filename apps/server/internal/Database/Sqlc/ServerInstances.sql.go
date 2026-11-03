@@ -13,7 +13,7 @@ import (
 )
 
 const listLiveServerInstances = `-- name: ListLiveServerInstances :many
-SELECT "Id", "Hostname", "Version", "Commit", "SchemaVersion", "StartedAt", "LastSeenAt"
+SELECT "Id", "InstanceKey", "Hostname", "Version", "Commit", "SchemaVersion", "StartedAt", "LastSeenAt"
 FROM "ServerInstances"
 WHERE NOT "IsDeleted" AND "LastSeenAt" >= now() - make_interval(secs => $1::double precision)
 ORDER BY "StartedAt", "Id"
@@ -21,6 +21,7 @@ ORDER BY "StartedAt", "Id"
 
 type ListLiveServerInstancesRow struct {
 	Id            uuid.UUID
+	InstanceKey   string
 	Hostname      string
 	Version       string
 	Commit        string
@@ -40,6 +41,7 @@ func (q *Queries) ListLiveServerInstances(ctx context.Context, staleAfterSeconds
 		var i ListLiveServerInstancesRow
 		if err := rows.Scan(
 			&i.Id,
+			&i.InstanceKey,
 			&i.Hostname,
 			&i.Version,
 			&i.Commit,
@@ -58,12 +60,17 @@ func (q *Queries) ListLiveServerInstances(ctx context.Context, staleAfterSeconds
 }
 
 const registerServerInstance = `-- name: RegisterServerInstance :one
-INSERT INTO "ServerInstances" ("Hostname", "Version", "Commit", "SchemaVersion")
-VALUES ($1, $2, $3, $4)
+INSERT INTO "ServerInstances" ("InstanceKey", "Hostname", "Version", "Commit", "SchemaVersion")
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT ("InstanceKey") DO UPDATE
+SET "Hostname" = EXCLUDED."Hostname", "Version" = EXCLUDED."Version", "Commit" = EXCLUDED."Commit",
+    "SchemaVersion" = EXCLUDED."SchemaVersion", "IsDeleted" = false, "StartedAt" = now(), "LastSeenAt" = now(),
+    "UpdatedAt" = now()
 RETURNING "Id"
 `
 
 type RegisterServerInstanceParams struct {
+	InstanceKey   string
 	Hostname      string
 	Version       string
 	Commit        string
@@ -72,6 +79,7 @@ type RegisterServerInstanceParams struct {
 
 func (q *Queries) RegisterServerInstance(ctx context.Context, arg RegisterServerInstanceParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, registerServerInstance,
+		arg.InstanceKey,
 		arg.Hostname,
 		arg.Version,
 		arg.Commit,

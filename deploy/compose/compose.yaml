@@ -59,6 +59,7 @@ services:
 
   dhow:
     image: ${DHOW_IMAGE:-ghcr.io/khaymah/dhow:latest}
+    hostname: dhow
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]

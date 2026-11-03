@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,6 +33,34 @@ func TestLoadMigrateRejects(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, err := config.LoadMigrate(env(vars))
 			assert.Error(t, err)
+		})
+	}
+}
+
+func TestOnIncompatibleAndInstanceID(t *testing.T) {
+	cfg, err := config.Load(env(valid()))
+	require.NoError(t, err)
+	assert.Equal(t, config.OnIncompatibleExit, cfg.OnIncompatible)
+	assert.Empty(t, cfg.InstanceID)
+
+	vars := valid()
+	vars[config.EnvOnIncompatible] = "wait"
+	vars[config.EnvInstanceID] = "web-1"
+	cfg, err = config.Load(env(vars))
+	require.NoError(t, err)
+	assert.Equal(t, config.OnIncompatibleWait, cfg.OnIncompatible)
+	assert.Equal(t, "web-1", cfg.InstanceID)
+
+	for name, bad := range map[string][2]string{
+		"an unknown mode":           {config.EnvOnIncompatible, "loop"},
+		"an instance id with space": {config.EnvInstanceID, "web 1"},
+		"a long instance id":        {config.EnvInstanceID, strings.Repeat("a", 129)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			vars := valid()
+			vars[bad[0]] = bad[1]
+			_, err := config.Load(env(vars))
+			assert.ErrorContains(t, err, bad[0])
 		})
 	}
 }

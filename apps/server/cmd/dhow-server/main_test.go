@@ -51,7 +51,14 @@ func TestExitCodeOfASchemaTooNew(t *testing.T) {
 	assert.Equal(t, 78, exitCode(tooNew))
 	assert.Equal(t, 78, exitCode(fmt.Errorf("start: %w", tooNew)))
 	assert.Equal(t, 1, exitCode(errors.New("anything else")))
+	assert.Equal(t, 1, exitCode(otherExit{}), "only a schema too new for the binary exits with 78")
 }
+
+type otherExit struct{}
+
+func (otherExit) Error() string { return "other" }
+
+func (otherExit) ExitCode() int { return 78 }
 
 func TestRunDispatchesMigrate(t *testing.T) {
 	require.ErrorIs(t, run(context.Background(), []string{"migrate"}), app.ErrMigrateUsage)

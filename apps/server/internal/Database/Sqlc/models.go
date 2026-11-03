@@ -644,6 +644,7 @@ type ServerInstance struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	IsDeleted     bool
+	InstanceKey   string
 	Hostname      string
 	Version       string
 	Commit        string

@@ -2,8 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
-	"os"
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,12 +15,13 @@ import (
 	"github.com/Khaymah/dhow/internal/buildinfo"
 )
 
+const unknownHost = "unknown"
+
 func PrepareSchema(ctx context.Context, m *migrations.Migrator, log *slog.Logger) error {
-	st, err := m.CheckCompatible(ctx)
-	if err != nil {
+	if _, err := m.CheckCompatible(ctx); err != nil {
 		return err
 	}
-	version, err := m.Up(ctx)
+	st, err := m.Apply(ctx)
 	if err != nil {
 		return err
 	}
@@ -29,18 +30,37 @@ func PrepareSchema(ctx context.Context, m *migrations.Migrator, log *slog.Logger
 			"database_version", st.DBVersion, "binary_latest", st.Latest, "floor", st.Floor, "binary", st.Binary)
 		return nil
 	}
-	log.Info("database schema is current", "version", version)
+	log.Info("database schema is current", "version", st.DBVersion)
 	return nil
 }
 
-func StartHeartbeat(ctx context.Context, pool *pgxpool.Pool, build buildinfo.Info, schema int64, log *slog.Logger) (func(), error) {
-	host, err := os.Hostname()
-	if err != nil {
-		host = "unknown"
+func HoldIncompatible(ctx context.Context, err error, mode string, log *slog.Logger) error {
+	var incompatible *migrations.IncompatibleError
+	if mode != config.OnIncompatibleWait || !errors.As(err, &incompatible) {
+		return err
 	}
-	hb := serverinstances.New(sqlc.New(pool), serverinstances.Identity{
-		Hostname: host, Version: build.Version, Commit: build.Commit, SchemaVersion: schema,
-	}, config.ServerInstanceStaleAfter, log)
+	log.Error("the database schema is too new for this binary; waiting for a stop signal instead of exiting, "+
+		"so the container does not restart in a loop", "code", migrations.CodeSchemaTooNew, "error", err.Error(),
+		config.EnvOnIncompatible, mode)
+	<-ctx.Done()
+	return nil
+}
+
+func ServerIdentity(build buildinfo.Info, schema int64, key string, hostname func() (string, error), log *slog.Logger) serverinstances.Identity {
+	host, err := hostname()
+	if err != nil || host == "" {
+		log.Warn("could not read the host name; set "+config.EnvInstanceID+" so this server keeps one row in ServerInstances",
+			"error", err)
+		host = unknownHost
+	}
+	if key == "" {
+		key = host
+	}
+	return serverinstances.Identity{Key: key, Hostname: host, Version: build.Version, Commit: build.Commit, SchemaVersion: schema}
+}
+
+func StartHeartbeat(ctx context.Context, pool *pgxpool.Pool, ident serverinstances.Identity, log *slog.Logger) (func(), error) {
+	hb := serverinstances.New(sqlc.New(pool), ident, config.ServerInstanceStaleAfter, log)
 	if err := hb.Register(ctx); err != nil {
 		return nil, err
 	}

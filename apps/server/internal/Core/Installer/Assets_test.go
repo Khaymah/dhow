@@ -101,3 +101,12 @@ func TestEnvFiles(t *testing.T) {
 	assert.Equal(t, "ghcr.io/khaymah/dhow:1.2.3", ComposeImageFor("v1.2.3"))
 	assert.Equal(t, "ghcr.io/khaymah/dhow:latest", ComposeImageFor("dev"))
 }
+
+func TestOnlyTheImageWaitsOnASchemaTooNew(t *testing.T) {
+	dockerfile, err := os.ReadFile(repoRoot + "deploy/docker/Dockerfile")
+	require.NoError(t, err)
+	assert.Contains(t, string(dockerfile), "\nENV DHOW_ON_INCOMPATIBLE=wait\n", "the image waits instead of exiting into Compose's restart loop")
+	assert.NotContains(t, string(UnitFile), "DHOW_ON_INCOMPATIBLE", "systemd keeps exit code 78")
+	assert.NotContains(t, string(ComposeFile), "DHOW_ON_INCOMPATIBLE")
+	assert.Contains(t, string(ComposeFile), "    hostname: dhow\n", "a stable host name keeps one ServerInstances row across container restarts")
+}

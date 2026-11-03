@@ -11,12 +11,11 @@ import (
 	app "github.com/Khaymah/dhow/apps/server/internal/App"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	installer "github.com/Khaymah/dhow/apps/server/internal/Core/Installer"
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	"github.com/Khaymah/dhow/internal/buildinfo"
 )
 
 const commandHealthcheck = "healthcheck"
-
-type exitCoder interface{ ExitCode() int }
 
 func main() {
 	if err := run(context.Background(), os.Args[1:]); err != nil {
@@ -26,9 +25,9 @@ func main() {
 }
 
 func exitCode(err error) int {
-	var coded exitCoder
-	if errors.As(err, &coded) {
-		return coded.ExitCode()
+	var incompatible *migrations.IncompatibleError
+	if errors.As(err, &incompatible) {
+		return incompatible.ExitCode()
 	}
 	return 1
 }

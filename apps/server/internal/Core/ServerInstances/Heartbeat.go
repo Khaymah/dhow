@@ -20,6 +20,7 @@ type Querier interface {
 }
 
 type Identity struct {
+	Key           string
 	Hostname      string
 	Version       string
 	Commit        string
@@ -48,7 +49,7 @@ func (h *Heartbeat) ID() uuid.UUID {
 
 func (h *Heartbeat) Register(ctx context.Context) error {
 	id, err := h.q.RegisterServerInstance(ctx, sqlc.RegisterServerInstanceParams{
-		Hostname: h.ident.Hostname, Version: h.ident.Version, Commit: h.ident.Commit, SchemaVersion: h.ident.SchemaVersion,
+		InstanceKey: h.ident.Key, Hostname: h.ident.Hostname, Version: h.ident.Version, Commit: h.ident.Commit, SchemaVersion: h.ident.SchemaVersion,
 	})
 	if err != nil {
 		return fmt.Errorf("register this server instance: %w", err)

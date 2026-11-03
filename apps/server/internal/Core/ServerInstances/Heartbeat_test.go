@@ -19,7 +19,7 @@ import (
 const staleAfter = 90 * time.Second
 
 func heartbeat(pool *pgxpool.Pool, host string) *serverinstances.Heartbeat {
-	return serverinstances.New(sqlc.New(pool), serverinstances.Identity{Hostname: host, Version: "1.0.0", SchemaVersion: 50},
+	return serverinstances.New(sqlc.New(pool), serverinstances.Identity{Key: host, Hostname: host, Version: "1.0.0", SchemaVersion: 50},
 		staleAfter, slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
@@ -53,7 +53,7 @@ func TestHeartbeat(t *testing.T) {
 
 	old := b.ID()
 	require.NoError(t, b.Beat(ctx))
-	assert.NotEqual(t, old, b.ID(), "a server whose row was retired registers again")
+	assert.Equal(t, old, b.ID(), "a server whose row was retired registers again, in the same row")
 	assert.Equal(t, []string{"a", "b"}, liveHosts(t, ctx, pool))
 
 	require.NoError(t, a.Retire(ctx))
@@ -77,4 +77,25 @@ func TestHeartbeatLoopStopsWithItsContext(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the loop did not stop")
 	}
+}
+
+func TestARestartReusesTheRowOfItsInstance(t *testing.T) {
+	ctx := context.Background()
+	pool := dbtest.NewPool(t)
+	first := heartbeat(pool, "web-1")
+	require.NoError(t, first.Register(ctx))
+	require.NoError(t, first.Retire(ctx))
+
+	second := serverinstances.New(sqlc.New(pool), serverinstances.Identity{Key: "web-1", Hostname: "web-1", Version: "1.1.0", SchemaVersion: 51},
+		staleAfter, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	require.NoError(t, second.Register(ctx))
+	assert.Equal(t, first.ID(), second.ID(), "a restart updates its row in place")
+	var rows int
+	require.NoError(t, pool.QueryRow(ctx, `SELECT count(*) FROM "ServerInstances"`).Scan(&rows))
+	assert.Equal(t, 1, rows, "restarts do not add rows")
+	live, err := sqlc.New(pool).ListLiveServerInstances(ctx, staleAfter.Seconds())
+	require.NoError(t, err)
+	require.Len(t, live, 1)
+	assert.Equal(t, "1.1.0", live[0].Version)
+	assert.Equal(t, int64(51), live[0].SchemaVersion)
 }

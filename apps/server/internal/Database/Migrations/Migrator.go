@@ -51,27 +51,57 @@ func NewMigratorFS(pool *pgxpool.Pool, fsys fs.FS, bin Binary) (*Migrator, error
 	}, nil
 }
 
-func (m *Migrator) Up(ctx context.Context) (version int64, retErr error) {
+func (m *Migrator) withLock(ctx context.Context, fn func() error) (retErr error) {
 	conn, err := m.db.Conn(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("apply migrations: %w", err)
+		return fmt.Errorf("take the migration lock: %w", err)
 	}
 	defer func() { retErr = errors.Join(retErr, conn.Close()) }()
 	if err := m.locker.SessionLock(ctx, conn); err != nil {
-		return 0, fmt.Errorf("apply migrations: take the migration lock: %w", err)
+		return fmt.Errorf("take the migration lock: %w", err)
 	}
 	defer func() {
 		if err := m.locker.SessionUnlock(context.WithoutCancel(ctx), conn); err != nil {
 			retErr = errors.Join(retErr, fmt.Errorf("release the migration lock: %w", err))
 		}
 	}()
+	return fn()
+}
+
+func (m *Migrator) up(ctx context.Context) error {
 	if err := m.dropInvalidIndexes(ctx); err != nil {
-		return 0, err
+		return err
 	}
 	if _, err := m.provider.Up(ctx); err != nil {
-		return 0, fmt.Errorf("apply migrations: %w", err)
+		return fmt.Errorf("apply migrations: %w", err)
+	}
+	return nil
+}
+
+func (m *Migrator) Up(ctx context.Context) (int64, error) {
+	if err := m.withLock(ctx, func() error { return m.up(ctx) }); err != nil {
+		return 0, err
 	}
 	return m.provider.GetDBVersion(ctx)
+}
+
+func (m *Migrator) Apply(ctx context.Context) (Status, error) {
+	var st Status
+	err := m.withLock(ctx, func() error {
+		if err := m.up(ctx); err != nil {
+			return err
+		}
+		var err error
+		st, err = m.Status(ctx)
+		if err != nil {
+			return err
+		}
+		if st.State == SchemaIncompatible {
+			return &IncompatibleError{Status: st}
+		}
+		return nil
+	})
+	return st, err
 }
 
 func (m *Migrator) dropInvalidIndexes(ctx context.Context) error {
@@ -101,10 +131,12 @@ func (m *Migrator) dropInvalidIndexes(ctx context.Context) error {
 }
 
 func (m *Migrator) DownTo(ctx context.Context, version int64) error {
-	if _, err := m.provider.DownTo(ctx, version); err != nil {
-		return fmt.Errorf("roll back migrations: %w", err)
-	}
-	return nil
+	return m.withLock(ctx, func() error {
+		if _, err := m.provider.DownTo(ctx, version); err != nil {
+			return fmt.Errorf("roll back migrations: %w", err)
+		}
+		return nil
+	})
 }
 
 func (m *Migrator) floor(ctx context.Context, dbVersion int64) (string, error) {

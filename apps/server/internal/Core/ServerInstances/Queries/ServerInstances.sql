@@ -1,6 +1,10 @@
 -- name: RegisterServerInstance :one
-INSERT INTO "ServerInstances" ("Hostname", "Version", "Commit", "SchemaVersion")
-VALUES (@hostname, @version, @commit, @schema_version)
+INSERT INTO "ServerInstances" ("InstanceKey", "Hostname", "Version", "Commit", "SchemaVersion")
+VALUES (@instance_key, @hostname, @version, @commit, @schema_version)
+ON CONFLICT ("InstanceKey") DO UPDATE
+SET "Hostname" = EXCLUDED."Hostname", "Version" = EXCLUDED."Version", "Commit" = EXCLUDED."Commit",
+    "SchemaVersion" = EXCLUDED."SchemaVersion", "IsDeleted" = false, "StartedAt" = now(), "LastSeenAt" = now(),
+    "UpdatedAt" = now()
 RETURNING "Id";
 
 -- name: TouchServerInstance :execrows
@@ -19,7 +23,7 @@ SET "IsDeleted" = true, "UpdatedAt" = now()
 WHERE NOT "IsDeleted" AND "LastSeenAt" < now() - make_interval(secs => @stale_after_seconds::double precision);
 
 -- name: ListLiveServerInstances :many
-SELECT "Id", "Hostname", "Version", "Commit", "SchemaVersion", "StartedAt", "LastSeenAt"
+SELECT "Id", "InstanceKey", "Hostname", "Version", "Commit", "SchemaVersion", "StartedAt", "LastSeenAt"
 FROM "ServerInstances"
 WHERE NOT "IsDeleted" AND "LastSeenAt" >= now() - make_interval(secs => @stale_after_seconds::double precision)
 ORDER BY "StartedAt", "Id";

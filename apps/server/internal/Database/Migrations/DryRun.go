@@ -15,14 +15,28 @@ import (
 const (
 	PreflightLockTimeout      = "3s"
 	PreflightStatementTimeout = "5min"
+	DefaultDryRunTimeout      = time.Minute
 
-	CodeLockTimeout      = "PREFLIGHT_LOCK_TIMEOUT"
-	CodeStatementTimeout = "PREFLIGHT_STATEMENT_TIMEOUT"
-	CodeMigrationFailed  = "PREFLIGHT_MIGRATION_FAILED"
+	CodeLockTimeout        = "PREFLIGHT_LOCK_TIMEOUT"
+	CodeStatementTimeout   = "PREFLIGHT_STATEMENT_TIMEOUT"
+	CodeMigrationFailed    = "PREFLIGHT_MIGRATION_FAILED"
+	CodeTransactionControl = "PREFLIGHT_TRANSACTION_CONTROL"
+	CodeTransactionEnded   = "PREFLIGHT_TRANSACTION_ENDED"
+	CodeDeadline           = "PREFLIGHT_DEADLINE"
 
 	sqlStateLockNotAvailable = "55P03"
 	sqlStateQueryCanceled    = "57014"
+	txStatusInTransaction    = 'T'
 )
+
+var (
+	ErrTransactionEnded   = errors.New("the statement ended the dry run's transaction")
+	ErrTransactionControl = errors.New("the statement controls the transaction; migrations never run BEGIN, COMMIT, END, ROLLBACK, SAVEPOINT, RELEASE or PREPARE TRANSACTION")
+)
+
+type DryRunOptions struct {
+	Timeout time.Duration
+}
 
 type DryRunOutcome string
 
@@ -58,7 +72,13 @@ func (e *PreflightError) Error() string {
 
 func (e *PreflightError) Unwrap() error { return e.Err }
 
-func preflightCode(err error) string {
+func preflightCode(ctx context.Context, err error) string {
+	if errors.Is(err, ErrTransactionEnded) {
+		return CodeTransactionEnded
+	}
+	if ctx.Err() != nil {
+		return CodeDeadline
+	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
@@ -71,21 +91,49 @@ func preflightCode(err error) string {
 	return CodeMigrationFailed
 }
 
-func (m *Migrator) DryRun(ctx context.Context) (res DryRunResult, retErr error) {
+func refuseTransactionControl(pending []PlanEntry) error {
+	for _, e := range pending {
+		if !e.UseTx {
+			continue
+		}
+		for k, stmt := range e.Up {
+			if TransactionControl(stmt) {
+				return &PreflightError{Code: CodeTransactionControl, Name: e.Name, Statement: k + 1, Err: ErrTransactionControl}
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Migrator) DryRun(ctx context.Context, opts DryRunOptions) (DryRunResult, error) {
+	timeout := opts.Timeout
+	if timeout <= 0 {
+		timeout = DefaultDryRunTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	entries, err := m.Plan(ctx)
 	if err != nil {
-		return res, err
+		return DryRunResult{}, err
 	}
 	pending := Pending(entries)
 	if len(pending) == 0 {
-		return res, nil
+		return DryRunResult{}, nil
 	}
+	if err := refuseTransactionControl(pending); err != nil {
+		return DryRunResult{}, err
+	}
+	return m.tryInTransaction(ctx, pending)
+}
+
+func (m *Migrator) tryInTransaction(ctx context.Context, pending []PlanEntry) (res DryRunResult, retErr error) {
 	tx, err := m.pool.Begin(ctx)
 	if err != nil {
 		return res, fmt.Errorf("dry run: begin: %w", err)
 	}
 	defer func() {
-		if err := tx.Rollback(context.WithoutCancel(ctx)); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+		err := tx.Rollback(context.WithoutCancel(ctx))
+		if err != nil && !errors.Is(err, pgx.ErrTxClosed) && ctx.Err() == nil {
 			retErr = errors.Join(retErr, fmt.Errorf("dry run: roll back: %w", err))
 		}
 	}()
@@ -110,7 +158,7 @@ func (m *Migrator) DryRun(ctx context.Context) (res DryRunResult, retErr error) 
 			for _, rest := range pending[i+1:] {
 				res.Steps = append(res.Steps, DryRunStep{Version: rest.Version, Name: rest.Name, Phase: rest.Phase, Outcome: DryRunNotReached})
 			}
-			return res, &PreflightError{Code: preflightCode(err), Name: e.Name, Statement: failed + 1, Err: err}
+			return res, &PreflightError{Code: preflightCode(ctx, err), Name: e.Name, Statement: failed + 1, Err: err}
 		}
 		step.Outcome = DryRunApplied
 		res.Steps = append(res.Steps, step)
@@ -122,6 +170,9 @@ func applyStatements(ctx context.Context, tx pgx.Tx, stmts []string) (int, error
 	for k, stmt := range stmts {
 		if _, err := tx.Exec(ctx, stmt); err != nil {
 			return k, err
+		}
+		if status := tx.Conn().PgConn().TxStatus(); status != txStatusInTransaction {
+			return k, fmt.Errorf("%w (%s, transaction status %q)", ErrTransactionEnded, CodeTransactionEnded, status)
 		}
 	}
 	return 0, nil

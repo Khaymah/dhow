@@ -46,9 +46,9 @@ func Run(ctx context.Context) error {
 		}
 	}()
 	if err := PrepareSchema(ctx, migrator, log); err != nil {
-		return err
+		return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
 	}
-	stopHeartbeat, err := StartHeartbeat(ctx, pool, build, migrator.Latest(), log)
+	stopHeartbeat, err := StartHeartbeat(ctx, pool, ServerIdentity(build, migrator.Latest(), cfg.InstanceID, os.Hostname, log), log)
 	if err != nil {
 		return err
 	}

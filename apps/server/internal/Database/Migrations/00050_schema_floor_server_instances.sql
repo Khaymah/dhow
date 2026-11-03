@@ -7,6 +7,7 @@ CREATE TABLE "ServerInstances" (
     "CreatedAt"     timestamptz NOT NULL DEFAULT now(),
     "UpdatedAt"     timestamptz NOT NULL DEFAULT now(),
     "IsDeleted"     boolean     NOT NULL DEFAULT false,
+    "InstanceKey"   TEXT        NOT NULL,
     "Hostname"      TEXT        NOT NULL,
     "Version"       TEXT        NOT NULL,
     "Commit"        TEXT        NOT NULL DEFAULT '',
@@ -15,6 +16,7 @@ CREATE TABLE "ServerInstances" (
     "LastSeenAt"    timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX "UX_ServerInstances_InstanceKey" ON "ServerInstances" ("InstanceKey");
 CREATE INDEX "IX_ServerInstances_LastSeenAt" ON "ServerInstances" ("LastSeenAt") WHERE NOT "IsDeleted";
 
 -- +goose Down
