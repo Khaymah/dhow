@@ -34,7 +34,7 @@
    - `AllowedRefs`: من 0 لـ 50 (`Kind` = `branch` أو `tag`، و`Pattern`)، والافتراضي الفرع الافتراضي للمستودع المربوط (أو `main` لو مفيش). الـ pattern بيعدّي `internal/pathglob.ValidPattern` (حد 256 والـ `**` لوحده في الجزء)، وبيترفض لو فيه `..` أو `//` أو بيبدأ أو بيخلص بـ `/` أو فيه مسافة أو `~` أو `^` أو `:`، لأن Git مابيقبلش الحاجات دي في اسم ref. القايمة الفاضية معناها مفيش حاجة تنشر.
    - `Reviewers`: 20 بالكتير بين المستخدمين والفرق. المستخدم لازم عضو في المؤسسة ودوره على المشروع Developer أو أعلى بعد الـ bindings، والفريق لازم من نفس المؤسسة، وغير كده `422 REVIEWER_NOT_ELIGIBLE`. والتحقق من كل عضو في الفريق وقت الموافقة (M5.6).
    - `RequiredApprovals` = 1 بس، والـ CHECK في القاعدة `= 1`، والتوسيع expand في M8.
-   - `AllowSelfApproval` افتراضيًا `false` (قرار Sabry). والـ Admin بس اللي يقدر يفتحه، لأنه جزء من القواعد.
+   - `AllowSelfApproval` افتراضيًا `false` ([قرار Sabry 5](../M5-Secrets-Environments.md#قرارات-sabry-2026-11-03)): ده نفس `PreventSelfReview` في الخطة بالعكس، والاسم الموجب بيخلّي الحقل الغايب يقفل مش يفتح. والـ Admin بس اللي يقدر يفتحه لبيئة واحدة، بـ `CurrentFactor` زي أي تعديل، والتغيير في الـ audit وبيبان في رد البيئة.
    - `WaitMinutes` من 0 لـ 43200، و`ApprovalTimeoutHours` من 1 لـ 720 (الافتراضي 72)، و`AllowedPlugins` 50 بادئة بالكتير، و`RequiredIsolation` = `container` بس، و`AllowAdminBypass` افتراضيًا `false`، و`SupersedePending` افتراضيًا `true`. التنفيذ في M5.6، والتحقق دلوقتي.
    - النوافذ والتجميد المجدول وأكتر من مراجع في M8.
 10. **الحذف soft:** `remove` بيعلّم البيئة ومراجعينها `"IsDeleted"`، والاسم يرجع متاح. أسرار البيئة والـ DEK بتاعها بيتمسحوا مع M5.4.
