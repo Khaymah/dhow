@@ -41,6 +41,7 @@
 - كل موديول ليه `oapi-codegen.yaml` بـ `include-tags`، و`make gen` بيشغّلهم كلهم.
 - أي جدول جديد فيه الأعمدة الأربعة: `"Id" uuid DEFAULT uuidv7()` و`"CreatedAt"` و`"UpdatedAt"` و`"IsDeleted"`. الاستثناء الوحيد جدول `"Instance"`.
 - الحذف soft بس (ممنوع `DELETE FROM` في `Queries/`)، والوقت `timestamptz` بـ UTC، والنص `TEXT` مش `VARCHAR`، والترجمات في جدول `<Entity>Translations` مش أعمدة `NameAr`/`NameEn`.
+- كل migration جديد بيبدأ بـ `-- dhow:phase expand` أو `-- dhow:phase contract` (ADR-0077): الـ expand إضافات بس (جدول، أو عمود nullable أو بـ `DEFAULT`، أو index بـ `CONCURRENTLY IF NOT EXISTS` في ملف `NO TRANSACTION`، أو constraint بـ `NOT VALID`)، وأي شيل أو تغيير contract بـ `-- dhow:floor X.Y.Z` بعد release كامل. التفاصيل في `Plan/Upgrades-and-Help.md` §5.
 - مسارات الـ API بـ kebab-case، وأكواد الأخطاء UPPER_SNAKE، ورسالة الخطأ بتتترجم في السيرفر من `Accept-Language`، ورسالة النجاح هي مفتاح i18n.
 - PostgreSQL 18 (لـ `uuidv7()` المدمجة).
 
@@ -93,6 +94,7 @@
 - الـ migrations اللي اتعملها merge.
 - مكان ملفات Go في `apps/server/internal`، وتسمية PascalCase، واتجاه الاستيراد بين الطبقات.
 - قواعد الـ migrations (الأعمدة الأساسية، `timestamptz`، `TEXT`، ممنوع أعمدة `Ar`/`En`) وممنوع `DELETE FROM` في الـ queries.
+- قاعدة expand/contract لأي migration جديد بعد `00048` (ADR-0077، القواعد M1 لـ M9 في `migration_rules.py`). ونفس القواعد في `Database/Migrations/Compat_test.go` عشان الـ CI يطبّقها على أي PR، والاتنين بيمشوا على نفس الحالات في `Database/Migrations/testdata/compat/`.
 - مسارات `openapi.yaml` بـ kebab-case.
 - رسائل الـ commits (Conventional، إنجليزي، ومن غير أي إشارة لـ AI).
 - اسم المشروع: `github.com/Khaymah/dhow` والـ image `ghcr.io/khaymah/dhow`، وأي ذكر لاسم المنظمة القديم مرفوض.
