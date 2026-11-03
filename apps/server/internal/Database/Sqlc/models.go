@@ -97,6 +97,20 @@ type AuthChallenge struct {
 	FirstMethod     string
 }
 
+type Backfill struct {
+	Id        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	IsDeleted bool
+	Name      string
+	LastKey   string
+	Processed int64
+	Failed    int64
+	Remaining pgtype.Int8
+	Passes    int32
+	DoneAt    *time.Time
+}
+
 type Blob struct {
 	Id         uuid.UUID
 	CreatedAt  time.Time
@@ -175,6 +189,7 @@ type DataKey struct {
 	State          string
 	DestroyedAt    *time.Time
 	UnwrapFailedAt *time.Time
+	SupersededAt   *time.Time
 }
 
 type Environment struct {
@@ -350,6 +365,18 @@ type KeyEncryptionKey struct {
 	ActivatedAt    *time.Time
 	RetiredAt      *time.Time
 	LastExportedAt *time.Time
+}
+
+type KeyRekey struct {
+	Id         uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	IsDeleted  bool
+	Cutoff     time.Time
+	Superseded int64
+	Resealed   int64
+	Destroyed  int64
+	DoneAt     *time.Time
 }
 
 type Lease struct {

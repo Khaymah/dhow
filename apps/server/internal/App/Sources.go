@@ -12,6 +12,7 @@ import (
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	middleware "github.com/Khaymah/dhow/apps/server/internal/Core/Middleware"
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
@@ -20,13 +21,13 @@ import (
 	"github.com/Khaymah/dhow/internal/netguard"
 )
 
-func sourcesFor(in Infra, bus *eventbus.Bus, limiter ratelimit.Limiter, runs triggers.Sink) (*sources.Service, error) {
+func sourcesFor(in Infra, values *keys.Values, bus *eventbus.Bus, limiter ratelimit.Limiter, runs triggers.Sink) (*sources.Service, error) {
 	sink := in.Triggers
 	if sink == nil {
 		sink = runs
 	}
 	return sources.NewService(sources.Options{
-		DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now, SecretKey: in.Config.SecretKey, PublicURL: in.Config.PublicURL.String(),
+		DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now, Values: values, PublicURL: in.Config.PublicURL.String(),
 		Triggers: sink, Limiter: limiter, Dialer: netguard.Dialer{Policy: netguard.Policy{Allowed: in.Config.Sources.AllowPrivate}, Lookup: in.GitLookup, Dial: in.GitDial},
 	})
 }

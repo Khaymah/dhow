@@ -11,6 +11,7 @@ import (
 
 	settingspec "github.com/Khaymah/dhow/apps/server/internal/Config/Settings"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 )
@@ -59,7 +60,7 @@ func (s *Store) Update(ctx context.Context, g settingspec.Group, version int64, 
 		var current int64
 		if exists {
 			current = row.Version
-			if base, unread, err = s.decodeRow(g, row.Value, row.Secrets); err != nil {
+			if base, unread, err = s.decodeRow(ctx, g, row.Value, row.Secrets); err != nil {
 				return err
 			}
 		}
@@ -74,7 +75,7 @@ func (s *Store) Update(ctx context.Context, g settingspec.Group, version int64, 
 		if len(p.changed) == 0 {
 			return nil
 		}
-		value, secrets, err := s.encode(g, p.next)
+		value, secrets, err := s.encode(ctx, q, g, p.next)
 		if err != nil {
 			return err
 		}
@@ -110,7 +111,7 @@ func (s *Store) Update(ctx context.Context, g settingspec.Group, version int64, 
 	return res, nil
 }
 
-func (s *Store) encode(g settingspec.Group, raw settingspec.Raw) ([]byte, []byte, error) {
+func (s *Store) encode(ctx context.Context, q *sqlc.Queries, g settingspec.Group, raw settingspec.Raw) ([]byte, []byte, error) {
 	values := map[string]any{}
 	secrets := map[string]string{}
 	for _, k := range settingspec.KeysOf(g) {
@@ -140,7 +141,7 @@ func (s *Store) encode(g settingspec.Group, raw settingspec.Raw) ([]byte, []byte
 		return nil, nil, fmt.Errorf("encode instance setting secrets: %w", err)
 	}
 	defer clear(plain)
-	sealed, err := s.sealer.Seal(plain, sealContext(g))
+	sealed, err := s.secrets.SealIn(ctx, q, keys.InstanceOwner(), sealContext(g), plain)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -154,7 +154,7 @@ func (s *Service) insert(ctx context.Context, q *sqlc.Queries, plan linkPlan) (m
 	if err != nil {
 		return models.Linked{}, err
 	}
-	sealedSecret, err := s.sealWebhookSecret(id, secret)
+	sealedSecret, err := s.sealWebhookSecret(ctx, q, plan.project, id, secret)
 	if err != nil {
 		return models.Linked{}, err
 	}
@@ -164,7 +164,7 @@ func (s *Service) insert(ctx context.Context, q *sqlc.Queries, plan linkPlan) (m
 		HookID: text(hookID), CreatedByUserID: plan.actor, Now: plan.now,
 	}
 	if plan.url.Transport == gitsource.TransportSSH {
-		key, err := s.newDeployKey(id)
+		key, err := s.newDeployKey(ctx, q, plan.project, id)
 		if err != nil {
 			return models.Linked{}, err
 		}
@@ -218,7 +218,7 @@ func (s *Service) relink(ctx context.Context, q *sqlc.Queries, current sqlc.Repo
 			clearHostKey(&u)
 		}
 		if !u.DeployKeyPublic.Valid {
-			key, err := s.newDeployKey(current.Id)
+			key, err := s.newDeployKey(ctx, q, current.ProjectId, current.Id)
 			if err != nil {
 				return sqlc.Repository{}, nil, err
 			}

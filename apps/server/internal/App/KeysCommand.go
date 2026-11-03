@@ -31,10 +31,11 @@ const (
 	KeysGenerate   = "generate"
 	KeysActivate   = "activate"
 	KeysExport     = "export"
+	KeysRekey      = "rekey"
 	stdoutPath     = "-"
 	exportFilePerm = 0o600
 	keysUsage      = "usage: dhow-server keys init [--discard-unreadable [--confirm destroy-N-keys]] | status | generate | " +
-		"activate VERSION | export --recipient age1... --out FILE|-; every command takes --file PATH, and the default is " +
+		"activate VERSION | export --recipient age1... --out FILE|- | rekey [--grace 10s, at least 5s]; every command takes --file PATH, and the default is " +
 		config.EnvKeyringFile + " or the systemd credential " + config.CredentialKeyring
 )
 
@@ -51,6 +52,7 @@ type KeysOptions struct {
 	Version   int32
 	Recipient string
 	Out       string
+	Grace     time.Duration
 }
 
 func ParseKeysArgs(args []string) (KeysOptions, error) {
@@ -68,6 +70,8 @@ func ParseKeysArgs(args []string) (KeysOptions, error) {
 	case KeysExport:
 		flags.StringVar(&opts.Recipient, "recipient", "", "")
 		flags.StringVar(&opts.Out, "out", "", "")
+	case KeysRekey:
+		flags.DurationVar(&opts.Grace, "grace", config.KeyRekeyGrace, "")
 	case KeysStatus, KeysGenerate, KeysActivate:
 	default:
 		return KeysOptions{}, ErrKeysUsage
@@ -86,7 +90,7 @@ func ParseKeysArgs(args []string) (KeysOptions, error) {
 	if err := flags.Parse(rest); err != nil || flags.NArg() != 0 {
 		return KeysOptions{}, ErrKeysUsage
 	}
-	if (opts.Command == KeysExport && (opts.Recipient == "" || opts.Out == "")) || (opts.Confirm != "" && !opts.Discard) {
+	if (opts.Command == KeysExport && (opts.Recipient == "" || opts.Out == "")) || (opts.Confirm != "" && !opts.Discard) || (opts.Command == KeysRekey && opts.Grace < config.KeyRekeyMinGrace) {
 		return KeysOptions{}, ErrKeysUsage
 	}
 	return opts, nil
@@ -124,6 +128,8 @@ func (k KeysRunner) Run(ctx context.Context) error {
 		return k.activate(ctx)
 	case KeysExport:
 		return k.export(ctx)
+	case KeysRekey:
+		return k.rekey(ctx)
 	}
 	return ErrKeysUsage
 }

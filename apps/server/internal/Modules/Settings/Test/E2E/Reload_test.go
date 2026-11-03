@@ -71,12 +71,13 @@ func build(t *testing.T, secret []byte, env settingspec.Raw, pool *pgxpool.Pool)
 	t.Helper()
 	publicURL, err := url.Parse(apptest.PublicOrigin)
 	require.NoError(t, err)
+	log := logging.New(&apptest.SyncBuffer{}, slog.LevelDebug)
 	wired, err := app.Build(t.Context(), app.Infra{
 		Config: config.Config{
 			SecretKey: secret, PublicURL: publicURL, ListenAddr: config.DefaultListenAddr, Settings: env,
 			Artifacts: config.Artifacts{BlobDir: apptest.PrivateDir(t)},
 		},
-		Log: logging.New(&apptest.SyncBuffer{}, slog.LevelDebug), Pool: pool, Migrations: currentMigrations{},
+		Log: log, Pool: pool, Migrations: currentMigrations{}, Keys: apptest.NewKeys(t, pool, log),
 		Build: buildinfo.Info{Version: "test"}, Breach: &apptest.FakeBreach{}, HashParams: ptr(apptest.TestParams()),
 	})
 	if err == nil {

@@ -75,7 +75,7 @@ func linkedRepository(t *testing.T) setup {
 func service(t *testing.T, s setup, providers map[string]sources.Provider) *sources.Service {
 	t.Helper()
 	svc, err := sources.NewService(sources.Options{
-		DB: s.env.Pool, Log: s.env.Wired.Options.Log, Now: s.env.Clock.Now, SecretKey: s.env.Config.SecretKey,
+		DB: s.env.Pool, Log: s.env.Wired.Options.Log, Now: s.env.Clock.Now, Values: s.env.Wired.Values,
 		PublicURL: apptest.PublicOrigin, Providers: providers,
 	})
 	require.NoError(t, err)

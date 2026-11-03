@@ -289,17 +289,27 @@ func changedProviderFields(before, after settingspec.OIDCProvider) []string {
 	return out
 }
 
-func (s *Store) oidcRows(ctx context.Context, q *sqlc.Queries) ([]oidcRow, error) {
+func (s *Store) oidcRows(ctx context.Context, q *sqlc.Queries, lock bool) ([]oidcRow, error) {
 	if len(s.envOIDC) > 0 {
 		return nil, nil
 	}
-	rows, err := q.ListOidcProviders(ctx)
+	var rows []sqlc.ListOidcProvidersRow
+	var err error
+	if lock {
+		var locked []sqlc.ListOidcProvidersForUpdateRow
+		locked, err = q.ListOidcProvidersForUpdate(ctx)
+		for _, r := range locked {
+			rows = append(rows, sqlc.ListOidcProvidersRow(r))
+		}
+	} else {
+		rows, err = q.ListOidcProviders(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
 	out := make([]oidcRow, 0, len(rows))
 	for _, r := range rows {
-		p, err := s.decodeProvider(r.ProviderId, storedProvider{
+		p, err := s.decodeProvider(ctx, r.ProviderId, storedProvider{
 			Type: r.Type, Name: r.Name, Issuer: r.Issuer, ClientID: r.ClientId, Domains: r.AllowedDomains, Secret: r.Secret,
 		}, true)
 		if err != nil {
@@ -315,7 +325,7 @@ func (s *Store) CheckOidc(ctx context.Context, c OidcChange) error {
 		return apperrors.ServiceUnavailable()
 	}
 	q := sqlc.New(s.db)
-	rows, err := s.oidcRows(ctx, q)
+	rows, err := s.oidcRows(ctx, q, false)
 	if err != nil {
 		return err
 	}

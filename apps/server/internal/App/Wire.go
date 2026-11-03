@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -93,6 +94,7 @@ type Wired struct {
 	Retention     *retention.Runner
 	Alerts        *alerts.Service
 	Settings      *instancesettings.Store
+	Values        *keys.Values
 }
 
 func (w *Wired) Close() {
@@ -113,17 +115,17 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	store, err := settingsStore(ctx, in)
+	values, store, err := valuesAndSettings(ctx, in)
 	if err != nil {
 		return nil, err
 	}
 	passwords := passwordsFor(in, store)
 	csrf := auth.NewCSRF(in.Config.SecretKey)
-	keys, err := keysFor(in)
+	derived, err := keysFor(in, values)
 	if err != nil {
 		return nil, err
 	}
-	sealer, recovery, passkeys, runnerKeys := keys.totp, keys.recovery, keys.passkeys, keys.runner
+	totp, recovery, passkeys, runnerKeys := derived.totp, derived.recovery, derived.passkeys, derived.runner
 	external, err := externalAuth(in, store)
 	if err != nil {
 		return nil, err
@@ -135,7 +137,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	auditService := audit.NewService(in.Pool, in.Log, in.Now)
 	audit.Subscribe(bus, auditService)
 	sessionService := session.NewService(session.Options{
-		DB: in.Pool, Hasher: hasher, Passwords: passwords, CSRF: csrf, Sealer: sealer, Recovery: recovery, WebAuthn: passkeys,
+		DB: in.Pool, Hasher: hasher, Passwords: passwords, CSRF: csrf, Totp: totp, Recovery: recovery, WebAuthn: passkeys,
 		Bus: bus, Instance: store.Instance, Log: in.Log, Now: in.Now,
 		Oidc: external.providers, OidcKey: external.oidcKey, CallbackBase: in.Config.PublicURL.String() + config.OidcCallbackPath,
 		EnvProviders: envProviderIDs(in.Config.OIDCProviders),
@@ -160,7 +162,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	pipelinesService, sourcesService, artifactsService, err := runsFor(in, bus, limiter, jobsService, secrets)
+	pipelinesService, sourcesService, artifactsService, err := runsFor(in, values, bus, limiter, jobsService, secrets)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +199,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	}
 	wired := &Wired{
 		Options: opts, Handler: NewRouter(opts), Identity: identityService, Jobs: jobsService, JobQueue: jobsService.Queue(),
-		Projects: opts.Projects, Sources: sourcesService, Pipelines: pipelinesService, Artifacts: artifactsService, LogPool: logPool, Settings: store, Alerts: alertsService,
+		Projects: opts.Projects, Sources: sourcesService, Pipelines: pipelinesService, Artifacts: artifactsService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
 		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now}),
 	}
 	if in.Config.RunnerPlaneSeparate() {
@@ -206,17 +208,31 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	return wired, nil
 }
 
+func valuesAndSettings(ctx context.Context, in Infra) (*keys.Values, *instancesettings.Store, error) {
+	if in.Keys == nil {
+		return nil, nil, errors.New("the keyring is not loaded; every sealed value needs it")
+	}
+	values := keys.NewValues(in.Keys.Envelope(), in.Config.SecretKey)
+	if in.Pool != nil {
+		if err := values.LoadLegacyState(ctx, in.Pool); err != nil {
+			return nil, nil, err
+		}
+	}
+	store, err := settingsStore(ctx, in, values)
+	return values, store, err
+}
+
 type keyset struct {
-	totp     *appcrypto.Sealer
+	totp     *keys.Column
 	recovery *auth.RecoveryHasher
 	passkeys *webauthn.WebAuthn
 	runner   *runnerauth.Keys
 }
 
-func keysFor(in Infra) (keyset, error) {
+func keysFor(in Infra, values *keys.Values) (keyset, error) {
 	var k keyset
 	var err error
-	if k.totp, err = appcrypto.NewSealer(in.Config.SecretKey, config.TotpSealLabel); err != nil {
+	if k.totp, err = values.Column(session.TotpSecretSpec()); err != nil {
 		return k, err
 	}
 	if k.recovery, err = auth.NewRecoveryHasher(in.Config.SecretKey); err != nil {
@@ -357,9 +373,9 @@ func passwordsFor(in Infra, store *instancesettings.Store) *auth.PasswordPolicy 
 	return auth.NewPasswordPolicy(instancesettings.NewBreach(store, breach), in.Log, config.PasswordMinLength, config.PasswordMaxLength)
 }
 
-func settingsStore(ctx context.Context, in Infra) (*instancesettings.Store, error) {
+func settingsStore(ctx context.Context, in Infra, values *keys.Values) (*instancesettings.Store, error) {
 	opts := instancesettings.Options{
-		SecretKey: in.Config.SecretKey, Env: in.Config.Settings, EnvOIDC: in.Config.OIDCProviders, Dev: in.Config.Dev, Log: in.Log, Now: in.Now,
+		Values: values, Env: in.Config.Settings, EnvOIDC: in.Config.OIDCProviders, Dev: in.Config.Dev, Log: in.Log, Now: in.Now,
 	}
 	if in.Pool != nil {
 		opts.DB = in.Pool

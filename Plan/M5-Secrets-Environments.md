@@ -497,7 +497,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 كل PR بيعدّي `make check` وCI أخضر، وفيه اختبارات سلبية لكل مسار أمني، وبيحدّث `Plan/Progress/` في يومه، وبيكتب الـ ADR بتاع قراراته في أوله، وعليه مراجعة أمنية مستقلة قبل الـ merge. والأوامر بتفترض نفس `DHOW_TEST_DATABASE_URL` بتاع M3 وM4.
 
 ### M5.1: سلسلة المفاتيح والتشفير المغلّف (`Core/Keys`)
-- **الحالة:** على `feat/keyring-m51`، والقرارات في [ADR-0081](ADR/0081-keyring-and-envelope-encryption.md).
+- **الحالة:** اتدمج في #91، والقرارات في [ADR-0081](ADR/0081-keyring-and-envelope-encryption.md).
 - **الحجم:** M. **الاعتماد:** U2 (`"ServerInstances"` و`"SchemaFloor"`) 
 - **المحتوى:**
   - `apps/server/internal/Core/Keys` (`package keys`): قراية السلسلة وفحصها، و`KeyProvider` بـ `file` و`fake`، و`Envelope.Seal` و`Open` بالصاحب والغرض والـ context، والـ DEK lazy (`INSERT ... ON CONFLICT DO NOTHING` وبعده `SELECT`)، و`Destroy(owner)`.
@@ -523,6 +523,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 
 ### M5.2: نقل مستخدمي `Sealer` للتشفير المغلّف
 - **ملزم (من المراجعة الأمنية لـ M5.1):** M5.2 لازم يضيف `dhow-server keys rekey`: DEK جديد لكل صاحب، وإعادة ختم كل قيمة من خلال «أماكن قيم» مسجّلة (كل عمود متشفّر بيسجّل الصاحب والـ label والـ context بتوعه)، وبعدها مسح الـ DEK القديم. لأن تدوير الـ KEK مابيحميش من سلسلة اتسرّبت مع نسخة قاعدة قديمة، و`Destroy` مابيمنعش نسخة أقدم. M5 مابيخلصش من غيره. وفيه اختبار: سلسلة قديمة ونسخة قاعدة من قبل الـ rekey مابيفتحوش أي قيمة حالية.
+- **الحالة:** على `feat/sealer-to-envelope-m52` مع U4، والقرارات في [ADR-0082](ADR/0082-sealer-users-move-to-the-envelope.md). الصيغة الجديدة هي `0x03` بتاعة M5.1 (مكان `0x02` في النص تحت). `GitConnections.TokenSealed` مالوش كاتب لحد M4.6 فاتأجّل معاه، و`GitHubApps` مش موجود (M4.5)، و`deploy/upgrade-test` مستني U3.
 - **الحجم:** M. **الاعتماد:** M5.1، وU4 (`Core/Backfill`) اللي بيتعمل هنا لو لسه.
 - **المحتوى:**
   - قراية `0x01` و`0x02` في كل الأماكن اللي في [الجدول](#نقل-مستخدمي-sealer-m52)، والكتابة `0x02`، والـ backfills (واحد لكل عمود) بنفس الـ context.

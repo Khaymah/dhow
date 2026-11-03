@@ -15,11 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
-	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
+	sources "github.com/Khaymah/dhow/apps/server/internal/Modules/Sources"
 	"github.com/Khaymah/dhow/internal/gitproof"
 	"github.com/Khaymah/dhow/internal/gitproof/gitprooftest"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
@@ -233,18 +234,22 @@ func (e *Env) SeedSSHRepository(org, project, creator uuid.UUID) SSHRepository {
 	require.NoError(e.T, err)
 	hostLine := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(hostKey)))
 	id := uuid.New()
-	sealer, err := appcrypto.NewSealer(e.Config.SecretKey, config.DeployKeySealLabel)
+	sealer, err := e.Wired.Values.Column(sources.DeployKeySpec())
 	require.NoError(e.T, err)
-	sealed, err := sealer.Seal(private, []byte("deploy-key:"+id.String()))
+	sealed, err := sealer.SealIn(context.Background(), sqlc.New(e.Pool), keys.ProjectOwner(project), []byte("deploy-key:"+id.String()), private)
+	require.NoError(e.T, err)
+	hooks, err := e.Wired.Values.Column(sources.WebhookSecretSpec())
+	require.NoError(e.T, err)
+	hookSecret, err := hooks.SealIn(context.Background(), sqlc.New(e.Pool), keys.ProjectOwner(project), []byte("webhook-secret:"+id.String()), []byte("seeded-webhook-secret"))
 	require.NoError(e.T, err)
 	out := SSHRepository{ID: id, PrivateKey: private, KnownHost: "git.example.com " + hostLine, CloneURL: "ssh://git@git.example.com/team/app.git"}
 	_, err = e.Pool.Exec(context.Background(),
 		`INSERT INTO "Repositories" ("Id", "OrganizationId", "ProjectId", "Provider", "FullName", "CloneUrl", "Transport", "HookId",
 		 "WebhookSecretSealed", "HostKey", "HostKeyConfirmedAt", "HostKeyConfirmedByUserId", "DeployKeyPublic", "DeployKeySealed",
 		 "CreatedByUserId")
-		 VALUES ($1, $2, $3, 'generic', 'team/app', $4, 'ssh', $5, '\x01', $6, now(), $7, $8, $9, $7)`,
+		 VALUES ($1, $2, $3, 'generic', 'team/app', $4, 'ssh', $5, $10, $6, now(), $7, $8, $9, $7)`,
 		id, org, project, out.CloneURL, hex32(uuid.New()), hostLine, creator,
-		strings.TrimSpace(string(ssh.MarshalAuthorizedKey(deployPub))), sealed)
+		strings.TrimSpace(string(ssh.MarshalAuthorizedKey(deployPub))), sealed, hookSecret)
 	require.NoError(e.T, err)
 	return out
 }

@@ -2,8 +2,8 @@ import os
 import re
 import subprocess
 
-from . import (arabic_rules, cli_rules, go_comments, js_comments, migration_rules, port_rules, runner_rules, web_rules,
-               webhook_rules)
+from . import (arabic_rules, cli_rules, crypto_rules, go_comments, js_comments, migration_rules, port_rules, runner_rules,
+               web_rules, webhook_rules)
 from .common import GENERATED_PATH, is_test, is_ts, new_lines
 
 CSS_EXT = (".css",)
@@ -584,6 +584,7 @@ CHECKS = (
     check_migration_immutable,
     check_comments,
     check_go,
+    crypto_rules.check_new_sealer,
     check_server_layout,
     check_server_imports,
     port_rules.check_port_imports,

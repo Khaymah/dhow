@@ -6,8 +6,10 @@ usage() {
   printf 'usage: %s\n' "$0" >&2
   printf 'Looks for the credentials of the demo stack in clear. Where: pg_dump, the server, runner and Postgres logs, the\n' >&2
   printf 'runner state with its Podman storage, the blob store with every tar.gz artifact and cache entry unpacked in\n' >&2
-  printf 'memory, and the systemd journal when there is one. What: the deploy keys and webhook secrets (unsealed with\n' >&2
-  printf 'the server key), the server key, the artifact grant key, the API token, the runner registration token, the\n' >&2
+  printf 'memory, and the systemd journal when there is one. What: every sealed value of every registered column (the\n' >&2
+  printf 'deploy keys, webhook secrets, TOTP secrets and instance setting secrets, opened in both formats with the keyring\n' >&2
+  printf 'and the server key; a value it cannot open fails the sweep), the data keys after unwrapping, the keyring keys,\n' >&2
+  printf 'the server key, the artifact grant key, the API token, the runner registration token, the\n' >&2
   printf 'session cookie, the CSRF token, the owner password and the runner keys (allowed only in its identity file),\n' >&2
   printf 'and anything shaped like an API, runner access or registration token or a download grant (input grants are\n' >&2
   printf 'kept in the job spec of the Jobs table on purpose and allowed there only). Not covered: the\n' >&2
@@ -31,6 +33,7 @@ sweep_test() {
   docker compose exec -T \
     -e DHOW_LEAK_SWEEP_DATABASE_URL='postgres://dhow:dhow-dev-only@db:5432/dhow?sslmode=disable' \
     -e DHOW_LEAK_SWEEP_SECRET_KEY_FILE="$work/server/secret-key" \
+    -e DHOW_LEAK_SWEEP_KEYRING_FILE="$work/server/keyring" \
     -e DHOW_LEAK_SWEEP_NEEDLES="$work/needles" \
     -e DHOW_LEAK_SWEEP_RUNNER_IDENTITY=/sweep/runner-state/identity \
     -e DHOW_LEAK_SWEEP_DIRS="$where" \

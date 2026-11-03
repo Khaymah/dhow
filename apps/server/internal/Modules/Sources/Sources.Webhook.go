@@ -56,9 +56,9 @@ func (s *Service) OpenHook(ctx context.Context, provider, hookID string) (Hook, 
 	if err != nil {
 		return out, err
 	}
-	secret, err := s.openWebhookSecret(row.Repository.Id, row.Repository.WebhookSecretSealed)
+	secret, err := s.openWebhookSecret(ctx, row.Repository.ProjectId, row.Repository.Id, row.Repository.WebhookSecretSealed)
 	if err != nil {
-		s.log.ErrorContext(ctx, "a webhook secret cannot be opened; was DHOW_SECRET_KEY changed? Rotate the webhook secret",
+		s.log.ErrorContext(ctx, "a webhook secret cannot be opened; check the keyring, then rotate the webhook secret",
 			"repository_id", row.Repository.Id)
 		return out, nil
 	}

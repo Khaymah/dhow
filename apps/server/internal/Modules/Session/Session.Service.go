@@ -12,9 +12,9 @@ import (
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
-	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	oidcauth "github.com/Khaymah/dhow/apps/server/internal/Core/Oidc"
 	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
@@ -36,7 +36,7 @@ type Options struct {
 	Hasher    *auth.Hasher
 	Passwords *auth.PasswordPolicy
 	CSRF      *auth.CSRF
-	Sealer    *appcrypto.Sealer
+	Totp      *keys.Column
 	Recovery  *auth.RecoveryHasher
 	WebAuthn  *webauthn.WebAuthn
 	Bus       Publisher
@@ -55,7 +55,7 @@ type Service struct {
 	hasher    *auth.Hasher
 	passwords *auth.PasswordPolicy
 	csrf      *auth.CSRF
-	sealer    *appcrypto.Sealer
+	totp      *keys.Column
 	recovery  *auth.RecoveryHasher
 	webauthn  *webauthn.WebAuthn
 	bus       Publisher
@@ -84,7 +84,7 @@ func NewService(o Options) *Service {
 		instance = func() policy.InstanceSettings { return policy.InstanceSettings{} }
 	}
 	return &Service{
-		db: o.DB, hasher: o.Hasher, passwords: o.Passwords, csrf: o.CSRF, sealer: o.Sealer, recovery: o.Recovery,
+		db: o.DB, hasher: o.Hasher, passwords: o.Passwords, csrf: o.CSRF, totp: o.Totp, recovery: o.Recovery,
 		webauthn: o.WebAuthn, bus: o.Bus, instance: instance, log: o.Log, now: now,
 		oidc: o.Oidc, oidcKey: o.OidcKey, callbackBase: o.CallbackBase, envProviders: append([]string{}, o.EnvProviders...),
 	}

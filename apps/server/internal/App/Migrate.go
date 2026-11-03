@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	backfill "github.com/Khaymah/dhow/apps/server/internal/Core/Backfill"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	"github.com/Khaymah/dhow/internal/buildinfo"
@@ -151,6 +154,9 @@ func printStatus(ctx context.Context, m *migrations.Migrator, pool *pgxpool.Pool
 		pending = []string{"none"}
 	}
 	p.row("Pending:\t%s", strings.Join(pending, ", "))
+	if err := printBackfills(ctx, pool, p); err != nil {
+		return err
+	}
 	if st.DBVersion >= migrations.FloorMigration {
 		live, err := sqlc.New(pool).ListLiveServerInstances(ctx, config.ServerInstanceStaleAfter.Seconds())
 		if err != nil {
@@ -163,6 +169,58 @@ func printStatus(ctx context.Context, m *migrations.Migrator, pool *pgxpool.Pool
 		}
 	}
 	return p.flush()
+}
+
+func printBackfills(ctx context.Context, pool *pgxpool.Pool, p *printer) error {
+	list, err := backfill.List(ctx, pool)
+	if err != nil {
+		return err
+	}
+	reg, err := ValueRegistry()
+	if err != nil {
+		return err
+	}
+	seen := map[string]backfill.Progress{}
+	for _, b := range list {
+		seen[b.Name] = b
+	}
+	names := []string{}
+	for _, l := range reg.Locations() {
+		names = append(names, keys.BackfillName(l.Spec()))
+	}
+	for _, b := range list {
+		if !slices.Contains(names, b.Name) {
+			names = append(names, b.Name)
+		}
+	}
+	done := 0
+	for _, n := range names {
+		if seen[n].Done() {
+			done++
+		}
+	}
+	p.row("Backfills:\t%d of %d done", done, len(names))
+	for _, n := range names {
+		p.row("\t%s  %s", n, backfillState(seen[n], n))
+	}
+	return nil
+}
+
+func backfillState(b backfill.Progress, name string) string {
+	switch {
+	case b.Name != name:
+		return "not started: a running server starts it"
+	case b.Done():
+		return fmt.Sprintf("done %s, %d rows converted", b.DoneAt.UTC().Format("2006-01-02 15:04:05Z"), b.Processed)
+	}
+	out := fmt.Sprintf("running, %d rows converted", b.Processed)
+	if b.Remaining != nil {
+		out += fmt.Sprintf(", %d left after pass %d", *b.Remaining, b.Passes)
+	}
+	if b.Failed > 0 {
+		out += fmt.Sprintf(", %d could not be converted (see the server log)", b.Failed)
+	}
+	return out
 }
 
 func printPlan(ctx context.Context, m *migrations.Migrator, out io.Writer) error {

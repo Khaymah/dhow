@@ -71,6 +71,7 @@ Every command reads the keyring from `--file` when you give it, and otherwise fr
 | `dhow-server keys activate <n>` | Makes version `n` the active one, provided every running server has loaded it. | Yes |
 | `dhow-server keys export --recipient age1... --out FILE` | Writes the keyring encrypted to an [age](https://age-encryption.org) public key. `--out -` writes it to standard output. | Yes, to record the export time |
 | `dhow-server keys init --discard-unreadable` | Only for a database restored without its keyring. See [The keyring is lost](#the-keyring-is-lost). | Yes |
+| `dhow-server keys rekey [--grace 10s]` | Gives every owner a new data key, encrypts every value again, then destroys the old keys. See [Replace the data keys](#replace-the-data-keys). | Yes |
 
 With systemd, run the database commands with the service's own settings:
 
@@ -105,7 +106,43 @@ Rotation does not stop the server, and reads keep working the whole time, becaus
 
 ### What rotation protects and what it does not
 
-Rotation re-wraps the data keys only and does not change them, so it protects against a leaked keyring only after the old key is gone from every keyring file and every database backup taken before the rotation is gone. A leaked keyring together with a database backup from before the rotation unwraps data keys that still protect the current values. For the same reason, destroying an environment's data key does not stop a backup taken before the destroy, together with its keyring, from opening its values. The full fix after a keyring leak is `keys rekey`, which gives every owner a new data key and encrypts every value again, and comes with M5.2. Until then, after a secret or the keyring leaks, the fix is for the owner of each secret to change its value.
+Rotation re-wraps the data keys only and does not change them, so it protects against a leaked keyring only after the old key is gone from every keyring file and every database backup taken before the rotation is gone. A leaked keyring together with a database backup from before the rotation unwraps data keys that still protect the current values. For the same reason, destroying an environment's data key does not stop a backup taken before the destroy, together with its keyring, from opening its values. The full fix after a keyring leak is a rotation followed by [Replace the data keys](#replace-the-data-keys). The values that were in the leaked copy itself are exposed anyway, so the owner of each secret should still change its value.
+
+## Replace the data keys
+
+`dhow-server keys rekey` gives every owner a new data key, encrypts every stored value again with the new key of its owner, then destroys the old keys. After it, the old keyring together with a database copy from before the command opens no current value. The decisions and their reasons are in [ADR-0082](../../../Plan/ADR/0082-sealer-users-move-to-the-envelope.md).
+
+1. If the keyring leaked, the order is `keys generate`, then copy the file and restart every server, then `keys activate`, then `keys rekey`, as in [Rotate the key](#rotate-the-key). This way the new data keys are wrapped with a version the leaker does not have. If the active version was activated more than an hour before the command, the command prints a warning (`WARNING`) with this order.
+2. Run the command with the settings of the service:
+
+   ```sh
+   sudo systemd-run --pipe --wait --quiet -p User=dhow -p EnvironmentFile=/etc/dhow/dhow.env \
+     -p LoadCredential=dhow-database-url:/etc/dhow/credentials/dhow-database-url \
+     -p LoadCredential=dhow-keyring:/etc/dhow/credentials/dhow-keyring \
+     /usr/local/bin/dhow-server keys rekey
+   ```
+
+3. The command runs while the server runs. Reads never stop, because an old key stays readable in the `superseded` state until all its values have moved, and a new value is encrypted with the new key at once. After the first pass the command waits for `--grace` (10 seconds by default, and at least 5 seconds) so every write that started with an old key finishes, then counts the values left and passes over them again, then destroys the old keys.
+4. The command runs under an advisory lock, so a second run at the same time stops with `REKEY_RUNNING`. If it stops halfway, run it again and it resumes where it stopped. If it finds a value on an old key that does not open, it stops with `REKEY_UNREADABLE`, names the column and the row, and does not destroy the key that value uses. Fix or clear the value, then run the command again.
+5. The command writes `system.keys.rekey_started` to the audit log when it starts, then `system.keys.rekeyed` when it ends or `system.keys.rekey_failed` when it stops, with high severity and counts only.
+6. The command needs a direct connection to PostgreSQL, because its lock is tied to the session. Do not run it through PgBouncer in transaction mode, where the session changes between statements.
+7. The command changes the keys only, not the secret values themselves. Replacing a secret that leaked is a separate job: change it where it comes from, then save it in Dhow again.
+
+Every encrypted column is registered in the code as a value location: the table and column, the kind of owner, the label, and the context that binds the value to its row. The command passes over these locations only, and the tests check that every encrypted column in the database is registered.
+
+## Values saved before the keyring
+
+Before the keyring, values were encrypted with a key derived from `DHOW_SECRET_KEY`, in a format whose first byte is `0x01`. New values use the keyring format (`0x03`). The server reads both formats, writes only the new one, and converts the old values [in the background](upgrades.md#background-backfills), one backfill per column, with the same label and context:
+
+| Column | Owner |
+|---|---|
+| `"TotpFactors"."SecretSealed"` | The user |
+| `"InstanceSettings"."Secrets"` | The instance |
+| `"OidcProviders"."Secret"` | The instance |
+| `"Repositories"."DeployKeySealed"` and `"PreviousDeployKeySealed"` | The project |
+| `"Repositories"."WebhookSecretSealed"` | The project |
+
+Once the backfills are done (`dhow-server migrate status`), `DHOW_SECRET_KEY` opens no stored value and only derives signing and HMAC keys. Changing it does not touch the stored secrets, but every runner must register again, current API tokens and recovery codes stop working, and OIDC sign-ins that started before it and temporary artifact download links fail. So change it only if it leaked.
 
 ## Backups and export
 
@@ -128,7 +165,7 @@ The values in the database are encrypted with data keys wrapped by the keyring, 
 
 ### The keyring file leaked
 
-The file alone opens nothing without the database, but together with any database copy the leaker has, it opens everything. Rotate the key at once as in [Rotate the key](#rotate-the-key), wait until the old version is `retired`, then remove its line from the file and from every copy, and delete every database backup taken before the rotation. Change the secret values themselves, because rotation does not change the data keys (see [What rotation protects and what it does not](#what-rotation-protects-and-what-it-does-not)).
+The file alone opens nothing without the database, but together with any database copy the leaker has, it opens everything. Rotate the key at once as in [Rotate the key](#rotate-the-key), then run [Replace the data keys](#replace-the-data-keys), because rotation alone does not change the data keys (see [What rotation protects and what it does not](#what-rotation-protects-and-what-it-does-not)). Wait until the old version is `retired`, then remove its line from the file and from every copy, and delete every database backup taken before the rotation. Change the secret values that were stored at the time of the leak.
 
 ### The keyring is lost
 

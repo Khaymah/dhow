@@ -14,9 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	settingspec "github.com/Khaymah/dhow/apps/server/internal/Config/Settings"
-	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
@@ -34,7 +33,7 @@ const (
 )
 
 var (
-	ErrUndecryptable = errors.New("cannot be decrypted with the current DHOW_SECRET_KEY")
+	ErrUndecryptable = errors.New("cannot be decrypted with the keyring, or with DHOW_SECRET_KEY for a value saved before the keyring")
 	ErrReloadFailed  = errors.New("the last instance settings reload failed, so this instance may serve stale settings")
 )
 
@@ -123,20 +122,21 @@ func (s *Snapshot) Instance() policy.InstanceSettings {
 }
 
 type Options struct {
-	DB        DB
-	SecretKey []byte
-	Env       settingspec.Raw
-	EnvOIDC   []settingspec.OIDCProvider
-	Dev       bool
-	Listen    Listener
-	Log       *slog.Logger
-	Now       func() time.Time
-	Wait      func(ctx context.Context, d time.Duration) bool
+	DB      DB
+	Values  *keys.Values
+	Env     settingspec.Raw
+	EnvOIDC []settingspec.OIDCProvider
+	Dev     bool
+	Listen  Listener
+	Log     *slog.Logger
+	Now     func() time.Time
+	Wait    func(ctx context.Context, d time.Duration) bool
 }
 
 type Store struct {
 	db       DB
-	sealer   *appcrypto.Sealer
+	secrets  *keys.Column
+	oidcKeys *keys.Column
 	env      settingspec.Raw
 	envOIDC  []settingspec.OIDCProvider
 	dev      bool
@@ -151,7 +151,14 @@ type Store struct {
 }
 
 func New(o Options) (*Store, error) {
-	sealer, err := appcrypto.NewSealer(o.SecretKey, config.InstanceSettingsSealLabel)
+	if o.Values == nil {
+		return nil, errors.New("instance settings need the keyring to seal their secrets")
+	}
+	secrets, err := o.Values.Column(SecretsSpec())
+	if err != nil {
+		return nil, err
+	}
+	oidcKeys, err := o.Values.Column(OidcSecretSpec())
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +172,7 @@ func New(o Options) (*Store, error) {
 	}
 	env := o.Env.Clone()
 	s := &Store{
-		db: o.DB, sealer: sealer, env: env, envOIDC: append([]settingspec.OIDCProvider(nil), o.EnvOIDC...), dev: o.Dev,
+		db: o.DB, secrets: secrets, oidcKeys: oidcKeys, env: env, envOIDC: append([]settingspec.OIDCProvider(nil), o.EnvOIDC...), dev: o.Dev,
 		listen: o.Listen, log: o.Log, now: now, wait: wait,
 	}
 	snap, err := s.build(map[settingspec.Group]Stored{}, s.emptyOidc())
@@ -232,7 +239,7 @@ func (s *Store) read(ctx context.Context, q *sqlc.Queries) (map[settingspec.Grou
 			errs = append(errs, fmt.Errorf("instance setting group %q in the database is unknown", r.Group))
 			continue
 		}
-		raw, unread, err := s.decodeRow(g, r.Value, r.Secrets)
+		raw, unread, err := s.decodeRow(ctx, g, r.Value, r.Secrets)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -281,7 +288,7 @@ func describe(src Source) string {
 	}
 }
 
-func sealContext(g settingspec.Group) []byte { return []byte(contextPrefix + string(g)) }
+func sealContext(g settingspec.Group) []byte { return groupContext(string(g)) }
 
 func (s *Store) secretsLocked(g settingspec.Group) bool {
 	found := false
@@ -297,16 +304,16 @@ func (s *Store) secretsLocked(g settingspec.Group) bool {
 	return found
 }
 
-func (s *Store) decodeRow(g settingspec.Group, value, secrets []byte) (settingspec.Raw, bool, error) {
+func (s *Store) decodeRow(ctx context.Context, g settingspec.Group, value, secrets []byte) (settingspec.Raw, bool, error) {
 	if len(secrets) > 0 && s.secretsLocked(g) {
-		raw, err := s.decode(g, value, nil)
+		raw, err := s.decode(ctx, g, value, nil)
 		return raw, true, err
 	}
-	raw, err := s.decode(g, value, secrets)
+	raw, err := s.decode(ctx, g, value, secrets)
 	return raw, false, err
 }
 
-func (s *Store) decode(g settingspec.Group, value, secrets []byte) (settingspec.Raw, error) {
+func (s *Store) decode(ctx context.Context, g settingspec.Group, value, secrets []byte) (settingspec.Raw, error) {
 	raw := settingspec.Raw{}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(value, &fields); err != nil {
@@ -329,7 +336,7 @@ func (s *Store) decode(g settingspec.Group, value, secrets []byte) (settingspec.
 	if len(secrets) == 0 {
 		return raw, nil
 	}
-	plain, err := s.sealer.Open(secrets, sealContext(g))
+	plain, err := s.secrets.Open(ctx, keys.InstanceOwner(), sealContext(g), secrets)
 	if err != nil {
 		return nil, fmt.Errorf("instance setting secrets of %s (from the database): %w", g, ErrUndecryptable)
 	}

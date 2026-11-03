@@ -9,18 +9,23 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 
+	app "github.com/Khaymah/dhow/apps/server/internal/App"
+	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	"github.com/Khaymah/dhow/internal/leaksweep"
 )
 
@@ -30,16 +35,11 @@ const (
 	envNeedles  = "DHOW_LEAK_SWEEP_NEEDLES"
 	envDirs     = "DHOW_LEAK_SWEEP_DIRS"
 	envIdentity = "DHOW_LEAK_SWEEP_RUNNER_IDENTITY"
+	envKeyring  = "DHOW_LEAK_SWEEP_KEYRING_FILE"
 	tokenChars  = `[A-Za-z0-9_-]`
 )
 
-var (
-	identityFiles = []string{"runner-state/identity", "runner-state/identity.pending"}
-	knownSealed   = map[string]bool{
-		`"Repositories"."DeployKeySealed"`: true, `"Repositories"."PreviousDeployKeySealed"`: true,
-		`"Repositories"."WebhookSecretSealed"`: true,
-	}
-)
+var identityFiles = []string{"runner-state/identity", "runner-state/identity.pending"}
 
 func required(t *testing.T, name string) string {
 	t.Helper()
@@ -73,49 +73,108 @@ func serverKey(t *testing.T) []byte {
 	return nil
 }
 
-func sealedNeedles(t *testing.T, conn *pgx.Conn, secret []byte) []leaksweep.Needle {
+func readKeyring(t *testing.T) (*keys.Keyring, keys.KeyProvider) {
 	t.Helper()
-	ctx := context.Background()
-	deploy, err := appcrypto.NewSealer(secret, config.DeployKeySealLabel)
+	raw, err := os.ReadFile(required(t, envKeyring))
 	require.NoError(t, err)
-	webhooks, err := appcrypto.NewSealer(secret, config.WebhookDeliveryKeyLabel)
+	ring, err := keys.ParseKeyring(raw)
+	clear(raw)
 	require.NoError(t, err)
-	rows, err := conn.Query(ctx, `SELECT "Id", "DeployKeySealed", "PreviousDeployKeySealed", "WebhookSecretSealed" FROM "Repositories"`)
+	provider, err := keys.NewFileProvider(ring)
 	require.NoError(t, err)
-	defer rows.Close()
-	var out []leaksweep.Needle
-	for rows.Next() {
-		var id uuid.UUID
-		var key, previous, hook []byte
-		require.NoError(t, rows.Scan(&id, &key, &previous, &hook))
-		for kind, sealed := range map[string][]byte{"deploy key": key, "previous deploy key": previous} {
-			if len(sealed) == 0 {
+	return ring, provider
+}
+
+func plainNeedles(t *testing.T, spec keys.Spec, name string, plain []byte) []leaksweep.Needle {
+	t.Helper()
+	switch spec.Label {
+	case config.DeployKeySealLabel:
+		out, err := leaksweep.PEMKey(name, plain)
+		require.NoError(t, err)
+		return out
+	case config.TotpSealLabel:
+		return []leaksweep.Needle{
+			checked{t}.needle(leaksweep.Encoded(name, plain)),
+			checked{t}.needle(leaksweep.Encoded(name+" as text", []byte(auth.TotpSecretText(plain)))),
+		}
+	case config.InstanceSettingsSealLabel:
+		var fields map[string]string
+		if json.Unmarshal(plain, &fields) != nil {
+			fields = map[string]string{"": string(plain)}
+		}
+		var out []leaksweep.Needle
+		for field, v := range fields {
+			if len(v) < leaksweep.MinValueBytes {
+				t.Logf("the %s %s is shorter than %d bytes; it is not looked for", name, field, leaksweep.MinValueBytes)
 				continue
 			}
-			plain, err := deploy.Open(sealed, []byte("deploy-key:"+id.String()))
-			require.NoError(t, err, "the %s of repository %s does not open with this server key", kind, id)
-			keys, err := leaksweep.PEMKey(kind+" of repository "+id.String(), plain)
-			require.NoError(t, err)
-			out = append(out, keys...)
+			out = append(out, checked{t}.needle(leaksweep.Encoded(strings.TrimSpace(name+" "+field), []byte(v))))
 		}
-		if len(hook) > 0 {
-			plain, err := webhooks.Open(hook, []byte("webhook-secret:"+id.String()))
-			require.NoError(t, err, "the webhook secret of repository %s does not open with this server key", id)
-			out = append(out, checked{t}.needle(leaksweep.Encoded("webhook secret of repository "+id.String(), plain)))
+		return out
+	}
+	return []leaksweep.Needle{checked{t}.needle(leaksweep.Encoded(name, plain))}
+}
+
+func sealedNeedles(t *testing.T, pool *pgxpool.Pool, secret []byte, provider keys.KeyProvider) []leaksweep.Needle {
+	t.Helper()
+	ctx := context.Background()
+	reg, err := app.ValueRegistry()
+	require.NoError(t, err)
+	values := keys.NewValues(keys.NewEnvelope(keys.NewPostgresStore(pool), provider), secret)
+	var out []leaksweep.Needle
+	opened := map[byte]int{}
+	for _, l := range reg.Locations() {
+		spec := l.Spec()
+		col, err := values.Column(spec)
+		require.NoError(t, err)
+		var rows []keys.Value
+		require.NoError(t, pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+			rows, err = l.Scan(ctx, tx, "", 1<<20, false)
+			return err
+		}))
+		for _, v := range rows {
+			name := spec.Name() + " of row " + v.Key
+			plain, err := col.Open(ctx, v.Owner, v.Context, v.Sealed)
+			require.NoError(t, err, "the sweep cannot open %s with this keyring and server key", name)
+			opened[v.Sealed[0]]++
+			out = append(out, plainNeedles(t, spec, name, plain)...)
 		}
 	}
-	require.NoError(t, rows.Err())
-	require.NotEmpty(t, out, "no repository with a sealed credential was found")
+	t.Logf("opened %d values in the envelope format and %d in the format from before the keyring", opened[keys.FormatVersion], opened[keys.LegacyFormat])
+	require.NotEmpty(t, out, "no sealed value was found")
+	deks, err := apptest.DataKeysInClear(ctx, pool, provider)
+	require.NoError(t, err)
+	for i, dek := range deks {
+		out = append(out, checked{t}.needle(leaksweep.Encoded(fmt.Sprintf("data key %d after unwrapping", i+1), dek)))
+	}
 	return out
 }
 
-func uncoveredSealed(t *testing.T, conn *pgx.Conn) []string {
+func keyringNeedles(t *testing.T, ring *keys.Keyring) []leaksweep.Needle {
 	t.Helper()
-	rows, err := conn.Query(context.Background(), `SELECT quote_ident(table_name) || '.' || quote_ident(column_name),
+	keks, err := apptest.KeyringKeys(ring)
+	require.NoError(t, err)
+	out := make([]leaksweep.Needle, 0, len(keks))
+	for i, k := range keks {
+		out = append(out, checked{t}.needle(leaksweep.Encoded(fmt.Sprintf("keyring key %d", i+1), k)))
+	}
+	return out
+}
+
+func uncoveredSealed(t *testing.T, pool *pgxpool.Pool) []string {
+	t.Helper()
+	reg, err := app.ValueRegistry()
+	require.NoError(t, err)
+	known := map[string]bool{}
+	for _, l := range reg.Locations() {
+		known[l.Spec().Name()] = true
+	}
+	rows, err := pool.Query(context.Background(), `SELECT table_name || '.' || column_name,
 		(xpath('/row/n/text()', query_to_xml(format('SELECT count(*) AS n FROM %I WHERE %I IS NOT NULL', table_name, column_name),
 			false, true, '')))[1]::text::bigint
 		FROM information_schema.columns
-		WHERE table_schema = 'public' AND column_name LIKE '%Sealed' AND data_type = 'bytea' ORDER BY 1`)
+		WHERE table_schema = 'public' AND data_type = 'bytea' AND (column_name LIKE '%Sealed' OR column_name IN ('Secret', 'Secrets'))
+		ORDER BY 1`)
 	require.NoError(t, err)
 	defer rows.Close()
 	var out []string
@@ -125,7 +184,7 @@ func uncoveredSealed(t *testing.T, conn *pgx.Conn) []string {
 		var n int64
 		require.NoError(t, rows.Scan(&name, &n))
 		seen++
-		if n > 0 && !knownSealed[name] {
+		if n > 0 && !known[name] {
 			out = append(out, name)
 		}
 	}
@@ -185,16 +244,18 @@ func patterns() []leaksweep.Pattern {
 func TestNoCredentialIsStoredInClear(t *testing.T) {
 	ctx := context.Background()
 	secret := serverKey(t)
-	conn, err := pgx.Connect(ctx, required(t, envDatabase))
+	pool, err := pgxpool.New(ctx, required(t, envDatabase))
 	require.NoError(t, err)
-	defer func() { _ = conn.Close(ctx) }()
+	defer pool.Close()
 	grantKey, err := appcrypto.DeriveKey(secret, config.ArtifactGrantKeyLabel)
 	require.NoError(t, err)
-	needles := sealedNeedles(t, conn, secret)
+	ring, provider := readKeyring(t)
+	needles := sealedNeedles(t, pool, secret, provider)
+	needles = append(needles, keyringNeedles(t, ring)...)
 	needles = append(needles, checked{t}.needle(leaksweep.Encoded("server secret key", secret)), checked{t}.needle(leaksweep.Encoded("artifact grant key", grantKey)))
 	needles = append(needles, listedNeedles(t, required(t, envNeedles))...)
 	needles = append(needles, runnerKeys(t, required(t, envIdentity))...)
-	require.Empty(t, uncoveredSealed(t, conn), "the demo made sealed values the sweep cannot open; teach it these columns")
+	require.Empty(t, uncoveredSealed(t, pool), "the demo made sealed values that no value location covers; register these columns")
 
 	dirs := strings.Split(required(t, envDirs), ":")
 	hits, stats, err := leaksweep.Sweep(dirs, needles, patterns(), leaksweep.DefaultLimits())

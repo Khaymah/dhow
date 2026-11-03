@@ -74,11 +74,11 @@ func (s *Service) ConfirmHostKey(ctx context.Context, org, project uuid.UUID, fi
 }
 
 func (s *Service) RotateDeployKey(ctx context.Context, org, project uuid.UUID) (models.Repository, error) {
-	repo, _, p, err := s.change(ctx, org, project, func(_ *sqlc.Queries, current sqlc.Repository, u *sqlc.UpdateRepositoryParams) (bool, error) {
+	repo, _, p, err := s.change(ctx, org, project, func(q *sqlc.Queries, current sqlc.Repository, u *sqlc.UpdateRepositoryParams) (bool, error) {
 		if current.Transport != models.TransportSSH || !current.DeployKeyPublic.Valid {
 			return false, apperrors.DeployKeyNotApplicable()
 		}
-		key, err := s.newDeployKey(current.Id)
+		key, err := s.newDeployKey(ctx, q, current.ProjectId, current.Id)
 		if err != nil {
 			return false, err
 		}
@@ -109,7 +109,7 @@ func (s *Service) ConfirmDeployKey(ctx context.Context, org, project uuid.UUID) 
 
 func (s *Service) RotateWebhookSecret(ctx context.Context, org, project uuid.UUID) (models.Linked, error) {
 	var secret string
-	repo, _, p, err := s.change(ctx, org, project, func(_ *sqlc.Queries, current sqlc.Repository, u *sqlc.UpdateRepositoryParams) (bool, error) {
+	repo, _, p, err := s.change(ctx, org, project, func(q *sqlc.Queries, current sqlc.Repository, u *sqlc.UpdateRepositoryParams) (bool, error) {
 		if !current.HookId.Valid {
 			return false, apperrors.DeployKeyNotApplicable()
 		}
@@ -117,7 +117,7 @@ func (s *Service) RotateWebhookSecret(ctx context.Context, org, project uuid.UUI
 		if secret, err = newWebhookSecret(); err != nil {
 			return false, err
 		}
-		u.WebhookSecretSealed, err = s.sealWebhookSecret(current.Id, secret)
+		u.WebhookSecretSealed, err = s.sealWebhookSecret(ctx, q, current.ProjectId, current.Id, secret)
 		return err == nil, err
 	})
 	if err != nil {

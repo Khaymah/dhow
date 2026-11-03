@@ -57,7 +57,7 @@ The binary has three commands that read the database and change nothing. They ne
 
 | Command | What it shows |
 |---|---|
-| `dhow-server migrate status` | The state (`current`, `pending`, `ahead` or `incompatible`), the last migration in the database and in the binary, the floor, the pending migrations, and the servers running on the database now. |
+| `dhow-server migrate status` | The state (`current`, `pending`, `ahead` or `incompatible`), the last migration in the database and in the binary, the floor, the pending migrations, the progress of every background backfill, and the servers running on the database now. |
 | `dhow-server migrate plan` | Every migration file, its kind (`expand` or `contract`), its floor, whether it runs in a transaction, and whether it was applied. |
 | `dhow-server migrate dry-run [--timeout 60s]` | Tries the pending migrations on the real database in one transaction, then rolls all of them back. It stops after one overall deadline, 60 seconds by default. |
 
@@ -108,6 +108,12 @@ In every other case the database does not change.
 - Every migration file runs in its own transaction. If it fails, nothing of it is kept, and the files before it stay applied.
 - `NO TRANSACTION` files build indexes with `CREATE INDEX CONCURRENTLY`. If the build stops halfway, PostgreSQL keeps the index as `INVALID`, and `IF NOT EXISTS` does not repair it. So before Dhow runs that file again, it drops any `INVALID` index with that name, then builds it again.
 - If Dhow does not start after a failed migration, the reason is in the log. Fix it and restart, or go back to the previous release as in the section above.
+
+## Background backfills
+
+Some changes convert many rows, such as moving sealed values to the format of the [keyring](keys.md#values-saved-before-the-keyring). This does not happen during the upgrade, so the server is not stopped for a long time. The server converts the rows in the background after it starts: 1,000 rows per batch, with a short pause between batches so requests do not slow down, and under an advisory lock per backfill, so two servers never work on it together. Each batch saves its position in the `"Backfills"` table together with the change itself, so a server stopped in the middle resumes from the last batch and never converts a row twice. A row that is held at the moment of a batch is converted on the next pass.
+
+`dhow-server migrate status` shows every backfill: done, running with how many rows it converted and how many are left, or not started. A row that cannot be converted stays as it is, is named in the server log, and keeps the backfill unfinished until you fix it. A migration that removes something old that depends on a backfill stops with `BACKFILL_NOT_DONE` if that backfill has not finished yet. Wait until `migrate status` says it is done, then upgrade again.
 
 ## Several servers on one database
 

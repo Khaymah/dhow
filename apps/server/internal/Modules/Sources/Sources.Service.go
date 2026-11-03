@@ -12,9 +12,9 @@ import (
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
-	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
@@ -43,7 +43,7 @@ type Options struct {
 	Bus       Publisher
 	Log       *slog.Logger
 	Now       func() time.Time
-	SecretKey []byte
+	Values    *keys.Values
 	PublicURL string
 	Triggers  triggers.Sink
 	Dialer    netguard.Dialer
@@ -60,8 +60,8 @@ type Service struct {
 	triggers   triggers.Sink
 	dialer     netguard.Dialer
 	limiter    ratelimit.Limiter
-	deployKeys *appcrypto.Sealer
-	webhooks   *appcrypto.Sealer
+	deployKeys *keys.Column
+	webhooks   *keys.Column
 	providers  map[string]Provider
 }
 
@@ -70,11 +70,14 @@ func NewService(o Options) (*Service, error) {
 	if now == nil {
 		now = time.Now
 	}
-	deployKeys, err := appcrypto.NewSealer(o.SecretKey, config.DeployKeySealLabel)
+	if o.Values == nil {
+		return nil, errors.New("the sources service needs the keyring to seal deploy keys and webhook secrets")
+	}
+	deployKeys, err := o.Values.Column(DeployKeySpec())
 	if err != nil {
 		return nil, err
 	}
-	webhooks, err := appcrypto.NewSealer(o.SecretKey, config.WebhookDeliveryKeyLabel)
+	webhooks, err := o.Values.Column(WebhookSecretSpec())
 	if err != nil {
 		return nil, err
 	}
@@ -131,13 +134,13 @@ func (s *Service) audit(ctx context.Context, p auth.Principal, name string, repo
 	}})
 }
 
-func (s *Service) openDeployKey(repo uuid.UUID, sealed []byte) ([]byte, error) {
+func (s *Service) openDeployKey(ctx context.Context, project, repo uuid.UUID, sealed []byte) ([]byte, error) {
 	if len(sealed) == 0 {
 		return nil, errors.New("the repository has no deploy key")
 	}
-	return s.deployKeys.Open(sealed, sealContext(contextDeploy, repo))
+	return s.deployKeys.Open(ctx, keys.ProjectOwner(project), sealContext(contextDeploy, repo), sealed)
 }
 
-func (s *Service) openWebhookSecret(repo uuid.UUID, sealed []byte) ([]byte, error) {
-	return s.webhooks.Open(sealed, sealContext(contextWebhook, repo))
+func (s *Service) openWebhookSecret(ctx context.Context, project, repo uuid.UUID, sealed []byte) ([]byte, error) {
+	return s.webhooks.Open(ctx, keys.ProjectOwner(project), sealContext(contextWebhook, repo), sealed)
 }
