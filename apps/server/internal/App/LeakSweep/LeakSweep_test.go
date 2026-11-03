@@ -6,14 +6,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
-	"io"
-	"io/fs"
+	"encoding/json"
 	"os"
-	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -21,10 +18,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/ssh"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
+	"github.com/Khaymah/dhow/internal/leaksweep"
 )
 
 const (
@@ -32,19 +29,17 @@ const (
 	envKeyFile  = "DHOW_LEAK_SWEEP_SECRET_KEY_FILE"
 	envNeedles  = "DHOW_LEAK_SWEEP_NEEDLES"
 	envDirs     = "DHOW_LEAK_SWEEP_DIRS"
-	chunkBytes  = 4 << 20
-	minNeedle   = 12
+	envIdentity = "DHOW_LEAK_SWEEP_RUNNER_IDENTITY"
+	tokenChars  = `[A-Za-z0-9_-]`
 )
 
-type needle struct {
-	name  string
-	forms [][]byte
-}
-
-type hit struct {
-	needle string
-	file   string
-}
+var (
+	identityFiles = []string{"runner-state/identity", "runner-state/identity.pending"}
+	knownSealed   = map[string]bool{
+		`"Repositories"."DeployKeySealed"`: true, `"Repositories"."PreviousDeployKeySealed"`: true,
+		`"Repositories"."WebhookSecretSealed"`: true,
+	}
+)
 
 func required(t *testing.T, name string) string {
 	t.Helper()
@@ -53,161 +48,12 @@ func required(t *testing.T, name string) string {
 	return v
 }
 
-func encodedForms(name string, secret []byte) needle {
-	n := needle{name: name, forms: [][]byte{secret, []byte(hex.EncodeToString(secret)), []byte(strings.ToUpper(hex.EncodeToString(secret)))}}
-	for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.URLEncoding} {
-		for shift := range 3 {
-			text := enc.EncodeToString(append(make([]byte, shift), secret...))
-			start := 0
-			if shift > 0 {
-				start = 4
-			}
-			if end := len(text) - 4; end-start >= minNeedle {
-				n.forms = append(n.forms, []byte(text[start:end]))
-			}
-		}
-	}
+type checked struct{ t *testing.T }
+
+func (c checked) needle(n leaksweep.Needle, err error) leaksweep.Needle {
+	c.t.Helper()
+	require.NoError(c.t, err)
 	return n
-}
-
-func deployKeyNeedles(t *testing.T, label string, pemText []byte) []needle {
-	t.Helper()
-	out := []needle{{name: label + " (PEM)", forms: [][]byte{pemText, bytes.ReplaceAll(pemText, []byte("\n"), []byte(`\n`))}}}
-	raw, err := ssh.ParseRawPrivateKey(pemText)
-	require.NoError(t, err, "%s does not parse as a private key", label)
-	key, ok := raw.(*ed25519.PrivateKey)
-	require.True(t, ok, "%s is not an Ed25519 key", label)
-	return append(out, encodedForms(label+" (private seed)", key.Seed()))
-}
-
-func sealedNeedles(t *testing.T, ctx context.Context, dsn string, secret []byte) []needle {
-	t.Helper()
-	deploy, err := appcrypto.NewSealer(secret, config.DeployKeySealLabel)
-	require.NoError(t, err)
-	webhooks, err := appcrypto.NewSealer(secret, config.WebhookDeliveryKeyLabel)
-	require.NoError(t, err)
-	conn, err := pgx.Connect(ctx, dsn)
-	require.NoError(t, err)
-	defer func() { _ = conn.Close(ctx) }()
-	rows, err := conn.Query(ctx, `SELECT "Id", "DeployKeySealed", "PreviousDeployKeySealed", "WebhookSecretSealed" FROM "Repositories"`)
-	require.NoError(t, err)
-	defer rows.Close()
-	var out []needle
-	for rows.Next() {
-		var id uuid.UUID
-		var key, previous, hook []byte
-		require.NoError(t, rows.Scan(&id, &key, &previous, &hook))
-		for kind, sealed := range map[string][]byte{"deploy key": key, "previous deploy key": previous} {
-			if len(sealed) == 0 {
-				continue
-			}
-			plain, err := deploy.Open(sealed, []byte("deploy-key:"+id.String()))
-			require.NoError(t, err, "the %s of repository %s does not open with this server key", kind, id)
-			out = append(out, deployKeyNeedles(t, kind+" of repository "+id.String(), plain)...)
-		}
-		if len(hook) > 0 {
-			plain, err := webhooks.Open(hook, []byte("webhook-secret:"+id.String()))
-			require.NoError(t, err, "the webhook secret of repository %s does not open with this server key", id)
-			out = append(out, encodedForms("webhook secret of repository "+id.String(), plain))
-		}
-	}
-	require.NoError(t, rows.Err())
-	return out
-}
-
-func listedNeedles(t *testing.T, path string) []needle {
-	t.Helper()
-	f, err := os.Open(path)
-	require.NoError(t, err)
-	defer func() { _ = f.Close() }()
-	var out []needle
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		name, value, ok := strings.Cut(s.Text(), "=")
-		if !ok || value == "" {
-			continue
-		}
-		require.GreaterOrEqual(t, len(value), minNeedle, "the %s is too short to look for", name)
-		out = append(out, encodedForms(name, []byte(value)))
-	}
-	require.NoError(t, s.Err())
-	return out
-}
-
-func longest(needles []needle) int {
-	most := 0
-	for _, n := range needles {
-		for _, f := range n.forms {
-			most = max(most, len(f))
-		}
-	}
-	return most
-}
-
-func scanFile(path string, needles []needle, overlap int) ([]string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = f.Close() }()
-	found := map[string]bool{}
-	buf := make([]byte, 0, chunkBytes+overlap)
-	chunk := make([]byte, chunkBytes)
-	for {
-		n, err := f.Read(chunk)
-		buf = append(buf, chunk[:n]...)
-		for _, nd := range needles {
-			for _, form := range nd.forms {
-				if bytes.Contains(buf, form) {
-					found[nd.name] = true
-				}
-			}
-		}
-		if len(buf) > overlap {
-			buf = append(buf[:0], buf[len(buf)-overlap:]...)
-		}
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-	names := make([]string, 0, len(found))
-	for name := range found {
-		names = append(names, name)
-	}
-	return names, nil
-}
-
-func sweep(t *testing.T, dirs []string, needles []needle) ([]hit, int) {
-	t.Helper()
-	overlap := longest(needles)
-	var hits []hit
-	files := 0
-	for _, dir := range dirs {
-		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				t.Logf("skipped %s: %v", path, err)
-				return nil
-			}
-			if !d.Type().IsRegular() {
-				return nil
-			}
-			names, err := scanFile(path, needles, overlap)
-			if err != nil {
-				t.Logf("skipped %s: %v", path, err)
-				return nil
-			}
-			files++
-			for _, name := range names {
-				hits = append(hits, hit{needle: name, file: path})
-			}
-			return nil
-		})
-		require.NoError(t, err)
-	}
-	return hits, files
 }
 
 func serverKey(t *testing.T) []byte {
@@ -227,26 +73,146 @@ func serverKey(t *testing.T) []byte {
 	return nil
 }
 
+func sealedNeedles(t *testing.T, conn *pgx.Conn, secret []byte) []leaksweep.Needle {
+	t.Helper()
+	ctx := context.Background()
+	deploy, err := appcrypto.NewSealer(secret, config.DeployKeySealLabel)
+	require.NoError(t, err)
+	webhooks, err := appcrypto.NewSealer(secret, config.WebhookDeliveryKeyLabel)
+	require.NoError(t, err)
+	rows, err := conn.Query(ctx, `SELECT "Id", "DeployKeySealed", "PreviousDeployKeySealed", "WebhookSecretSealed" FROM "Repositories"`)
+	require.NoError(t, err)
+	defer rows.Close()
+	var out []leaksweep.Needle
+	for rows.Next() {
+		var id uuid.UUID
+		var key, previous, hook []byte
+		require.NoError(t, rows.Scan(&id, &key, &previous, &hook))
+		for kind, sealed := range map[string][]byte{"deploy key": key, "previous deploy key": previous} {
+			if len(sealed) == 0 {
+				continue
+			}
+			plain, err := deploy.Open(sealed, []byte("deploy-key:"+id.String()))
+			require.NoError(t, err, "the %s of repository %s does not open with this server key", kind, id)
+			keys, err := leaksweep.PEMKey(kind+" of repository "+id.String(), plain)
+			require.NoError(t, err)
+			out = append(out, keys...)
+		}
+		if len(hook) > 0 {
+			plain, err := webhooks.Open(hook, []byte("webhook-secret:"+id.String()))
+			require.NoError(t, err, "the webhook secret of repository %s does not open with this server key", id)
+			out = append(out, checked{t}.needle(leaksweep.Encoded("webhook secret of repository "+id.String(), plain)))
+		}
+	}
+	require.NoError(t, rows.Err())
+	require.NotEmpty(t, out, "no repository with a sealed credential was found")
+	return out
+}
+
+func uncoveredSealed(t *testing.T, conn *pgx.Conn) []string {
+	t.Helper()
+	rows, err := conn.Query(context.Background(), `SELECT quote_ident(table_name) || '.' || quote_ident(column_name),
+		(xpath('/row/n/text()', query_to_xml(format('SELECT count(*) AS n FROM %I WHERE %I IS NOT NULL', table_name, column_name),
+			false, true, '')))[1]::text::bigint
+		FROM information_schema.columns
+		WHERE table_schema = 'public' AND column_name LIKE '%Sealed' AND data_type = 'bytea' ORDER BY 1`)
+	require.NoError(t, err)
+	defer rows.Close()
+	var out []string
+	seen := 0
+	for rows.Next() {
+		var name string
+		var n int64
+		require.NoError(t, rows.Scan(&name, &n))
+		seen++
+		if n > 0 && !knownSealed[name] {
+			out = append(out, name)
+		}
+	}
+	require.NoError(t, rows.Err())
+	require.Positive(t, seen, "no sealed column was found")
+	return out
+}
+
+func listedNeedles(t *testing.T, path string) []leaksweep.Needle {
+	t.Helper()
+	f, err := os.Open(path)
+	require.NoError(t, err)
+	defer func() { _ = f.Close() }()
+	var out []leaksweep.Needle
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		name, value, ok := strings.Cut(s.Text(), "=")
+		require.True(t, ok, "a needle line is name=value")
+		out = append(out, checked{t}.needle(leaksweep.Encoded(name, []byte(value))))
+	}
+	require.NoError(t, s.Err())
+	require.NotEmpty(t, out)
+	return out
+}
+
+func runnerKeys(t *testing.T, path string) []leaksweep.Needle {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var id struct {
+		SigningSeed   []byte
+		EncryptionKey []byte
+	}
+	require.NoError(t, json.Unmarshal(raw, &id))
+	out := []leaksweep.Needle{
+		checked{t}.needle(leaksweep.Encoded("runner signing key", id.SigningSeed)),
+		checked{t}.needle(leaksweep.Encoded("runner encryption key", id.EncryptionKey)),
+	}
+	for i := range out {
+		out[i].Allowed = identityFiles
+	}
+	return out
+}
+
+func patterns() []leaksweep.Pattern {
+	return []leaksweep.Pattern{
+		{Name: "API token", Re: regexp.MustCompile(config.APITokenPrefix + tokenChars + `{20,}`)},
+		{Name: "runner access token", Re: regexp.MustCompile(config.RunnerAccessTokenPrefix + tokenChars + `{20,}`)},
+		{Name: "runner registration token", Re: regexp.MustCompile(config.RunnerRegistrationTokenPrefix + tokenChars + `{20,}`)},
+		{
+			Name: "artifact or cache download grant", Allowed: []string{"pg_dump/Jobs.sql"},
+			Re: regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])A[Qg]AAAA` + tokenChars + `{49}(?:$|[^A-Za-z0-9_-])`),
+		},
+	}
+}
+
 func TestNoCredentialIsStoredInClear(t *testing.T) {
 	ctx := context.Background()
 	secret := serverKey(t)
-	needles := sealedNeedles(t, ctx, required(t, envDatabase), secret)
-	require.NotEmpty(t, needles, "no repository with a sealed credential was found")
-	needles = append(needles, encodedForms("server secret key", secret))
+	conn, err := pgx.Connect(ctx, required(t, envDatabase))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close(ctx) }()
+	grantKey, err := appcrypto.DeriveKey(secret, config.ArtifactGrantKeyLabel)
+	require.NoError(t, err)
+	needles := sealedNeedles(t, conn, secret)
+	needles = append(needles, checked{t}.needle(leaksweep.Encoded("server secret key", secret)), checked{t}.needle(leaksweep.Encoded("artifact grant key", grantKey)))
 	needles = append(needles, listedNeedles(t, required(t, envNeedles))...)
+	needles = append(needles, runnerKeys(t, required(t, envIdentity))...)
+	require.Empty(t, uncoveredSealed(t, conn), "the demo made sealed values the sweep cannot open; teach it these columns")
+
 	dirs := strings.Split(required(t, envDirs), ":")
-	hits, files := sweep(t, dirs, needles)
-	names := make([]string, 0, len(needles))
+	hits, stats, err := leaksweep.Sweep(dirs, needles, patterns(), leaksweep.DefaultLimits())
+	require.NoError(t, err, "the sweep cannot vouch for what it could not read")
+	listed := make([]string, 0, len(needles)+len(patterns()))
 	for _, n := range needles {
-		names = append(names, n.name)
+		listed = append(listed, n.Name)
 	}
-	sort.Strings(names)
-	t.Logf("looked for %d credentials in %d files under %s", len(needles), files, strings.Join(dirs, ", "))
-	for _, name := range names {
+	for _, p := range patterns() {
+		listed = append(listed, "any "+p.Name+", by its shape")
+	}
+	sort.Strings(listed)
+	t.Logf("looked for %d kinds of credential in %d files, %d archives and %d archive entries under %s",
+		len(listed), stats.Files, stats.Archives, stats.Entries, strings.Join(dirs, ", "))
+	for _, name := range listed {
 		t.Logf("  %s", name)
 	}
-	require.Positive(t, files, "there was nothing to sweep")
 	for _, h := range hits {
-		t.Errorf("found the %s in clear in %s", h.needle, h.file)
+		t.Errorf("found the %s in clear in %s", h.Name, h.File)
 	}
 }
