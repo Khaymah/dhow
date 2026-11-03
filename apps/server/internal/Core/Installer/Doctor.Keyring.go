@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"fmt"
-	"strconv"
+	"io/fs"
 	"strings"
 	"time"
 
@@ -23,6 +23,7 @@ type StoredKek struct {
 	Version        int32
 	State          string
 	CheckValue     []byte
+	Unreadable     int64
 	ActivatedAt    *time.Time
 	LastExportedAt *time.Time
 }
@@ -35,21 +36,32 @@ func (PostgresChecker) StoredKeks(ctx context.Context, url string) ([]StoredKek,
 		return nil, err
 	}
 	defer pool.Close()
-	rows, err := sqlc.New(pool).ListKeyEncryptionKeys(ctx)
+	q := sqlc.New(pool)
+	rows, err := q.ListKeyEncryptionKeys(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read the KEK versions: %w", err)
 	}
+	counts, err := q.CountDataKeysByVersion(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count the data keys: %w", err)
+	}
+	unreadable := map[int32]int64{}
+	for _, c := range counts {
+		unreadable[c.KekVersion] = c.Unreadable
+	}
 	out := make([]StoredKek, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, StoredKek{Version: r.Version, State: r.State, CheckValue: r.CheckValue, ActivatedAt: r.ActivatedAt, LastExportedAt: r.LastExportedAt})
+		out = append(out, StoredKek{
+			Version: r.Version, State: r.State, CheckValue: r.CheckValue, Unreadable: unreadable[r.Version],
+			ActivatedAt: r.ActivatedAt, LastExportedAt: r.LastExportedAt,
+		})
 	}
 	return out, nil
 }
 
 func (d Doctor) keyringFile() (string, int) {
 	if d.A.Mode == ModeCompose {
-		uid, _ := strconv.Atoi(ContainerUser)
-		return ComposeKeyring, uid
+		return ComposeKeyring, ContainerUID
 	}
 	return KeyringPath, 0
 }
@@ -60,9 +72,12 @@ func (d Doctor) keyring(ctx context.Context) []Finding {
 	failed := func(detail string) []Finding {
 		return []Finding{{Severity: SeverityFail, Title: title, Detail: detail, Advice: d.M.T(KeyAdviceKeyring)}}
 	}
-	info, err := d.Sys.Stat(path)
+	info, err := d.Sys.Lstat(path)
 	if err != nil {
 		return failed(path + ": " + err.Error())
+	}
+	if info.Mode&fs.ModeSymlink != 0 {
+		return failed(path + " is a symbolic link; the server refuses it, so put the keyring file itself there")
 	}
 	if info.IsDir || info.Mode.Perm()&keyringPrivateBits != 0 || info.UID != owner {
 		return []Finding{d.keyringPermissions(path, owner, info)}
@@ -84,7 +99,15 @@ func (d Doctor) keyring(ctx context.Context) []Finding {
 	if problems := keyringProblems(ctx, ring, stored); len(problems) > 0 {
 		return failed(strings.Join(problems, "; "))
 	}
-	return append([]Finding{ok(title)}, d.keyringAdvisories(stored, time.Now())...)
+	out := []Finding{ok(title)}
+	for _, s := range stored {
+		if s.Unreadable > 0 {
+			out = append(out, Finding{
+				Severity: SeverityWarn, Title: d.M.T(KeyCheckKeyringUnreadable, s.Unreadable, s.Version), Advice: d.M.T(KeyAdviceKeyringUnreadable),
+			})
+		}
+	}
+	return append(out, d.keyringAdvisories(stored, time.Now())...)
 }
 
 func (d Doctor) keyringPermissions(path string, owner int, info FileInfo) Finding {

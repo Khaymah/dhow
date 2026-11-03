@@ -67,6 +67,13 @@ func TestDoctorChecksTheKeyringButNeverMakesOne(t *testing.T) {
 		require.NoError(t, app.Doctor(context.Background(), DoctorOptions{Fix: true}), out.String())
 		assert.Equal(t, uint32(0o600), uint32(f.files[KeyringPath].mode.Perm))
 	})
+	t.Run("a symbolic link", func(t *testing.T) {
+		f, _ := installedHost(t)
+		f.files[KeyringPath].link = true
+		app, out := newApp(f, "")
+		require.ErrorIs(t, app.Doctor(context.Background(), DoctorOptions{Fix: true}), ErrUnhealthy)
+		assert.Contains(t, out.String(), "symbolic link")
+	})
 	t.Run("malformed", func(t *testing.T) {
 		f, _ := installedHost(t)
 		original := f.content(KeyringPath)
@@ -146,6 +153,17 @@ func TestDoctorChecksTheComposeKeyringOwner(t *testing.T) {
 	assert.Contains(t, findings[0].Detail, "uid=0")
 	require.NotNil(t, findings[0].Fix)
 	assert.Contains(t, findings[0].Fix.Commands[0], "chown 65532:65532")
+}
+
+func TestDoctorReportsDataKeysTheKeyringCannotUnwrap(t *testing.T) {
+	now := time.Now()
+	f, _ := installedHost(t)
+	app, out := newApp(f, "")
+	kek := storedFor(t, installedKeyring(t, f), keys.KekActive, &now, &now)
+	kek.Unreadable = 3
+	app.DB = keyringDB{keks: []StoredKek{kek}}
+	require.ErrorIs(t, app.Doctor(context.Background(), DoctorOptions{}), ErrUnhealthy)
+	assert.Contains(t, out.String(), "3 data keys on KEK version 1 cannot be unwrapped")
 }
 
 func TestTheKeyringMessagesReadInArabicToo(t *testing.T) {

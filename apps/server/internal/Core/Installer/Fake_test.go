@@ -17,6 +17,7 @@ type fakeFile struct {
 	data []byte
 	mode FileMode
 	dir  bool
+	link bool
 }
 
 type fakeSys struct {
@@ -164,6 +165,16 @@ func (f *fakeSys) Chmod(p string, mode FileMode) error {
 	}
 	file.mode = mode
 	return nil
+}
+
+func (f *fakeSys) Lstat(p string) (FileInfo, error) {
+	info, err := f.Stat(p)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if file, ok := f.files[p]; err == nil && ok && file.link {
+		info.Mode |= fs.ModeSymlink
+	}
+	return info, err
 }
 
 func (f *fakeSys) Stat(p string) (FileInfo, error) {

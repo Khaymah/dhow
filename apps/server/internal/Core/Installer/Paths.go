@@ -59,6 +59,7 @@ const (
 	ComposeProject = "dhow"
 	ComposeImage   = "ghcr.io/khaymah/dhow"
 	ComposeEdgeNet = "dhow_edge"
+	ContainerUID   = 65532
 	ContainerUser  = "65532"
 )
 
