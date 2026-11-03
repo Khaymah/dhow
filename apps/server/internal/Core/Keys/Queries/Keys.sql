@@ -30,7 +30,7 @@ WHERE "Version" = @version AND "State" IN ('pending', 'retiring');
 UPDATE "KeyEncryptionKeys" AS k
 SET "State" = 'retired', "RetiredAt" = now(), "UpdatedAt" = now()
 WHERE k."State" = 'retiring'
-  AND NOT EXISTS (SELECT 1 FROM "DataKeys" AS d WHERE d."KekVersion" = k."Version" AND d."State" = 'active')
+  AND NOT EXISTS (SELECT 1 FROM "DataKeys" AS d WHERE d."KekVersion" = k."Version" AND d."State" <> 'destroyed')
 RETURNING k."Version";
 
 -- name: RetireKeyEncryptionKey :execrows
@@ -69,17 +69,17 @@ ON CONFLICT DO NOTHING;
 -- name: DestroyDataKeysOfOwner :execrows
 UPDATE "DataKeys"
 SET "State" = 'destroyed', "Wrapped" = NULL, "DestroyedAt" = now(), "UpdatedAt" = now()
-WHERE "OwnerKind" = @owner_kind AND "OwnerId" IS NOT DISTINCT FROM sqlc.narg('owner_id')::uuid AND "State" = 'active';
+WHERE "OwnerKind" = @owner_kind AND "OwnerId" IS NOT DISTINCT FROM sqlc.narg('owner_id')::uuid AND "State" <> 'destroyed';
 
 -- name: DestroyDataKeysOnVersions :execrows
 UPDATE "DataKeys"
 SET "State" = 'destroyed', "Wrapped" = NULL, "DestroyedAt" = now(), "UpdatedAt" = now()
-WHERE "KekVersion" = ANY(@versions::integer[]) AND "State" = 'active';
+WHERE "KekVersion" = ANY(@versions::integer[]) AND "State" <> 'destroyed';
 
 -- name: ListDataKeysToRewrap :many
 SELECT "Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped"
 FROM "DataKeys"
-WHERE "State" = 'active' AND "KekVersion" <> @active_version AND "UnwrapFailedAt" IS NULL
+WHERE "State" IN ('active', 'superseded') AND "KekVersion" <> @active_version AND "UnwrapFailedAt" IS NULL
 ORDER BY "Id"
 LIMIT @batch
 FOR UPDATE SKIP LOCKED;
@@ -87,17 +87,17 @@ FOR UPDATE SKIP LOCKED;
 -- name: RewrapDataKey :execrows
 UPDATE "DataKeys"
 SET "KekVersion" = @kek_version, "Wrapped" = @wrapped, "UpdatedAt" = now()
-WHERE "Id" = @id AND "State" = 'active' AND "KekVersion" = @from_version;
+WHERE "Id" = @id AND "State" IN ('active', 'superseded') AND "KekVersion" = @from_version;
 
 -- name: CountDataKeysByVersion :many
 SELECT "KekVersion", count(*)::bigint AS "Count", (count(*) FILTER (WHERE "UnwrapFailedAt" IS NOT NULL))::bigint AS "Unreadable"
 FROM "DataKeys"
-WHERE "State" = 'active'
+WHERE "State" <> 'destroyed'
 GROUP BY "KekVersion"
 ORDER BY "KekVersion";
 
 -- name: CountDataKeysOnVersions :one
-SELECT count(*)::bigint FROM "DataKeys" WHERE "State" = 'active' AND "KekVersion" = ANY(@versions::integer[]);
+SELECT count(*)::bigint FROM "DataKeys" WHERE "State" <> 'destroyed' AND "KekVersion" = ANY(@versions::integer[]);
 
 -- name: ListLiveServerInstanceKeks :many
 SELECT "InstanceKey", "Hostname", "KekVersions"
@@ -108,9 +108,9 @@ ORDER BY "InstanceKey";
 -- name: MarkDataKeyUnreadable :execrows
 UPDATE "DataKeys"
 SET "UnwrapFailedAt" = now(), "UpdatedAt" = now()
-WHERE "Id" = @id AND "State" = 'active' AND "UnwrapFailedAt" IS NULL;
+WHERE "Id" = @id AND "State" <> 'destroyed' AND "UnwrapFailedAt" IS NULL;
 
 -- name: ClearDataKeyUnreadable :execrows
 UPDATE "DataKeys"
 SET "UnwrapFailedAt" = NULL, "UpdatedAt" = now()
-WHERE "UnwrapFailedAt" IS NOT NULL AND "State" = 'active';
+WHERE "UnwrapFailedAt" IS NOT NULL AND "State" <> 'destroyed';

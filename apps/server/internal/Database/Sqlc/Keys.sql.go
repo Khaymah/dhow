@@ -15,7 +15,7 @@ import (
 const clearDataKeyUnreadable = `-- name: ClearDataKeyUnreadable :execrows
 UPDATE "DataKeys"
 SET "UnwrapFailedAt" = NULL, "UpdatedAt" = now()
-WHERE "UnwrapFailedAt" IS NOT NULL AND "State" = 'active'
+WHERE "UnwrapFailedAt" IS NOT NULL AND "State" <> 'destroyed'
 `
 
 func (q *Queries) ClearDataKeyUnreadable(ctx context.Context) (int64, error) {
@@ -29,7 +29,7 @@ func (q *Queries) ClearDataKeyUnreadable(ctx context.Context) (int64, error) {
 const countDataKeysByVersion = `-- name: CountDataKeysByVersion :many
 SELECT "KekVersion", count(*)::bigint AS "Count", (count(*) FILTER (WHERE "UnwrapFailedAt" IS NOT NULL))::bigint AS "Unreadable"
 FROM "DataKeys"
-WHERE "State" = 'active'
+WHERE "State" <> 'destroyed'
 GROUP BY "KekVersion"
 ORDER BY "KekVersion"
 `
@@ -61,7 +61,7 @@ func (q *Queries) CountDataKeysByVersion(ctx context.Context) ([]CountDataKeysBy
 }
 
 const countDataKeysOnVersions = `-- name: CountDataKeysOnVersions :one
-SELECT count(*)::bigint FROM "DataKeys" WHERE "State" = 'active' AND "KekVersion" = ANY($1::integer[])
+SELECT count(*)::bigint FROM "DataKeys" WHERE "State" <> 'destroyed' AND "KekVersion" = ANY($1::integer[])
 `
 
 func (q *Queries) CountDataKeysOnVersions(ctx context.Context, versions []int32) (int64, error) {
@@ -88,7 +88,7 @@ func (q *Queries) DemoteActiveKeyEncryptionKey(ctx context.Context) (int64, erro
 const destroyDataKeysOfOwner = `-- name: DestroyDataKeysOfOwner :execrows
 UPDATE "DataKeys"
 SET "State" = 'destroyed', "Wrapped" = NULL, "DestroyedAt" = now(), "UpdatedAt" = now()
-WHERE "OwnerKind" = $1 AND "OwnerId" IS NOT DISTINCT FROM $2::uuid AND "State" = 'active'
+WHERE "OwnerKind" = $1 AND "OwnerId" IS NOT DISTINCT FROM $2::uuid AND "State" <> 'destroyed'
 `
 
 type DestroyDataKeysOfOwnerParams struct {
@@ -107,7 +107,7 @@ func (q *Queries) DestroyDataKeysOfOwner(ctx context.Context, arg DestroyDataKey
 const destroyDataKeysOnVersions = `-- name: DestroyDataKeysOnVersions :execrows
 UPDATE "DataKeys"
 SET "State" = 'destroyed', "Wrapped" = NULL, "DestroyedAt" = now(), "UpdatedAt" = now()
-WHERE "KekVersion" = ANY($1::integer[]) AND "State" = 'active'
+WHERE "KekVersion" = ANY($1::integer[]) AND "State" <> 'destroyed'
 `
 
 func (q *Queries) DestroyDataKeysOnVersions(ctx context.Context, versions []int32) (int64, error) {
@@ -248,7 +248,7 @@ func (q *Queries) InsertKeyEncryptionKey(ctx context.Context, arg InsertKeyEncry
 const listDataKeysToRewrap = `-- name: ListDataKeysToRewrap :many
 SELECT "Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped"
 FROM "DataKeys"
-WHERE "State" = 'active' AND "KekVersion" <> $1 AND "UnwrapFailedAt" IS NULL
+WHERE "State" IN ('active', 'superseded') AND "KekVersion" <> $1 AND "UnwrapFailedAt" IS NULL
 ORDER BY "Id"
 LIMIT $2
 FOR UPDATE SKIP LOCKED
@@ -382,7 +382,7 @@ func (q *Queries) LockKeyring(ctx context.Context) error {
 const markDataKeyUnreadable = `-- name: MarkDataKeyUnreadable :execrows
 UPDATE "DataKeys"
 SET "UnwrapFailedAt" = now(), "UpdatedAt" = now()
-WHERE "Id" = $1 AND "State" = 'active' AND "UnwrapFailedAt" IS NULL
+WHERE "Id" = $1 AND "State" <> 'destroyed' AND "UnwrapFailedAt" IS NULL
 `
 
 func (q *Queries) MarkDataKeyUnreadable(ctx context.Context, id uuid.UUID) (int64, error) {
@@ -444,7 +444,7 @@ const retireDrainedKeyEncryptionKeys = `-- name: RetireDrainedKeyEncryptionKeys 
 UPDATE "KeyEncryptionKeys" AS k
 SET "State" = 'retired', "RetiredAt" = now(), "UpdatedAt" = now()
 WHERE k."State" = 'retiring'
-  AND NOT EXISTS (SELECT 1 FROM "DataKeys" AS d WHERE d."KekVersion" = k."Version" AND d."State" = 'active')
+  AND NOT EXISTS (SELECT 1 FROM "DataKeys" AS d WHERE d."KekVersion" = k."Version" AND d."State" <> 'destroyed')
 RETURNING k."Version"
 `
 
@@ -485,7 +485,7 @@ func (q *Queries) RetireKeyEncryptionKey(ctx context.Context, version int32) (in
 const rewrapDataKey = `-- name: RewrapDataKey :execrows
 UPDATE "DataKeys"
 SET "KekVersion" = $1, "Wrapped" = $2, "UpdatedAt" = now()
-WHERE "Id" = $3 AND "State" = 'active' AND "KekVersion" = $4
+WHERE "Id" = $3 AND "State" IN ('active', 'superseded') AND "KekVersion" = $4
 `
 
 type RewrapDataKeyParams struct {
