@@ -9,6 +9,8 @@ import { useT } from '@/I18n/useT';
 import { ProjectGate } from '@/Modules/Projects/Components/ProjectGate';
 import { ProjectAction, ProjectOverview } from '@/Modules/Projects/Components/ProjectOverview';
 
+const isolate = (value: string): string => `\u2066${value}\u2069`;
+
 export const ProjectPage = () => {
   const t = useT();
   const navigate = useNavigate();
@@ -21,7 +23,7 @@ export const ProjectPage = () => {
       {({ organizationId, project, role }) => (
         <Page
           title={project.Name}
-          lead={t('projects.detail.lead', { slug: project.Slug, path: project.PipelinePath })}
+          lead={t('projects.detail.lead', { slug: isolate(project.Slug), path: isolate(project.PipelinePath) })}
           action={<ProjectAction organizationId={organizationId} project={project} role={role} onTrigger={() => { open('run-trigger'); }} />}
           nav={<ProjectNav projectId={projectId} current="runs" />}
         >
