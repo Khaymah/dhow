@@ -1,6 +1,6 @@
 # حالة داو: اللي اتعمل واللي لسه
 
-**آخر تحديث:** 2026-11-02 · **main:** PR التحديث ده
+**آخر تحديث:** 2026-11-03 · **main:** PR التحديث ده
 
 الوثيقة دي نقطة البداية لأي جلسة جديدة. التفاصيل في [سجل التقدّم](Progress/README.md) والقرارات في [`ADR/`](ADR/README.md) والخطة الكاملة في [`docs/roadmap.md`](../docs/roadmap.md).
 
@@ -76,7 +76,7 @@
 
 | الشغل | الـ branch | الـ PR | اللي فاضل |
 |---|---|---|---|
-| M4.9: الـ artifacts والـ cache: `Core/Blob` على القرص، وموديول `Artifacts` بـ `/runner-api/blobs/{sha256}` المربوط بالـ lease ومنح التنزيل، و`ArtifactService` و`CacheService`، والـ scope من السيرفر والـ fork مابيكتبش، وsandbox نقل في الـ runner بفك آمن وأرشيف حتمي، والتنضيف بـ mark and sweep، واحتفاظ الـ logs لكل مؤسسة (ADR-0078) | `feat/artifacts-cache` | — | المراجعة الأمنية اتعملت وكل الـ findings اتصلّحت (Medium اتنين وLow تلاتة وقواعد وتقوية). فاضل: الـ PR والـ CI. والواجهة في M4.10 |
+| M4.10: واجهة المشاريع وGit العام والتنفيذات والملفات الناتجة، ومدة حفظ السجلات، و`RepositoryLinked` و`CallerRole` و`Kind` في الـ API، وفصل المستودع بيمسح المفاتيح ويلغي التنفيذات المفتوحة | `feat/web-projects-runs` | — | مراجعة الأمان والـ UX اتصلّحت، وPlaywright على Forgejo أخضر من غير أي console error. فاضل: الـ PR والـ CI. وGitHub وGitLab مستنيين M4.5 وM4.6 |
 | `runner.revoked` (إلغاء اللوحة وإلغاء الـ runner لنفسه) بيتنشر على الـ event bus بعد الـ commit، فلو الـ process وقع بينهم الـ audit بيضيع. الـ bus مافيهوش outbox | — | — | outbox للأحداث اللي بتتسجّل، أو نشرها جوه نفس الـ transaction |
 
 M2.6 وM3.6 والتطوير المحلي وإصلاحات مراجعة M3.6 وتغيير الاسم وM3.7 وتجهيز Windows وM3.9 اتدمجوا في 2026-10-28، ومن #35 لـ #59 اتدمجوا في 2026-10-28 و2026-10-29.
@@ -117,7 +117,7 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
 
 [ADR-0068](ADR/0068-first-production-release-scope.md) حدّد نطاق أول نسخة production: الـ runners على Debian وUbuntu بـ Podman rootless بس، والنشر على SSH/VPS وDocker Compose، وGitHub وGitLab وGit عام، ونسخة Community بس. الترتيب: M3.13 ← M4 ← M5 ← M6 ← M7 ← M9 ← M10 ← M11، واللي اتأجّل (SELinux وKubernetes وHelm وgVisor وBitbucket وStatic/CDN/SFTP والمحرر المرئي وTeams وWhatsApp وM8 ومكوّن GitLab CI) في قسم «بعد أول نسخة» في [`docs/roadmap.md`](../docs/roadmap.md).
 
-**M4 شغّال:** خطته في [`M4-Pipelines.md`](M4-Pipelines.md) اتقبلت، وSabry جاوب أسئلتها كلها بالتوصية يوم 2026-10-30. **M4.1** (`internal/pipelinespec`، [ADR-0069](ADR/0069-pipeline-spec-parser-and-validator.md)) اتدمج في #65، و**M4.2** (`dhow lint`) في #66، و**M4.3** (`Projects` والـ ports، [ADR-0070](ADR/0070-ports-in-core-and-project-permissions.md)) في #68. **M4.4** (`Sources` وGit عام، [ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) اتدمج في #71. وقرار Sabry الجديد لربط Git (الـ OAuth للتجهيز بس والـ deploy keys للوصول) في [ADR-0074](ADR/0074-git-connection-oauth-for-setup-deploy-keys-for-access.md)، وفيه نقط لازم تتحسم في أول M4.6. **M4.7** (الـ runner بأكتر من حاوية والـ checkout والإضافات، [ADR-0075](ADR/0075-multi-container-attempts-checkout-and-plugins.md)) اتدمج في #74. **M4.8** (`Pipelines`، [ADR-0076](ADR/0076-pipeline-runs-definitions-and-forks.md)) اتدمج في #73، والربط بالـ checkout وإصلاحات مراجعته في #75. **M4.9** (الـ artifacts والـ cache، [ADR-0078](ADR/0078-artifacts-cache-and-blob-store.md)) على `feat/artifacts-cache`. وفاضل M4.5 وM4.6 (مستنيين حسابات الاختبار) وM4.10 وM4.11.
+**M4 شغّال:** خطته في [`M4-Pipelines.md`](M4-Pipelines.md) اتقبلت، وSabry جاوب أسئلتها كلها بالتوصية يوم 2026-10-30. **M4.1** (`internal/pipelinespec`، [ADR-0069](ADR/0069-pipeline-spec-parser-and-validator.md)) اتدمج في #65، و**M4.2** (`dhow lint`) في #66، و**M4.3** (`Projects` والـ ports، [ADR-0070](ADR/0070-ports-in-core-and-project-permissions.md)) في #68. **M4.4** (`Sources` وGit عام، [ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) اتدمج في #71. وقرار Sabry الجديد لربط Git (الـ OAuth للتجهيز بس والـ deploy keys للوصول) في [ADR-0074](ADR/0074-git-connection-oauth-for-setup-deploy-keys-for-access.md)، وفيه نقط لازم تتحسم في أول M4.6. **M4.7** (الـ runner بأكتر من حاوية والـ checkout والإضافات، [ADR-0075](ADR/0075-multi-container-attempts-checkout-and-plugins.md)) اتدمج في #74. **M4.8** (`Pipelines`، [ADR-0076](ADR/0076-pipeline-runs-definitions-and-forks.md)) اتدمج في #73، والربط بالـ checkout وإصلاحات مراجعته في #75. **M4.9** (الـ artifacts والـ cache، [ADR-0078](ADR/0078-artifacts-cache-and-blob-store.md)) اتدمج في #79، و**M4.10** (الواجهة) على `feat/web-projects-runs`. وفاضل M4.5 وM4.6 (مستنيين حسابات الاختبار) وM4.11.
 
 **الترقيات والمساعدة جوه التطبيق:** الخطة في [`Upgrades-and-Help.md`](Upgrades-and-Help.md) و[ADR-0077](ADR/0077-upgrades-migrations-and-update-policy.md) (مقبولة، وSabry جاوب الأسئلة الـ 11 يوم 2026-11-02، وشرطه: كله ببلاش). قاعدة expand/contract شغّالة من 2026-11-02 على أي migration جديد، وU1 (الـ hook) وU2 (توافق الـ schema في الـ binary) أولوية مع M4.
 
