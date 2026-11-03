@@ -228,6 +228,21 @@ func TestAValueThatCannotBeOpenedStaysAndKeepsItsBackfillOpen(t *testing.T) {
 	assert.Equal(t, 1, formats(t, w.env)[keys.LegacyFormat])
 }
 
+var notSealed = map[string]string{
+	"ApiTokens.TokenHash": "hash", "AuditEvents.Hash": "hash", "AuditEvents.PrevHash": "hash", "AuthChallenges.DeviceHash": "hash",
+	"AuthChallenges.TokenHash": "hash", "GitSetupFlows.StateHash": "hash", "Invitations.TokenHash": "hash", "OidcFlows.DeviceHash": "hash",
+	"OidcFlows.StateHash": "hash", "OidcFlows.TokenHash": "hash", "RecoveryCodes.CodeHash": "hash", "RunnerRegistrationTokens.TokenHash": "hash",
+	"RunnerSessions.TokenHash": "hash", "Sessions.CsrfHash": "hash", "Sessions.TokenHash": "hash", "SetupTokens.TokenHash": "hash",
+	"Artifacts.Digest": "digest", "BlobOwners.Digest": "digest", "BlobUploads.Digest": "digest", "Blobs.Digest": "digest",
+	"CacheEntries.Digest": "digest", "JobAttempts.CompletionDigest": "digest", "Jobs.SpecDigest": "digest", "Leases.GrantDigest": "digest",
+	"PipelineRuns.DefinitionDigest": "digest", "WebhookDeliveries.PayloadDigest": "digest",
+	"Passkeys.Aaguid": "public", "Passkeys.CredentialId": "public", "Passkeys.PublicKey": "public key", "Users.WebauthnHandle": "public",
+	"Runners.EncryptionPublicKey": "public key", "Runners.SigningPublicKey": "public key", "RunnerSessions.ChallengeNonce": "public nonce",
+	"LogChunks.Data": "job logs, masked by the runner",
+	"DataKeys.Wrapped": "the keyring wraps it", "KeyEncryptionKeys.CheckValue": "an HMAC of the KEK",
+	"GitConnections.TokenSealed": "nothing writes it until M4.6, which must register it",
+}
+
 var maxCheck = regexp.MustCompile(`octet_length\("([A-Za-z]+)"\) <= (\d+)`)
 
 func TestEverySealedColumnIsARegisteredLocationThatFitsItsCheck(t *testing.T) {
@@ -237,9 +252,9 @@ func TestEverySealedColumnIsARegisteredLocationThatFitsItsCheck(t *testing.T) {
 	for _, l := range reg.Locations() {
 		registered[l.Spec().Name()] = l.Spec()
 	}
-	rows, err := env.Pool.Query(t.Context(), `SELECT table_name, column_name FROM information_schema.columns
-		WHERE table_schema = current_schema() AND data_type = 'bytea'
-		  AND (column_name LIKE '%Sealed' OR column_name IN ('Secret', 'Secrets'))`)
+	rows, err := env.Pool.Query(t.Context(), `SELECT c.table_name, c.column_name FROM information_schema.columns AS c
+		WHERE c.table_schema = current_schema() AND c.data_type = 'bytea'
+		  AND NOT EXISTS (SELECT 1 FROM pg_inherits WHERE inhrelid = to_regclass(quote_ident(c.table_name)))`)
 	require.NoError(t, err)
 	var found []string
 	for rows.Next() {
@@ -248,10 +263,13 @@ func TestEverySealedColumnIsARegisteredLocationThatFitsItsCheck(t *testing.T) {
 		found = append(found, table+"."+column)
 	}
 	rows.Close()
-	notYetWritten := map[string]bool{"GitConnections.TokenSealed": true}
 	for _, name := range found {
 		_, ok := registered[name]
-		assert.True(t, ok || notYetWritten[name], "%s holds sealed values; register it as a value location", name)
+		_, plain := notSealed[name]
+		assert.True(t, ok || plain, "%s is a bytea column: register it as a value location, or add it to notSealed with the reason it holds no secret", name)
+	}
+	for name := range notSealed {
+		assert.Contains(t, found, name, "notSealed lists a column that does not exist")
 	}
 	assert.Len(t, registered, 6)
 

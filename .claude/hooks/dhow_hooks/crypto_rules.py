@@ -5,8 +5,8 @@ from .common import GENERATED_PATH, is_test, new_lines
 SERVER = "apps/server/"
 CRYPTO_PACKAGE = "apps/server/internal/Core/Crypto/"
 LEGACY_READ = ("apps/server/internal/Core/Keys/Values.go",)
-NEW_SEALER = re.compile(r"(?<![\w])(?:\w+\.)?NewSealer\(")
-DEFINITION = re.compile(r"^\s*func\s+NewSealer\(")
+NEW_SEALER = re.compile(r"(?<![\w])NewSealer(?![\w])")
+DEFINITION = re.compile(r"^\s*func\s+NewSealer\s*\(")
 ADR = "Plan/ADR/0082-sealer-users-move-to-the-envelope.md"
 
 

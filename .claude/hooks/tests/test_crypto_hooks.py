@@ -32,6 +32,12 @@ class NewSealerRule(unittest.TestCase):
         src = CALL.replace("appcrypto.NewSealer", "NewSealer")
         self.assertIsNotNone(edit(SERVER + "Modules/Sources/Sources.Keys.go", src))
 
+    def test_references_without_a_direct_call_are_blocked(self):
+        for line in ("\tf := appcrypto.NewSealer\n", "\ts, err := appcrypto.NewSealer (secret, label)\n",
+                     "var make = crypto.NewSealer\n", "\tuse(appcrypto.NewSealer)\n", "\ts, _ := appcrypto.\n\t\tNewSealer(secret, label)\n"):
+            src = "package x\n\nfunc f() {\n" + line + "}\n"
+            self.assertIsNotNone(edit(SERVER + "Modules/Sources/Sources.Keys.go", src), line)
+
     def test_the_crypto_package_and_the_legacy_reader_may_make_sealers(self):
         self.assertIsNone(edit(SERVER + "Core/Crypto/Sealer.go",
                                "package appcrypto\n\nfunc NewSealer(secret []byte, label string) (*Sealer, error) {\n\treturn nil, nil\n}\n"))

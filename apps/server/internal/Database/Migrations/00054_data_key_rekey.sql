@@ -19,6 +19,15 @@ CREATE TABLE "KeyRekeys" (
 CREATE UNIQUE INDEX "UX_KeyRekeys_Open" ON "KeyRekeys" ((true)) WHERE "DoneAt" IS NULL AND NOT "IsDeleted";
 
 -- +goose Down
+-- +goose StatementBegin
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "DataKeys" WHERE "State" = 'superseded') THEN
+        RAISE EXCEPTION 'some data keys are superseded: finish dhow-server keys rekey before rolling back 00054, or their values would stop opening';
+    END IF;
+END
+$$;
+-- +goose StatementEnd
 DROP TABLE "KeyRekeys";
 ALTER TABLE "DataKeys" DROP COLUMN "SupersededAt";
 ALTER TABLE "DataKeys" DROP CONSTRAINT "CK_DataKeys_State";
