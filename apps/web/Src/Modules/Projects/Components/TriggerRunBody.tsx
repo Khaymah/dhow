@@ -124,7 +124,7 @@ export const TriggerRunBody = ({ projectId, onStarted }: ITriggerRunBodyProps) =
   const organizationId = access.Kind === 'allowed' ? access.OrganizationId : '';
   const project = useProject(organizationId, projectId ?? '');
   const role = project.data?.CallerRole ?? (access.Kind === 'allowed' ? access.Role : undefined);
-  const allowed = canOnProject(role, 'run.trigger') && project.data?.State === 'active';
+  const allowed = canOnProject(role, 'run.trigger') && project.data?.State === 'active' && project.data.RepositoryLinked;
   const manual = useManualInputs(organizationId, projectId ?? '', allowed && organizationId !== '' && projectId !== undefined);
 
   if (projectId === undefined || access.Kind === 'denied') return <Notice text={t('repository.link.missing')} />;
@@ -132,6 +132,7 @@ export const TriggerRunBody = ({ projectId, onStarted }: ITriggerRunBodyProps) =
   if (project.isError) return <InlineAlert accent="failed" title={t('projects.detail.error')} />;
   if (project.data.State === 'archived') return <Notice text={t('runs.trigger.archived')} />;
   if (!canOnProject(role, 'run.trigger')) return <Notice text={t('runs.trigger.forbidden')} />;
+  if (!project.data.RepositoryLinked) return <Notice text={t('runs.trigger.notLinked')} />;
   if (isNotLinked(manual.error)) return <Notice text={t('runs.trigger.notLinked')} />;
   if (manual.isError) return <InlineAlert accent="failed" title={t('runs.trigger.error')} />;
   if (manual.data === undefined) return <Skeleton label={t('ui.loading')} lines={5} />;

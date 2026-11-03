@@ -17,6 +17,7 @@ export interface IRunActionsProps {
   projectId: string;
   run: TRun;
   role: TRole;
+  linked: boolean;
   onSecondFactor: () => void;
 }
 
@@ -40,7 +41,7 @@ const ActionError = ({ error, onSecondFactor }: { error: unknown; onSecondFactor
   return <InlineAlert accent="failed" title={errorText(error)} />;
 };
 
-export const RunActions = ({ organizationId, projectId, run, role, onSecondFactor }: IRunActionsProps) => {
+export const RunActions = ({ organizationId, projectId, run, role, linked, onSecondFactor }: IRunActionsProps) => {
   const t = useT();
   const Push = useToastStore((state) => state.Push);
   const cancel = useRunAction(organizationId, projectId, run.Id, 'cancel');
@@ -77,12 +78,12 @@ export const RunActions = ({ organizationId, projectId, run, role, onSecondFacto
       {error ? <ActionError error={error} onSecondFactor={onSecondFactor} /> : null}
       <div className="flex flex-wrap gap-2">
         {awaiting && canApprove ? (
-          <Button variant="primary" iconStart="shield" disabled={busy} onClick={() => { HandleRun('approve'); }}>
+          <Button variant="primary" iconStart="shield" disabled={busy || !linked} onClick={() => { HandleRun('approve'); }}>
             {Confirm === 'approve' ? t('runs.actions.approve.confirm') : t('runs.actions.approve.action')}
           </Button>
         ) : null}
         {isRerunnable(run.State) && canRerun ? (
-          <Button variant="primary" iconStart="play" disabled={busy} onClick={() => { HandleRun('rerun'); }}>
+          <Button variant="primary" iconStart="play" disabled={busy || !linked} onClick={() => { HandleRun('rerun'); }}>
             {t('runs.actions.rerun.action')}
           </Button>
         ) : null}
@@ -97,6 +98,9 @@ export const RunActions = ({ organizationId, projectId, run, role, onSecondFacto
           </Button>
         )}
       </div>
+      {!linked && ((awaiting && canApprove) || (isRerunnable(run.State) && canRerun)) ? (
+        <p className="m-0 text-body-sm text-tertiary">{t('runs.actions.notLinked')}</p>
+      ) : null}
       {blocked ? <p className="m-0 text-body-sm text-tertiary">{t(awaiting ? 'runs.actions.approve.forbidden' : 'runs.actions.forbidden')}</p> : null}
       {run.CancelRequestedAt !== undefined && !['succeeded', 'failed', 'canceled', 'skipped'].includes(run.State) ? (
         <p className="m-0 text-body-sm text-secondary">{t('runs.actions.cancel.requested')}</p>

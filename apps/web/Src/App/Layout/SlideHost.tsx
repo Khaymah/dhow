@@ -8,6 +8,7 @@ import { isThemeEditSlide, slideAllowed, themeOf, type TSlideId } from '@/App/Pa
 import { useCurrentMembership } from '@/Core/Auth/useMe';
 import type { ICustomTheme } from '@/Core/Theme/ThemeTokens';
 import { useThemeStore } from '@/Core/Theme/useThemeStore';
+import { useSlideGuardStore } from '@/Core/Store/useSlideGuardStore';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { SlideStack } from '@/Core/Ui/SlideStack';
 import { useT } from '@/I18n/useT';
@@ -27,6 +28,8 @@ export const SlideHost = () => {
   const customThemes = useThemeStore((state) => state.CustomThemes);
   const DiscardDraft = useThemeStore((state) => state.DiscardDraft);
   const Push = useToastStore((state) => state.Push);
+  const Blocked = useSlideGuardStore((state) => state.Blocked);
+  const Attempt = useSlideGuardStore((state) => state.Attempt);
   const [Seen, setSeen] = useState<TSlideId | null>(null);
   const [Missing, setMissing] = useState(false);
   if (slide !== Seen) {
@@ -86,5 +89,5 @@ export const SlideHost = () => {
           }),
         ];
 
-  return <SlideStack slides={slides} onPop={close} onCloseAll={close} onJump={close} />;
+  return <SlideStack slides={slides} onPop={close} onCloseAll={close} onJump={close} closeGuard={{ blocked: Blocked, onBlocked: Attempt }} />;
 };

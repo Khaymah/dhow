@@ -80,16 +80,21 @@ describe('the job page', () => {
     expect(within(dialog).getByText(Ar['jobs.size.mib'].replace('{n}', isolate('512')))).toBeInTheDocument();
   });
 
-  it('lists attempts with their state, reason and fencing token', async () => {
+  it('lists attempts with their state, reason and runner name, without the fencing token', async () => {
     const jobs = running();
     jobs.attempts = [
       attemptFixture({ Id: '0198a000-0000-7000-8000-0000000000f0', Number: 1, FencingToken: 40, State: 'lost', FailureReason: 'LEASE_LOST' }),
-      attemptFixture({ Number: 2, FencingToken: 52 }),
+      attemptFixture({ Number: 2, FencingToken: 52, RunnerName: 'build-01' }),
     ];
     const { dialog } = await mount(jobs);
     const list = await within(dialog).findByRole('list', { name: Ar['jobs.attempts.title'] });
     const items = within(list).getAllByRole('listitem').filter((item) => item.parentElement === list);
-    expect(items[0]).toHaveTextContent(Ar['jobs.attempts.fencing'].replace('{n}', isolate('52')));
+    expect(items[0]).toHaveTextContent('build-01');
+    expect(items[0]).not.toHaveTextContent('52');
+    const latest = items[0];
+    if (latest === undefined) throw new Error('no attempt');
+    expect(within(latest).getByRole('button', { name: Ar['jobs.attempts.runnerId.copy'] })).toBeInTheDocument();
+    expect(items[1]).toHaveTextContent(Ar['jobs.attempts.runnerGone']);
     expect(items[1]).toHaveTextContent(Ar['jobs.reason.LEASE_LOST']);
     expect(items[1]).toHaveTextContent(Ar['jobs.state.lost']);
   });

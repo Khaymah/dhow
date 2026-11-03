@@ -35,7 +35,7 @@ export const ShellBottomBar = () => {
     ...(member(role) ? [entry('projects', 'folder', t('shell.nav.projects'), '/projects', section?.id === 'projects')] : []),
     ...(member(role) ? [{ ...entry('jobs', 'play', t('shell.nav.jobs'), '/jobs', section?.id === 'jobs'), dot: jobsDot }] : []),
     ...(canReadRunners(role)
-      ? [entry('runners', 'server', t('shell.nav.runners'), '/runners', section?.id === 'runners' || section?.parent === 'runners')]
+      ? [entry('runners', 'server', t('shell.bottom.runners'), '/runners', section?.id === 'runners' || section?.parent === 'runners')]
       : []),
     entry('org', 'users', t('shell.bottom.org'), orgPath, section?.group === 'org'),
     entry('account', 'user', t('shell.group.account'), '/account/profile', section?.group === 'account'),

@@ -34,11 +34,12 @@ export const ProjectSettingsPage = () => {
               <RepositoryCard
                 organizationId={organizationId}
                 projectId={projectId}
+                linked={project.RepositoryLinked}
                 manager={manager}
                 blocked={active ? null : t('projects.archived.blocked')}
                 onLink={() => { open('repository-link'); }}
               />
-              {manager && active ? <RepositoryActions organizationId={organizationId} projectId={projectId} /> : null}
+              {manager && active && project.RepositoryLinked ? <RepositoryActions organizationId={organizationId} projectId={projectId} /> : null}
             </PageGroup>
             {manager && active ? (
               <PageGroup title={t('projects.danger.title')} lead={t('projects.danger.lead')} icon="alert" danger>

@@ -21,7 +21,6 @@ export const WebhookSecretOnce = ({ secret, onHide }: IWebhookSecretOnceProps) =
         value={secret}
         copy={t('repository.secret.copy')}
         copied={t('repository.secret.copied')}
-        primary
       />
       {onHide === undefined ? null : (
         <Button size="sm" variant="ghost" className="justify-self-start" onClick={onHide}>

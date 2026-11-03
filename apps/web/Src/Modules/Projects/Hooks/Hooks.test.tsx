@@ -82,7 +82,7 @@ describe('the project hooks', () => {
       }
       return linked ? ok(repositoryFixture()) : notLinked();
     });
-    const { result } = renderHook(() => ({ repo: useRepository(ORG_ID, PROJECT_ID), unlink: useUnlinkRepository(ORG_ID, PROJECT_ID) }), { wrapper });
+    const { result } = renderHook(() => ({ repo: useRepository(ORG_ID, PROJECT_ID, true), unlink: useUnlinkRepository(ORG_ID, PROJECT_ID) }), { wrapper });
     await waitFor(() => {
       expect(result.current.repo.data?.Transport).toBe('ssh');
     });

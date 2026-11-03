@@ -22,7 +22,7 @@ export const ProjectPage = () => {
         <Page
           title={project.Name}
           lead={t('projects.detail.lead', { slug: project.Slug, path: project.PipelinePath })}
-          action={<ProjectAction organizationId={organizationId} project={project} role={role} onTrigger={() => { open('run-trigger'); }} />}
+          action={<ProjectAction project={project} role={role} onTrigger={() => { open('run-trigger'); }} />}
           nav={<ProjectNav projectId={projectId} current="runs" />}
         >
           <ProjectOverview

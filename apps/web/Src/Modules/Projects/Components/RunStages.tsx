@@ -16,10 +16,11 @@ export interface IRunStagesProps {
 const JobEntry = ({ job, now, jobHref, onOpenJob }: { job: TRunJob } & Omit<IRunStagesProps, 'jobs'>) => {
   const t = useT();
   const text = useRunText();
-  const matrix = matrixOf(job);
+  const name = job.Kind === 'discovery' ? t('runs.job.system.discovery') : job.Name === '' ? job.JobId : job.Name;
+  const matrix = matrixOf(job).filter((pair) => !name.includes(pair));
   const took = job.StartedAt === undefined ? '' : text.duration(job.StartedAt, job.FinishedAt ?? now);
   const reason = job.FailureReason === undefined || job.FailureReason === '' ? null : text.reason(job.FailureReason);
-  const title = <bdi>{job.Name === '' ? job.JobId : job.Name}</bdi>;
+  const title = <bdi>{name}</bdi>;
   const target = job.CurrentJobId;
 
   return (
@@ -55,21 +56,19 @@ const JobEntry = ({ job, now, jobHref, onOpenJob }: { job: TRunJob } & Omit<IRun
             </dd>
           </div>
         )}
-        <div className="flex gap-1.5">
-          <dt>{t('runs.job.needs')}</dt>
-          <dd className="m-0">
-            {job.Needs.length === 0 ? (
-              t('runs.job.needs.none')
-            ) : (
+        {job.Needs.length === 0 ? null : (
+          <div className="flex gap-1.5">
+            <dt>{t('runs.job.needs')}</dt>
+            <dd className="m-0">
               <bdi dir="ltr" className="font-mono">
                 {job.Needs.join(', ')}
               </bdi>
-            )}
-          </dd>
-        </div>
+            </dd>
+          </div>
+        )}
         {took === '' ? null : (
           <div className="flex gap-1.5">
-            <dt>{t('runs.job.took')}</dt>
+            <dt>{job.FinishedAt === undefined ? t('runs.job.runningFor') : t('runs.job.took')}</dt>
             <dd className="m-0">{took}</dd>
           </div>
         )}

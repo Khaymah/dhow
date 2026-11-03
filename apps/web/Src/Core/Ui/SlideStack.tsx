@@ -10,11 +10,17 @@ export type { ISlide } from '@/Core/Ui/Slide';
 
 export type TJumpSource = 'crumb' | 'slide';
 
+export interface ISlideCloseGuard {
+  blocked: boolean;
+  onBlocked: () => void;
+}
+
 export interface ISlideStackProps {
   slides: readonly ISlide[];
   onPop: () => void;
   onJump: (index: number, source: TJumpSource) => void;
   onCloseAll: () => void;
+  closeGuard?: ISlideCloseGuard;
 }
 
 interface IGhost {
@@ -122,7 +128,24 @@ const useFocusFlow = (count: number, topId: string | undefined) => {
   };
 };
 
-export const SlideStack = ({ slides, onPop, onJump, onCloseAll }: ISlideStackProps) => {
+const useGuarded = ({ onPop, onJump, onCloseAll, closeGuard }: Omit<ISlideStackProps, 'slides'>) => {
+  const guarded = (close: () => void) => () => {
+    if (closeGuard?.blocked === true) closeGuard.onBlocked();
+    else close();
+  };
+  return {
+    onPop: guarded(onPop),
+    onCloseAll: guarded(onCloseAll),
+    onJump: (index: number, source: TJumpSource) => {
+      guarded(() => {
+        onJump(index, source);
+      })();
+    },
+  };
+};
+
+export const SlideStack = ({ slides, ...handlers }: ISlideStackProps) => {
+  const { onPop, onCloseAll, onJump } = useGuarded(handlers);
   const reducedMotion = usePrefersReducedMotion();
   const ghosts = useGhosts(slides, reducedMotion);
   const { topRef, focusTop, takeOriginalOpener } = useFocusFlow(slides.length, slides[slides.length - 1]?.id);

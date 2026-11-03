@@ -4,7 +4,6 @@ import { useT } from '@/I18n/useT';
 import type { TProject } from '@/Modules/Projects/Api/ProjectsApi';
 import { RepositoryUnlink } from '@/Modules/Projects/Components/RepositoryActions';
 import { ProjectArchive } from '@/Modules/Projects/Components/ProjectSettingsCard';
-import { useRepository } from '@/Modules/Projects/Hooks/useRepository';
 
 export interface IProjectDangerZoneProps {
   organizationId: string;
@@ -23,11 +22,10 @@ const DangerItem = ({ title, about, children }: { title: string; about: string; 
 
 export const ProjectDangerZone = ({ organizationId, project }: IProjectDangerZoneProps) => {
   const t = useT();
-  const repository = useRepository(organizationId, project.Id);
   return (
     <div className="min-w-0 rounded-md border border-bad-line bg-surface">
       <ul aria-label={t('projects.danger.title')} className="m-0 grid list-none p-0">
-        {repository.data === undefined ? null : (
+        {!project.RepositoryLinked ? null : (
           <DangerItem title={t('repository.unlink.title')} about={t('repository.unlink.about')}>
             <RepositoryUnlink organizationId={organizationId} projectId={project.Id} />
           </DangerItem>

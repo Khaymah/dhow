@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { useSlideGuardStore } from '@/Core/Store/useSlideGuardStore';
+import { Button } from '@/Core/Ui/Button';
 import { Card } from '@/Core/Ui/Card';
 import { EmptyState } from '@/Core/Ui/EmptyState';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
@@ -27,8 +29,46 @@ interface IFlowProps {
   onDone: () => void;
 }
 
-const firstStep = (current: TRepository | undefined): TLinkStep =>
-  current?.PendingHostKeyFingerprint === undefined ? 'source' : 'host-key';
+const firstStep = (current: TRepository | undefined): TLinkStep => {
+  if (current === undefined) return 'source';
+  if (current.PendingHostKeyFingerprint !== undefined) return 'host-key';
+  return current.LastDeliveryAt === undefined ? 'webhook' : 'source';
+};
+
+const useSecretGuard = (guarded: boolean) => {
+  const Block = useSlideGuardStore((state) => state.Block);
+  const Attempts = useSlideGuardStore((state) => state.Attempts);
+  const [Seen, setSeen] = useState(Attempts);
+  useEffect(() => {
+    Block(guarded);
+  }, [Block, guarded]);
+  useEffect(
+    () => () => {
+      Block(false);
+    },
+    [Block],
+  );
+  return { Asking: guarded && Attempts !== Seen, Dismiss: () => { setSeen(Attempts); } };
+};
+
+const LeaveSecret = ({ onStay, onLeave }: { onStay: () => void; onLeave: () => void }) => {
+  const t = useT();
+  return (
+    <InlineAlert accent="failed" title={t('repository.secret.leave.title')}>
+      <span className="grid justify-items-start gap-3">
+        {t('repository.secret.leave.body')}
+        <span className="flex flex-wrap gap-2">
+          <Button variant="primary" iconStart="back" onClick={onStay}>
+            {t('repository.secret.leave.stay')}
+          </Button>
+          <Button variant="danger" iconStart="close" onClick={onLeave}>
+            {t('repository.secret.leave.confirm')}
+          </Button>
+        </span>
+      </span>
+    </InlineAlert>
+  );
+};
 
 const LinkFlow = ({ organizationId, projectId, current, onDone }: IFlowProps) => {
   const t = useT();
@@ -36,8 +76,8 @@ const LinkFlow = ({ organizationId, projectId, current, onDone }: IFlowProps) =>
   const [Step, setStep] = useState<TLinkStep>(() => firstStep(current));
   const [Repository, setRepository] = useState<TRepository | undefined>(current);
   const [Secret, setSecret] = useState<string | null>(null);
-  const ssh = (Repository ?? current)?.Transport === 'ssh';
-  const steps = stepsFor(ssh || Step === 'deploy-key' || Step === 'host-key');
+  const guard = useSecretGuard(Secret !== null && Step === 'webhook');
+  const steps = stepsFor((Repository ?? current)?.Transport === 'ssh' || Step === 'deploy-key' || Step === 'host-key');
 
   useEffect(
     () => () => {
@@ -58,18 +98,29 @@ const LinkFlow = ({ organizationId, projectId, current, onDone }: IFlowProps) =>
     setStep(result.Repository.Transport === 'ssh' ? 'deploy-key' : 'webhook');
   };
 
-  const HandlePinned = (repository: TRepository) => {
-    setRepository(repository);
-    go('webhook');
+  const HandleLeave = () => {
+    setSecret(null);
+    guard.Dismiss();
+    onDone();
   };
 
   return (
     <div className="grid gap-6">
       <LinkStepper steps={steps} current={Step} />
+      {guard.Asking ? <LeaveSecret onStay={guard.Dismiss} onLeave={HandleLeave} /> : null}
       {Step === 'source' ? <LinkSourceStep organizationId={organizationId} projectId={projectId} current={Repository} onLinked={HandleLinked} /> : null}
       {Step === 'deploy-key' && Repository !== undefined ? <DeployKeyStep repository={Repository} onNext={() => { go('host-key'); }} /> : null}
       {Step === 'host-key' && Repository !== undefined ? (
-        <HostKeyStep organizationId={organizationId} projectId={projectId} repository={Repository} onPinned={HandlePinned} onBack={() => { go('source'); }} />
+        <HostKeyStep
+          organizationId={organizationId}
+          projectId={projectId}
+          repository={Repository}
+          onPinned={(repository) => {
+            setRepository(repository);
+            go('webhook');
+          }}
+          onBack={() => { go('source'); }}
+        />
       ) : null}
       {Step === 'webhook' && Repository !== undefined ? (
         <WebhookStep
@@ -98,9 +149,10 @@ export const RepositoryLinkBody = ({ projectId, onDone }: IRepositoryLinkBodyPro
   const access = useOrganizationAccess();
   const organizationId = access.Kind === 'allowed' ? access.OrganizationId : '';
   const project = useProject(organizationId, projectId ?? '');
-  const repository = useRepository(organizationId, projectId ?? '');
+  const linked = project.data?.RepositoryLinked === true;
+  const repository = useRepository(organizationId, projectId ?? '', linked);
   if (projectId === undefined || access.Kind === 'denied') return <Denied text={t('repository.link.missing')} />;
-  if (access.Kind === 'loading' || project.isPending || (repository.isPending && repository.fetchStatus !== 'idle')) {
+  if (access.Kind === 'loading' || project.isPending || (linked && repository.isPending)) {
     return <Skeleton label={t('ui.loading')} lines={5} />;
   }
   if (project.isError) return <InlineAlert accent="failed" title={t('projects.detail.error')} />;
@@ -108,5 +160,5 @@ export const RepositoryLinkBody = ({ projectId, onDone }: IRepositoryLinkBodyPro
   if (!canOnProject(role, 'project.manage')) return <Denied text={t('repository.link.forbidden')} />;
   if (project.data.State === 'archived') return <Denied text={t('repository.link.archived')} />;
   if (repository.isError && !isNotLinked(repository.error)) return <InlineAlert accent="failed" title={t('repository.error.load')} />;
-  return <LinkFlow organizationId={organizationId} projectId={projectId} current={repository.data} onDone={onDone} />;
+  return <LinkFlow organizationId={organizationId} projectId={projectId} current={linked ? repository.data : undefined} onDone={onDone} />;
 };

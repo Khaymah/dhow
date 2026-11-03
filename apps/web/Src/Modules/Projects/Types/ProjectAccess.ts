@@ -1,4 +1,6 @@
 import type { TRole } from '@/Core/Auth/AuthTypes';
+import type { TMessageKey } from '@/I18n/Messages';
+import type { TProject } from '@/Modules/Projects/Api/ProjectsApi';
 
 export type TProjectAction = 'project.manage' | 'run.trigger' | 'run.cancel' | 'run.approve' | 'artifact.read';
 
@@ -20,3 +22,10 @@ export const canOnProject = (role: TRole | undefined, action: TProjectAction): b
 export { canCreateProjects } from '@/Core/Auth/AuthTypes';
 
 export const canRunForksWithoutApproval = (role: TRole | undefined): boolean => role !== undefined && FORK_ADMINS.includes(role);
+
+export const triggerBlock = (project: Pick<TProject, 'State' | 'RepositoryLinked'>, role: TRole | undefined): TMessageKey | null => {
+  if (!canOnProject(role, 'run.trigger')) return 'runs.trigger.forbidden';
+  if (project.State !== 'active') return 'runs.trigger.archived';
+  if (!project.RepositoryLinked) return 'runs.trigger.notLinked';
+  return null;
+};

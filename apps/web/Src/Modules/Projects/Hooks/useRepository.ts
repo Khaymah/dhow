@@ -5,9 +5,12 @@ import {
   confirmDeployKey,
   confirmHostKey,
   getRepository,
+  projectKey,
+  projectListKey,
   repositoryKey,
   rotateDeployKey,
   unlinkRepository,
+  type TProject,
   type TRepository,
 } from '@/Modules/Projects/Api/ProjectsApi';
 import { manualInputsKey } from '@/Modules/Projects/Api/RunsApi';
@@ -17,11 +20,11 @@ const PENDING_REFRESH_MS = 15_000;
 
 export const isNotLinked = (error: unknown): boolean => isApiError(error) && error.Code === NOT_LINKED;
 
-export const useRepository = (organizationId: string, projectId: string): UseQueryResult<TRepository, ApiError> =>
+export const useRepository = (organizationId: string, projectId: string, linked: boolean): UseQueryResult<TRepository, ApiError> =>
   useQuery<TRepository, ApiError>({
     queryKey: repositoryKey(organizationId, projectId),
     queryFn: () => getRepository(organizationId, projectId),
-    enabled: organizationId !== '' && projectId !== '',
+    enabled: linked && organizationId !== '' && projectId !== '',
     retry: false,
     refetchInterval: (query) => (query.state.data?.LastDeliveryAt === undefined && query.state.data !== undefined ? PENDING_REFRESH_MS : false),
   });
@@ -29,12 +32,13 @@ export const useRepository = (organizationId: string, projectId: string): UseQue
 export const useRepositorySaved = (organizationId: string, projectId: string) => {
   const client = useQueryClient();
   return (repository: TRepository | null) => {
-    if (repository === null) void client.resetQueries({ queryKey: repositoryKey(organizationId, projectId) });
-    else {
-      client.setQueryData(repositoryKey(organizationId, projectId), repository);
-      void client.invalidateQueries({ queryKey: repositoryKey(organizationId, projectId) });
-    }
-    void client.invalidateQueries({ queryKey: manualInputsKey(organizationId, projectId) });
+    client.setQueryData<TProject>(projectKey(organizationId, projectId), (project) =>
+      project === undefined ? project : { ...project, RepositoryLinked: repository !== null },
+    );
+    if (repository === null) client.removeQueries({ queryKey: repositoryKey(organizationId, projectId) });
+    else client.setQueryData(repositoryKey(organizationId, projectId), repository);
+    client.removeQueries({ queryKey: manualInputsKey(organizationId, projectId) });
+    void client.invalidateQueries({ queryKey: projectListKey(organizationId) });
   };
 };
 

@@ -64,7 +64,8 @@ describe('the UI glossary (ADR-0034)', () => {
     expect(Ar['shell.nav.orgSettings']).toBe('إعدادات المؤسسة');
     expect(Ar['shell.nav.audit']).toBe('سجل الأحداث');
     expect(Ar['shell.nav.system']).toBe('حالة السيرفر');
-    expect([Ar['shell.group.run'], Ar['shell.group.org'], Ar['shell.group.watch']]).toEqual(['التشغيل', 'المؤسسة', 'المتابعة']);
+    expect([Ar['shell.group.run'], Ar['shell.group.org'], Ar['shell.group.watch']]).toEqual(['النشر', 'المؤسسة', 'المتابعة']);
+    expect(Ar['shell.bottom.runners']).toBe('الأجهزة');
     expect(Ar['appearance.title']).toBe('المظهر والألوان');
     expect(En['shell.nav.home']).toBe('Home');
     expect(En['shell.nav.runners']).toBe('Runners');

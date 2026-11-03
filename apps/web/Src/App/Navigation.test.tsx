@@ -107,7 +107,7 @@ describe('the phone bar', () => {
       Ar['shell.nav.home'],
       Ar['shell.nav.projects'],
       Ar['shell.nav.jobs'],
-      Ar['shell.nav.runners'],
+      Ar['shell.bottom.runners'],
       Ar['shell.bottom.org'],
       Ar['shell.group.account'],
     ]);

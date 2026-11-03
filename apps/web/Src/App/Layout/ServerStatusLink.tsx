@@ -30,11 +30,12 @@ export const ServerStatusLink = () => {
       })}
       className={cx(
         'flex h-btn items-center gap-2 rounded-pill border border-line-2 px-3 text-label-sm whitespace-nowrap text-secondary no-underline',
-        'transition-colors duration-140 hover:bg-hover hover:text-primary max-md:w-btn max-md:justify-center max-md:px-0',
+        'transition-colors duration-140 hover:bg-hover hover:text-primary max-md:px-2.5',
       )}
     >
       <i aria-hidden="true" className={cx('size-2 flex-none rounded-full', DOT[state])} />
       <span className="max-md:hidden">{label}</span>
+      <span aria-hidden="true" className="md:hidden">{t(`shell.status.short.${state}`)}</span>
     </a>
   );
 };

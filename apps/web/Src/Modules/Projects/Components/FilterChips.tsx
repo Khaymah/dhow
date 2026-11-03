@@ -15,7 +15,7 @@ export interface IFilterChipsProps<T extends string> {
 
 export const FilterChips = <T extends string>({ label, chips, value, disabled = false, onChange }: IFilterChipsProps<T>) => (
   <div className="min-w-0">
-    <div role="group" aria-label={label} className="flex gap-1.5 overflow-x-auto pb-1">
+    <div role="group" aria-label={label} className="flex flex-wrap gap-1.5 pb-1">
       {chips.map((chip) => {
         const pressed = chip.id === value;
         return (
@@ -28,7 +28,7 @@ export const FilterChips = <T extends string>({ label, chips, value, disabled = 
               onChange(chip.id);
             }}
             className={cx(
-              'h-btn-sm flex-none cursor-pointer rounded-pill border px-3 text-label-sm whitespace-nowrap transition-colors duration-140',
+              'h-btn-sm flex-none cursor-pointer rounded-pill border px-3 text-label-sm whitespace-nowrap transition-colors duration-140 max-md:h-11',
               pressed ? 'border-line-2 bg-surface-raised text-primary' : 'border-line bg-transparent text-secondary hover:text-primary',
             )}
           >

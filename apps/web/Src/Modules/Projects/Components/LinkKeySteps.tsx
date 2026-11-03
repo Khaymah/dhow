@@ -26,7 +26,6 @@ export const DeployKeyStep = ({ repository, onNext }: IDeployKeyStepProps) => {
           value={repository.DeployKeyPublic}
           copy={t('repository.deployKey.copy')}
           copied={t('repository.deployKey.copied')}
-          primary
         />
       )}
       <ol className="m-0 grid list-decimal gap-2 ps-5 text-body-sm text-secondary">

@@ -5,7 +5,7 @@ import { useT } from '@/I18n/useT';
 import type { TRun } from '@/Modules/Projects/Api/RunsApi';
 import { LinkRow } from '@/Modules/Projects/Components/LinkRow';
 import { useRunText } from '@/Modules/Projects/Hooks/useRunText';
-import { runStatusOf, shortRef, shortSha } from '@/Modules/Projects/Types/RunStates';
+import { isFinalRun, runStatusOf, shortRef, shortSha } from '@/Modules/Projects/Types/RunStates';
 
 export interface IRunRowProps {
   run: TRun;
@@ -23,7 +23,7 @@ export const RunRow = ({ run, now, href, onOpen }: IRunRowProps) => {
     t(`runs.kind.${run.Trigger}`),
     t('runs.row.by', { actor: text.actor(run) }),
     time.ago(run.CreatedAt),
-    took === '' ? '' : t('runs.row.took', { duration: took }),
+    took === '' ? '' : isFinalRun(run.State) ? t('runs.row.took', { duration: took }) : t('runs.row.runningFor', { duration: took }),
   ].filter((part) => part !== '');
 
   return (

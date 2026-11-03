@@ -18,6 +18,7 @@ export const useRunText = () => {
   const duration = (from: string, to: string | number): string => {
     const seconds = secondsBetween(from, to);
     if (seconds === null) return '';
+    if (seconds < 1) return t('runs.duration.lessThanSecond');
     if (seconds < MINUTE) return t('jobs.duration.seconds', { s: seconds });
     if (seconds < HOUR) return t('jobs.duration.minutes', { m: Math.floor(seconds / MINUTE), s: seconds % MINUTE });
     return t('jobs.duration.hours', { h: Math.floor(seconds / HOUR), m: Math.floor((seconds % HOUR) / MINUTE) });

@@ -151,7 +151,7 @@ export const RepositoryUnlink = ({ organizationId, projectId }: IRepositoryActio
 
 export const RepositoryActions = ({ organizationId, projectId }: IRepositoryActionsProps) => {
   const t = useT();
-  const repository = useRepository(organizationId, projectId);
+  const repository = useRepository(organizationId, projectId, true);
   const data = repository.data;
   if (data === undefined) return null;
   return (

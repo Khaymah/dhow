@@ -2,6 +2,8 @@ import { useRelativeTime } from '@/Core/Hooks/useRelativeTime';
 import { Card } from '@/Core/Ui/Card';
 import { EmptyState } from '@/Core/Ui/EmptyState';
 import { StatusDot } from '@/Core/Ui/StatusDot';
+import { useToastStore } from '@/Core/Store/useToastStore';
+import { copyText } from '@/Core/Ui/Clipboard';
 import { useT } from '@/I18n/useT';
 import type { TJobAttempt, TJobAttemptStep, TJobStepState } from '@/Modules/Jobs/Api/JobsApi';
 import { AttemptStateDot } from '@/Modules/Jobs/Components/JobStateDot';
@@ -37,10 +39,10 @@ const StepLine = ({ step, now }: { step: TJobAttemptStep; now: number }) => {
 
 const AttemptItem = ({ attempt, now }: { attempt: TJobAttempt; now: number }) => {
   const t = useT();
+  const Push = useToastStore((state) => state.Push);
   const time = useRelativeTime();
   const text = useJobText();
   const facts = [
-    t('jobs.attempts.fencing', { n: attempt.FencingToken }),
     t('jobs.attempts.leasedAt', { time: time.ago(attempt.LeasedAt) }),
     attempt.StartedAt === undefined ? '' : text.duration(attempt.StartedAt, attempt.FinishedAt ?? now),
     attempt.ExitCode === undefined ? '' : t('jobs.attempts.exitCode', { code: attempt.ExitCode }),
@@ -53,11 +55,24 @@ const AttemptItem = ({ attempt, now }: { attempt: TJobAttempt; now: number }) =>
         <AttemptStateDot state={attempt.State} />
       </div>
       <small className="text-caption text-tertiary">{facts.join(' · ')}</small>
-      <small className="text-caption text-tertiary">
-        {t('jobs.attempts.runner')}{' '}
-        <bdi dir="ltr" className="font-mono">
-          {attempt.RunnerId}
-        </bdi>
+      <small className="flex flex-wrap items-center gap-x-2 text-caption text-tertiary">
+        {t('jobs.attempts.runner')}
+        <bdi className="text-secondary">{attempt.RunnerName ?? t('jobs.attempts.runnerGone')}</bdi>
+        <button
+          type="button"
+          className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-xs border-0 bg-transparent p-0 text-caption text-tertiary underline decoration-line-2 underline-offset-4 hover:text-primary md:min-h-0"
+          onClick={() => {
+            void copyText(attempt.RunnerId).then((done) => {
+              Push(
+                done
+                  ? { Id: `runner-id-${attempt.Id}`, Accent: 'live', Title: t('jobs.attempts.runnerId.copied') }
+                  : { Id: `runner-id-failed-${attempt.Id}`, Accent: 'awaiting', Title: t('jobs.attempts.runnerId.failed') },
+              );
+            });
+          }}
+        >
+          {t('jobs.attempts.runnerId.copy')}
+        </button>
       </small>
       {attempt.FailureReason === undefined ? null : <p className="m-0 text-body-sm">{text.reason(attempt.FailureReason)}</p>}
       {attempt.MutationStartedAt === undefined ? null : (

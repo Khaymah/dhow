@@ -15,6 +15,7 @@ import { isNotLinked, useRepository } from '@/Modules/Projects/Hooks/useReposito
 export interface IRepositoryCardProps {
   organizationId: string;
   projectId: string;
+  linked: boolean;
   manager: boolean;
   blocked: string | null;
   onLink: () => void;
@@ -60,7 +61,7 @@ const Facts = ({ repository }: { repository: TRepository }) => {
   );
 };
 
-const Linked = ({ repository, manager, blocked, onLink }: { repository: TRepository } & Omit<IRepositoryCardProps, 'organizationId' | 'projectId'>) => {
+const Linked = ({ repository, manager, blocked, onLink }: { repository: TRepository } & Omit<IRepositoryCardProps, 'organizationId' | 'projectId' | 'linked'>) => {
   const t = useT();
   const time = useRelativeTime();
   return (
@@ -97,11 +98,11 @@ const Linked = ({ repository, manager, blocked, onLink }: { repository: TReposit
   );
 };
 
-export const RepositoryCard = ({ organizationId, projectId, manager, blocked, onLink }: IRepositoryCardProps) => {
+export const RepositoryCard = ({ organizationId, projectId, linked, manager, blocked, onLink }: IRepositoryCardProps) => {
   const t = useT();
-  const repository = useRepository(organizationId, projectId);
+  const repository = useRepository(organizationId, projectId, linked);
 
-  if (repository.isPending) {
+  if (linked && repository.isPending) {
     return (
       <Card title={t('repository.title')} icon="layers" padded>
         <Skeleton label={t('repository.loading')} lines={4} />

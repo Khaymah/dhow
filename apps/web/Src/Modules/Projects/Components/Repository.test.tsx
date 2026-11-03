@@ -6,7 +6,7 @@ import { envelope, meBody, ORG_ID, stubFetch } from '@/Core/Testing/Fetch';
 import { FINGERPRINT, notLinked, ok, PROJECT_ID, projectFixture, repositoryFixture, WEBHOOK_SECRET, type TFixture } from '@/Core/Testing/ProjectsBackend';
 import { renderWithProviders } from '@/Core/Testing/Render';
 import { Ar } from '@/I18n/Locales/Ar';
-import type { TProject } from '@/Modules/Projects/Api/ProjectsApi';
+import { projectKey, repositoryKey, type TProject } from '@/Modules/Projects/Api/ProjectsApi';
 import { ProjectDangerZone } from '@/Modules/Projects/Components/ProjectDangerZone';
 import { ProjectSettingsCard } from '@/Modules/Projects/Components/ProjectSettingsCard';
 import { RepositoryActions } from '@/Modules/Projects/Components/RepositoryActions';
@@ -41,31 +41,31 @@ const backend = (repository: () => Response | Promise<Response>) => {
 describe('the repository card', () => {
   it('covers loading, error and not linked for a manager and a member', async () => {
     backend(() => new Promise<Response>(() => undefined));
-    const pending = renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} manager blocked={null} onLink={vi.fn()} />);
+    const pending = renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} linked manager blocked={null} onLink={vi.fn()} />);
     expect(await screen.findByRole('status', { name: Ar['repository.loading'] })).toBeInTheDocument();
     pending.unmount();
 
     backend(() => backendFailure('INTERNAL', 'x', 500));
-    const failing = renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} manager blocked={null} onLink={vi.fn()} />);
+    const failing = renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} linked manager blocked={null} onLink={vi.fn()} />);
     expect(await screen.findByText(Ar['repository.error.load'])).toBeInTheDocument();
     failing.unmount();
 
     backend(notLinked);
     const onLink = vi.fn();
-    const manager = renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} manager blocked={null} onLink={onLink} />);
+    const manager = renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} linked manager blocked={null} onLink={onLink} />);
     await manager.user.click(await screen.findByRole('button', { name: Ar['repository.link'] }));
     expect(onLink).toHaveBeenCalledOnce();
     manager.unmount();
 
     backend(notLinked);
-    renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} manager={false} blocked={null} onLink={vi.fn()} />);
+    renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} linked manager={false} blocked={null} onLink={vi.fn()} />);
     expect(await screen.findByText(Ar['repository.empty.member'])).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: Ar['repository.link'] })).toBeNull();
   });
 
   it('shows the address, the webhook URL, the public key and a waiting fingerprint, never a secret', async () => {
     backend(() => ok(repositoryFixture()));
-    renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} manager blocked={null} onLink={vi.fn()} />);
+    renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} linked manager blocked={null} onLink={vi.fn()} />);
     expect(await screen.findByText('ssh://git@git.example.com/team/app.git')).toBeInTheDocument();
     expect(screen.getByText(Ar['repository.pending.title'])).toBeInTheDocument();
     expect(screen.getByRole('button', { name: Ar['repository.pending.confirm'] })).toBeInTheDocument();
@@ -76,7 +76,7 @@ describe('the repository card', () => {
 
   it('tells an archived project why nothing can change', async () => {
     backend(() => ok(repositoryFixture({ PendingHostKeyFingerprint: undefined, HostKeyFingerprint: FINGERPRINT, State: 'ready' })));
-    renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} manager blocked={Ar['projects.archived.blocked']} onLink={vi.fn()} />);
+    renderWithProviders(<RepositoryCard organizationId={ORG_ID} projectId={PROJECT_ID} linked manager blocked={Ar['projects.archived.blocked']} onLink={vi.fn()} />);
     expect(await screen.findByText(Ar['projects.archived.blocked'])).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: Ar['repository.change'] })).toBeNull();
   });
@@ -107,6 +107,7 @@ describe('the repository keys and webhook', () => {
   it('unlinks only after a confirmation in the danger style', async () => {
     const writes = backend(() => ok(repositoryFixture()));
     const view = renderWithProviders(<ProjectDangerZone organizationId={ORG_ID} project={projectFixture() as TProject} />);
+    view.client.setQueryData(projectKey(ORG_ID, PROJECT_ID), projectFixture());
     const unlink = await screen.findByRole('button', { name: Ar['repository.unlink.action'] });
     expect(unlink).toHaveAttribute('data-variant', 'danger');
     await view.user.click(unlink);
@@ -117,8 +118,9 @@ describe('the repository keys and webhook', () => {
       expect(writes.map((write) => write.method)).toEqual(['DELETE']);
     });
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: Ar['repository.unlink.action'] })).toBeNull();
+      expect(view.client.getQueryData<TProject>(projectKey(ORG_ID, PROJECT_ID))?.RepositoryLinked).toBe(false);
     });
+    expect(view.client.getQueryData(repositoryKey(ORG_ID, PROJECT_ID))).toBeUndefined();
   });
 
   it('archives after a confirmation', async () => {

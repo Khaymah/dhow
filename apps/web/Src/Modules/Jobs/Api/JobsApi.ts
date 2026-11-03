@@ -7,6 +7,7 @@ export type TJob = TSchemas['Job'];
 export type TJobDetail = TSchemas['JobDetail'];
 export type TJobSpec = TSchemas['JobSpec'];
 export type TJobAttempt = TSchemas['JobAttempt'];
+export type TJobRun = TSchemas['JobRun'];
 export type TJobAttemptStep = TSchemas['JobAttemptStep'];
 export type TJobState = TSchemas['JobState'];
 export type TJobAttemptState = TSchemas['JobAttemptState'];

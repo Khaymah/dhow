@@ -74,9 +74,13 @@ interface IDetailBackend {
   detail?: () => Response | Promise<Response>;
   artifacts?: () => Response;
   action?: (name: string) => Response;
+  linked?: boolean;
 }
 
-const mountDetail = (role: TRole, { detail = () => ok(detailFixture()), artifacts = () => ok([artifactFixture()]), action }: IDetailBackend = {}) => {
+const mountDetail = (
+  role: TRole,
+  { detail = () => ok(detailFixture()), artifacts = () => ok([artifactFixture()]), action, linked = true }: IDetailBackend = {},
+) => {
   const posts: string[] = [];
   stubFetch((request) => {
     const p = path(request);
@@ -98,6 +102,7 @@ const mountDetail = (role: TRole, { detail = () => ok(detailFixture()), artifact
       projectId={PROJECT_ID}
       runId={RUN_ID}
       role={role}
+      linked={linked}
       crumbKey="crumb"
       jobHref={(id) => `/jobs/${id}`}
       onOpenJob={onOpenJob}
@@ -219,10 +224,51 @@ describe('the artifacts and problems of a run', () => {
   });
 
   it('lists the problems of a wrong pipeline file', async () => {
-    const issues = [{ Code: 'UNKNOWN_KEY', Severity: 'error', Path: 'jobs.build.imag', Line: 4, Column: 5, Message: 'unknown key' }];
+    const issues = [
+      { Code: 'UNKNOWN_KEY', Severity: 'error', Path: 'jobs.build.imag', Line: 4, Column: 5, Message: 'unknown key' },
+      { Code: 'BRAND_NEW', Severity: 'warning', Path: 'jobs', Line: 1, Column: 1, Message: 'something new' },
+    ];
     mountDetail('viewer', { detail: () => ok(detailFixture(runFixture({ State: 'failed', FailureReason: 'PIPELINE_INVALID' }), [], issues)) });
     expect(await screen.findByText(Ar['runs.reason.PIPELINE_INVALID'])).toBeInTheDocument();
     expect(screen.getByText(arText('runs.issues.where', { path: 'jobs.build.imag', line: 4, column: 5 }))).toBeInTheDocument();
-    expect(screen.getByText('UNKNOWN_KEY: unknown key')).toBeInTheDocument();
+    expect(screen.getByText(Ar['runs.issue.UNKNOWN_KEY'])).toBeInTheDocument();
+    expect(screen.getByText(arText('runs.issue.unknown', { message: 'something new' }))).toBeInTheDocument();
+    expect(screen.queryByText(/UNKNOWN_KEY/)).toBeNull();
+  });
+});
+
+describe('the run page details', () => {
+  it('names the system job, hides empty needs, keeps matrix values in one place and says less than a second', async () => {
+    const quick = { StartedAt: '2026-11-01T08:00:00Z', FinishedAt: '2026-11-01T08:00:00.400Z' };
+    mountDetail('developer', {
+      detail: () =>
+        ok(
+          detailFixture(runFixture(), [
+            runJobFixture({ Id: 'd', Key: 'dhow.discovery', Kind: 'discovery', JobId: 'dhow.discovery', Name: 'Read the pipeline file', ...quick }),
+            runJobFixture({ Id: 't', Key: 'test (os=debian)', JobId: 'test', Name: 'test (os=debian)', Matrix: { os: 'debian' }, Needs: ['build'] }),
+          ]),
+        ),
+    });
+    expect(await screen.findByRole('link', { name: Ar['runs.job.system.discovery'] })).toBeInTheDocument();
+    expect(screen.queryByText('Read the pipeline file')).toBeNull();
+    expect(screen.getAllByText(Ar['runs.job.needs'])).toHaveLength(1);
+    expect(screen.queryByText(Ar['runs.job.matrix'])).toBeNull();
+    expect(screen.getByText(Ar['runs.duration.lessThanSecond'])).toBeInTheDocument();
+  });
+
+  it('says how long a run has been running', async () => {
+    mountDetail('viewer', { detail: () => ok(detailFixture(runFixture({ State: 'running', FinishedAt: undefined }))) });
+    expect(await screen.findByText(new RegExp(Ar['runs.facts.runningFor'].replace('{duration}', '')))).toBeInTheDocument();
+  });
+
+  it('explains a run canceled by an unlink and blocks approve and rerun without a repository', async () => {
+    const view = mountDetail('maintainer', {
+      detail: () => ok(detailFixture(runFixture({ State: 'canceled', FailureReason: 'REPOSITORY_UNLINKED' }))),
+      linked: false,
+    });
+    expect(await screen.findByText(Ar['runs.reason.REPOSITORY_UNLINKED'])).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: Ar['runs.actions.rerun.action'] })).toBeDisabled();
+    expect(screen.getByText(Ar['runs.actions.notLinked'])).toBeInTheDocument();
+    expect(view.posts).toEqual([]);
   });
 });

@@ -315,3 +315,38 @@ describe('SlideStack motion', () => {
     expect(document.querySelectorAll('style')).toHaveLength(before);
   });
 });
+
+describe('SlideStack close guard', () => {
+  const Guarded = ({ blocked, onBlocked, onClose }: { blocked: boolean; onBlocked: () => void; onClose: () => void }) => (
+    <SlideStack
+      slides={[{ id: 'a', title: 'Alpha', children: <p>Body a</p> }]}
+      onPop={onClose}
+      onJump={onClose}
+      onCloseAll={onClose}
+      closeGuard={{ blocked, onBlocked }}
+    />
+  );
+
+  it('asks the owner of the slide instead of closing on Escape, the backdrop or the close button', async () => {
+    const onBlocked = vi.fn();
+    const onClose = vi.fn();
+    const view = renderWithProviders(<Guarded blocked onBlocked={onBlocked} onClose={onClose} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha' });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.click(findBackdrop());
+    await view.user.click(within(dialog).getByRole('button', { name: Ar['slides.closeAll'] }));
+    expect(onBlocked).toHaveBeenCalledTimes(3);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector('style')).toBeNull();
+  });
+
+  it('closes as usual while nothing is guarded', async () => {
+    const onBlocked = vi.fn();
+    const onClose = vi.fn();
+    const view = renderWithProviders(<Guarded blocked={false} onBlocked={onBlocked} onClose={onClose} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha' });
+    await view.user.click(within(dialog).getByRole('button', { name: Ar['slides.closeAll'] }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onBlocked).not.toHaveBeenCalled();
+  });
+});

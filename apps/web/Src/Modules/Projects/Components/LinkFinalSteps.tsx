@@ -25,9 +25,11 @@ export const WebhookStep = ({ organizationId, projectId, repository, secret, onS
   const t = useT();
   const errorText = useApiErrorText();
   const [Busy, setBusy] = useState(false);
+  const [Confirming, setConfirming] = useState(false);
   const [Problem, setProblem] = useState<string | null>(null);
 
   const HandleRotate = () => {
+    setConfirming(false);
     setBusy(true);
     setProblem(null);
     rotateWebhookSecret(organizationId, projectId)
@@ -52,9 +54,25 @@ export const WebhookStep = ({ organizationId, projectId, repository, secret, onS
             {t('repository.webhook.kept.body')}
           </InlineAlert>
           {Problem === null ? null : <InlineAlert accent="failed" title={Problem} />}
-          <Button size="sm" iconStart="key" className="justify-self-start" disabled={Busy} onClick={HandleRotate}>
-            {t('repository.webhook.rotate')}
-          </Button>
+          {Confirming ? <p className="m-0 text-body-sm text-secondary">{t('repository.actions.secret.question')}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              iconStart="key"
+              disabled={Busy}
+              onClick={() => {
+                if (Confirming) HandleRotate();
+                else setConfirming(true);
+              }}
+            >
+              {Confirming ? t('repository.actions.secret.confirm') : t('repository.webhook.rotate')}
+            </Button>
+            {Confirming ? (
+              <Button size="sm" variant="ghost" disabled={Busy} onClick={() => { setConfirming(false); }}>
+                {t('projects.cancel')}
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : (
         <WebhookSecretOnce secret={secret} />
@@ -80,12 +98,16 @@ export interface IStatusStepProps {
 export const StatusStep = ({ organizationId, projectId, onDone }: IStatusStepProps) => {
   const t = useT();
   const time = useRelativeTime();
-  const repository = useRepository(organizationId, projectId);
+  const repository = useRepository(organizationId, projectId, true);
   const data = repository.data;
 
   return (
     <div className="grid gap-5">
-      {data === undefined ? null : <RepositoryState repository={data} />}
+      {data === undefined ? null : (
+        <span className="justify-self-start">
+          <RepositoryState repository={data} />
+        </span>
+      )}
       {data?.LastDeliveryAt === undefined ? (
         <InlineAlert accent="awaiting" title={t('repository.status.waiting.title')}>
           {t('repository.status.waiting.body')}

@@ -21,6 +21,7 @@ import { useNow } from '@/Modules/Projects/Hooks/useNow';
 import { useRunText } from '@/Modules/Projects/Hooks/useRunText';
 import { useRun } from '@/Modules/Projects/Hooks/useRuns';
 import { canOnProject } from '@/Modules/Projects/Types/ProjectAccess';
+import { isKnownIssue } from '@/Modules/Projects/Types/IssueCodes';
 import { isFinalRun, runStatusOf, shortRef, shortSha } from '@/Modules/Projects/Types/RunStates';
 
 export interface IRunBodyProps {
@@ -28,6 +29,7 @@ export interface IRunBodyProps {
   projectId: string;
   runId: string;
   role: TRole;
+  linked: boolean;
   crumbKey: string;
   jobHref: (jobId: string) => string;
   onOpenJob: (jobId: string) => void;
@@ -64,7 +66,9 @@ const RunFacts = ({ detail, now }: { detail: TRunDetail; now: number }) => {
         <bdi>{text.actor(run)}</bdi>
       </Fact>
       <Fact label={t('runs.facts.created')}>{time.full(run.CreatedAt)}</Fact>
-      <Fact label={t('runs.facts.duration')}>{took === '' ? t('runs.facts.notStarted') : took}</Fact>
+      <Fact label={t('runs.facts.duration')}>
+        {took === '' ? t('runs.facts.notStarted') : isFinalRun(run.State) ? took : t('runs.facts.runningFor', { duration: took })}
+      </Fact>
     </dl>
   );
 };
@@ -79,13 +83,11 @@ const Issues = ({ detail }: { detail: TRunDetail }) => {
           <li key={`${issue.Code}-${issue.Path}-${issue.Line}-${issue.Column}`} className="grid gap-1 border-t border-line px-card py-3 first:border-t-0">
             <span className="flex flex-wrap items-center gap-2 text-label">
               <Badge tone={issue.Severity === 'error' ? 'bad' : 'warn'}>{t(`runs.issues.${issue.Severity}`)}</Badge>
-              <bdi dir="ltr" className="font-mono text-body-sm">
-                {t('runs.issues.where', { path: issue.Path, line: issue.Line, column: issue.Column })}
-              </bdi>
+              <span className="text-body-sm">{t('runs.issues.where', { path: issue.Path, line: issue.Line, column: issue.Column })}</span>
             </span>
-            <bdi dir="ltr" className="text-body-sm text-secondary">
-              {`${issue.Code}: ${issue.Message}`}
-            </bdi>
+            <span className="text-body-sm text-secondary">
+              {isKnownIssue(issue.Code) ? t(`runs.issue.${issue.Code}`) : t('runs.issue.unknown', { message: issue.Message })}
+            </span>
           </li>
         ))}
       </ul>
@@ -106,7 +108,6 @@ const RunDetailView = ({ detail, props }: { detail: TRunDetail; props: IRunBodyP
       <Card padded>
         <div className="grid gap-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="m-0 text-title-card">{t('runs.row.number', { number: run.Number })}</h2>
             <StatusDot status={runStatusOf(run.State)}>{t(`runs.state.${run.State}`)}</StatusDot>
             {run.IsFork ? (
               <Badge tone="warn" icon="alert">
@@ -117,7 +118,7 @@ const RunDetailView = ({ detail, props }: { detail: TRunDetail; props: IRunBodyP
           {run.State === 'awaiting_approval' ? <InlineAlert accent="awaiting" title={t('runs.approval.title')}>{t('runs.approval.body')}</InlineAlert> : null}
           {reason === null ? null : <InlineAlert accent={run.State === 'failed' ? 'failed' : 'queued'} title={reason} />}
           <RunFacts detail={detail} now={now} />
-          <RunActions organizationId={props.organizationId} projectId={props.projectId} run={run} role={props.role} onSecondFactor={props.onSecondFactor} />
+          <RunActions organizationId={props.organizationId} projectId={props.projectId} run={run} role={props.role} linked={props.linked} onSecondFactor={props.onSecondFactor} />
         </div>
       </Card>
       <Issues detail={detail} />

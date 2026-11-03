@@ -24,7 +24,10 @@ export const LinkStepper = ({ steps, current }: ILinkStepperProps) => {
           className={cx('inline-flex items-center gap-1.5 text-label-sm', step === current ? 'text-primary' : 'text-tertiary')}
         >
           {index < at ? (
-            <Icon name="check" size={15} className="text-ok-fg" />
+            <>
+              <Icon name="check" size={15} className="text-ok-fg" />
+              <span className="sr-only">{t('repository.steps.done')}</span>
+            </>
           ) : (
             <span aria-hidden="true" className={cx('inline-grid size-5 place-items-center rounded-full border text-caption', step === current ? 'border-accent text-accent' : 'border-line-2')}>
               {index + 1}

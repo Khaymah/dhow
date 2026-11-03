@@ -11,6 +11,7 @@ import { startBackend, type TRouteHandler } from '@/Core/Testing/Backend';
 import { envelope, ORG_ID } from '@/Core/Testing/Fetch';
 import { GOOD_CODE } from '@/Core/Testing/MfaBackend';
 import { findPage } from '@/Core/Testing/Pages';
+import { jobFixture, jobsRoute, specFixture } from '@/Core/Testing/JobsBackend';
 import { JOB_ID, ok, PROJECT_ID, projectFixture, projectsRoute, RUN_ID } from '@/Core/Testing/ProjectsBackend';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
@@ -25,10 +26,10 @@ const organization = (days?: number): TRouteHandler => (_request, url) => {
   });
 };
 
-const mount = (url: string, role = 'owner', routes: TRouteHandler[] = [], totp = false) => {
+const mount = (url: string, role = 'owner', routes: TRouteHandler[] = [], totp = false, project: Record<string, unknown> = {}) => {
   const backend = startBackend({
     role,
-    routes: [...routes, projectsRoute({ project: () => ok(projectFixture({ CallerRole: role })) }), organization(30)],
+    routes: [...routes, projectsRoute({ project: () => ok(projectFixture({ CallerRole: role, ...project })) }), organization(30)],
     mfa: { TotpEnabled: totp, RecoveryCodesRemaining: totp ? 10 : 0, Passkeys: [] },
   });
   const router = createAppRouter(createMemoryHistory({ initialEntries: [url] }));
@@ -70,7 +71,7 @@ describe('the projects pages', () => {
 
   it('opens a run, links its jobs to the live log and names it in the crumbs', async () => {
     const view = mount(`/projects/${PROJECT_ID}/runs/${RUN_ID}`, 'maintainer');
-    const main = await findPage(Ar['runs.detail.title']);
+    const main = await findPage(arText('runs.row.number', { number: 7 }));
     const job = await within(main).findByRole('link', { name: 'build' });
     expect(job).toHaveAttribute('href', `/jobs/${JOB_ID}`);
     expect(await screen.findByRole('navigation', { name: Ar['shell.crumbs.label'] })).toHaveTextContent(arText('runs.row.number', { number: 7 }));
@@ -109,6 +110,54 @@ describe('the projects pages', () => {
     ]);
     const main = await findPage(Ar['projects.detail.title']);
     expect(await within(main).findByText(Ar['projects.detail.notFound'])).toBeInTheDocument();
+  });
+});
+
+describe('the manual run button', () => {
+  it.each([
+    ['viewer', {}, 'runs.trigger.forbidden'],
+    ['developer', { RepositoryLinked: false }, 'runs.trigger.notLinked'],
+    ['owner', { State: 'archived' }, 'runs.trigger.archived'],
+  ] as const)('stays visible but disabled for a %s, with the reason', async (role, project, reason) => {
+    const view = mount(`/projects/${PROJECT_ID}`, role, [], false, project);
+    const main = await findPage('Web app');
+    expect(await within(main).findByRole('button', { name: Ar['runs.trigger.open'] })).toBeDisabled();
+    expect(within(main).getByText(Ar[reason])).toBeInTheDocument();
+    if (reason === 'runs.trigger.notLinked') {
+      await within(main).findByText(Ar['repository.empty.member']);
+      expect(view.calls.some((call) => new URL(call.url).pathname.endsWith('/repository'))).toBe(false);
+    }
+  });
+});
+
+describe('a job of a run', () => {
+  it('names the system job and links its run and project', async () => {
+    const job = jobFixture({ Name: 'Read the pipeline file' });
+    const view = mount(`/jobs/${job.Id}`, 'developer', [
+      jobsRoute({
+        jobs: [job],
+        detail: () =>
+          envelope({
+            Success: true,
+            Data: {
+              Job: job,
+              Spec: specFixture(),
+              Attempts: [],
+              Run: { ProjectId: PROJECT_ID, ProjectName: 'Web app', RunId: RUN_ID, RunNumber: 7, Kind: 'discovery' },
+            },
+          }),
+      }),
+    ]);
+    const main = await findPage(Ar['jobs.detail.title']);
+    expect(await within(main).findByRole('heading', { name: Ar['runs.job.system.discovery'] })).toBeInTheDocument();
+    expect(within(main).queryByText('Read the pipeline file')).toBeNull();
+    expect(within(main).getByRole('link', { name: arText('runs.row.number', { number: 7 }) })).toHaveAttribute('href', `/projects/${PROJECT_ID}/runs/${RUN_ID}`);
+    expect(within(main).getByRole('link', { name: 'Web app' })).toHaveAttribute('href', `/projects/${PROJECT_ID}`);
+    await view.user.click(within(main).getByRole('link', { name: arText('runs.row.number', { number: 7 }) }));
+    await waitFor(() => {
+      expect(view.router.state.location.pathname).toBe(`/projects/${PROJECT_ID}/runs/${RUN_ID}`);
+    });
+    expect(await findPage(arText('runs.row.number', { number: 7 }))).toBeInTheDocument();
   });
 });
 
