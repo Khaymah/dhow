@@ -12,6 +12,7 @@ import { En } from '@/I18n/Locales/En';
 import { WorkspaceAr } from '@/I18n/Locales/Workspace/Ar';
 import { useCatalogStore } from '@/I18n/useCatalogStore';
 import { loadWorkspaceMessages } from '@/I18n/WorkspaceCatalog';
+import { isolate } from '@/I18n/Translate';
 
 const renderApp = (url = '/') => {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [url] }));
@@ -41,7 +42,7 @@ describe('the workspace messages', () => {
     useCatalogStore.setState({ Workspace: { ar: WorkspaceAr } });
     const { user } = renderApp();
     await screen.findByRole('heading', { level: 1, name: Ar['home.title'] });
-    await user.click(screen.getByRole('button', { name: Ar['shell.language.switch'].replace('{language}', Ar['language.en']) }));
+    await user.click(screen.getByRole('button', { name: Ar['shell.language.switch'].replace('{language}', isolate(Ar['language.en'])) }));
     expect(await screen.findByRole('heading', { level: 1, name: En['home.title'] })).toBeInTheDocument();
     await waitFor(() => {
       expect(document.documentElement.lang).toBe('en');

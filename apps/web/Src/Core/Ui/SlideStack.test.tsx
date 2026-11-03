@@ -6,6 +6,7 @@ import { findBackdrop } from '@/Core/Testing/Overlay';
 import { renderWithProviders } from '@/Core/Testing/Render';
 import { SlideStack, type TJumpSource } from '@/Core/Ui/SlideStack';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const TITLES: Record<string, string> = { a: 'Alpha', b: 'Bravo', c: 'Charlie', d: 'Delta', e: 'Echo', f: 'Foxtrot' };
 const NEXT: Record<string, string | undefined> = { a: 'b', b: 'c', c: 'd', d: 'e', e: 'f' };
@@ -155,10 +156,10 @@ describe('SlideStack', () => {
   it('shows each slide its own place in the stack', async () => {
     renderWithProviders(<Harness initial={['a', 'b', 'c']} />);
     await screen.findByRole('dialog', { name: 'Charlie' });
-    for (const label of ['1 من 3', '2 من 3', '3 من 3']) {
+    for (const label of [1, 2, 3].map((n) => `${isolate(n)} من ${isolate('3')}`)) {
       expect(document.body).toHaveTextContent(label);
     }
-    expect(within(topSlide()).getByText('3 من 3')).toBeInTheDocument();
+    expect(within(topSlide()).getByText(`${isolate('3')} من ${isolate('3')}`)).toBeInTheDocument();
   });
 
   it('closes every slide at once', async () => {

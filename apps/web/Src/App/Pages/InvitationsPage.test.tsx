@@ -12,6 +12,7 @@ import { envelope, ORG_ID } from '@/Core/Testing/Fetch';
 import { gate } from '@/Core/Testing/Gate';
 import { findPage } from '@/Core/Testing/Pages';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -60,10 +61,10 @@ describe('the invitations page', () => {
     expect(rows[1]).toHaveTextContent('old@future.dev');
     expect(rows[1]).toHaveTextContent(Ar['invitations.status.expired']);
     for (const email of ['new@future.dev', 'old@future.dev']) {
-      expect(within(list).getByRole('button', { name: Ar['invitations.resendLabel'].replace('{email}', email) })).toBeInTheDocument();
-      expect(within(list).getByRole('button', { name: Ar['invitations.revokeLabel'].replace('{email}', email) })).toBeInTheDocument();
+      expect(within(list).getByRole('button', { name: Ar['invitations.resendLabel'].replace('{email}', isolate(email)) })).toBeInTheDocument();
+      expect(within(list).getByRole('button', { name: Ar['invitations.revokeLabel'].replace('{email}', isolate(email)) })).toBeInTheDocument();
     }
-    expect(within(page).getByText(Ar['invitations.counts'].replace('{pending}', '1').replace('{expired}', '1'))).toBeInTheDocument();
+    expect(within(page).getByText(Ar['invitations.counts'].replace('{pending}', isolate('1')).replace('{expired}', isolate('1')))).toBeInTheDocument();
   });
 
   it('isolates the email and the inviter name', async () => {

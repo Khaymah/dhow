@@ -10,6 +10,7 @@ import { useToastStore } from '@/Core/Store/useToastStore';
 import { backendFailure, startBackend } from '@/Core/Testing/Backend';
 import { findPage } from '@/Core/Testing/Pages';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -30,7 +31,7 @@ const open = async (role = 'owner', url = '/org/settings') => {
 
 const dangerOf = (page: HTMLElement) => within(page).findByRole('region', { name: Ar['orgSettings.group.danger'] });
 
-const leaveName = Ar['organization.leave.action'].replace('{name}', 'Future Solution');
+const leaveName = Ar['organization.leave.action'].replace('{name}', isolate('Future Solution'));
 
 afterEach(() => {
   useToastStore.setState({ Toasts: [] });

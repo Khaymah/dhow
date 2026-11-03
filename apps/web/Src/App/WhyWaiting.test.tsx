@@ -11,6 +11,7 @@ import { startBackend } from '@/Core/Testing/Backend';
 import { JOB_ID, jobFixture, jobsRoute } from '@/Core/Testing/JobsBackend';
 import { runnerFixture, runnerId, runnersRoute } from '@/Core/Testing/RunnersBackend';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -60,7 +61,7 @@ describe('why a stuck job is waiting, on the job page', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(3);
     await view.user.click(
       screen.getByRole('button', {
-        name: Ar['runners.fit.resume'].replace('{name}', 'build-arm'),
+        name: Ar['runners.fit.resume'].replace('{name}', isolate('build-arm')),
       }),
     );
     await waitFor(() => {

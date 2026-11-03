@@ -6,6 +6,7 @@ import { envelope, stubFetch } from '@/Core/Testing/Fetch';
 import { renderWithProviders } from '@/Core/Testing/Render';
 import { Ar } from '@/I18n/Locales/Ar';
 import { LoginPage } from '@/Modules/Session/Pages/LoginPage';
+import { isolate } from '@/I18n/Translate';
 
 const LOGIN = { User: { Id: 'u', Email: 'sabry@future.dev', Name: 'Sabry', Locale: 'ar' }, CsrfToken: 'csrf', ExpiresAt: '2026-11-10T08:00:00Z' };
 
@@ -78,7 +79,7 @@ describe('the second sign-in step', () => {
     await user.type(screen.getByLabelText(Ar['mfa.step.code']), '000000');
     await user.click(screen.getByRole('button', { name: Ar['mfa.step.submit'] }));
     expect(await screen.findByRole('timer')).toHaveTextContent('0:30');
-    expect(screen.getByRole('button', { name: Ar['throttle.retryIn'].replace('{time}', '0:30') })).toBeDisabled();
+    expect(screen.getByRole('button', { name: Ar['throttle.retryIn'].replace('{time}', isolate('0:30')) })).toBeDisabled();
   });
 
   it('returns to the password form on request', async () => {

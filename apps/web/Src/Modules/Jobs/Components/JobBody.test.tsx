@@ -12,6 +12,7 @@ import { attemptFixture, JOB_ID, jobFixture, jobsRoute, TEST_IMAGE, type IJobsBa
 import { findPage } from '@/Core/Testing/Pages';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const mount = async (jobs: IJobsBackend, role = 'owner') => {
   const backend = startBackend({ role, routes: [jobsRoute(jobs)] });
@@ -76,7 +77,7 @@ describe('the job page', () => {
     expect(within(dialog).getByText(Ar['jobs.spec.mutating'])).toBeInTheDocument();
     expect(within(dialog).getByText('registry.npmjs.org')).toBeInTheDocument();
     expect(within(dialog).getByText(arText('jobs.spec.cpuValue', { n: 2 }))).toBeInTheDocument();
-    expect(within(dialog).getByText(Ar['jobs.size.mib'].replace('{n}', '512'))).toBeInTheDocument();
+    expect(within(dialog).getByText(Ar['jobs.size.mib'].replace('{n}', isolate('512')))).toBeInTheDocument();
   });
 
   it('lists attempts with their state, reason and fencing token', async () => {
@@ -88,7 +89,7 @@ describe('the job page', () => {
     const { dialog } = await mount(jobs);
     const list = await within(dialog).findByRole('list', { name: Ar['jobs.attempts.title'] });
     const items = within(list).getAllByRole('listitem').filter((item) => item.parentElement === list);
-    expect(items[0]).toHaveTextContent(Ar['jobs.attempts.fencing'].replace('{n}', '52'));
+    expect(items[0]).toHaveTextContent(Ar['jobs.attempts.fencing'].replace('{n}', isolate('52')));
     expect(items[1]).toHaveTextContent(Ar['jobs.reason.LEASE_LOST']);
     expect(items[1]).toHaveTextContent(Ar['jobs.state.lost']);
   });

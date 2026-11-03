@@ -12,6 +12,7 @@ import { useToastStore } from '@/Core/Store/useToastStore';
 import { findPage } from '@/Core/Testing/Pages';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const mount = async (options: IBackendOptions = {}, url = '/account/security') => {
   const backend = startBackend(options);
@@ -106,14 +107,14 @@ describe('two-step verification in my account', () => {
     expect(screen.getByText('MacBook Touch ID')).toBeInTheDocument();
     expect(screen.getByText(Ar['mfa.passkeys.synced'])).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: Ar['mfa.passkeys.rename.aria'].replace('{name}', 'MacBook Touch ID') }));
+    await user.click(screen.getByRole('button', { name: Ar['mfa.passkeys.rename.aria'].replace('{name}', isolate('MacBook Touch ID')) }));
     const name = screen.getByRole('textbox', { name: Ar['mfa.passkeys.name'] });
     await user.clear(name);
     await user.type(name, 'YubiKey 5C');
     await user.click(screen.getByRole('button', { name: Ar['mfa.passkeys.rename.save'] }));
     expect(await screen.findByText('YubiKey 5C')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: Ar['mfa.passkeys.remove.aria'].replace('{name}', 'YubiKey 5C') }));
+    await user.click(screen.getByRole('button', { name: Ar['mfa.passkeys.remove.aria'].replace('{name}', isolate('YubiKey 5C')) }));
     await user.type(screen.getByLabelText(Ar['factor.method.totp']), '000000');
     await user.click(screen.getByRole('button', { name: Ar['mfa.passkeys.remove.confirm'] }));
     expect(await screen.findByText('INVALID_CURRENT_FACTOR')).toBeInTheDocument();

@@ -8,6 +8,7 @@ import { DEFAULT_COLORS, SYSTEM_THEMES } from '@/Core/Theme/ThemeTokens';
 import { useThemeStore } from '@/Core/Theme/useThemeStore';
 import { Ar } from '@/I18n/Locales/Ar';
 import { AppearanceBody } from '@/Modules/Appearance/Components/AppearanceBody';
+import { isolate } from '@/I18n/Translate';
 
 const html = document.documentElement;
 
@@ -32,7 +33,7 @@ describe('AppearanceBody', () => {
     expect(window.localStorage.getItem(ACTIVE_THEME_KEY)).toBe('teak');
     expect(screen.getByRole('button', { name: Ar['theme.system.teak'] })).toHaveAttribute('aria-pressed', 'true');
     expect(useToastStore.getState().Toasts.map((toast) => toast.Title)).toContain(
-      Ar['appearance.changed'].replace('{name}', Ar['theme.system.teak']),
+      Ar['appearance.changed'].replace('{name}', isolate(Ar['theme.system.teak'])),
     );
   });
 

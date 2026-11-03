@@ -7,6 +7,7 @@ import { renderWithProviders } from '@/Core/Testing/Render';
 import { Ar } from '@/I18n/Locales/Ar';
 import { RegistrationTokensCard } from '@/Modules/Runners/Components/RegistrationTokensCard';
 import { RunnersBody, RunnersFooter } from '@/Modules/Runners/Components/RunnersBody';
+import { isolate } from '@/I18n/Translate';
 
 const RUNNER_ID = '0198a000-0000-7000-8000-0000000000e1';
 const TOKEN_ID = '0198a000-0000-7000-8000-0000000000f1';
@@ -174,7 +175,7 @@ describe('the registration tokens card', () => {
 
   it('revokes a token only after asking', async () => {
     const { user, calls } = mount({ revokeToken: () => envelope({ Success: true, Data: token({ Status: 'revoked' }) }) }, true);
-    await user.click(await screen.findByRole('button', { name: Ar['runners.token.revoke.aria'].replace('{name}', 'Build box') }));
+    await user.click(await screen.findByRole('button', { name: Ar['runners.token.revoke.aria'].replace('{name}', isolate('Build box')) }));
     expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0);
     await user.click(screen.getByRole('button', { name: Ar['runners.token.revoke.confirm'] }));
     await waitFor(() => {

@@ -6,6 +6,7 @@ import { matrixOf, stagesOf } from '@/Modules/Projects/Types/Stages';
 const job = (JobId: string, Needs: string[] = [], Matrix: Record<string, string> = {}, Key = JobId): TRunJob => ({
   Id: `id-${Key}`,
   Key,
+  Kind: 'job',
   JobId,
   Name: JobId,
   Matrix,

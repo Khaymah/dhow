@@ -12,6 +12,7 @@ import { Ar } from '@/I18n/Locales/Ar';
 import { InvitePage } from '@/Modules/Identity/Pages/InvitePage';
 import { takeInviteTokenFromHash, takeInviteTokenFromLocation } from '@/Modules/Identity/Store/InviteToken';
 import { useInviteTokenStore } from '@/Modules/Identity/Store/useInviteTokenStore';
+import { isolate } from '@/I18n/Translate';
 
 const TOKEN = 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8s9T0u1V';
 const PASSWORD = 'a brand new passphrase 2026';
@@ -87,7 +88,7 @@ describe('the invitation token', () => {
     backend();
     const router = createAppRouter(createMemoryHistory({ initialEntries: [`/invite#${TOKEN}`] }));
     render(<App router={router} queryClient={createQueryClient({ retry: false })} />);
-    expect(await screen.findByText(Ar['invite.page.title'].replace('{inviter}', 'Mona Adel').replace('{organization}', 'Future Solution'))).toBeInTheDocument();
+    expect(await screen.findByText(Ar['invite.page.title'].replace('{inviter}', isolate('Mona Adel')).replace('{organization}', isolate('Future Solution')))).toBeInTheDocument();
     expect(router.state.location.href).toBe('/invite');
   });
 });
@@ -108,7 +109,7 @@ describe('the invitation page', () => {
     await user.type(screen.getByLabelText(Ar['field.password']), PASSWORD);
     expect(screen.getByRole('meter', { name: Ar['password.strength.label'] })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: Ar['invite.page.submit'] }));
-    expect(await screen.findByText(Ar['invite.page.done.title'].replace('{organization}', 'Future Solution'))).toBeInTheDocument();
+    expect(await screen.findByText(Ar['invite.page.done.title'].replace('{organization}', isolate('Future Solution')))).toBeInTheDocument();
     const accept = calls.find((call) => call.url.endsWith('/invitations/accept'));
     expect(await accept?.clone().json()).toEqual({ Token: TOKEN, Name: 'Ali Hassan', Password: PASSWORD, Locale: 'ar' });
     await user.click(screen.getByRole('button', { name: Ar['invite.page.done.action'] }));
@@ -150,7 +151,7 @@ describe('the invitation page', () => {
     useInviteTokenStore.getState().Set(TOKEN);
     const { calls } = backend({ signedIn: true });
     const { user, onJoined } = mount();
-    await user.click(await screen.findByRole('button', { name: Ar['invite.page.join'].replace('{organization}', 'Future Solution') }));
+    await user.click(await screen.findByRole('button', { name: Ar['invite.page.join'].replace('{organization}', isolate('Future Solution')) }));
     await waitFor(() => {
       expect(onJoined).toHaveBeenCalled();
     });
@@ -161,8 +162,8 @@ describe('the invitation page', () => {
     useInviteTokenStore.getState().Set(TOKEN);
     const { calls } = backend({ signedIn: true, email: 'eve@future.dev' });
     mount();
-    expect(await screen.findByText(Ar['invite.page.mismatch.title'].replace('{email}', 'ali@future.dev'))).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: Ar['invite.page.signOut'].replace('{email}', 'eve@future.dev') })).toBeInTheDocument();
+    expect(await screen.findByText(Ar['invite.page.mismatch.title'].replace('{email}', isolate('ali@future.dev')))).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: Ar['invite.page.signOut'].replace('{email}', isolate('eve@future.dev')) })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /انضم/ })).not.toBeInTheDocument();
     expect(calls.some((call) => call.url.includes('/accept'))).toBe(false);
   });

@@ -85,8 +85,17 @@ describe('the UI glossary (ADR-0034)', () => {
 
 describe('translate', () => {
   it('fills placeholders and leaves unknown ones visible', () => {
-    expect(translate('en', 'shell.language.switch', { language: 'Arabic' })).toBe('Switch the language to Arabic');
+    expect(translate('en', 'shell.language.switch', { language: 'Arabic' })).toBe('Switch the language to \u2068Arabic\u2069');
     expect(translate('en', 'shell.language.switch')).toBe('Switch the language to {language}');
+  });
+
+  it('isolates every value, so a path or an address keeps its order inside Arabic text', () => {
+    const path = '.github/ci.yaml';
+    const url = 'ssh://git@git.example.com/team/app.git';
+    const text = translate('ar', 'projects.form.path.hint', { ext: '.yaml', example: path });
+    expect(text).toContain(`\u2068${path}\u2069`);
+    expect(text).toContain('\u2068.yaml\u2069');
+    expect(translate('ar', 'repository.source.url.hint', { ssh: url, scp: 'git@h:a/b.git' })).toContain(`\u2068${url}\u2069`);
   });
 });
 

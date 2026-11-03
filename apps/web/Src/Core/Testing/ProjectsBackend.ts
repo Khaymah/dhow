@@ -19,6 +19,7 @@ export const projectFixture = (overrides: Partial<TFixture> = {}): TFixture => (
   PipelinePath: '.dhow.yml',
   ForkPolicy: 'approval',
   State: 'active',
+  RepositoryLinked: true,
   CreatedAt: '2026-11-01T08:00:00Z',
   UpdatedAt: '2026-11-01T08:00:00Z',
   ...overrides,
@@ -62,6 +63,7 @@ export const runFixture = (overrides: Partial<TFixture> = {}): TFixture => ({
 export const runJobFixture = (overrides: Partial<TFixture> = {}): TFixture => ({
   Id: '0198a000-0000-7000-8000-000000000801',
   Key: 'build',
+  Kind: 'job',
   JobId: 'build',
   Name: 'build',
   Matrix: {},

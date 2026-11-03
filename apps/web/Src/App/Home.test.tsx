@@ -11,6 +11,7 @@ import { gate, type TGateMode } from '@/Core/Testing/Gate';
 import { jobFixture, jobsRoute } from '@/Core/Testing/JobsBackend';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const BUSY = overviewFixture({
   Jobs: { Running: 1, Queued: 4, QueuedNoRunner: 3, FailedLast24h: 2 },
@@ -68,10 +69,10 @@ describe('the home page', () => {
     expect(banner.closest('[role="status"]')).toHaveTextContent(Ar['home.stuck.fix.manager']);
     expect(within(main()).getByRole('link', { name: new RegExp(Ar['home.stat.queued']) })).toHaveTextContent('4');
 
-    const jobs = await within(menu()).findByLabelText(Ar['shell.count.jobsStuck'].replace('{count}', '4').replace('{stuck}', '3'));
+    const jobs = await within(menu()).findByLabelText(Ar['shell.count.jobsStuck'].replace('{count}', isolate('4')).replace('{stuck}', isolate('3')));
     expect(jobs).toHaveTextContent('4');
     expect(jobs).toHaveAttribute('data-tone', 'warn');
-    expect(within(menu()).getByLabelText(Ar['shell.count.runners'].replace('{count}', '1'))).toHaveTextContent('1');
+    expect(within(menu()).getByLabelText(Ar['shell.count.runners'].replace('{count}', isolate('1')))).toHaveTextContent('1');
     expect(within(menu()).getByLabelText(arText('shell.count.invitations', { count: 2 }))).toHaveTextContent('2');
     expect(within(bottom()).getByRole('link', { name: new RegExp(Ar['shell.nav.jobs']) }).querySelector('[data-dot="warn"]')).not.toBeNull();
     expect(menuLink(Ar['shell.nav.home']).querySelector('[aria-label]')).toBeNull();
@@ -79,14 +80,14 @@ describe('the home page', () => {
 
   it('keeps the plain tone and no phone dot when queued jobs all have a runner', async () => {
     await mount({ overview: overviewFixture({ Jobs: { Queued: 2 } }) });
-    const jobs = await within(menu()).findByLabelText(Ar['shell.count.jobs'].replace('{count}', '2'));
+    const jobs = await within(menu()).findByLabelText(Ar['shell.count.jobs'].replace('{count}', isolate('2')));
     expect(jobs).not.toHaveAttribute('data-tone');
     expect(bottom().querySelector('[data-dot]')).toBeNull();
   });
 
   it('hides the counters a role may not read', async () => {
     await mount({ overview: BUSY, role: 'developer' });
-    await within(menu()).findByLabelText(Ar['shell.count.runners'].replace('{count}', '1'));
+    await within(menu()).findByLabelText(Ar['shell.count.runners'].replace('{count}', isolate('1')));
     expect(within(menu()).queryByLabelText(arText('shell.count.invitations', { count: 2 }))).not.toBeInTheDocument();
   });
 

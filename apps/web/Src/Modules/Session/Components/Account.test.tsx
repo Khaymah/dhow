@@ -12,6 +12,7 @@ import { useToastStore } from '@/Core/Store/useToastStore';
 import { findPage } from '@/Core/Testing/Pages';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const PROFILE = '/account/profile';
 
@@ -76,14 +77,14 @@ describe('my account pages', () => {
 
   it('lists the devices with a readable name, address, last activity and which one is this device', async () => {
     const { dialog } = await mount();
-    const chrome = await rowOf('Chrome على Linux');
+    const chrome = await rowOf(`${isolate('Chrome')} على ${isolate('Linux')}`);
     expect(within(chrome).getByText(Ar['sessions.current'])).toBeInTheDocument();
     expect(within(chrome).queryByRole('button')).not.toBeInTheDocument();
     expect(within(chrome).getByText('203.0.113.7')).toBeInTheDocument();
-    const firefox = await rowOf('Firefox على Windows');
+    const firefox = await rowOf(`${isolate('Firefox')} على ${isolate('Windows')}`);
     expect(within(firefox).getByText(/منذ ساعتين/)).toBeInTheDocument();
-    expect(within(firefox).getByRole('button', { name: Ar['sessions.revoke.aria'].replace('{device}', 'Firefox على Windows') })).toBeInTheDocument();
-    expect(await rowOf('Safari على iOS')).toBeInTheDocument();
+    expect(within(firefox).getByRole('button', { name: Ar['sessions.revoke.aria'].replace('{device}', isolate(`${isolate('Firefox')} على ${isolate('Windows')}`)) })).toBeInTheDocument();
+    expect(await rowOf(`${isolate('Safari')} على ${isolate('iOS')}`)).toBeInTheDocument();
     expect(within(dialog).getByText(arText('account.sessions.count', { count: 3 }))).toBeInTheDocument();
   });
 });
@@ -91,7 +92,7 @@ describe('my account pages', () => {
 describe('signing out one device', () => {
   it('asks first, sends nothing until confirmed, and can be cancelled', async () => {
     const { user, calls } = await mount();
-    const firefox = await rowOf('Firefox على Windows');
+    const firefox = await rowOf(`${isolate('Firefox')} على ${isolate('Windows')}`);
     await user.click(within(firefox).getByRole('button'));
     expect(within(firefox).getByText(Ar['sessions.revoke.question'])).toBeInTheDocument();
     expect(within(firefox).getByRole('button', { name: Ar['sessions.revoke.confirm'] })).toHaveFocus();
@@ -103,11 +104,11 @@ describe('signing out one device', () => {
 
   it('revokes the chosen session with the CSRF token and refreshes the list', async () => {
     const { user, calls, state } = await mount();
-    const firefox = await rowOf('Firefox على Windows');
+    const firefox = await rowOf(`${isolate('Firefox')} على ${isolate('Windows')}`);
     await user.click(within(firefox).getByRole('button'));
     await user.click(within(firefox).getByRole('button', { name: Ar['sessions.revoke.confirm'] }));
     await waitFor(() => {
-      expect(screen.queryByText('Firefox على Windows')).not.toBeInTheDocument();
+      expect(screen.queryByText(`${isolate('Firefox')} على ${isolate('Windows')}`)).not.toBeInTheDocument();
     });
     const [revoke] = methodCalls(calls, 'DELETE');
     expect(new URL(revoke?.url ?? '').pathname).toBe('/api/v1/sessions/0198a000-0000-7000-8000-0000000000c2');
@@ -120,11 +121,11 @@ describe('signing out one device', () => {
     const { user } = await mount({
       routes: [(request) => (request.method === 'DELETE' ? backendFailure('INTERNAL', 'حدث خطأ في السيرفر.', 500) : undefined)],
     });
-    const firefox = await rowOf('Firefox على Windows');
+    const firefox = await rowOf(`${isolate('Firefox')} على ${isolate('Windows')}`);
     await user.click(within(firefox).getByRole('button'));
     await user.click(within(firefox).getByRole('button', { name: Ar['sessions.revoke.confirm'] }));
     expect(await screen.findByRole('alert')).toHaveTextContent('حدث خطأ في السيرفر.');
-    expect(await rowOf('Firefox على Windows')).toBeInTheDocument();
+    expect(await rowOf(`${isolate('Firefox')} على ${isolate('Windows')}`)).toBeInTheDocument();
   });
 });
 
@@ -137,13 +138,13 @@ describe('signing out every other device', () => {
     expect(methodCalls(calls, 'POST')).toHaveLength(0);
     await user.click(screen.getByRole('button', { name: Ar['sessions.revokeOthers.confirm'] }));
     await waitFor(() => {
-      expect(screen.queryByText('Firefox على Windows')).not.toBeInTheDocument();
+      expect(screen.queryByText(`${isolate('Firefox')} على ${isolate('Windows')}`)).not.toBeInTheDocument();
     });
     const [revoke] = methodCalls(calls, 'POST');
     expect(new URL(revoke?.url ?? '').pathname).toBe('/api/v1/sessions/revoke-others');
     expect(revoke?.headers.get('X-CSRF-Token')).toBe('csrf-token-1');
     expect(state.sessions).toHaveLength(1);
-    expect(await rowOf('Chrome على Linux')).toBeInTheDocument();
+    expect(await rowOf(`${isolate('Chrome')} على ${isolate('Linux')}`)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: Ar['sessions.revokeOthers'] })).not.toBeInTheDocument();
     expect(useToastStore.getState().Toasts.some((toast) => toast.Title === arText('sessions.revokedOthers', { count: 2 }))).toBe(true);
   });
@@ -151,7 +152,7 @@ describe('signing out every other device', () => {
   it('offers nothing to revoke when this is the only device', async () => {
     const [current] = startBackend().state.sessions;
     await mount({ sessions: current ? [current] : [] });
-    await rowOf('Chrome على Linux');
+    await rowOf(`${isolate('Chrome')} على ${isolate('Linux')}`);
     expect(screen.queryByRole('button', { name: Ar['sessions.revokeOthers'] })).not.toBeInTheDocument();
     expect(screen.getByText(Ar['account.sessions.count.one'])).toBeInTheDocument();
   });
@@ -169,7 +170,7 @@ describe('signing out every other device', () => {
     expect(await screen.findByText(Ar['account.sessions.error'])).toBeInTheDocument();
     failing = false;
     await user.click(screen.getByRole('button', { name: Ar['status.retry'] }));
-    expect(await rowOf('Chrome على Linux')).toBeInTheDocument();
+    expect(await rowOf(`${isolate('Chrome')} على ${isolate('Linux')}`)).toBeInTheDocument();
   });
 });
 

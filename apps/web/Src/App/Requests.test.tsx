@@ -11,6 +11,7 @@ import { auditFixture, startBackend } from '@/Core/Testing/Backend';
 import { settingsFixture, settingsRoute } from '@/Core/Testing/SettingsBackend';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -181,15 +182,15 @@ describe('API requests per page', () => {
     await screen.findByRole('heading', { level: 1, name: Ar['shell.nav.security'] });
     await settle(view.client, view.calls, ['GET /api/v1/sessions']);
     const list = await screen.findByRole('list', { name: Ar['account.sessions.title'] });
-    const firefox = (await within(list).findByText('Firefox على Windows')).closest('li');
+    const firefox = (await within(list).findByText(`${isolate('Firefox')} على ${isolate('Windows')}`)).closest('li');
     if (!firefox) throw new Error('no row for Firefox');
 
-    await view.user.click(within(firefox).getByRole('button', { name: Ar['sessions.revoke.aria'].replace('{device}', 'Firefox على Windows') }));
+    await view.user.click(within(firefox).getByRole('button', { name: Ar['sessions.revoke.aria'].replace('{device}', isolate(`${isolate('Firefox')} على ${isolate('Windows')}`)) }));
     await view.user.click(within(firefox).getByRole('button', { name: Ar['sessions.revoke.confirm'] }));
 
     await waitFor(() => {
       expect(countsOf(view.calls, endpointOf)['GET /api/v1/sessions']).toBe(2);
     });
-    expect(within(list).queryByText('Firefox على Windows')).not.toBeInTheDocument();
+    expect(within(list).queryByText(`${isolate('Firefox')} على ${isolate('Windows')}`)).not.toBeInTheDocument();
   });
 });

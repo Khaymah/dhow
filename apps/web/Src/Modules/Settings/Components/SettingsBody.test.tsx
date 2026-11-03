@@ -16,6 +16,7 @@ import {
 } from '@/Core/Testing/SettingsBackend';
 import { Ar } from '@/I18n/Locales/Ar';
 import { SettingsBody } from '@/Modules/Settings/Components/SettingsBody';
+import { isolate } from '@/I18n/Translate';
 
 const TOTP = { TotpEnabled: true, RecoveryCodesRemaining: 10, Passkeys: [] };
 
@@ -162,7 +163,7 @@ describe('saving server settings', () => {
     });
     const mail = await card(Ar['settings.mail.title']);
     await user.click(await within(mail).findByRole('button', { name: Ar['settings.mail.test'] }));
-    expect(await within(mail).findByText(Ar['settings.mail.testSent'].replace('{email}', 'sabry@future.dev'))).toBeInTheDocument();
+    expect(await within(mail).findByText(Ar['settings.mail.testSent'].replace('{email}', isolate('sabry@future.dev')))).toBeInTheDocument();
     fail = true;
     await user.click(within(mail).getByRole('button', { name: Ar['settings.mail.test'] }));
     expect(await within(mail).findByText('لم يقبل خادم البريد رسالة التجربة.')).toBeInTheDocument();

@@ -13,6 +13,7 @@ import { envelope, meBody, ORG_ID } from '@/Core/Testing/Fetch';
 import { GOOD_CODE } from '@/Core/Testing/MfaBackend';
 import { findPage } from '@/Core/Testing/Pages';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const RULE_PATH = `/api/v1/organizations/${ORG_ID}/second-factor-rule`;
 const SINCE = '2026-10-20T08:00:00Z';
@@ -82,7 +83,7 @@ describe('the second-step rule of the organization', () => {
     const put = calls.find((call) => call.method === 'PUT' && new URL(call.url).pathname === RULE_PATH);
     expect(put?.headers.get('X-CSRF-Token')).toBe('csrf-token-1');
     expect(await put?.clone().json()).toEqual({ RequireSecondFactor: 'admins', CurrentFactor: { Method: 'totp', Code: GOOD_CODE } });
-    expect(await within(dialog).findByText(Ar['organization.secondFactor.since'].replace('{date}', formatDateTime(SINCE, 'ar')))).toBeInTheDocument();
+    expect(await within(dialog).findByText(Ar['organization.secondFactor.since'].replace('{date}', isolate(formatDateTime(SINCE, 'ar'))))).toBeInTheDocument();
   });
 
   it('warns before lowering the protection and shows the server reason on failure', async () => {
@@ -119,14 +120,14 @@ describe('the second-step deadline banner', () => {
     render(<App router={router} queryClient={createQueryClient({ retry: false })} />);
     return { ...backend, user };
   };
-  const title = Ar['secondFactor.banner.title'].replace('{organization}', 'Future Solution');
+  const title = Ar['secondFactor.banner.title'].replace('{organization}', isolate('Future Solution'));
 
   it('shows the deadline during the grace period and opens the account', async () => {
     const due = new Date(Date.now() + 3 * 86_400_000).toISOString();
     const { user } = mountHome([meWithDue(due)]);
     const banner = (await screen.findByText(title)).closest('[role="status"]');
     expect(banner).not.toBeNull();
-    expect(within(banner as HTMLElement).getByText(Ar['secondFactor.banner.before'].replace('{date}', formatDateTime(due, 'ar')))).toBeInTheDocument();
+    expect(within(banner as HTMLElement).getByText(Ar['secondFactor.banner.before'].replace('{date}', isolate(formatDateTime(due, 'ar'))))).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: Ar['secondFactor.banner.action'] }));
     expect(await findPage(Ar['shell.nav.security'])).toBeInTheDocument();
   });

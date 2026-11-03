@@ -11,6 +11,7 @@ import { backendFailure, startBackend, type TRouteHandler } from '@/Core/Testing
 import { envelope, ORG_ID } from '@/Core/Testing/Fetch';
 import { findPage } from '@/Core/Testing/Pages';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -118,7 +119,7 @@ describe('team actions per role', () => {
       within(page).queryByRole('button', { name: Ar['teams.new'] }),
       within(page).queryByRole('combobox', { name: Ar['team.role.pick'] }),
       within(page).queryByRole('button', { name: Ar['team.members.add'] }),
-      within(page).queryByRole('button', { name: Ar['team.members.remove'].replace('{name}', 'Hana Samir') }),
+      within(page).queryByRole('button', { name: Ar['team.members.remove'].replace('{name}', isolate('Hana Samir')) }),
       within(page).queryByRole('button', { name: Ar['team.delete'] }),
       within(page).queryByLabelText(Ar['team.name']),
     ];

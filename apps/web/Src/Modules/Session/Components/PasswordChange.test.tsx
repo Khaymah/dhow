@@ -11,6 +11,7 @@ import { envelope } from '@/Core/Testing/Fetch';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const CURRENT = 'the old password 123';
 const NEXT = 'correct horse battery staple 42';
@@ -109,7 +110,7 @@ describe('refused password changes', () => {
     });
     await type(user, 'wrong password 1', NEXT, NEXT);
     await submit(user);
-    const locked = await screen.findByRole('button', { name: Ar['throttle.retryIn'].replace('{time}', '0:30') });
+    const locked = await screen.findByRole('button', { name: Ar['throttle.retryIn'].replace('{time}', isolate('0:30')) });
     expect(locked).toBeDisabled();
     expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
   });

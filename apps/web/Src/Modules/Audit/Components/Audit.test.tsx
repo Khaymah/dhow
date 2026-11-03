@@ -12,6 +12,7 @@ import { envelope, USER_ID } from '@/Core/Testing/Fetch';
 import { findPage } from '@/Core/Testing/Pages';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const mount = async (options: IBackendOptions = {}, url = '/audit') => {
   const backend = startBackend({ audit: auditFixture(45), ...options });
@@ -34,7 +35,7 @@ describe('the audit log page', () => {
     expect(first).toHaveTextContent(Ar['audit.action.auth.login']);
     expect(first).toHaveTextContent('Sabry Dawood');
     expect(first).toHaveTextContent('203.0.113.1');
-    expect(first).toHaveTextContent('منذ 10 دقائق');
+    expect(first).toHaveTextContent(`منذ ${isolate('10')} دقائق`);
     expect(rows[2]).toHaveTextContent(Ar['audit.action.auth.login_failed']);
     expect(rows[2]).toHaveTextContent(Ar['audit.actor.visitor']);
     expect(within(dialog).getByText(arText('audit.list.total', { count: 45 }))).toBeInTheDocument();
@@ -43,10 +44,10 @@ describe('the audit log page', () => {
   it('asks the API for one page at a time and moves between pages', async () => {
     const { dialog, user, calls } = await mount();
     await within(dialog).findByRole('list', { name: Ar['audit.list.title'] });
-    expect(within(dialog).getByText(Ar['pager.status'].replace('{page}', '1').replace('{pages}', '3'))).toBeInTheDocument();
+    expect(within(dialog).getByText(Ar['pager.status'].replace('{page}', isolate('1')).replace('{pages}', isolate('3')))).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: Ar['pager.next'] }));
     await waitFor(() => {
-      expect(within(dialog).getByText(Ar['pager.status'].replace('{page}', '2').replace('{pages}', '3'))).toBeInTheDocument();
+      expect(within(dialog).getByText(Ar['pager.status'].replace('{page}', isolate('2')).replace('{pages}', isolate('3')))).toBeInTheDocument();
     });
     const urls = calls.map((call) => new URL(call.url)).filter((url) => url.pathname.endsWith('/audit-events'));
     expect(urls.map((url) => [url.searchParams.get('Page'), url.searchParams.get('Limit')])).toEqual([
@@ -55,7 +56,7 @@ describe('the audit log page', () => {
     ]);
     await user.click(within(dialog).getByRole('button', { name: Ar['pager.next'] }));
     await waitFor(() => {
-      expect(within(dialog).getByText(Ar['pager.status'].replace('{page}', '3').replace('{pages}', '3'))).toBeInTheDocument();
+      expect(within(dialog).getByText(Ar['pager.status'].replace('{page}', isolate('3')).replace('{pages}', isolate('3')))).toBeInTheDocument();
     });
     expect(within(dialog).getByRole('button', { name: Ar['pager.next'] })).toBeDisabled();
     expect(within(await within(dialog).findByRole('list', { name: Ar['audit.list.title'] })).getAllByRole('listitem')).toHaveLength(5);
@@ -122,7 +123,7 @@ describe('verifying the chain', () => {
     });
     await user.click(await verifyButton());
     expect(await screen.findByText(Ar['audit.verify.broken.title'])).toBeInTheDocument();
-    expect(screen.getByText(/فحصنا 12 حدث/)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`فحصنا ${isolate('12')} حدث`))).toBeInTheDocument();
     expect(screen.getByText('0198a000-0000-7000-8000-000000000013')).toBeInTheDocument();
     expect(screen.queryByText(Ar['audit.verify.intact.title'])).not.toBeInTheDocument();
   });

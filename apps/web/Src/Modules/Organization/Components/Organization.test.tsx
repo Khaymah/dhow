@@ -11,6 +11,7 @@ import { envelope } from '@/Core/Testing/Fetch';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { findPage } from '@/Core/Testing/Pages';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const mount = async (options: IBackendOptions = {}, url = '/org/members', title: string = Ar['shell.nav.members']) => {
   const backend = startBackend(options);
@@ -36,7 +37,7 @@ describe('the organization in the shell', () => {
     const user = userEvent.setup();
     render(<App router={router} queryClient={createQueryClient({ retry: false })} />);
     expect(backend.state.orgName).toBe('Future Solution');
-    const chips = await screen.findAllByRole('button', { name: Ar['shell.organization.switch'].replace('{name}', 'Future Solution') });
+    const chips = await screen.findAllByRole('button', { name: Ar['shell.organization.switch'].replace('{name}', isolate('Future Solution')) });
     expect(chips.length).toBeGreaterThan(0);
     const [chip] = chips;
     if (!chip) throw new Error('the organization chip is missing');
@@ -68,14 +69,14 @@ describe('renaming the organization', () => {
     await save(user);
     await waitFor(() => {
       expect(
-        screen.getAllByRole('button', { name: Ar['shell.organization.switch'].replace('{name}', 'Future Labs'), hidden: true }).length,
+        screen.getAllByRole('button', { name: Ar['shell.organization.switch'].replace('{name}', isolate('Future Labs')), hidden: true }).length,
       ).toBeGreaterThan(0);
     });
     const patch = calls.find((call) => call.method === 'PATCH');
     expect(new URL(patch?.url ?? '').pathname).toBe('/api/v1/organizations/0198a000-0000-7000-8000-0000000000a1');
     expect(patch?.headers.get('X-CSRF-Token')).toBe('csrf-token-1');
     expect(await patch?.clone().json()).toEqual({ Name: 'Future Labs' });
-    expect(useToastStore.getState().Toasts.some((toast) => toast.Title === Ar['organization.renamed'].replace('{name}', 'Future Labs'))).toBe(true);
+    expect(useToastStore.getState().Toasts.some((toast) => toast.Title === Ar['organization.renamed'].replace('{name}', isolate('Future Labs')))).toBe(true);
     await waitFor(() => {
       expect(screen.getByRole('button', { name: Ar['organization.save'] })).toBeDisabled();
     });
