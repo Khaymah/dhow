@@ -18,7 +18,7 @@ type kindView struct {
 type jobOriginView struct {
 	Run *struct {
 		ProjectId, ProjectName, RunId, Kind string
-		RunNumber                     int64
+		RunNumber                           int64
 	}
 	Attempts []struct {
 		RunnerId   string
