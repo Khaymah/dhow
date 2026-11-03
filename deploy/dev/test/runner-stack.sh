@@ -21,9 +21,20 @@ failures=0
 trap 'rm -rf -- "$work"' EXIT
 
 ok() { printf '  ok    %s\n' "$1"; }
+evidence() {
+  local service=$1
+  printf '\n--- %s log ---\n' "$service" >&2
+  docker compose logs --no-color "$service" >&2 || true
+  if [[ -n $runner_id ]]; then
+    printf -- '--- server log lines for runner %s ---\n' "$runner_id" >&2
+    docker compose logs --no-color server 2>/dev/null | grep -F -- "$runner_id" >&2 || true
+  fi
+  printf -- '--- end ---\n\n' >&2
+}
 bad() {
   printf '  FAIL  %s\n' "$1" >&2
   failures=$((failures + 1))
+  evidence "$service"
 }
 expect() {
   local what=$1
@@ -98,12 +109,34 @@ online() {
   return 1
 }
 
+ready() {
+  local log
+  for _ in $(seq 120); do
+    log=$(docker compose logs --no-color "$service" 2>/dev/null) || true
+    if grep -F -- '"msg":"the runner is ready"' <<<"$log" | grep -qF -- "\"runner_id\":\"$runner_id\""; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+started_once() {
+  local log
+  log=$(docker compose logs --no-color "$service") || return 1
+  [[ $(grep -cF 'starting the runner' <<<"$log") == 1 ]] && ! grep -qF 'the runner stopped' <<<"$log" &&
+    [[ $(grep -cF '"msg":"the runner is ready"' <<<"$log") == 1 ]]
+}
+
 delegated() {
-  local pid
-  if pid=$(docker compose exec -T runner pgrep -o -u dhow-runner -x dhow-runner) &&
-    docker compose exec -T runner grep -q '^0::/dhow-runner[.]service' "/proc/$pid/cgroup"; then
-    return 0
-  fi
+  local pid=
+  for _ in $(seq 60); do
+    if pid=$(docker compose exec -T runner pgrep -o -u dhow-runner -x dhow-runner) &&
+      docker compose exec -T runner grep -q '^0::/dhow-runner[.]service' "/proc/$pid/cgroup"; then
+      return 0
+    fi
+    sleep 1
+  done
   printf '    runner pid: %s\n' "${pid:-none}" >&2
   docker compose exec -T runner ps -eo pid,user,comm >&2 || true
   docker compose exec -T runner find /proc -mindepth 2 -maxdepth 2 -path '/proc/[0-9]*/cgroup' -exec grep -H . {} + >&2 || true
@@ -142,21 +175,29 @@ password='dev stack runner passphrase'
 session=()
 org_id=
 runner_id=
+service=runner
 
 printf 'The Podman runner\n'
 must "the runner waits for a registration token" logged runner 'waiting for a registration token'
 must "the owner and the organization are set up" setup_owner
 must "the runner registers with dhow-dev-register" register runner
 must "the runner is online" online
+must "the runner signs in" ready
 expect "the runner runs as dhow-runner in its delegated cgroup" delegated
 expect "a job runs to success in rootless Podman" job_succeeds "dev stack podman"
+expect "the runner started once after registering, with no restart" started_once
 
 printf 'The fake runner\n'
+evidence runner
+runner_id=
+service=fake-runner
 docker compose --profile fake-runner up --detach --scale runner=0
 must "the fake runner waits for a registration token" logged fake-runner 'waiting for a registration token'
 must "the fake runner registers with dhow-dev-register" register fake-runner
 must "the fake runner is online" online
+must "the fake runner signs in" ready
 expect "a job runs to success on the fake driver" job_succeeds "dev stack fake"
+expect "the fake runner started once after registering, with no restart" started_once
 expect "the fake container is not privileged" test "$(docker inspect --format '{{.HostConfig.Privileged}}' "$(docker compose ps -q fake-runner)")" = false
 
 if ((failures != 0)); then
