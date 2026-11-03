@@ -172,6 +172,7 @@ The redirect URI to register at the provider is `<DHOW_PUBLIC_URL>/oidc/callback
 | Variable | Required | Default | Example | Purpose and validation |
 |---|---|---|---|---|
 | `DHOW_TEST_DATABASE_URL` | Only in CI | none | `postgres://dhow:dhow@127.0.0.1:5432/dhow_test?sslmode=disable` | Used by the Go tests, never by the server. The database tests create a throwaway schema in this database for each test. Without it they are skipped, except when `CI` is set, where they fail. |
+| `DHOW_TEST_PG_DUMP` | Only in CI | `pg_dump` | `docker run --rm --network host postgres:18 pg_dump` | The `pg_dump` command, with its arguments, that the test comparing the migration splitter with goose uses. Its version must not be older than PostgreSQL's. If it is older the test is skipped, except when `CI` is set, where it fails. |
 
 ## Compose stack variables
 

@@ -172,6 +172,7 @@ DHOW_PUBLIC_URL: must use https (http is allowed only with DHOW_DEV=true)
 | المتغير | مطلوب | القيمة الافتراضية | مثال | الغرض والتحقق |
 |---|---|---|---|---|
 | `DHOW_TEST_DATABASE_URL` | في CI فقط | لا يوجد | `postgres://dhow:dhow@127.0.0.1:5432/dhow_test?sslmode=disable` | تستخدمه اختبارات Go، ولا يستخدمه السيرفر أبدًا. اختبارات قاعدة البيانات تنشئ schema مؤقتة في هذه القاعدة لكل اختبار. بدونه نتخطى هذه الاختبارات، إلا عند ضبط `CI`، فعندها تفشل. |
+| `DHOW_TEST_PG_DUMP` | في CI فقط | `pg_dump` | `docker run --rm --network host postgres:18 pg_dump` | أمر `pg_dump` الذي يستخدمه اختبار مقارنة مقسّم الـ migrations مع goose، ويُكتب كاملًا مع وسائطه. يجب ألا تكون نسخته أقدم من نسخة PostgreSQL. إذا كانت أقدم نتخطى الاختبار، إلا عند ضبط `CI`، فعندها يفشل. |
 
 ## متغيرات حزمة Compose
 
