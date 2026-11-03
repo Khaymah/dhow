@@ -19,6 +19,8 @@ export interface IJobOverviewProps {
   organizationId: string;
   job: TJob;
   role: TRole | undefined;
+  name?: string;
+  origin?: ReactNode;
   waitingFor?: (job: TJob) => ReactNode;
 }
 
@@ -63,11 +65,11 @@ const useFacts = (job: TJob): IFact[] => {
   }
   if (!final && job.Deadline !== undefined) facts.push({ id: 'deadline', label: t('jobs.detail.deadline'), value: at(job.Deadline) });
   if (job.State === 'queued') facts.push({ id: 'queue-deadline', label: t('jobs.detail.queueDeadline'), value: at(job.QueueDeadline) });
-  facts.push({ id: 'priority', label: t('jobs.detail.priority'), value: job.Priority });
+  if (job.Priority !== 0) facts.push({ id: 'priority', label: t('jobs.detail.priority'), value: job.Priority });
   return facts;
 };
 
-export const JobOverview = ({ organizationId, job, role, waitingFor }: IJobOverviewProps) => {
+export const JobOverview = ({ organizationId, job, role, waitingFor, name, origin }: IJobOverviewProps) => {
   const t = useT();
   const text = useJobText();
   const facts = useFacts(job);
@@ -87,10 +89,11 @@ export const JobOverview = ({ organizationId, job, role, waitingFor }: IJobOverv
         <div className="grid gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="m-0 min-w-0 text-title-card break-words">
-              <bdi>{job.Name}</bdi>
+              <bdi>{name ?? job.Name}</bdi>
             </h3>
             <JobStateDot job={job} />
           </div>
+          {origin}
           {job.FailureReason === undefined || isStuck(job) ? null : (
             <p className="m-0 text-body-sm">
               <span className="text-secondary">{t('jobs.detail.reason')}: </span>

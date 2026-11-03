@@ -12,6 +12,7 @@ import { ORG_ID } from '@/Core/Testing/Fetch';
 import { orgBackend, TEAM_ID } from '@/Core/Testing/OrgBackend';
 import { findPage } from '@/Core/Testing/Pages';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -144,7 +145,7 @@ describe('the members page', () => {
 describe('removing a member', () => {
   it('asks in a slide and removes only after the confirmation', async () => {
     const { page, user, calls, router } = await open(`/org/members/${HANA}`);
-    await user.click(await within(page).findByRole('button', { name: Ar['member.remove.action'].replace('{name}', 'Hana Samir') }));
+    await user.click(await within(page).findByRole('button', { name: Ar['member.remove.action'].replace('{name}', isolate('Hana Samir')) }));
     const slide = await screen.findByRole('dialog', { name: Ar['member.remove.title'] });
     expect(router.state.location.search).toEqual({ slide: 'member-remove' });
     expect(calls.some((call) => call.method === 'DELETE')).toBe(false);
@@ -155,7 +156,7 @@ describe('removing a member', () => {
     });
     expect(calls.some((call) => call.method === 'DELETE')).toBe(false);
 
-    await user.click(within(page).getByRole('button', { name: Ar['member.remove.action'].replace('{name}', 'Hana Samir') }));
+    await user.click(within(page).getByRole('button', { name: Ar['member.remove.action'].replace('{name}', isolate('Hana Samir')) }));
     const again = await screen.findByRole('dialog', { name: Ar['member.remove.title'] });
     await user.click(await within(again).findByRole('button', { name: Ar['member.remove.confirm'] }));
     await waitFor(() => {
@@ -183,7 +184,7 @@ describe('member actions per role', () => {
   ] as const)('as a %s, can manage another member: %s', async (role, manage) => {
     const { page } = await open(`/org/members/${HANA}`, { role });
     await within(page).findByRole('heading', { level: 2, name: 'Hana Samir' });
-    const remove = within(page).queryByRole('button', { name: Ar['member.remove.action'].replace('{name}', 'Hana Samir') });
+    const remove = within(page).queryByRole('button', { name: Ar['member.remove.action'].replace('{name}', isolate('Hana Samir')) });
     const roleSelect = within(page).queryByRole('combobox', { name: Ar['member.role.pick'] });
     const invite = within(page).queryByRole('button', { name: Ar['organization.invite'] });
     for (const control of [remove, roleSelect, invite]) {
@@ -198,7 +199,7 @@ describe('member actions per role', () => {
     const { page } = await open(`/org/members/${MONA}`, { role: 'admin', members });
     await within(page).findByRole('heading', { level: 2, name: 'Mona Adel' });
     expect(within(page).queryByRole('combobox', { name: Ar['member.role.pick'] })).not.toBeInTheDocument();
-    expect(within(page).queryByRole('button', { name: Ar['member.remove.action'].replace('{name}', 'Mona Adel') })).not.toBeInTheDocument();
+    expect(within(page).queryByRole('button', { name: Ar['member.remove.action'].replace('{name}', isolate('Mona Adel')) })).not.toBeInTheDocument();
     expect(within(page).queryByRole('button', { name: Ar['member.mfa.reset'] })).not.toBeInTheDocument();
   });
 

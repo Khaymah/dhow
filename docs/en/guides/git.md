@@ -2,7 +2,7 @@
 
 # Link a Git repository
 
-Dhow links each project to one Git repository. This page covers generic Git: Gitea, Forgejo and any Git server that speaks SSH or https. Linking GitHub and GitLab comes in later phases. The dashboard comes later too, so the steps here use the API.
+Dhow links each project to one Git repository. This page covers generic Git: Gitea, Forgejo and any Git server that speaks SSH or https. Linking GitHub and GitLab comes in later phases. The dashboard steps are in [Projects and runs](projects.md#link-a-repository); this page shows them with the API.
 
 ## The address
 
@@ -81,3 +81,11 @@ What Dhow does with each request:
 Dhow does not keep the request body, because it can hold names and email addresses. It keeps the id, a digest of the body, the branch, the sha and the outcome only, and deletes them after 30 days.
 
 To rotate the secret, use `POST .../repository/rotate-webhook-secret`. The new secret is shown once, and the old one stops working at once.
+
+## Unlink the repository
+
+```http
+DELETE /api/v1/organizations/{id}/projects/{projectId}/repository
+```
+
+It needs `project.manage`. The deploy key and the webhook stop at once, Dhow erases the stored key and secret, cancels the open runs with `REPOSITORY_UNLINKED` and abandons the commit statuses it has not sent: a webhook to the old URL answers `401`, and no new run starts until you link a repository again. Linking again makes a new key, a new URL and a new secret. Remove the key and the webhook from the Git server too.

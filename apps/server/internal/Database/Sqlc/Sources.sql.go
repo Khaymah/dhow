@@ -13,6 +13,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const abandonCommitStatuses = `-- name: AbandonCommitStatuses :execrows
+UPDATE "CommitStatusReports"
+SET "AbandonedAt" = $1::timestamptz, "UpdatedAt" = $1::timestamptz
+WHERE "RepositoryId" = $2 AND "OrganizationId" = $3 AND NOT "IsDeleted" AND "AbandonedAt" IS NULL
+  AND "SentState" IS DISTINCT FROM "DesiredState"
+`
+
+type AbandonCommitStatusesParams struct {
+	Now            time.Time
+	RepositoryID   uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) AbandonCommitStatuses(ctx context.Context, arg AbandonCommitStatusesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, abandonCommitStatuses, arg.Now, arg.RepositoryID, arg.OrganizationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const claimCommitStatuses = `-- name: ClaimCommitStatuses :many
 UPDATE "CommitStatusReports" c
 SET "NextAttemptAt" = $1, "UpdatedAt" = $2
@@ -26,7 +47,7 @@ WHERE c."Id" IN (
     LIMIT $3
     FOR UPDATE SKIP LOCKED
 )
-  AND r."Id" = c."RepositoryId" AND r."OrganizationId" = c."OrganizationId"
+  AND r."Id" = c."RepositoryId" AND r."OrganizationId" = c."OrganizationId" AND NOT r."IsDeleted"
 RETURNING c."Id", c."OrganizationId", c."RepositoryId", c."Sha", c."RunId", c."TargetUrl", c."DesiredState", c."DesiredAt",
     c."Attempts", r."Provider", r."CloneUrl"
 `
@@ -503,6 +524,55 @@ func (q *Queries) TryLockWebhookPartitions(ctx context.Context) (bool, error) {
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const unlinkRepository = `-- name: UnlinkRepository :one
+UPDATE "Repositories"
+SET "IsDeleted" = true, "DeployKeySealed" = NULL, "PreviousDeployKeySealed" = NULL, "WebhookSecretSealed" = NULL,
+    "PendingHostKey" = NULL, "PendingHostKeyFetchedAt" = NULL, "UpdatedAt" = $1
+WHERE "Id" = $2 AND "OrganizationId" = $3 AND NOT "IsDeleted"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Provider", "ConnectionId", "ExternalId", "FullName", "CloneUrl", "Transport", "DefaultBranch", "HostKey", "HostKeyConfirmedAt", "HostKeyConfirmedByUserId", "PendingHostKey", "PendingHostKeyFetchedAt", "DeployKeyPublic", "DeployKeySealed", "PreviousDeployKeyPublic", "PreviousDeployKeySealed", "PreviousDeployKeyExpiresAt", "WebhookSecretSealed", "HookId", "LastDeliveryAt", "CreatedByUserId"
+`
+
+type UnlinkRepositoryParams struct {
+	Now            time.Time
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) UnlinkRepository(ctx context.Context, arg UnlinkRepositoryParams) (Repository, error) {
+	row := q.db.QueryRow(ctx, unlinkRepository, arg.Now, arg.ID, arg.OrganizationID)
+	var i Repository
+	err := row.Scan(
+		&i.Id,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.OrganizationId,
+		&i.ProjectId,
+		&i.Provider,
+		&i.ConnectionId,
+		&i.ExternalId,
+		&i.FullName,
+		&i.CloneUrl,
+		&i.Transport,
+		&i.DefaultBranch,
+		&i.HostKey,
+		&i.HostKeyConfirmedAt,
+		&i.HostKeyConfirmedByUserId,
+		&i.PendingHostKey,
+		&i.PendingHostKeyFetchedAt,
+		&i.DeployKeyPublic,
+		&i.DeployKeySealed,
+		&i.PreviousDeployKeyPublic,
+		&i.PreviousDeployKeySealed,
+		&i.PreviousDeployKeyExpiresAt,
+		&i.WebhookSecretSealed,
+		&i.HookId,
+		&i.LastDeliveryAt,
+		&i.CreatedByUserId,
+	)
+	return i, err
 }
 
 const updateRepository = `-- name: UpdateRepository :one

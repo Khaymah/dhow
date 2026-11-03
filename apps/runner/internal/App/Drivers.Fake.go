@@ -7,11 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 
 	config "github.com/Khaymah/dhow/apps/runner/internal/Config"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
 	fake "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Fake"
 )
+
+const fakeWorkspaces = "fake-workspaces"
 
 var ErrDriverMissing = errors.New("is not built into this test build; only the fake driver is")
 
@@ -23,5 +26,5 @@ func newDriver(_ context.Context, cfg config.Config, _ *slog.Logger) (sandbox.Dr
 	if err != nil {
 		return nil, err
 	}
-	return fake.New(rec, fake.Options{}), nil
+	return fake.New(rec, fake.Options{WorkspaceRoot: filepath.Join(cfg.StateDir, fakeWorkspaces)}), nil
 }

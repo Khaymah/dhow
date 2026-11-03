@@ -6,6 +6,7 @@ import { Ar } from '@/I18n/Locales/Ar';
 import type { TOverview } from '@/Modules/Overview/Api/OverviewApi';
 import { OverviewStats } from '@/Modules/Overview/Components/OverviewStats';
 import type { IOverviewLinks } from '@/Modules/Overview/Types/OverviewTargets';
+import { isolate } from '@/I18n/Translate';
 
 const FULL: TOverview = {
   Jobs: { Running: 1, Queued: 3, QueuedNoRunner: 2, FailedLast24h: 4 },
@@ -29,8 +30,8 @@ describe('OverviewStats', () => {
       ['/go/runners', 'ok'],
     ]);
     expect(tiles.map((tile) => tile.querySelector('b')?.textContent)).toEqual(['1', '3', '4', '2']);
-    expect(tiles[1]).toHaveTextContent(Ar['home.stat.queued.stuck'].replace('{count}', '2'));
-    expect(tiles[3]).toHaveTextContent(Ar['home.stat.online.offline'].replace('{count}', '1'));
+    expect(tiles[1]).toHaveTextContent(Ar['home.stat.queued.stuck'].replace('{count}', isolate('2')));
+    expect(tiles[3]).toHaveTextContent(Ar['home.stat.online.offline'].replace('{count}', isolate('1')));
     await user.click(screen.getByRole('link', { name: new RegExp(Ar['home.stat.failed']) }));
     expect(links.open).toHaveBeenCalledWith('failed');
   });

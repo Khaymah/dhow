@@ -49,9 +49,11 @@ func (f *fakeProvider) sent() []sources.StatusReport {
 }
 
 type setup struct {
-	env  *apptest.Env
-	org  uuid.UUID
-	repo uuid.UUID
+	env     *apptest.Env
+	org     uuid.UUID
+	repo    uuid.UUID
+	project uuid.UUID
+	owner   *apptest.Client
 }
 
 func linkedRepository(t *testing.T) setup {
@@ -67,7 +69,7 @@ func linkedRepository(t *testing.T) setup {
 	require.Equal(t, http.StatusCreated, res.Status, string(res.Raw))
 	var l struct{ Repository struct{ Id uuid.UUID } }
 	res.Decode(t, &l)
-	return setup{env: env, org: org, repo: l.Repository.Id}
+	return setup{env: env, org: org, repo: l.Repository.Id, project: project, owner: owner}
 }
 
 func service(t *testing.T, s setup, providers map[string]sources.Provider) *sources.Service {

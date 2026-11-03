@@ -11,11 +11,12 @@ import { useThemeStore } from '@/Core/Theme/useThemeStore';
 import { Ar } from '@/I18n/Locales/Ar';
 import { ThemeEditorBody } from '@/Modules/Appearance/Components/ThemeEditorBody';
 import { ThemeEditorFooter } from '@/Modules/Appearance/Components/ThemeEditorFooter';
+import { isolate } from '@/I18n/Translate';
 
 const html = document.documentElement;
 const variable = (name: string) => html.style.getPropertyValue(`--color-${name}`);
 const hexOf = (token: TThemeToken) =>
-  screen.getByLabelText<HTMLInputElement>(Ar['themeEditor.hexLabel'].replace('{name}', Ar[`theme.token.${token}`]));
+  screen.getByLabelText<HTMLInputElement>(Ar['themeEditor.hexLabel'].replace('{name}', isolate(Ar[`theme.token.${token}`])));
 const pickerOf = (token: TThemeToken) => screen.getByLabelText<HTMLInputElement>(Ar[`theme.token.${token}`]);
 const type = (input: HTMLInputElement, value: string) => {
   fireEvent.change(input, { target: { value } });
@@ -124,8 +125,8 @@ describe('ThemeEditor feedback and saving', () => {
     await mount();
     type(hexOf('blue'), DEFAULT_COLORS.green);
     const text = Ar['themeEditor.similar']
-      .replace('{first}', Ar['theme.token.green'])
-      .replace('{second}', Ar['theme.token.blue']);
+      .replace('{first}', isolate(Ar['theme.token.green']))
+      .replace('{second}', isolate(Ar['theme.token.blue']));
     expect(screen.getByText(text)).toBeInTheDocument();
   });
 
@@ -154,7 +155,7 @@ describe('ThemeEditor feedback and saving', () => {
     expect(variable('canvas')).toBe('#0a0b0c');
     expect(JSON.parse(window.localStorage.getItem(CUSTOM_THEMES_KEY) ?? '[]')).toHaveLength(1);
     expect(useToastStore.getState().Toasts.map((toast) => toast.Title)).toContain(
-      Ar['themeEditor.saved'].replace('{name}', 'Harbour'),
+      Ar['themeEditor.saved'].replace('{name}', isolate('Harbour')),
     );
   });
 

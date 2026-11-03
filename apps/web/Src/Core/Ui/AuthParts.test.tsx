@@ -11,6 +11,7 @@ import { PasswordInput } from '@/Core/Ui/PasswordInput';
 import { StrengthMeter } from '@/Core/Ui/StrengthMeter';
 import { Ar } from '@/I18n/Locales/Ar';
 import { En } from '@/I18n/Locales/En';
+import { isolate } from '@/I18n/Translate';
 
 const Typing = () => {
   const [Value, setValue] = useState('');
@@ -67,7 +68,7 @@ describe('Pager', () => {
   it('moves between pages and disables the ends', async () => {
     const onPage = vi.fn();
     const { user } = renderWithProviders(<Pager page={1} limit={20} total={41} onPage={onPage} />);
-    expect(screen.getByText(Ar['pager.status'].replace('{page}', '1').replace('{pages}', '3'))).toBeInTheDocument();
+    expect(screen.getByText(Ar['pager.status'].replace('{page}', isolate('1')).replace('{pages}', isolate('3')))).toBeInTheDocument();
     expect(screen.getByRole('button', { name: Ar['pager.previous'] })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: Ar['pager.next'] }));
     expect(onPage).toHaveBeenCalledWith(2);
@@ -100,7 +101,7 @@ describe('AuthPage', () => {
     );
     expect(screen.getAllByRole('main')).toHaveLength(1);
     expect(screen.getByRole('heading', { level: 1, name: 'العنوان' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: Ar['shell.language.switch'].replace('{language}', En['language.en']) }));
+    await user.click(screen.getByRole('button', { name: Ar['shell.language.switch'].replace('{language}', isolate(En['language.en'])) }));
     expect(document.documentElement.lang).toBe('en');
     expect(document.documentElement.dir).toBe('ltr');
   });

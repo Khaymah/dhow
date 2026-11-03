@@ -1522,7 +1522,11 @@ export interface paths {
          */
         put: operations["linkRepository"];
         post?: never;
-        delete?: never;
+        /**
+         * Unlink the repository from a project
+         * @description Needs `project.manage` on the project. The deploy key and the webhook stop working at once: a webhook to the old address answers 401, and no new run starts until a repository is linked again, with a new deploy key, host key and webhook secret. The project's open runs (waiting for approval, pending, queued or running) are canceled with `REPOSITORY_UNLINKED`, its unsent commit statuses are abandoned, and the stored deploy keys and webhook secret are erased. A project without a repository answers 404 `REPOSITORY_NOT_LINKED`, and an archived project 409 `PROJECT_ARCHIVED`.
+         */
+        delete: operations["unlinkRepository"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1683,7 +1687,7 @@ export interface paths {
         put?: never;
         /**
          * Run the failed and canceled jobs of a finished run again
-         * @description Needs `run.trigger` on the project. Only a run that ended `failed` or `canceled` can be run again (409 `RUN_NOT_RERUNNABLE` otherwise). Every job that failed, was canceled or was skipped because of them waits again and gets a new job; the jobs that succeeded keep their result. The run uses the same pipeline file and the same image digests as before.
+         * @description Needs `run.trigger` on the project. Only a run that ended `failed` or `canceled` can be run again (409 `RUN_NOT_RERUNNABLE` otherwise), and only while a repository is linked (404 `REPOSITORY_NOT_LINKED`). Every job that failed, was canceled or was skipped because of them waits again and gets a new job; the jobs that succeeded keep their result. The run uses the same pipeline file and the same image digests as before.
          */
         post: operations["rerunFailedRun"];
         delete?: never;
@@ -1703,7 +1707,7 @@ export interface paths {
         put?: never;
         /**
          * Approve a run from a fork's pull request
-         * @description Needs `run.approve` on the project (Maintainer and above). Only a run that waits for approval can be approved (409 `RUN_NOT_AWAITING_APPROVAL` otherwise). The run still has no secrets and no environments, and reads its pipeline file from the base branch.
+         * @description Needs `run.approve` on the project (Maintainer and above). Only a run that waits for approval can be approved (409 `RUN_NOT_AWAITING_APPROVAL` otherwise), and only while a repository is linked (404 `REPOSITORY_NOT_LINKED`). The run still has no secrets and no environments, and reads its pipeline file from the base branch.
          */
         post: operations["approveRun"];
         delete?: never;
@@ -1744,6 +1748,26 @@ export interface paths {
          * @description Needs `artifact.read` on the project. Streams the tar.gz archive as an attachment named after the artifact (`<name>.tar.gz`, with every character outside letters, digits, `.`, `_` and `-` replaced). An expired artifact is 404 `ARTIFACT_NOT_FOUND`, and a stored file that is missing or does not match its SHA-256 is 410 `ARTIFACT_GONE`.
          */
         get: operations["downloadArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/manual-inputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the inputs a manual run asks for
+         * @description Needs `run.trigger` on the project. Dhow reads the pipeline file only for a run, so the answer comes from the file of the latest run on the default branch that was not from a fork. `Known` is false when no such run read a file yet. `Enabled` says whether that file allows manual runs (`on.manual`), and `Inputs` lists what `on.manual.inputs` declares, by name. A project without a repository answers 404 `REPOSITORY_NOT_LINKED`.
+         */
+        get: operations["getManualInputs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3205,6 +3229,8 @@ export interface components {
             Number: number;
             /** Format: uuid */
             RunnerId: string;
+            /** @description The runner's name, when the runner still exists. */
+            RunnerName?: string;
             /**
              * Format: int64
              * @description The fencing token of the attempt's lease. Every attempt gets a larger one than the attempts before it, and the server refuses any call from a runner that holds an older token.
@@ -3223,9 +3249,21 @@ export interface components {
             MutationStartedAt?: string;
             Steps: components["schemas"]["JobAttemptStep"][];
         };
+        /** @description The pipeline run this job belongs to. Absent for a job that no run made. */
+        JobRun: {
+            Kind: components["schemas"]["RunJobKind"];
+            /** Format: uuid */
+            ProjectId: string;
+            ProjectName: string;
+            /** Format: uuid */
+            RunId: string;
+            /** Format: int64 */
+            RunNumber: number;
+        };
         JobDetail: {
             Job: components["schemas"]["Job"];
             Spec: components["schemas"]["JobSpec"];
+            Run?: components["schemas"]["JobRun"];
             Attempts: components["schemas"]["JobAttempt"][];
         };
         JobResponse: components["schemas"]["Envelope"] & {
@@ -3299,12 +3337,16 @@ export interface components {
             PipelinePath: string;
             ForkPolicy: components["schemas"]["ForkPolicy"];
             State: components["schemas"]["ProjectState"];
+            /** @description A repository is linked, so `getRepository` answers it instead of 404 `REPOSITORY_NOT_LINKED`. */
+            RepositoryLinked: boolean;
             /** Format: date-time */
             CreatedAt: string;
             /** Format: date-time */
             UpdatedAt: string;
             /** Format: date-time */
             ArchivedAt?: string;
+            /** @description The caller's role on this project after its role bindings, so a client can hide what the caller may not do. Only in the answers about one project (read, change, archive), not in the list. */
+            CallerRole?: components["schemas"]["Role"];
         };
         ProjectResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["Project"];
@@ -3332,6 +3374,11 @@ export interface components {
         RunState: "awaiting_approval" | "pending" | "queued" | "running" | "succeeded" | "failed" | "canceled" | "skipped";
         /** @enum {string} */
         RunTrigger: "push" | "tag" | "pull_request" | "manual" | "api";
+        /**
+         * @description `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a client names it from the kind.
+         * @enum {string}
+         */
+        RunJobKind: "job" | "discovery";
         /** @enum {string} */
         RunJobState: "waiting" | "active" | "succeeded" | "failed" | "canceled" | "skipped";
         RunIssue: {
@@ -3366,7 +3413,7 @@ export interface components {
             PrNumber?: number;
             Actor?: string;
             State: components["schemas"]["RunState"];
-            /** @description Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs), `RUN_STATE_INVALID` (a stored value of the run could not be read), `SHA_NOT_ON_REF` (the commit is not in the history of its ref), `DISCOVERY_FAILED` (the job that reads the file of a generic repository failed), `DEFINITION_UNVERIFIED` (the git objects that job handed over do not prove the file is in the run's commit) or `REPOSITORY_UNAVAILABLE`. */
+            /** @description Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `REPOSITORY_UNLINKED` (the repository was unlinked while the run was open), `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs), `RUN_STATE_INVALID` (a stored value of the run could not be read), `SHA_NOT_ON_REF` (the commit is not in the history of its ref), `DISCOVERY_FAILED` (the job that reads the file of a generic repository failed), `DEFINITION_UNVERIFIED` (the git objects that job handed over do not prove the file is in the run's commit) or `REPOSITORY_UNAVAILABLE`. */
             FailureReason?: string;
             DefinitionPath: string;
             /** @description The commit the pipeline file was read from. For a fork's pull request it is the base. */
@@ -3396,6 +3443,7 @@ export interface components {
             Id: string;
             /** @description The job's id, with its matrix values for a matrix job, such as `build (node=20, os=debian)`. */
             Key: string;
+            Kind: components["schemas"]["RunJobKind"];
             /** @description The id of the job in the pipeline file. */
             JobId: string;
             Name: string;
@@ -3427,6 +3475,32 @@ export interface components {
         };
         RunResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["Run"];
+        };
+        /** @enum {string} */
+        ManualInputType: "string" | "boolean" | "choice";
+        ManualInput: {
+            Name: string;
+            Type: components["schemas"]["ManualInputType"];
+            Description?: string;
+            Required: boolean;
+            /** @description The default as text. For a boolean it is `true` or `false`. */
+            Default?: string;
+            /** @description The allowed values of a `choice`. Empty for the other types. */
+            Options: string[];
+        };
+        ManualInputs: {
+            /** @description False while no run of the default branch has read the pipeline file. */
+            Known: boolean;
+            /** @description The pipeline file has `on.manual`. */
+            Enabled: boolean;
+            /** @description The default branch, as `refs/heads/<name>`. */
+            Ref: string;
+            /** @description The commit the inputs were read from. */
+            Sha?: string;
+            Inputs: components["schemas"]["ManualInput"][];
+        };
+        ManualInputsResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["ManualInputs"];
         };
         Artifact: {
             /** Format: uuid */
@@ -5931,6 +6005,30 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    unlinkRepository: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The repository as it was before the unlink. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     confirmHostKey: {
         parameters: {
             query?: never;
@@ -6236,6 +6334,30 @@ export interface operations {
                 };
                 content: {
                     "application/gzip": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getManualInputs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The manual inputs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualInputsResponse"];
                 };
             };
             default: components["responses"]["Error"];

@@ -11,6 +11,7 @@ import { useToastStore } from '@/Core/Store/useToastStore';
 import { usePaletteStore } from '@/Core/Store/usePaletteStore';
 import { En } from '@/I18n/Locales/En';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const renderApp = async (url = '/') => {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [url] }));
@@ -118,13 +119,13 @@ describe('slides in the URL', () => {
 describe('language switch', () => {
   it('flips the whole shell to English and left to right, and remembers it', async () => {
     const { user } = await renderApp();
-    await user.click(screen.getByRole('button', { name: Ar['shell.language.switch'].replace('{language}', Ar['language.en']) }));
+    await user.click(screen.getByRole('button', { name: Ar['shell.language.switch'].replace('{language}', isolate(Ar['language.en'])) }));
     expect(document.documentElement.dir).toBe('ltr');
     expect(document.documentElement.lang).toBe('en');
     expect(screen.getByRole('heading', { level: 1, name: En['home.title'] })).toBeInTheDocument();
     expect(within(screen.getByRole('navigation', { name: En['shell.nav.label'] })).getByRole('link', { name: En['shell.nav.home'] })).toBeInTheDocument();
     expect(window.localStorage.getItem('dhow.lang')).toBe('en');
-    await user.click(screen.getByRole('button', { name: En['shell.language.switch'].replace('{language}', En['language.ar']) }));
+    await user.click(screen.getByRole('button', { name: En['shell.language.switch'].replace('{language}', isolate(En['language.ar'])) }));
     expect(document.documentElement.dir).toBe('rtl');
   });
 });

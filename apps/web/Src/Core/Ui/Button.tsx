@@ -36,7 +36,7 @@ export const Button = ({
     data-variant={variant}
     className={cx(
       'inline-flex cursor-pointer items-center justify-center gap-2 rounded-btn border whitespace-nowrap',
-      'transition-colors duration-140 ease-dhow disabled:cursor-not-allowed',
+      'transition-colors duration-140 ease-dhow disabled:cursor-not-allowed max-md:min-h-11',
       size === 'sm' ? 'h-btn-sm px-3 text-label-sm' : 'h-btn px-4 text-label',
       VARIANTS[variant],
       className,

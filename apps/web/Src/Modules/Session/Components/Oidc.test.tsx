@@ -11,6 +11,7 @@ import { SignInChoices } from '@/Modules/Session/Components/SignInChoices';
 import { OidcCallbackPage } from '@/Modules/Session/Pages/OidcCallbackPage';
 import { providerOf, rememberOidcPurpose, readOidcPurpose, takeOidcCallbackFromSearch } from '@/Modules/Session/Store/OidcCallback';
 import { useOidcCallbackStore } from '@/Modules/Session/Store/useOidcCallbackStore';
+import { isolate } from '@/I18n/Translate';
 
 const PROVIDERS = [
   { Id: 'corp', Name: 'Corp SSO', Kind: 'oidc' },
@@ -25,7 +26,7 @@ const nth = <T,>(items: readonly T[], index: number): T => {
   return item;
 };
 
-const label = (key: keyof typeof Ar, provider: string) => Ar[key].replace('{provider}', provider);
+const label = (key: keyof typeof Ar, provider: string) => Ar[key].replace('{provider}', isolate(provider));
 
 afterEach(() => {
   useOidcCallbackStore.getState().Take();

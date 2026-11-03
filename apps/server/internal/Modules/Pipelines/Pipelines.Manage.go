@@ -23,7 +23,7 @@ func runJobOf(rj sqlc.RunJob) (models.RunJob, error) {
 		return models.RunJob{}, err
 	}
 	return models.RunJob{
-		ID: rj.Id, Key: rj.Key, JobID: rj.JobId, Name: rj.JobName, Matrix: matrix, Needs: rj.Needs, State: rj.State,
+		ID: rj.Id, Key: rj.Key, Kind: rj.Kind, JobID: rj.JobId, Name: rj.JobName, Matrix: matrix, Needs: rj.Needs, State: rj.State,
 		FailureReason: rj.FailureReason, CurrentJobID: rj.CurrentJobId, Attempts: int(rj.Attempts), StartedAt: rj.StartedAt,
 		FinishedAt: rj.FinishedAt,
 	}, nil
@@ -90,12 +90,12 @@ func (s *Service) List(ctx context.Context, org, project uuid.UUID, states []str
 	return out, nil
 }
 
-func (s *Service) cancelLocked(ctx context.Context, q *sqlc.Queries, id uuid.UUID, user *uuid.UUID) error {
+func (s *Service) cancelLocked(ctx context.Context, q *sqlc.Queries, id uuid.UUID, user *uuid.UUID, reason string) error {
 	run, err := q.LockRun(ctx, id)
 	if err != nil || models.RunFinished(run.State) {
 		return err
 	}
-	if err := q.RequestRunCancel(ctx, sqlc.RequestRunCancelParams{ID: id, UserID: user}); err != nil {
+	if err := q.RequestRunCancel(ctx, sqlc.RequestRunCancelParams{ID: id, UserID: user, Reason: reason}); err != nil {
 		return err
 	}
 	rows, err := q.ListRunJobs(ctx, id)
@@ -107,7 +107,7 @@ func (s *Service) cancelLocked(ctx context.Context, q *sqlc.Queries, id uuid.UUI
 		switch rj.State {
 		case models.JobWaiting:
 			if _, err := q.FinishRunJob(ctx, sqlc.FinishRunJobParams{
-				ID: rj.Id, State: models.JobCanceled, FailureReason: models.ReasonCanceled, Outputs: []byte("{}"),
+				ID: rj.Id, State: models.JobCanceled, FailureReason: reason, Outputs: []byte("{}"),
 			}); err != nil {
 				return err
 			}
@@ -118,7 +118,7 @@ func (s *Service) cancelLocked(ctx context.Context, q *sqlc.Queries, id uuid.UUI
 	if active && run.State == models.RunRunning {
 		return nil
 	}
-	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: id, State: models.RunCanceled, FailureReason: models.ReasonCanceled}); err != nil {
+	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: id, State: models.RunCanceled, FailureReason: reason}); err != nil {
 		return err
 	}
 	return s.recordStatus(ctx, q, run, commitstatus.StateCanceled)
@@ -135,7 +135,7 @@ func (s *Service) Cancel(ctx context.Context, org, project, id uuid.UUID) (model
 		if before, err = s.loadRun(ctx, q, org, project, id); err != nil {
 			return err
 		}
-		if err := s.cancelLocked(ctx, q, id, &p.UserID); err != nil {
+		if err := s.cancelLocked(ctx, q, id, &p.UserID, models.ReasonCanceled); err != nil {
 			return err
 		}
 		after, err = q.LockRun(ctx, id)
@@ -193,6 +193,9 @@ func (s *Service) Rerun(ctx context.Context, org, project, id uuid.UUID) (models
 		if _, err := s.loadRun(ctx, q, org, project, id); err != nil {
 			return err
 		}
+		if err := requireRepository(ctx, q, org, project); err != nil {
+			return err
+		}
 		run, err := q.LockRun(ctx, id)
 		if err != nil {
 			return err
@@ -238,6 +241,9 @@ func (s *Service) Approve(ctx context.Context, org, project, id uuid.UUID) (mode
 	var after sqlc.PipelineRun
 	err = s.inTx(ctx, func(q *sqlc.Queries) error {
 		if _, err := s.loadRun(ctx, q, org, project, id); err != nil {
+			return err
+		}
+		if err := requireRepository(ctx, q, org, project); err != nil {
 			return err
 		}
 		run, err := q.LockRun(ctx, id)

@@ -8,6 +8,7 @@ import { isThemeEditSlide, slideAllowed, themeOf, type TSlideId } from '@/App/Pa
 import { useCurrentMembership } from '@/Core/Auth/useMe';
 import type { ICustomTheme } from '@/Core/Theme/ThemeTokens';
 import { useThemeStore } from '@/Core/Theme/useThemeStore';
+import { useSlideGuardStore } from '@/Core/Store/useSlideGuardStore';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { SlideStack } from '@/Core/Ui/SlideStack';
 import { useT } from '@/I18n/useT';
@@ -21,12 +22,14 @@ export const SlideHost = () => {
   const t = useT();
   const navigate = useNavigate();
   const { slide, invalid, close, discard } = useSlide();
-  const { memberId } = useParams({ strict: false });
+  const { memberId, projectId } = useParams({ strict: false });
   const role = useCurrentMembership()?.Role;
   const draftName = useThemeStore((state) => state.Draft?.Name);
   const customThemes = useThemeStore((state) => state.CustomThemes);
   const DiscardDraft = useThemeStore((state) => state.DiscardDraft);
   const Push = useToastStore((state) => state.Push);
+  const Blocked = useSlideGuardStore((state) => state.Blocked);
+  const Attempt = useSlideGuardStore((state) => state.Attempt);
   const [Seen, setSeen] = useState<TSlideId | null>(null);
   const [Missing, setMissing] = useState(false);
   if (slide !== Seen) {
@@ -76,8 +79,15 @@ export const SlideHost = () => {
             openHome: () => {
               void navigate({ to: '/' });
             },
+            projectId: isUuid(projectId) ? projectId : undefined,
+            openProject: (id) => {
+              void navigate({ to: '/projects/$projectId', params: { projectId: id } });
+            },
+            openRun: (id, runId) => {
+              void navigate({ to: '/projects/$projectId/runs/$runId', params: { projectId: id, runId } });
+            },
           }),
         ];
 
-  return <SlideStack slides={slides} onPop={close} onCloseAll={close} onJump={close} />;
+  return <SlideStack slides={slides} onPop={close} onCloseAll={close} onJump={close} closeGuard={{ blocked: Blocked, onBlocked: Attempt }} />;
 };

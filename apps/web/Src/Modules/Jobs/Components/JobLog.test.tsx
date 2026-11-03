@@ -8,6 +8,7 @@ import { renderWithProviders } from '@/Core/Testing/Render';
 import { Ar } from '@/I18n/Locales/Ar';
 import { JobLog } from '@/Modules/Jobs/Components/JobLog';
 import { FLUSH_MS } from '@/Modules/Jobs/Hooks/useJobLog';
+import { isolate } from '@/I18n/Translate';
 
 const chunk = (seq: number, text: string, extra: Record<string, unknown> = {}) => ({
   Seq: seq,
@@ -35,7 +36,7 @@ const deliver = async (source: FakeEventSource, events: [string, unknown][]) => 
   });
 };
 
-const log = () => screen.getByRole('log', { name: Ar['jobs.log.label'].replace('{n}', '2') });
+const log = () => screen.getByRole('log', { name: Ar['jobs.log.label'].replace('{n}', isolate('2')) });
 
 beforeEach(() => {
   installFakeEventSource();
@@ -62,8 +63,8 @@ describe('the job log', () => {
     expect(log()).toHaveTextContent('npm ERR! bad thing');
     expect(screen.getByText('ERR!')).toHaveClass('text-accent-coral');
     expect(screen.getByText('second line')).toBeInTheDocument();
-    expect(screen.getByText(Ar['jobs.log.stepHeader'].replace('{n}', '1').replace('{name}', 'install'))).toBeInTheDocument();
-    expect(screen.getByText(Ar['jobs.log.stepHeader'].replace('{n}', '2').replace('{name}', 'test'))).toBeInTheDocument();
+    expect(screen.getByText(Ar['jobs.log.stepHeader'].replace('{n}', isolate('1')).replace('{name}', isolate('install')))).toBeInTheDocument();
+    expect(screen.getByText(Ar['jobs.log.stepHeader'].replace('{n}', isolate('2')).replace('{name}', isolate('test')))).toBeInTheDocument();
     expect(screen.getByText('oops').closest('[data-stream]')).toHaveAttribute('data-stream', 'stderr');
     expect(log().querySelector('[style]')).toBeNull();
   });

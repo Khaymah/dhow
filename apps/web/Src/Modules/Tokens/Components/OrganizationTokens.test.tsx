@@ -11,6 +11,7 @@ import {
   OrganizationTokensBody,
   OrganizationTokensFooter,
 } from '@/Modules/Tokens/Components/OrganizationTokensBody';
+import { isolate } from '@/I18n/Translate';
 
 const VALUE = 'dhow_pat_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd';
 const TOKEN_ID = '0198a000-0000-7000-8000-0000000000d1';
@@ -70,7 +71,7 @@ describe('the organization API tokens slide', () => {
       request.method === 'POST' ? envelope({ Success: true, Data: token({ Status: 'revoked' }) }) : envelope({ Success: true, Data: [token()] }),
     );
     const { user } = renderWithProviders(<OrganizationTokensBody onNew={vi.fn()} />);
-    await user.click(await screen.findByRole('button', { name: Ar['tokens.revoke.aria'].replace('{name}', 'Deploy bot') }));
+    await user.click(await screen.findByRole('button', { name: Ar['tokens.revoke.aria'].replace('{name}', isolate('Deploy bot')) }));
     expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0);
     await user.click(screen.getByRole('button', { name: Ar['tokens.revoke.confirm'] }));
     await waitFor(() => {

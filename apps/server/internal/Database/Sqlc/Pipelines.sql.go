@@ -302,6 +302,40 @@ func (q *Queries) GetCheckoutRepository(ctx context.Context, arg GetCheckoutRepo
 	return i, err
 }
 
+const getManualDefinition = `-- name: GetManualDefinition :one
+SELECT r."DefaultBranch", d."DefinitionSource", d."DefinitionSha"
+FROM "Projects" p
+JOIN "Repositories" r ON r."ProjectId" = p."Id" AND r."OrganizationId" = p."OrganizationId" AND NOT r."IsDeleted"
+LEFT JOIN LATERAL (
+    SELECT pr."DefinitionSource", pr."DefinitionSha"
+    FROM "PipelineRuns" pr
+    WHERE pr."ProjectId" = p."Id" AND pr."OrganizationId" = p."OrganizationId" AND pr."RepositoryId" = r."Id"
+      AND pr."Ref" = 'refs/heads/' || r."DefaultBranch" AND NOT pr."IsFork" AND pr."DefinitionPath" = p."PipelinePath"
+      AND pr."DefinitionSource" IS NOT NULL AND NOT pr."IsDeleted"
+    ORDER BY pr."Number" DESC
+    LIMIT 1
+) d ON true
+WHERE p."Id" = $1 AND p."OrganizationId" = $2 AND NOT p."IsDeleted"
+`
+
+type GetManualDefinitionParams struct {
+	ProjectID      uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+type GetManualDefinitionRow struct {
+	DefaultBranch    string
+	DefinitionSource pgtype.Text
+	DefinitionSha    pgtype.Text
+}
+
+func (q *Queries) GetManualDefinition(ctx context.Context, arg GetManualDefinitionParams) (GetManualDefinitionRow, error) {
+	row := q.db.QueryRow(ctx, getManualDefinition, arg.ProjectID, arg.OrganizationID)
+	var i GetManualDefinitionRow
+	err := row.Scan(&i.DefaultBranch, &i.DefinitionSource, &i.DefinitionSha)
+	return i, err
+}
+
 const getRun = `-- name: GetRun :one
 SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt"
 FROM "PipelineRuns"
@@ -689,6 +723,40 @@ func (q *Queries) ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobs
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOpenProjectRuns = `-- name: ListOpenProjectRuns :many
+SELECT "Id"
+FROM "PipelineRuns"
+WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+  AND "State" IN ('awaiting_approval', 'pending', 'queued', 'running')
+ORDER BY "Number"
+FOR UPDATE
+`
+
+type ListOpenProjectRunsParams struct {
+	ProjectID      uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) ListOpenProjectRuns(ctx context.Context, arg ListOpenProjectRunsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listOpenProjectRuns, arg.ProjectID, arg.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var Id uuid.UUID
+		if err := rows.Scan(&Id); err != nil {
+			return nil, err
+		}
+		items = append(items, Id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1152,17 +1220,19 @@ func (q *Queries) ReopenRun(ctx context.Context, id uuid.UUID) error {
 const requestRunCancel = `-- name: RequestRunCancel :exec
 UPDATE "PipelineRuns"
 SET "CancelRequestedAt" = COALESCE("CancelRequestedAt", now()),
-    "CancelRequestedBy" = COALESCE("CancelRequestedBy", $1::uuid), "UpdatedAt" = now()
-WHERE "Id" = $2
+    "CancelRequestedBy" = COALESCE("CancelRequestedBy", $1::uuid),
+    "FailureReason" = CASE WHEN "CancelRequestedAt" IS NULL THEN $2 ELSE "FailureReason" END, "UpdatedAt" = now()
+WHERE "Id" = $3
 `
 
 type RequestRunCancelParams struct {
 	UserID *uuid.UUID
+	Reason string
 	ID     uuid.UUID
 }
 
 func (q *Queries) RequestRunCancel(ctx context.Context, arg RequestRunCancelParams) error {
-	_, err := q.db.Exec(ctx, requestRunCancel, arg.UserID, arg.ID)
+	_, err := q.db.Exec(ctx, requestRunCancel, arg.UserID, arg.Reason, arg.ID)
 	return err
 }
 

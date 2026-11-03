@@ -31,12 +31,12 @@ afterEach(() => {
 });
 
 const ADMIN_MENU = {
-  run: [Ar['shell.nav.jobs'], Ar['shell.nav.runners']],
+  run: [Ar['shell.nav.projects'], Ar['shell.nav.jobs'], Ar['shell.nav.runners']],
   org: [Ar['shell.nav.members'], Ar['shell.nav.teams'], Ar['shell.nav.invitations'], Ar['shell.nav.apiKeys'], Ar['shell.nav.orgSettings']],
   watch: [Ar['shell.nav.audit'], Ar['shell.nav.system']],
 };
 const BUILDER_MENU = {
-  run: [Ar['shell.nav.jobs'], Ar['shell.nav.runners']],
+  run: [Ar['shell.nav.projects'], Ar['shell.nav.jobs'], Ar['shell.nav.runners']],
   org: [Ar['shell.nav.members'], Ar['shell.nav.teams'], Ar['shell.nav.orgSettings']],
   watch: [Ar['shell.nav.system']],
 };
@@ -47,7 +47,7 @@ describe('the side menu', () => {
     ['admin', ADMIN_MENU],
     ['maintainer', BUILDER_MENU],
     ['developer', BUILDER_MENU],
-    ['viewer', { run: [Ar['shell.nav.jobs']], org: [Ar['shell.nav.orgSettings']], watch: [Ar['shell.nav.system']] }],
+    ['viewer', { run: [Ar['shell.nav.projects'], Ar['shell.nav.jobs']], org: [Ar['shell.nav.orgSettings']], watch: [Ar['shell.nav.system']] }],
   ])('groups the sections for a %s and hides what the role cannot open', async (role, menu) => {
     const { nav } = await mount(role);
     expect(groupLinks(nav, Ar['shell.group.run'])).toEqual(menu.run);
@@ -99,14 +99,15 @@ describe('the top bar path', () => {
 });
 
 describe('the phone bar', () => {
-  it('has five sections, each with an icon and its name, and opens the organization on its members', async () => {
+  it('has six sections, each with an icon and its name, and opens the organization on its members', async () => {
     const { router, user } = await mount('owner', '/jobs');
     const bar = screen.getByRole('navigation', { name: Ar['shell.bottom.label'] });
     const links = within(bar).getAllByRole('link');
     expect(links.map((link) => link.textContent)).toEqual([
       Ar['shell.nav.home'],
+      Ar['shell.nav.projects'],
       Ar['shell.nav.jobs'],
-      Ar['shell.nav.runners'],
+      Ar['shell.bottom.runners'],
       Ar['shell.bottom.org'],
       Ar['shell.group.account'],
     ]);
@@ -124,6 +125,7 @@ describe('the phone bar', () => {
     const bar = screen.getByRole('navigation', { name: Ar['shell.bottom.label'] });
     expect(within(bar).getAllByRole('link').map((link) => link.textContent)).toEqual([
       Ar['shell.nav.home'],
+      Ar['shell.nav.projects'],
       Ar['shell.nav.jobs'],
       Ar['shell.bottom.org'],
       Ar['shell.group.account'],

@@ -12,6 +12,7 @@ import { findPage } from '@/Core/Testing/Pages';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
 import { JOBS_GUIDE_URL } from '@/Modules/Jobs/Types/JobStates';
+import { isolate } from '@/I18n/Translate';
 
 const mount = async (jobs: IJobsBackend, role = 'owner') => {
   const backend = startBackend({ role, routes: [jobsRoute(jobs)] });
@@ -72,7 +73,7 @@ describe('the jobs page', () => {
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent('job-1');
     expect(rows[0]).toHaveTextContent(Ar['jobs.state.succeeded']);
-    expect(rows[0]).toHaveTextContent(Ar['jobs.row.took'].replace('{duration}', Ar['jobs.duration.minutes'].replace('{m}', '1').replace('{s}', '0')));
+    expect(rows[0]).toHaveTextContent(Ar['jobs.row.took'].replace('{duration}', isolate(Ar['jobs.duration.minutes'].replace('{m}', isolate('1')).replace('{s}', isolate('0')))));
     expect(rows[1]).toHaveTextContent(Ar['jobs.state.failed']);
     expect(rows[1]).toHaveTextContent(Ar['jobs.reason.STEP_FAILED']);
     expect(rows[1]).toHaveTextContent(arText('jobs.row.attempts', { count: 1 }));
@@ -100,7 +101,7 @@ describe('the jobs page', () => {
     await within(dialog).findByRole('list', { name: Ar['jobs.list.title'] });
     await user.click(within(dialog).getByRole('button', { name: Ar['pager.next'] }));
     await waitFor(() => {
-      expect(within(dialog).getByText(Ar['pager.status'].replace('{page}', '2').replace('{pages}', '2'))).toBeInTheDocument();
+      expect(within(dialog).getByText(Ar['pager.status'].replace('{page}', isolate('2')).replace('{pages}', isolate('2')))).toBeInTheDocument();
     });
     expect(listCalls(calls).map((url) => url.searchParams.get('Limit'))).toContain('20');
 

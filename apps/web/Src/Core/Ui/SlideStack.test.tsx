@@ -6,6 +6,7 @@ import { findBackdrop } from '@/Core/Testing/Overlay';
 import { renderWithProviders } from '@/Core/Testing/Render';
 import { SlideStack, type TJumpSource } from '@/Core/Ui/SlideStack';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const TITLES: Record<string, string> = { a: 'Alpha', b: 'Bravo', c: 'Charlie', d: 'Delta', e: 'Echo', f: 'Foxtrot' };
 const NEXT: Record<string, string | undefined> = { a: 'b', b: 'c', c: 'd', d: 'e', e: 'f' };
@@ -155,10 +156,10 @@ describe('SlideStack', () => {
   it('shows each slide its own place in the stack', async () => {
     renderWithProviders(<Harness initial={['a', 'b', 'c']} />);
     await screen.findByRole('dialog', { name: 'Charlie' });
-    for (const label of ['1 من 3', '2 من 3', '3 من 3']) {
+    for (const label of [1, 2, 3].map((n) => `${isolate(n)} من ${isolate('3')}`)) {
       expect(document.body).toHaveTextContent(label);
     }
-    expect(within(topSlide()).getByText('3 من 3')).toBeInTheDocument();
+    expect(within(topSlide()).getByText(`${isolate('3')} من ${isolate('3')}`)).toBeInTheDocument();
   });
 
   it('closes every slide at once', async () => {
@@ -312,5 +313,40 @@ describe('SlideStack motion', () => {
     await user.click(await screen.findByRole('button', { name: 'Open b' }));
     await screen.findByRole('dialog', { name: 'Bravo' });
     expect(document.querySelectorAll('style')).toHaveLength(before);
+  });
+});
+
+describe('SlideStack close guard', () => {
+  const Guarded = ({ blocked, onBlocked, onClose }: { blocked: boolean; onBlocked: () => void; onClose: () => void }) => (
+    <SlideStack
+      slides={[{ id: 'a', title: 'Alpha', children: <p>Body a</p> }]}
+      onPop={onClose}
+      onJump={onClose}
+      onCloseAll={onClose}
+      closeGuard={{ blocked, onBlocked }}
+    />
+  );
+
+  it('asks the owner of the slide instead of closing on Escape, the backdrop or the close button', async () => {
+    const onBlocked = vi.fn();
+    const onClose = vi.fn();
+    const view = renderWithProviders(<Guarded blocked onBlocked={onBlocked} onClose={onClose} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha' });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.click(findBackdrop());
+    await view.user.click(within(dialog).getByRole('button', { name: Ar['slides.closeAll'] }));
+    expect(onBlocked).toHaveBeenCalledTimes(3);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector('style')).toBeNull();
+  });
+
+  it('closes as usual while nothing is guarded', async () => {
+    const onBlocked = vi.fn();
+    const onClose = vi.fn();
+    const view = renderWithProviders(<Guarded blocked={false} onBlocked={onBlocked} onClose={onClose} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha' });
+    await view.user.click(within(dialog).getByRole('button', { name: Ar['slides.closeAll'] }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onBlocked).not.toHaveBeenCalled();
   });
 });

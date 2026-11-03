@@ -32,7 +32,9 @@ export type TIconName =
   | 'swap'
   | 'play'
   | 'terminal'
-  | 'stop';
+  | 'stop'
+  | 'folder'
+  | 'download';
 
 export const MIRRORED_ICONS: readonly TIconName[] = ['back', 'next'];
 
@@ -193,4 +195,6 @@ export const ICONS: Record<TIconName, ReactElement> = {
       <path d="M9 9h6v6H9z" />
     </>
   ),
+  folder: <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z" />,
+  download: <path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14" />,
 };

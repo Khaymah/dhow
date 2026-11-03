@@ -16,6 +16,7 @@ const (
 	messageDeployRotated    = "sources.deployKey.rotated"
 	messageDeployConfirmed  = "sources.deployKey.confirmed"
 	messageSecretRotated    = "sources.webhookSecret.rotated"
+	messageUnlinked         = "sources.repository.unlinked"
 )
 
 type Controller struct {
@@ -111,4 +112,13 @@ func (c *Controller) RotateWebhookSecret(
 		return nil, err
 	}
 	return gen.RotateWebhookSecret200JSONResponse{Success: true, Message: ptrOf(messageSecretRotated), Data: c.withSecret(l)}, nil
+}
+
+func (c *Controller) UnlinkRepository(ctx context.Context, req gen.UnlinkRepositoryRequestObject) (gen.UnlinkRepositoryResponseObject, error) {
+	r, err := c.service.Unlink(ctx, req.Id, req.ProjectId)
+	if err != nil {
+		return nil, err
+	}
+	data := c.toGen(r)
+	return gen.UnlinkRepository200JSONResponse{Success: true, Message: ptrOf(messageUnlinked), Data: &data}, nil
 }

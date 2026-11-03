@@ -62,6 +62,7 @@ export const AuditEn: Record<keyof typeof AuditAr, string> = {
   'audit.action.project.deploy_key_rotated': 'Deploy key rotated',
   'audit.action.project.deploy_key_confirmed': 'Previous deploy key stopped',
   'audit.action.project.webhook_secret_rotated': 'Webhook secret rotated',
+  'audit.action.project.repository_unlinked': 'Repository unlinked',
   'audit.action.project.run_created': 'Pipeline run requested',
   'audit.action.project.run_started': 'Pipeline run started',
   'audit.action.project.run_cancel_requested': 'Pipeline run cancel requested',

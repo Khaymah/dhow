@@ -35,7 +35,7 @@ export const OrganizationChip = ({ className }: IOrganizationChipProps) => {
       )}
     >
       <Icon name="building" size={16} />
-      <span className="truncate">{membership.OrganizationName}</span>
+      <span dir="auto" className="truncate">{membership.OrganizationName}</span>
       <Icon name="swap" size={14} className="ms-auto flex-none text-tertiary" />
     </button>
   );

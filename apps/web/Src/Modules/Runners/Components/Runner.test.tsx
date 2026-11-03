@@ -8,6 +8,7 @@ import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
 import { RunnerBody } from '@/Modules/Runners/Components/RunnerBody';
 import { RunnerNewBody } from '@/Modules/Runners/Components/RunnerNewBody';
+import { isolate } from '@/I18n/Translate';
 
 const RUNNER_ID = '0198a000-0000-7000-8000-0000000000e1';
 const SECRET = 'dhow_rrt_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd';
@@ -83,7 +84,7 @@ describe('a runner', () => {
     const { user, calls } = detail('owner', () => envelope({ Success: true, Data: runner() }));
     await user.type(await screen.findByRole('textbox', { name: Ar['runners.edit.labels'] }), ' dhow.os=linux');
     await user.click(screen.getByRole('button', { name: Ar['runners.edit.save'] }));
-    expect(await screen.findByText(Ar['runners.new.error.labels'].replace('{prefix}', 'dhow.'))).toBeInTheDocument();
+    expect(await screen.findByText(Ar['runners.new.error.labels'].replace('{prefix}', isolate('dhow.')))).toBeInTheDocument();
     expect(calls.some((call) => call.method === 'PATCH')).toBe(false);
   });
 
@@ -166,8 +167,8 @@ describe('adding a runner', () => {
     await user.clear(uses);
     await user.type(uses, '51');
     await user.click(screen.getByRole('button', { name: Ar['runners.new.submit'] }));
-    expect(await screen.findByText(Ar['runners.new.error.labels'].replace('{prefix}', 'dhow.'))).toBeInTheDocument();
-    expect(screen.getByText(Ar['runners.new.error.uses'].replace('{max}', '50'))).toBeInTheDocument();
+    expect(await screen.findByText(Ar['runners.new.error.labels'].replace('{prefix}', isolate('dhow.')))).toBeInTheDocument();
+    expect(screen.getByText(Ar['runners.new.error.uses'].replace('{max}', isolate('50')))).toBeInTheDocument();
     expect(calls.some((call) => call.method === 'POST')).toBe(false);
   });
 

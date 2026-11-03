@@ -39,6 +39,7 @@ jobs:
 
 type gitWorld struct {
 	env     *apptest.Env
+	owner   *apptest.Client
 	org     uuid.UUID
 	project uuid.UUID
 	repo    apptest.SSHRepository
@@ -53,7 +54,7 @@ func newGitWorld(t *testing.T) gitWorld {
 	org, ownerID := env.OrganizationID(d.OrgSlug), uuid.MustParse(owner.UserID)
 	project := env.SeedProject(org, ownerID)
 	return gitWorld{
-		env: env, org: org, project: project, repo: env.SeedSSHRepository(org, project, ownerID),
+		env: env, owner: owner, org: org, project: project, repo: env.SeedSSHRepository(org, project, ownerID),
 		plain:  env.SeedConnectedRunner(org, ownerID, apptest.SeedRunnerSpec{}),
 		runner: env.SeedConnectedRunner(org, ownerID, apptest.SeedRunnerSpec{Capacity: 8, Features: checkoutFeatures()}),
 	}

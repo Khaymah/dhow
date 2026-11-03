@@ -10,6 +10,7 @@ import { usePaletteStore } from '@/Core/Store/usePaletteStore';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { apiUp, META_BODY } from '@/Core/Testing/Fetch';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const FAILING_READY = {
   Success: true,
@@ -93,7 +94,7 @@ describe('server status and its checks as pages', () => {
   it('shows the server state in the top bar and links it to the status page', async () => {
     apiUp(META_BODY, FAILING_READY);
     const { router, user } = await renderApp();
-    const label = Ar['shell.status.open'].replace('{state}', Ar['shell.status.down']);
+    const label = Ar['shell.status.open'].replace('{state}', isolate(Ar['shell.status.down']));
     const link = await screen.findByRole('link', { name: label });
     expect(link).toHaveAttribute('href', '/system');
     await user.click(link);

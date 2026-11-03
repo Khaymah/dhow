@@ -57,3 +57,8 @@ SELECT p."Id",
        )::text[] AS "Roles"
 FROM "Projects" p
 WHERE p."Id" = @project_id AND p."OrganizationId" = @organization_id AND NOT p."IsDeleted";
+
+-- name: LinkedProjects :many
+SELECT "ProjectId"
+FROM "Repositories"
+WHERE "OrganizationId" = @organization_id AND "ProjectId" = ANY(@project_ids::uuid[]) AND NOT "IsDeleted";

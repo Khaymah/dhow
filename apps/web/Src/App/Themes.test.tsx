@@ -13,6 +13,7 @@ import { readStoredThemes } from '@/Core/Theme/ThemeStorage';
 import { DEFAULT_COLORS } from '@/Core/Theme/ThemeTokens';
 import { useThemeStore } from '@/Core/Theme/useThemeStore';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const html = document.documentElement;
 
@@ -31,7 +32,7 @@ const runCommand = async (user: ReturnType<typeof userEvent.setup>, label: strin
 };
 
 const findHex = (token: 'canvas' | 'rail') =>
-  screen.findByLabelText<HTMLInputElement>(Ar['themeEditor.hexLabel'].replace('{name}', Ar[`theme.token.${token}`]));
+  screen.findByLabelText<HTMLInputElement>(Ar['themeEditor.hexLabel'].replace('{name}', isolate(Ar[`theme.token.${token}`])));
 
 beforeEach(() => {
   apiUp();

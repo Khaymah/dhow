@@ -8,6 +8,7 @@ import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
 import { TokenNewBody } from '@/Modules/Tokens/Components/TokenNewBody';
 import { TokensCard } from '@/Modules/Tokens/Components/TokensCard';
+import { isolate } from '@/I18n/Translate';
 
 const VALUE = 'dhow_pat_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd';
 const path = (request: Request) => new URL(request.url).pathname;
@@ -57,7 +58,7 @@ describe('the API tokens card', () => {
       request.method === 'POST' ? envelope({ Success: true, Data: token({ Status: 'revoked' }) }) : envelope({ Success: true, Data: [token()] }),
     );
     const { user } = renderWithProviders(<TokensCard onNew={vi.fn()} />);
-    await user.click(await screen.findByRole('button', { name: Ar['tokens.revoke.aria'].replace('{name}', 'Deploy bot') }));
+    await user.click(await screen.findByRole('button', { name: Ar['tokens.revoke.aria'].replace('{name}', isolate('Deploy bot')) }));
     expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0);
     await user.click(screen.getByRole('button', { name: Ar['tokens.revoke.confirm'] }));
     await waitFor(() => {

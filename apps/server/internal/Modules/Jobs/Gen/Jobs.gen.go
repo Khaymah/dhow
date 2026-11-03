@@ -165,6 +165,24 @@ func (e JobStepState) Valid() bool {
 	}
 }
 
+// Defines values for RunJobKind.
+const (
+	RunJobKindDiscovery RunJobKind = "discovery"
+	RunJobKindJob       RunJobKind = "job"
+)
+
+// Valid indicates whether the value is a known member of the RunJobKind enum.
+func (e RunJobKind) Valid() bool {
+	switch e {
+	case RunJobKindDiscovery:
+		return true
+	case RunJobKindJob:
+		return true
+	default:
+		return false
+	}
+}
+
 // CreateJobRequest defines model for CreateJobRequest.
 type CreateJobRequest struct {
 	// MaxInfraRetries How many times a job that lost its runner before any mutating step is queued again.
@@ -264,9 +282,12 @@ type JobAttempt struct {
 	MutationStartedAt *time.Time         `json:"MutationStartedAt,omitempty"`
 	Number            int                `json:"Number"`
 	RunnerId          openapi_types.UUID `json:"RunnerId"`
-	StartedAt         *time.Time         `json:"StartedAt,omitempty"`
-	State             JobAttemptState    `json:"State"`
-	Steps             []JobAttemptStep   `json:"Steps"`
+
+	// RunnerName The runner's name, when the runner still exists.
+	RunnerName *string          `json:"RunnerName,omitempty"`
+	StartedAt  *time.Time       `json:"StartedAt,omitempty"`
+	State      JobAttemptState  `json:"State"`
+	Steps      []JobAttemptStep `json:"Steps"`
 }
 
 // JobAttemptState defines model for JobAttemptState.
@@ -288,7 +309,10 @@ type JobAttemptStep struct {
 type JobDetail struct {
 	Attempts []JobAttempt `json:"Attempts"`
 	Job      Job          `json:"Job"`
-	Spec     JobSpec      `json:"Spec"`
+
+	// Run The pipeline run this job belongs to. Absent for a job that no run made.
+	Run  *JobRun `json:"Run,omitempty"`
+	Spec JobSpec `json:"Spec"`
 }
 
 // JobDetailResponse defines model for JobDetailResponse.
@@ -397,6 +421,16 @@ type JobResponse struct {
 	Success bool      `json:"Success"`
 }
 
+// JobRun The pipeline run this job belongs to. Absent for a job that no run made.
+type JobRun struct {
+	// Kind `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a client names it from the kind.
+	Kind        RunJobKind         `json:"Kind"`
+	ProjectId   openapi_types.UUID `json:"ProjectId"`
+	ProjectName string             `json:"ProjectName"`
+	RunId       openapi_types.UUID `json:"RunId"`
+	RunNumber   int64              `json:"RunNumber"`
+}
+
 // JobSecretRef defines model for JobSecretRef.
 type JobSecretRef struct {
 	// AsEnv The environment variable that carries the value. Exactly one of AsEnv and AsFile.
@@ -457,6 +491,9 @@ type PageMeta struct {
 	Page  int `json:"Page"`
 	Total int `json:"Total"`
 }
+
+// RunJobKind `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a client names it from the kind.
+type RunJobKind string
 
 // Id defines model for Id.
 type Id = openapi_types.UUID

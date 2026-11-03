@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import type { TGate } from '@/App/Navigation/Gates';
 import { SECTIONS, type TSectionId, type TSectionPath } from '@/App/Navigation/Sections';
 import type { TSlideId } from '@/App/Panels';
-import { canManageMembers, canManageRunners, canManageTokens } from '@/Core/Auth/AuthTypes';
+import { canCreateProjects, canManageMembers, canManageRunners, canManageTokens } from '@/Core/Auth/AuthTypes';
 import { useCurrentMembership, useMe } from '@/Core/Auth/useMe';
 import { useSignOut } from '@/Core/Auth/useSignOut';
 import type { ICommandItem } from '@/Core/Ui/CommandPalette';
@@ -19,6 +19,7 @@ export interface ICommands {
 
 const PAGE_COMMANDS: Record<TSectionId, TMessageKey> = {
   home: 'palette.command.home',
+  projects: 'palette.command.projects',
   jobs: 'palette.command.jobs',
   runners: 'palette.command.runners',
   runnerTokens: 'palette.command.runnerTokens',
@@ -57,6 +58,7 @@ const CREATE_COMMANDS: readonly ICreateCommand[] = [
     slide: 'organization-token-new',
     allow: canManageTokens,
   },
+  { id: 'project-new', icon: 'folder', label: 'palette.command.newProject', path: '/projects', slide: 'project-new', allow: canCreateProjects },
   { id: 'runner-new', icon: 'server', label: 'palette.command.newRunner', path: '/runners', slide: 'runner-new', allow: canManageRunners },
   { id: 'password', icon: 'key', label: 'palette.command.password', path: '/account/security', slide: 'account-password' },
   { id: 'account-token-new', icon: 'key', label: 'palette.command.newAccountToken', path: '/account/profile', slide: 'account-token-new' },

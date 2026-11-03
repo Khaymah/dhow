@@ -12,6 +12,11 @@ const BOOT: Record<TLocale, TCatalog> = { ar: BootAr, en: BootEn };
 const loadedWorkspace = (locale: TLocale): TWorkspaceMessages | undefined =>
   useCatalogStore.getState().Workspace[locale];
 
+export const FIRST_STRONG_ISOLATE = '\u2068';
+export const POP_DIRECTIONAL_ISOLATE = '\u2069';
+
+export const isolate = (value: string | number): string => `${FIRST_STRONG_ISOLATE}${String(value)}${POP_DIRECTIONAL_ISOLATE}`;
+
 export const translate = (
   locale: TLocale,
   key: TMessageKey,
@@ -22,7 +27,7 @@ export const translate = (
   if (!params) return template;
   return template.replace(/\{(\w+)\}/g, (placeholder, name: string) => {
     const value = params[name];
-    return value === undefined ? placeholder : String(value);
+    return value === undefined ? placeholder : isolate(value);
   });
 };
 

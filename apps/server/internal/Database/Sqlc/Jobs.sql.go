@@ -500,6 +500,42 @@ func (q *Queries) GetJobProject(ctx context.Context, arg GetJobProjectParams) (u
 	return ProjectId, err
 }
 
+const getJobRun = `-- name: GetJobRun :one
+SELECT p."Id" AS "ProjectId", p."Name" AS "ProjectName", r."Id" AS "RunId", r."Number" AS "RunNumber", rj."Kind"
+FROM "Jobs" j
+JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
+JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+JOIN "Projects" p ON p."Id" = r."ProjectId" AND p."OrganizationId" = r."OrganizationId"
+WHERE j."Id" = $1 AND j."OrganizationId" = $2 AND j."OriginKind" = 'pipeline'
+  AND NOT j."IsDeleted" AND NOT r."IsDeleted" AND NOT p."IsDeleted"
+`
+
+type GetJobRunParams struct {
+	JobID          uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+type GetJobRunRow struct {
+	ProjectId   uuid.UUID
+	ProjectName string
+	RunId       uuid.UUID
+	RunNumber   int64
+	Kind        string
+}
+
+func (q *Queries) GetJobRun(ctx context.Context, arg GetJobRunParams) (GetJobRunRow, error) {
+	row := q.db.QueryRow(ctx, getJobRun, arg.JobID, arg.OrganizationID)
+	var i GetJobRunRow
+	err := row.Scan(
+		&i.ProjectId,
+		&i.ProjectName,
+		&i.RunId,
+		&i.RunNumber,
+		&i.Kind,
+	)
+	return i, err
+}
+
 const getLeaseAttempt = `-- name: GetLeaseAttempt :one
 SELECT l."Id", l."AttemptId", l."JobId", a."State" AS "AttemptState"
 FROM "Leases" l
@@ -524,6 +560,42 @@ func (q *Queries) GetLeaseAttempt(ctx context.Context, id uuid.UUID) (GetLeaseAt
 		&i.AttemptState,
 	)
 	return i, err
+}
+
+const getRunnerNames = `-- name: GetRunnerNames :many
+SELECT "Id", "Name"
+FROM "Runners"
+WHERE "OrganizationId" = $1 AND "Id" = ANY($2::uuid[])
+`
+
+type GetRunnerNamesParams struct {
+	OrganizationID uuid.UUID
+	Ids            []uuid.UUID
+}
+
+type GetRunnerNamesRow struct {
+	Id   uuid.UUID
+	Name string
+}
+
+func (q *Queries) GetRunnerNames(ctx context.Context, arg GetRunnerNamesParams) ([]GetRunnerNamesRow, error) {
+	rows, err := q.db.Query(ctx, getRunnerNames, arg.OrganizationID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRunnerNamesRow{}
+	for rows.Next() {
+		var i GetRunnerNamesRow
+		if err := rows.Scan(&i.Id, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertAttempt = `-- name: InsertAttempt :one

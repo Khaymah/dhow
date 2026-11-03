@@ -60,7 +60,7 @@ func signGitea(secret string, body []byte) string {
 
 func TestAWebhookReplayedAfterItsDeliveriesArePurgedMakesNoRun(t *testing.T) {
 	w := newWorld(t)
-	_, err := w.env.Pool.Exec(context.Background(), `UPDATE "Repositories" SET "IsDeleted" = true WHERE "Id" = $1`, w.repo)
+	_, err := w.env.Pool.Exec(context.Background(), `UPDATE "Repositories" SET "IsDeleted" = true, "DeployKeySealed" = NULL, "WebhookSecretSealed" = NULL WHERE "Id" = $1`, w.repo)
 	require.NoError(t, err)
 	linked := w.owner.Do(apptest.Request{
 		Method: http.MethodPut, Path: apptest.OrgPath(w.org, "/projects/"+w.project.String()+"/repository"),

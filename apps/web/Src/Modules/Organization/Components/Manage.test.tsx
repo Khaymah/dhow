@@ -15,6 +15,7 @@ import { INVITE_LINK, orgBackend, TEAM_ID } from '@/Core/Testing/OrgBackend';
 import { findPage } from '@/Core/Testing/Pages';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
+import { isolate } from '@/I18n/Translate';
 
 const HANA = '0198a000-0000-7000-8000-0000000000b3';
 const MONA = '0198a000-0000-7000-8000-0000000000b2';
@@ -66,17 +67,17 @@ describe('inviting a member', () => {
     const { user, dialog } = await open('/org/members?slide=organization-invite', Ar['invite.title'], {}, 'sent');
     await user.type(within(dialog).getByLabelText(Ar['invite.email']), 'new@future.dev');
     await user.click(within(dialog).getByRole('button', { name: Ar['invite.create'] }));
-    expect(await within(dialog).findByText(Ar['invite.email.sent'].replace('{email}', 'new@future.dev'))).toBeInTheDocument();
+    expect(await within(dialog).findByText(Ar['invite.email.sent'].replace('{email}', isolate('new@future.dev')))).toBeInTheDocument();
   });
 
   it('lists open invitations, revokes one and makes a new link for another', async () => {
     const { user, dialog, calls } = await open('/org/invitations', Ar['shell.nav.invitations']);
     const list = await within(dialog).findByRole('list', { name: Ar['invitations.title'] });
     expect(list).toHaveTextContent('ali@future.dev');
-    expect(list).toHaveTextContent(Ar['invitations.expires'].replace('{when}', formatDateTime('2026-11-03T08:00:00Z', 'ar')));
-    await user.click(within(list).getByRole('button', { name: Ar['invitations.resendLabel'].replace('{email}', 'ali@future.dev') }));
+    expect(list).toHaveTextContent(Ar['invitations.expires'].replace('{when}', isolate(formatDateTime('2026-11-03T08:00:00Z', 'ar'))));
+    await user.click(within(list).getByRole('button', { name: Ar['invitations.resendLabel'].replace('{email}', isolate('ali@future.dev')) }));
     expect(await within(dialog).findByText(INVITE_LINK)).toBeInTheDocument();
-    await user.click(within(list).getByRole('button', { name: Ar['invitations.revokeLabel'].replace('{email}', 'ali@future.dev') }));
+    await user.click(within(list).getByRole('button', { name: Ar['invitations.revokeLabel'].replace('{email}', isolate('ali@future.dev')) }));
     expect(await within(dialog).findByText(Ar['invitations.empty'])).toBeInTheDocument();
     expect(calls.some((call) => call.method === 'DELETE' && call.url.includes('/invitations/'))).toBe(true);
   });
@@ -127,8 +128,8 @@ describe('a member page', () => {
       { UserId: coOwner, Name: 'Laila Owner', Email: 'laila@future.dev', Role: 'owner', EffectiveRole: 'owner', JoinedAt: '2026-10-06T08:00:00Z', Mfa: 'totp', Teams: [] },
     ];
     const { dialog } = await open(`/org/members/${coOwner}`, Ar['shell.nav.members'], { members });
-    expect(await within(dialog).findByText(Ar['member.remove.ownerFirst'].replace('{name}', 'Laila Owner'))).toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: Ar['member.remove.action'].replace('{name}', 'Laila Owner') })).not.toBeInTheDocument();
+    expect(await within(dialog).findByText(Ar['member.remove.ownerFirst'].replace('{name}', isolate('Laila Owner')))).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: Ar['member.remove.action'].replace('{name}', isolate('Laila Owner')) })).not.toBeInTheDocument();
   });
 
   it('points to the security page on your own member page', async () => {
@@ -170,7 +171,7 @@ describe('teams', () => {
     const { dialog } = await open('/org/teams', Ar['shell.nav.teams']);
     const list = await within(dialog).findByRole('list', { name: Ar['teams.title'] });
     expect(list).toHaveTextContent('Backend');
-    expect(list).toHaveTextContent(Ar['teams.roleIn'].replace('{role}', Ar['role.developer']));
+    expect(list).toHaveTextContent(Ar['teams.roleIn'].replace('{role}', isolate(Ar['role.developer'])));
   });
 });
 
@@ -194,13 +195,13 @@ describe('switching and leaving organizations', () => {
       expect(useOrganizationStore.getState().CurrentId).toBe(OTHER_ORG);
     });
     expect(
-      (await screen.findAllByRole('button', { name: Ar['shell.organization.switch'].replace('{name}', 'Sweets Store') })).length,
+      (await screen.findAllByRole('button', { name: Ar['shell.organization.switch'].replace('{name}', isolate('Sweets Store')) })).length,
     ).toBeGreaterThan(0);
   });
 
   it('leaves after a confirmation slide', async () => {
     const { user, dialog, calls, router } = await open('/org/settings', Ar['shell.nav.orgSettings'], { role: 'developer' });
-    await user.click(await within(dialog).findByRole('button', { name: Ar['organization.leave.action'].replace('{name}', 'Future Solution') }));
+    await user.click(await within(dialog).findByRole('button', { name: Ar['organization.leave.action'].replace('{name}', isolate('Future Solution')) }));
     const slide = await screen.findByRole('dialog', { name: Ar['organization.leave.title'] });
     expect(calls.some((call) => call.method === 'POST' && call.url.endsWith('/leave'))).toBe(false);
     await user.click(await within(slide).findByRole('button', { name: Ar['organization.leave.confirm'] }));

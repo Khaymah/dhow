@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { pluralCategory, selectPlurals } from '@/I18n/Plural';
-import { translate } from '@/I18n/Translate';
+import { translate, isolate } from '@/I18n/Translate';
 
 const JOBS_AR =
   '{count, plural, zero {لا توجد تشغيلات} one {تشغيل واحد} two {تشغيلان} few {{count} تشغيلات} many {{count} تشغيلًا} other {{count} تشغيل}}';
@@ -51,8 +51,8 @@ describe('plural forms', () => {
 
   it('fills the chosen form through translate', () => {
     expect(translate('ar', 'runners.facts.capacity.value', { count: 1 })).toBe('تشغيل واحد في نفس الوقت');
-    expect(translate('ar', 'runners.facts.capacity.value', { count: 3 })).toBe('3 تشغيلات في نفس الوقت');
-    expect(translate('en', 'runners.facts.capacity.value', { count: 1 })).toBe('1 job at a time');
-    expect(translate('en', 'runners.facts.capacity.value', { count: 3 })).toBe('3 jobs at a time');
+    expect(translate('ar', 'runners.facts.capacity.value', { count: 3 })).toBe(`${isolate('3')} تشغيلات في نفس الوقت`);
+    expect(translate('en', 'runners.facts.capacity.value', { count: 1 })).toBe(`${isolate('1')} job at a time`);
+    expect(translate('en', 'runners.facts.capacity.value', { count: 3 })).toBe(`${isolate('3')} jobs at a time`);
   });
 });

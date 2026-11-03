@@ -37,7 +37,7 @@ describe('locale catalogs', () => {
 });
 
 describe('the UI glossary (ADR-0034)', () => {
-  const ALLOWED_LATIN = new Set(['English', 'commit', 'DHOW_DATABASE_URL', 'API']);
+  const ALLOWED_LATIN = new Set(['English', 'commit', 'DHOW_DATABASE_URL', 'API', 'Git', 'GitHub', 'GitLab', 'SSH', 'HTTPS']);
 
   it('keeps English words out of the Arabic copy, except the language name, one first-mention term and a technical value', () => {
     const stray = Object.entries(Ar).flatMap(([key, text]) =>
@@ -64,7 +64,8 @@ describe('the UI glossary (ADR-0034)', () => {
     expect(Ar['shell.nav.orgSettings']).toBe('إعدادات المؤسسة');
     expect(Ar['shell.nav.audit']).toBe('سجل الأحداث');
     expect(Ar['shell.nav.system']).toBe('حالة السيرفر');
-    expect([Ar['shell.group.run'], Ar['shell.group.org'], Ar['shell.group.watch']]).toEqual(['التشغيل', 'المؤسسة', 'المتابعة']);
+    expect([Ar['shell.group.run'], Ar['shell.group.org'], Ar['shell.group.watch']]).toEqual(['النشر', 'المؤسسة', 'المتابعة']);
+    expect(Ar['shell.bottom.runners']).toBe('الأجهزة');
     expect(Ar['appearance.title']).toBe('المظهر والألوان');
     expect(En['shell.nav.home']).toBe('Home');
     expect(En['shell.nav.runners']).toBe('Runners');
@@ -76,15 +77,26 @@ describe('the UI glossary (ADR-0034)', () => {
     for (const text of Object.values(En)) expect(text.toLowerCase()).not.toContain('workspace');
   });
 
-  it('keeps projects out of the shell until M4', () => {
-    expect(Object.keys(Ar).filter((key) => key.startsWith('shell.') && /project|soon/i.test(key))).toEqual([]);
+  it('names projects in the shell from M4 on', () => {
+    expect(Ar['shell.nav.projects']).toBe('المشاريع');
+    expect(En['shell.nav.projects']).toBe('Projects');
+    expect(Object.keys(Ar).filter((key) => key.startsWith('shell.') && /soon/i.test(key))).toEqual([]);
   });
 });
 
 describe('translate', () => {
   it('fills placeholders and leaves unknown ones visible', () => {
-    expect(translate('en', 'shell.language.switch', { language: 'Arabic' })).toBe('Switch the language to Arabic');
+    expect(translate('en', 'shell.language.switch', { language: 'Arabic' })).toBe('Switch the language to \u2068Arabic\u2069');
     expect(translate('en', 'shell.language.switch')).toBe('Switch the language to {language}');
+  });
+
+  it('isolates every value, so a path or an address keeps its order inside Arabic text', () => {
+    const path = '.github/ci.yaml';
+    const url = 'ssh://git@git.example.com/team/app.git';
+    const text = translate('ar', 'projects.form.path.hint', { ext: '.yaml', example: path });
+    expect(text).toContain(`\u2068${path}\u2069`);
+    expect(text).toContain('\u2068.yaml\u2069');
+    expect(translate('ar', 'repository.source.url.hint', { ssh: url, scp: 'git@h:a/b.git' })).toContain(`\u2068${url}\u2069`);
   });
 });
 

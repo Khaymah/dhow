@@ -6,6 +6,7 @@ import { renderWithProviders } from '@/Core/Testing/Render';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
 import { LoginForm } from '@/Modules/Session/Components/LoginForm';
+import { isolate } from '@/I18n/Translate';
 
 const advance = (ms: number): void => {
   vi.advanceTimersByTime(ms);
@@ -27,7 +28,7 @@ const mountLocked = async (status = 401, retryAfter = '30') => {
   return { ...view, calls };
 };
 
-const lockedButton = (time: string) => screen.getByRole('button', { name: Ar['throttle.retryIn'].replace('{time}', time) });
+const lockedButton = (time: string) => screen.getByRole('button', { name: Ar['throttle.retryIn'].replace('{time}', isolate(time)) });
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });

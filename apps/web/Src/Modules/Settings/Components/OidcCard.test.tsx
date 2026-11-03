@@ -16,6 +16,7 @@ import {
 import { renderWithProviders } from '@/Core/Testing/Render';
 import { Ar } from '@/I18n/Locales/Ar';
 import { OidcCard } from '@/Modules/Settings/Components/OidcCard';
+import { isolate } from '@/I18n/Translate';
 
 const TOTP = { TotpEnabled: true, RecoveryCodesRemaining: 10, Passkeys: [] };
 
@@ -29,7 +30,7 @@ const mount = (oidc: TOidcFixture, replies: IOidcReplies = {}) => {
 };
 
 const fill = (key: keyof typeof Ar, values: Record<string, string>): string =>
-  Object.entries(values).reduce<string>((text, [name, value]) => text.replace(`{${name}}`, value), Ar[key]);
+  Object.entries(values).reduce<string>((text, [name, value]) => text.replace(`{${name}}`, isolate(value)), Ar[key]);
 
 afterEach(() => {
   useToastStore.setState({ Toasts: [] });

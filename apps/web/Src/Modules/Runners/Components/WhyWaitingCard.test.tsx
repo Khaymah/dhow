@@ -8,6 +8,7 @@ import { runnerFixture, runnerId, type TRunnerFixture } from '@/Core/Testing/Run
 import { Ar } from '@/I18n/Locales/Ar';
 import { WhyWaitingCard } from '@/Modules/Runners/Components/WhyWaitingCard';
 import type { IJobNeeds } from '@/Modules/Runners/Types/RunnerMatch';
+import { isolate } from '@/I18n/Translate';
 
 const NEEDS: IJobNeeds = {
   Labels: ['linux-builders', 'arm64'],
@@ -22,7 +23,7 @@ const page = (items: readonly TRunnerFixture[]) =>
   });
 
 const fill = (template: string, values: Record<string, string>) =>
-  Object.entries(values).reduce((text, [key, value]) => text.replace(`{${key}}`, value), template);
+  Object.entries(values).reduce((text, [key, value]) => text.replace(`{${key}}`, isolate(value)), template);
 
 const mount = (runners: () => Response | Promise<Response>, role = 'owner', needs: IJobNeeds = NEEDS) => {
   const { calls } = stubFetch((request) => {
