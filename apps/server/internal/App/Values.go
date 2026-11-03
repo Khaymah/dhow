@@ -32,6 +32,7 @@ func NewBackfills(db backfill.DB, values *keys.Values, log *slog.Logger) (*backf
 	}
 	return backfill.New(backfill.Options{
 		DB: db, Jobs: jobs, BatchSize: config.BackfillBatch, Pause: config.BackfillPause, Every: config.BackfillEvery, Log: log,
+		OnDone: values.BackfillDone,
 	})
 }
 

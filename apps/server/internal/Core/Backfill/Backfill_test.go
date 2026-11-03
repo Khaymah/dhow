@@ -215,3 +215,48 @@ func TestABatchThatDoesNotMoveItsCursorIsAnError(t *testing.T) {
 	_, err := r.Step(t.Context(), &stuckJob{})
 	require.ErrorIs(t, err, backfill.ErrKeyNotAhead)
 }
+
+type stuckRowJob struct{}
+
+func (*stuckRowJob) Name() string { return jobName }
+
+func (*stuckRowJob) Step(_ context.Context, _ sqlc.DBTX, after string, _ int32) (backfill.Batch, error) {
+	if after != "" {
+		return backfill.Batch{}, nil
+	}
+	return backfill.Batch{Rows: 1, Last: key(1), Failed: 1}, nil
+}
+
+func (*stuckRowJob) Remaining(context.Context, sqlc.DBTX) (int64, error) { return 1, nil }
+
+func TestTheFailedCountIsForTheLastPassOnly(t *testing.T) {
+	pool := dbtest.NewPool(t)
+	var done []string
+	r, err := backfill.New(backfill.Options{
+		DB: pool, Jobs: []backfill.Job{&stuckRowJob{}}, Wait: noWait,
+		OnDone: func(name string) { done = append(done, name) },
+	})
+	require.NoError(t, err)
+	for range 3 {
+		require.NoError(t, r.Drain(t.Context()))
+	}
+	p := progress(t, pool)
+	assert.EqualValues(t, 1, p.Failed, "one value fails on each pass, so the count stays one")
+	assert.EqualValues(t, 3, p.Passes)
+	assert.False(t, p.Done())
+	assert.Empty(t, done)
+}
+
+func TestTheRunnerReportsEveryFinishedBackfill(t *testing.T) {
+	pool := dbtest.NewPool(t)
+	seedRows(t, pool, 5)
+	var done []string
+	r, err := backfill.New(backfill.Options{
+		DB: pool, Jobs: []backfill.Job{&rowsJob{}}, Wait: noWait,
+		OnDone: func(name string) { done = append(done, name) },
+	})
+	require.NoError(t, err)
+	require.NoError(t, r.Drain(t.Context()))
+	require.NoError(t, r.Drain(t.Context()))
+	assert.Equal(t, []string{jobName, jobName}, done, "a later pass that finds the backfill done reports it too")
+}

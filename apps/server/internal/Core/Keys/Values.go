@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
 
+	backfill "github.com/Khaymah/dhow/apps/server/internal/Core/Backfill"
 	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 )
@@ -43,10 +46,43 @@ func (s Spec) Valid() error {
 type Values struct {
 	envelope *Envelope
 	legacy   []byte
+	mu       sync.RWMutex
+	closed   map[string]bool
 }
 
 func NewValues(envelope *Envelope, legacySecret []byte) *Values {
-	return &Values{envelope: envelope, legacy: append([]byte(nil), legacySecret...)}
+	return &Values{envelope: envelope, legacy: append([]byte(nil), legacySecret...), closed: map[string]bool{}}
+}
+
+func (v *Values) CloseLegacy(column string) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.closed[column] = true
+}
+
+func (v *Values) LegacyClosed(column string) bool {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return v.closed[column]
+}
+
+func (v *Values) BackfillDone(name string) {
+	if column, ok := strings.CutPrefix(name, BackfillPrefix); ok {
+		v.CloseLegacy(column)
+	}
+}
+
+func (v *Values) LoadLegacyState(ctx context.Context, db sqlc.DBTX) error {
+	list, err := backfill.List(ctx, db)
+	if err != nil {
+		return err
+	}
+	for _, p := range list {
+		if p.Done() {
+			v.BackfillDone(p.Name)
+		}
+	}
+	return nil
 }
 
 func (v *Values) Envelope() *Envelope { return v.envelope }
@@ -97,7 +133,7 @@ func (c *Column) Open(ctx context.Context, owner Owner, rowContext, sealed []byt
 	case FormatVersion:
 		return c.envelope.Open(ctx, owner, c.spec.Label, rowContext, sealed)
 	case LegacyFormat:
-		if c.legacy == nil || len(rowContext) == 0 {
+		if c.legacy == nil || len(rowContext) == 0 || c.values.LegacyClosed(c.spec.Name()) {
 			return nil, ErrSealed
 		}
 		plain, err := c.legacy.Open(sealed, rowContext)

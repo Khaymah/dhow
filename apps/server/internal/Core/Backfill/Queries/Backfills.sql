@@ -12,12 +12,14 @@ FOR UPDATE;
 
 -- name: AdvanceBackfill :exec
 UPDATE "Backfills"
-SET "LastKey" = @last_key, "Processed" = "Processed" + @processed, "Failed" = "Failed" + @failed, "UpdatedAt" = now()
+SET "LastKey" = @last_key, "Processed" = "Processed" + @processed,
+    "Failed" = CASE WHEN "LastKey" = '' THEN @failed::bigint ELSE "Failed" + @failed::bigint END, "UpdatedAt" = now()
 WHERE "Name" = @name;
 
 -- name: EndBackfillPass :exec
 UPDATE "Backfills"
 SET "LastKey" = '', "Passes" = "Passes" + 1, "Remaining" = @remaining::bigint,
+    "Failed" = CASE WHEN "LastKey" = '' THEN 0 ELSE "Failed" END,
     "DoneAt" = CASE WHEN @remaining::bigint = 0 THEN now() ELSE NULL END, "UpdatedAt" = now()
 WHERE "Name" = @name;
 

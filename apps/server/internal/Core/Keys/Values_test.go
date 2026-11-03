@@ -178,3 +178,37 @@ func TestASpecMustFitItsColumnOnceSealed(t *testing.T) {
 	require.ErrorIs(t, err, keys.ErrDuplicateLocation)
 }
 
+func TestTheOldFormatIsRefusedOnceItsColumnIsConverted(t *testing.T) {
+	pool := dbtest.NewPool(t)
+	provider, err := keys.NewFake(1)
+	require.NoError(t, err)
+	m := keys.NewManager(pool, provider, nil)
+	_, err = m.Register(t.Context())
+	require.NoError(t, err)
+	secret := secretKey(t)
+	owner := keys.ProjectOwner(uuid.New())
+	planted := legacySeal(t, secret, labelDeployKey, "deploy-key:1", []byte("a key planted with the server key"))
+
+	values := keys.NewValues(m.Envelope(), secret)
+	col, err := values.Column(deploySpec())
+	require.NoError(t, err)
+	_, err = col.Open(t.Context(), owner, []byte("deploy-key:1"), planted)
+	require.NoError(t, err, "before the backfill the old format still reads")
+	values.BackfillDone(keys.BackfillName(deploySpec()))
+	_, err = col.Open(t.Context(), owner, []byte("deploy-key:1"), planted)
+	require.ErrorIs(t, err, keys.ErrSealed, "after the backfill a planted old value is refused")
+
+	_, err = pool.Exec(t.Context(), `INSERT INTO "Backfills" ("Name", "DoneAt") VALUES ($1, now())`, keys.BackfillName(deploySpec()))
+	require.NoError(t, err)
+	booted := keys.NewValues(m.Envelope(), secret)
+	require.NoError(t, booted.LoadLegacyState(t.Context(), pool))
+	other, err := booted.Column(webhookSpec())
+	require.NoError(t, err)
+	again, err := booted.Column(deploySpec())
+	require.NoError(t, err)
+	_, err = again.Open(t.Context(), owner, []byte("deploy-key:1"), planted)
+	require.ErrorIs(t, err, keys.ErrSealed, "a server that starts after the backfill refuses it too")
+	hook := legacySeal(t, secret, labelWebhook, "webhook-secret:1", []byte("a webhook secret not yet converted"))
+	_, err = other.Open(t.Context(), owner, []byte("webhook-secret:1"), hook)
+	require.NoError(t, err, "a column whose backfill is not done still reads its old values")
+}

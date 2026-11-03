@@ -309,3 +309,30 @@ func TestTheLargestRealValuesFitTheirColumns(t *testing.T) {
 	}
 }
 
+func TestAnOldValuePlantedAfterTheBackfillIsRefused(t *testing.T) {
+	w := newSealedWorld(t)
+	drainBackfills(t, w.env)
+	legacy, err := appcrypto.NewSealer(w.env.Config.SecretKey, config.TotpSealLabel)
+	require.NoError(t, err)
+	planted := make([]byte, auth.TotpSecretBytes)
+	planted[0] = 7
+	user := uuid.MustParse(w.userID(t))
+	old, err := legacy.Seal(planted, []byte("totp:"+user.String()))
+	require.NoError(t, err)
+	_, err = w.env.Pool.Exec(t.Context(), `UPDATE "TotpFactors" SET "SecretSealed" = $1 WHERE "UserId" = $2`, old, user)
+	require.NoError(t, err)
+
+	for _, env := range []*apptest.Env{w.env, apptest.NewWithOptions(t, apptest.Options{Pool: w.env.Pool})} {
+		env.Clock.Advance(w.env.Clock.Now().Sub(env.Clock.Now()) + 31*time.Second)
+		cookie := env.StartMfa(w.details.Email, w.details.Password)
+		_, res := env.CompleteMfa(cookie, map[string]any{"Method": "totp", "Code": env.TotpCode(planted, 0)}, nil)
+		assert.NotEqual(t, http.StatusOK, res.Status, "a TOTP secret planted in the old format does not sign in")
+	}
+}
+
+func (w sealedWorld) userID(t *testing.T) string {
+	t.Helper()
+	var id string
+	require.NoError(t, w.env.Pool.QueryRow(t.Context(), `SELECT "UserId"::text FROM "TotpFactors" WHERE "ConfirmedAt" IS NOT NULL AND NOT "IsDeleted"`).Scan(&id))
+	return id
+}

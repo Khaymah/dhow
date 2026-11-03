@@ -56,16 +56,18 @@ type Options struct {
 	Every     time.Duration
 	Log       *slog.Logger
 	Wait      func(ctx context.Context, d time.Duration) bool
+	OnDone    func(name string)
 }
 
 type Runner struct {
-	db    DB
-	jobs  []Job
-	batch int32
-	pause time.Duration
-	every time.Duration
-	log   *slog.Logger
-	wait  func(ctx context.Context, d time.Duration) bool
+	db     DB
+	jobs   []Job
+	batch  int32
+	pause  time.Duration
+	every  time.Duration
+	log    *slog.Logger
+	wait   func(ctx context.Context, d time.Duration) bool
+	onDone func(name string)
 }
 
 func New(o Options) (*Runner, error) {
@@ -79,7 +81,7 @@ func New(o Options) (*Runner, error) {
 		}
 		seen[j.Name()] = true
 	}
-	r := &Runner{db: o.DB, jobs: o.Jobs, batch: o.BatchSize, pause: o.Pause, every: o.Every, log: o.Log, wait: o.Wait}
+	r := &Runner{db: o.DB, jobs: o.Jobs, batch: o.BatchSize, pause: o.Pause, every: o.Every, log: o.Log, wait: o.Wait, onDone: o.OnDone}
 	if r.batch <= 0 {
 		r.batch = DefaultBatchSize
 	}
@@ -199,10 +201,13 @@ func (r *Runner) drainJob(ctx context.Context, job Job) error {
 		switch {
 		case res.Locked:
 			return nil
-		case res.Done && res.PassEnded:
-			r.log.InfoContext(ctx, "backfill done", "backfill", job.Name())
-			return nil
 		case res.Done:
+			if res.PassEnded {
+				r.log.InfoContext(ctx, "backfill done", "backfill", job.Name())
+			}
+			if r.onDone != nil {
+				r.onDone(job.Name())
+			}
 			return nil
 		case res.PassEnded:
 			r.log.WarnContext(ctx, "a backfill pass ended with rows left; it tries again later", "backfill", job.Name(), "remaining", res.Remaining)
