@@ -41,12 +41,12 @@ jobs:
           persist-credentials: false
       - name: Check the shell scripts
         run: |
-          bash -n deploy/install/get.sh deploy/install/e2e/*.sh deploy/release/dist.sh deploy/systemd/*.sh deploy/test-vm/*.sh deploy/dev/setup.sh deploy/dev/lib/*.sh deploy/dev/stack/*.sh
+          bash -n deploy/install/get.sh deploy/install/e2e/*.sh deploy/release/dist.sh deploy/systemd/*.sh deploy/test-vm/*.sh deploy/dev/setup.sh deploy/dev/lib/*.sh deploy/dev/stack/*.sh deploy/dev/runner/*.sh
           shellcheck deploy/install/get.sh deploy/install/e2e/*.sh deploy/release/dist.sh deploy/systemd/*.sh deploy/test-vm/*.sh
           shellcheck -x deploy/dev/setup.sh
           shellcheck deploy/dev/test/fresh.sh
           shellcheck -x deploy/dev/test/settings.sh
-          shellcheck deploy/dev/stack/*.sh
+          shellcheck deploy/dev/stack/*.sh deploy/dev/runner/*.sh deploy/dev/test/runner-stack.sh
           bash deploy/dev/test/settings.sh
       - name: Check the setup script with the bash 3.2 of macOS
         run: docker run --rm -v "$PWD":/w:ro -w /w bash:3.2 bash deploy/dev/test/settings.sh
@@ -157,7 +157,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: ["ubuntu:24.04", "ubuntu:22.04", "debian:12", "fedora:latest"]
+        image: ["ubuntu:24.04", "ubuntu:22.04", "debian:12", "fedora:44"]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -176,13 +176,15 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: Development stack with Docker only
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 40
     env:
       COMPOSE_FILE: deploy/dev/compose.yaml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Let rootless Podman in the runner container make user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Start the stack from a clean clone
         run: |
           test ! -e .env.dev
@@ -214,12 +216,14 @@ jobs:
           done
           [ "$(docker compose logs server | grep -c '"msg":"listening"')" -gt "$before" ]
           curl -sf --retry 10 --retry-delay 1 --retry-all-errors http://127.0.0.1:8080/api/v1/health/ready
+      - name: Register the Podman runner and the fake runner, and run a job on each
+        run: bash deploy/dev/test/runner-stack.sh
       - name: Show the logs
         if: failure()
-        run: docker compose logs
+        run: docker compose --profile fake-runner logs
       - name: Tear down
         if: always()
-        run: docker compose down --volumes
+        run: docker compose --profile fake-runner down --volumes
 
   dev-setup:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -282,7 +286,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        base: ["debian:12", "ubuntu:24.04", "rockylinux/rockylinux:9", "fedora:latest"]
+        base: ["debian:12", "ubuntu:24.04", "rockylinux/rockylinux:9", "fedora:44"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

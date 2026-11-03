@@ -61,6 +61,14 @@
 | M4.2 | `dhow lint` في `apps/cli`، والأرشيفات الموقّعة، و`get.sh --component cli` | #66 |
 | M4.3 | موديول `Projects` و`policy.Project` بالـ bindings على المشروع، و`Core/JobQueue` جوه transaction اللي بينادي (ADR-0070) | #68 |
 | إصلاح CVE-2026-98432 | MPTCP مقفول في كل ملفات داو التنفيذية بـ `godebug multipathtcp=0`، وتحذير في `doctor`، وصفحة تنبيهات النواة (ADR-0073) | #70 |
+| M4.4 | موديول `Sources`: ربط Git عام بـ deploy key وhost key متثبّت، وwebhooks موقّعة، و`netguard` ([ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) | #71 |
+| خطة الترقيات والمساعدة | `Plan/Upgrades-and-Help.md` وقاعدة expand/contract للـ migrations وسياسة التحديث ([ADR-0077](ADR/0077-upgrades-migrations-and-update-policy.md)) | #72 |
+| M4.8 | موديول `Pipelines`: الـ runs والـ DAG والـ triggers والـ forks وتثبيت الصور بالـ digest، والربط بالـ checkout ([ADR-0076](ADR/0076-pipeline-runs-definitions-and-forks.md)) | #73 |
+| M4.7 | الـ runner: أكتر من حاوية بمساحة شغل مشتركة، والـ checkout المحصّن، والإضافات، والـ outputs، وقدرات الـ runner ([ADR-0075](ADR/0075-multi-container-attempts-checkout-and-plugins.md)) | #74 |
+| إصلاحات مراجعة الربط بالـ checkout | ترقيم أسرار الخطوات، وإثبات ملف الـ pipeline بكائنات git، وإخفاء القيم المحسوبة، وجلب التاريخ على مراحل | #75 |
+| الـ installer على Fedora 45 | وقفة واضحة قبل أي تغيير لو PGDG مش داعم الإصدار، والـ CI على `fedora:44` | #76 |
+| minimatch | `minimatch@^10` لـ 11.0.4 في أدوات الواجهة | #77 |
+| الـ runner في حزمة التطوير بـ Docker | Podman rootless في حاوية privileged للتطوير بس، وprofile `fake-runner`، و`dhow-dev-register` ([ADR-0079](ADR/0079-runner-in-the-docker-dev-stack.md)) | #78 |
 
 شرط خلاص M2 اتحقق: اختبارات الصلاحيات خضرا، ومفيش finding مفتوح Critical أو High. والمراجعة الخارجية اتنقلت لـ M9 (ADR-0040).
 
@@ -68,8 +76,6 @@
 
 | الشغل | الـ branch | الـ PR | اللي فاضل |
 |---|---|---|---|
-| M4.4: موديول `Sources`: `internal/gitref` و`gitsource` و`netguard`، وربط Git عام بـ deploy key وhost key متثبّت بالتأكيد، و`/webhooks/git/{hookId}` بالتوقيعات الأربعة والـ dedupe و`Core/Triggers`، و`"WebhookDeliveries"` مقسّم، وworker الـ commit statuses (ADR-0072 وADR-0074) | `feat/sources-generic-git` | — | الـ PR (المراجعة الأمنية اتعملت وكل الـ findings اتصلّحت: Medium واحدة وخمسة Low) |
-| M4.8: موديول `Pipelines`: `"PipelineRuns"` و`"RunJobs"` والـ DAG والـ matrix، و`Core/RunEvents` و`Core/CommitStatus`، والـ triggers (webhook وmanual وapi)، والتزامن، والـ forks بالموافقة، وتثبيت الصور بالـ tag من الـ registry، والإلغاء و«أعد تشغيل الفاشل»، والـ reconciler، و`POST /jobs` بـ `404` من غير `DHOW_DEV`، والدور على المشروع في routes الـ jobs، ومربوط بـ checkout بتاع M4.7: الـ discovery job لـ Git عام، وcheckout كل job بمفتاح المستودع وقت `Start` بس، والـ ancestry الإجباري في الـ runner، والـ outputs لـ `needs`، وأسرار `with:` للإضافات (ADR-0076) | `feat/pipelines-module` | #73 | المراجعتين الأمنيتين اتعملوا وكل الـ findings اتصلّحت، وآخرها: أرقام خطوات الأسرار بعد `if:`، وإثبات ملف الـ pipeline من كائنات git (`DEFINITION_UNVERIFIED`)، وإخفاء القيم المشتقة في تفاصيل الـ job، والـ outputs في الـ journal، والتعميق على خطوات بـ `--filter=tree:0`، ومفتاح الـ checkout للـ job الحالي بس. فاضل: الـ CI والدمج. ومتغيرات `DHOW_*` في `env` الـ job لسه مرفوضة من `jobspec` (مرحلة لاحقة) |
 | M4.9: الـ artifacts والـ cache: `Core/Blob` على القرص، وموديول `Artifacts` بـ `/runner-api/blobs/{sha256}` المربوط بالـ lease ومنح التنزيل، و`ArtifactService` و`CacheService`، والـ scope من السيرفر والـ fork مابيكتبش، وsandbox نقل في الـ runner بفك آمن وأرشيف حتمي، والتنضيف بـ mark and sweep، واحتفاظ الـ logs لكل مؤسسة (ADR-0078) | `feat/artifacts-cache` | — | المراجعة الأمنية اتعملت وكل الـ findings اتصلّحت (Medium اتنين وLow تلاتة وقواعد وتقوية). فاضل: الـ PR والـ CI. والواجهة في M4.10 |
 | `runner.revoked` (إلغاء اللوحة وإلغاء الـ runner لنفسه) بيتنشر على الـ event bus بعد الـ commit، فلو الـ process وقع بينهم الـ audit بيضيع. الـ bus مافيهوش outbox | — | — | outbox للأحداث اللي بتتسجّل، أو نشرها جوه نفس الـ transaction |
 
@@ -111,7 +117,7 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
 
 [ADR-0068](ADR/0068-first-production-release-scope.md) حدّد نطاق أول نسخة production: الـ runners على Debian وUbuntu بـ Podman rootless بس، والنشر على SSH/VPS وDocker Compose، وGitHub وGitLab وGit عام، ونسخة Community بس. الترتيب: M3.13 ← M4 ← M5 ← M6 ← M7 ← M9 ← M10 ← M11، واللي اتأجّل (SELinux وKubernetes وHelm وgVisor وBitbucket وStatic/CDN/SFTP والمحرر المرئي وTeams وWhatsApp وM8 ومكوّن GitLab CI) في قسم «بعد أول نسخة» في [`docs/roadmap.md`](../docs/roadmap.md).
 
-**M4 شغّال:** خطته في [`M4-Pipelines.md`](M4-Pipelines.md) اتقبلت، وSabry جاوب أسئلتها كلها بالتوصية يوم 2026-10-30. **M4.1** (`internal/pipelinespec`، [ADR-0069](ADR/0069-pipeline-spec-parser-and-validator.md)) اتدمج في #65، و**M4.2** (`dhow lint`) في #66، و**M4.3** (`Projects` والـ ports، [ADR-0070](ADR/0070-ports-in-core-and-project-permissions.md)) في #68. **M4.4** (`Sources` وGit عام، [ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) شغّال على `feat/sources-generic-git`. وقرار Sabry الجديد لربط Git (الـ OAuth للتجهيز بس والـ deploy keys للوصول) في [ADR-0074](ADR/0074-git-connection-oauth-for-setup-deploy-keys-for-access.md)، وفيه نقط لازم تتحسم في أول M4.6. **M4.7** (الـ runner بأكتر من حاوية والـ checkout والإضافات، [ADR-0075](ADR/0075-multi-container-attempts-checkout-and-plugins.md)) اتدمج في #74. **M4.8** (`Pipelines`، [ADR-0076](ADR/0076-pipeline-runs-definitions-and-forks.md)) مربوط بالـ checkout على `feat/pipelines-module` في #73. **M4.9** (الـ artifacts والـ cache، [ADR-0078](ADR/0078-artifacts-cache-and-blob-store.md)) على `feat/artifacts-cache`.
+**M4 شغّال:** خطته في [`M4-Pipelines.md`](M4-Pipelines.md) اتقبلت، وSabry جاوب أسئلتها كلها بالتوصية يوم 2026-10-30. **M4.1** (`internal/pipelinespec`، [ADR-0069](ADR/0069-pipeline-spec-parser-and-validator.md)) اتدمج في #65، و**M4.2** (`dhow lint`) في #66، و**M4.3** (`Projects` والـ ports، [ADR-0070](ADR/0070-ports-in-core-and-project-permissions.md)) في #68. **M4.4** (`Sources` وGit عام، [ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) اتدمج في #71. وقرار Sabry الجديد لربط Git (الـ OAuth للتجهيز بس والـ deploy keys للوصول) في [ADR-0074](ADR/0074-git-connection-oauth-for-setup-deploy-keys-for-access.md)، وفيه نقط لازم تتحسم في أول M4.6. **M4.7** (الـ runner بأكتر من حاوية والـ checkout والإضافات، [ADR-0075](ADR/0075-multi-container-attempts-checkout-and-plugins.md)) اتدمج في #74. **M4.8** (`Pipelines`، [ADR-0076](ADR/0076-pipeline-runs-definitions-and-forks.md)) اتدمج في #73، والربط بالـ checkout وإصلاحات مراجعته في #75. **M4.9** (الـ artifacts والـ cache، [ADR-0078](ADR/0078-artifacts-cache-and-blob-store.md)) على `feat/artifacts-cache`. وفاضل M4.5 وM4.6 (مستنيين حسابات الاختبار) وM4.10 وM4.11.
 
 **الترقيات والمساعدة جوه التطبيق:** الخطة في [`Upgrades-and-Help.md`](Upgrades-and-Help.md) و[ADR-0077](ADR/0077-upgrades-migrations-and-update-policy.md) (مقبولة، وSabry جاوب الأسئلة الـ 11 يوم 2026-11-02، وشرطه: كله ببلاش). قاعدة expand/contract شغّالة من 2026-11-02 على أي migration جديد، وU1 (الـ hook) وU2 (توافق الـ schema في الـ binary) أولوية مع M4.
 
@@ -138,6 +144,7 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
   - احتفاظ الـ audit 90 يوم.
   - GO-2026-5932 في `golang.org/x/crypto` لحد ما يطلع إصلاح.
 - **التنصيب:** ربط `make proxy-check` بالـ CI، وتجربة certbot وCloudflare وIPv6 الحقيقيين.
+- **Fedora 45 في الـ CI:** الـ matrix الاتنين في `installer.yml` متثبّتين على `fedora:44` لأن PGDG لسه مانشرش PostgreSQL 18 لـ Fedora 45. أول ما `fedora-45-x86_64/repodata/repomd.xml` يرجع 200، نرجّعهم لـ `fedora:latest` أو نضيف 45، ونحدّث سطر Fedora في `docs/install/installer.md` و`docs/en/install/installer.md`.
 - **الموارد:** قياس الـ sandbox بـ Podman على cgroup v2، وjob ليلي لـ `make bench` بعد ما نعرف ثبات الأرقام على أجهزة GitHub.
 
 ## طريقة الشغل اللي ماشيين بيها

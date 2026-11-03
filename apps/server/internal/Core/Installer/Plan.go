@@ -24,6 +24,7 @@ type Builder struct {
 	Version string
 	Exe     string
 	Sleep   func(time.Duration)
+	PGDG    PGDGCheck
 
 	restart bool
 }
@@ -97,6 +98,7 @@ func (b *Builder) blockers() []string {
 	}
 	if det.PackagesInstallable() && a.InstallPackages {
 		out = append(out, b.unavailable()...)
+		out = append(out, b.pgdgBlockers()...)
 	}
 	if a.Mode == ModeNative && a.Database.Mode == DatabaseInstall && !det.CanInstallPostgres() {
 		out = append(out, m.T(KeyBlockPostgresPort))
@@ -154,6 +156,7 @@ func (b *Builder) notes() []string {
 	if !b.Det.Distro.Supported {
 		out = append(out, b.M.T(KeyNoteManualMode, b.Det.Distro.PrettyName))
 	}
+	out = append(out, b.pgdgNotes()...)
 	if b.A.Mode == ModeCompose {
 		out = append(out, b.M.T(KeyDockerGroupWarning))
 	}
