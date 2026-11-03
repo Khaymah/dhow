@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -28,7 +29,6 @@ const (
 	maxActorBytes       = 255
 	limitTriggerUser    = "run-trigger-user"
 	limitTriggerProject = "run-trigger-project"
-	limitWebhookProject = "run-webhook-project"
 )
 
 var (
@@ -156,7 +156,7 @@ func (s *Service) Deliver(ctx context.Context, q *sqlc.Queries, t triggers.Trigg
 	case !errors.Is(err, pgx.ErrNoRows):
 		return triggers.Accepted{}, err
 	}
-	if err := s.chargeWebhook(ctx, project.Id); err != nil {
+	if err := chargeWebhook(ctx, q, project.Id); err != nil {
 		return triggers.Accepted{}, err
 	}
 	delivery := userRef(t.DeliveryID)
@@ -172,16 +172,16 @@ func (s *Service) Deliver(ctx context.Context, q *sqlc.Queries, t triggers.Trigg
 	return triggers.Accepted{RunID: run.Id, Created: true}, nil
 }
 
-func (s *Service) chargeWebhook(ctx context.Context, project uuid.UUID) error {
-	if s.limiter == nil {
-		return nil
-	}
-	limit := ratelimit.Limit{Name: limitWebhookProject, Max: config.PipelineWebhookRunsPerProject, Window: config.PipelineWebhookRunsWindow}
-	d, err := s.limiter.Take(ctx, limit, project.String())
+func chargeWebhook(ctx context.Context, q *sqlc.Queries, project uuid.UUID) error {
+	window := config.PipelineWebhookRunsWindow
+	recent, err := q.CountRecentWebhookRuns(ctx, sqlc.CountRecentWebhookRunsParams{ProjectID: project, WindowSeconds: window.Seconds()})
 	if err != nil {
 		return err
 	}
-	return d.Err()
+	if recent.Runs < config.PipelineWebhookRunsPerProject {
+		return nil
+	}
+	return apperrors.RateLimited(max(time.Duration(recent.RetryAfterSeconds)*time.Second, time.Second))
 }
 
 func (s *Service) chargeTrigger(ctx context.Context, project, user uuid.UUID) error {

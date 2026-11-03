@@ -45,6 +45,7 @@ type Querier interface {
 	CountOverviewRunners(ctx context.Context, arg CountOverviewRunnersParams) (CountOverviewRunnersRow, error)
 	CountProjects(ctx context.Context, arg CountProjectsParams) (int64, error)
 	CountQueuedJobs(ctx context.Context, arg CountQueuedJobsParams) (int64, error)
+	CountRecentWebhookRuns(ctx context.Context, arg CountRecentWebhookRunsParams) (CountRecentWebhookRunsRow, error)
 	CountRegistrationTokens(ctx context.Context, organizationID uuid.UUID) (int64, error)
 	CountRunnerSessionSwitches(ctx context.Context, arg CountRunnerSessionSwitchesParams) (int64, error)
 	CountRunners(ctx context.Context, organizationID uuid.UUID) (int64, error)

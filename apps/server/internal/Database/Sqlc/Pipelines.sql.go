@@ -141,6 +141,31 @@ func (q *Queries) ClaimPendingRun(ctx context.Context, arg ClaimPendingRunParams
 	return i, err
 }
 
+const countRecentWebhookRuns = `-- name: CountRecentWebhookRuns :one
+SELECT count(*)::bigint AS "Runs",
+       COALESCE(ceil(EXTRACT(EPOCH FROM (min("CreatedAt") + make_interval(secs => $1::double precision) - now()))), 0)::bigint AS "RetryAfterSeconds"
+FROM "PipelineRuns"
+WHERE "ProjectId" = $2 AND "DeliveryId" IS NOT NULL
+  AND "CreatedAt" > now() - make_interval(secs => $1::double precision)
+`
+
+type CountRecentWebhookRunsParams struct {
+	WindowSeconds float64
+	ProjectID     uuid.UUID
+}
+
+type CountRecentWebhookRunsRow struct {
+	Runs              int64
+	RetryAfterSeconds int64
+}
+
+func (q *Queries) CountRecentWebhookRuns(ctx context.Context, arg CountRecentWebhookRunsParams) (CountRecentWebhookRunsRow, error) {
+	row := q.db.QueryRow(ctx, countRecentWebhookRuns, arg.WindowSeconds, arg.ProjectID)
+	var i CountRecentWebhookRunsRow
+	err := row.Scan(&i.Runs, &i.RetryAfterSeconds)
+	return i, err
+}
+
 const countRuns = `-- name: CountRuns :one
 SELECT count(*)
 FROM "PipelineRuns"

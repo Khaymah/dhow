@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -212,4 +213,30 @@ func TestOnceAHundredCopiesOfTheSameEventMoveTheRunOnce(t *testing.T) {
 	assert.Equal(t, "succeeded", jobs["build"].State)
 	assert.Equal(t, "active", jobs["ship"].State)
 	assert.Equal(t, 2, w.env.CountRows(`SELECT count(*) FROM "Jobs"`), "ship was queued once, not once per copy")
+}
+
+func TestParallelDeliveriesOfNewCommitsFinishWithoutDeadlock(t *testing.T) {
+	w := newWorld(t, simple())
+	const n = 40
+	done := make(chan []error, 1)
+	go func() {
+		done <- parallel(n, func(i int) error {
+			tr := w.trigger()
+			tr.Sha = fmt.Sprintf("%040x", i+1)
+			tr.Ref = fmt.Sprintf("refs/heads/b%d", i%4)
+			return dbtx.Run(context.Background(), w.env.Pool, func(q *sqlc.Queries) error {
+				_, err := w.env.Wired.Pipelines.Deliver(context.Background(), q, tr)
+				return err
+			})
+		})
+	}()
+	select {
+	case errs := <-done:
+		for _, err := range errs {
+			require.NoError(t, err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("parallel webhook deliveries for one project did not finish in 30 seconds")
+	}
+	assert.Equal(t, n, w.env.CountRows(`SELECT count(*) FROM "PipelineRuns"`))
 }
