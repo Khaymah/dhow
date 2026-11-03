@@ -70,8 +70,7 @@ survives_a_killed_runner() {
   create_job "killed runner" "$(spec 'sleep 20; echo done')" ',"MaxInfraRetries":1' && id=$job_id || return 1
   running "$id" || return 1
   sleep 3
-  docker compose kill runner >/dev/null 2>&1
-  docker compose start runner >/dev/null 2>&1
+  docker compose exec -T runner pkill -KILL -x dhow-runner || return 1
   ends "$id" succeeded 900 && [[ $(job_number "$work/job.body" AttemptCount) == 2 ]] && online
 }
 
@@ -93,7 +92,7 @@ check "the job runs as root of its own user namespace, with a read-only root and
 say "Order"
 check "two jobs on one runner run one after the other, in the order they were queued" in_order
 say "A killed runner"
-check "a job whose runner is killed mid-step runs again once and succeeds, and the runner comes back" survives_a_killed_runner
+check "a job whose runner process is killed mid-step runs again once and succeeds, and the runner comes back" survives_a_killed_runner
 
 summary
 ((failed == 0))
