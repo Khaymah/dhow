@@ -48,6 +48,10 @@ func (e *Envelope) Seal(ctx context.Context, owner Owner, label string, rowConte
 	if err != nil {
 		return nil, err
 	}
+	return e.sealWith(ctx, dk, label, rowContext, plaintext)
+}
+
+func (e *Envelope) sealWith(ctx context.Context, dk DataKey, label string, rowContext, plaintext []byte) ([]byte, error) {
 	out := make([]byte, headerBytes, headerBytes+len(plaintext)+gcmTag)
 	out[0] = FormatVersion
 	copy(out[1:saltOffset], dk.ID[:])
@@ -206,7 +210,7 @@ func dekAAD(id uuid.UUID, owner Owner, version int32) []byte {
 func IsSealedV2(value []byte) bool { return len(value) >= Overhead && value[0] == FormatVersion }
 
 func DataKeyIDOf(value []byte) (uuid.UUID, bool) {
-	if !IsSealedV2(value) {
+	if len(value) < saltOffset || value[0] != FormatVersion {
 		return uuid.Nil, false
 	}
 	id, err := uuid.FromBytes(value[1:saltOffset])

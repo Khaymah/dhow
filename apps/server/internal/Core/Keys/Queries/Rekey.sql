@@ -48,3 +48,12 @@ SELECT "Id" FROM "DataKeys" WHERE "State" = 'superseded' ORDER BY "Id";
 UPDATE "DataKeys"
 SET "State" = 'destroyed', "Wrapped" = NULL, "DestroyedAt" = now(), "UpdatedAt" = now()
 WHERE "State" = 'superseded' AND "Id" = ANY(@ids::uuid[]);
+
+-- name: LockSupersededDataKeys :many
+SELECT "Id" FROM "DataKeys" WHERE "State" = 'superseded' ORDER BY "Id" FOR UPDATE;
+
+-- name: CountDataKeysToSupersede :one
+SELECT count(*)::bigint FROM "DataKeys" WHERE "State" = 'active' AND "CreatedAt" < @cutoff;
+
+-- name: GetActiveKeyEncryptionKeyActivatedAt :one
+SELECT "Version", "ActivatedAt" FROM "KeyEncryptionKeys" WHERE "State" = 'active';

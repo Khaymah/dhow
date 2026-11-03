@@ -114,3 +114,15 @@ WHERE "Id" = @id AND "State" <> 'destroyed' AND "UnwrapFailedAt" IS NULL;
 UPDATE "DataKeys"
 SET "UnwrapFailedAt" = NULL, "UpdatedAt" = now()
 WHERE "UnwrapFailedAt" IS NOT NULL AND "State" <> 'destroyed';
+
+-- name: LockActiveDataKeyForOwner :one
+SELECT "Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped", "State"
+FROM "DataKeys"
+WHERE "OwnerKind" = @owner_kind AND "OwnerId" IS NOT DISTINCT FROM sqlc.narg('owner_id')::uuid AND "State" = 'active'
+FOR SHARE;
+
+-- name: GetOwnerDataKeyStates :one
+SELECT (count(*) FILTER (WHERE "State" = 'destroyed'))::bigint AS "Destroyed",
+       (count(*) FILTER (WHERE "State" <> 'destroyed'))::bigint AS "Live"
+FROM "DataKeys"
+WHERE "OwnerKind" = @owner_kind AND "OwnerId" IS NOT DISTINCT FROM sqlc.narg('owner_id')::uuid;

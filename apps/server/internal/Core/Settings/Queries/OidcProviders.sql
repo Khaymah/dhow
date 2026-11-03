@@ -84,3 +84,11 @@ FROM "OidcProviders" p
 JOIN "UserIdentities" i ON i."Provider" = p."ProviderId" AND NOT i."IsDeleted"
 JOIN "Users" u ON u."Id" = i."UserId" AND NOT u."IsDeleted"
 WHERE NOT p."IsDeleted" AND NOT (p."ProviderId" = ANY (@active::text[]));
+
+-- name: ListOidcProvidersForUpdate :many
+SELECT "Id", "ProviderId", "Type", "Name", "Issuer", "ClientId", "AllowedDomains", "Secret", "Version", "CreatedAt",
+       "UpdatedAt", "UpdatedBy"
+FROM "OidcProviders"
+WHERE NOT "IsDeleted"
+ORDER BY "CreatedAt", "Id"
+FOR UPDATE;

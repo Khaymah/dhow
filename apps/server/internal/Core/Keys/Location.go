@@ -80,7 +80,13 @@ func (b *envelopeBackfill) Step(ctx context.Context, tx sqlc.DBTX, after string,
 	out := backfill.Batch{Rows: len(rows)}
 	for _, v := range rows {
 		out.Last = v.Key
-		sealed, err := b.column.Reseal(ctx, v.Owner, v.Context, v.Sealed)
+		sealed, err := b.column.Reseal(ctx, sqlc.New(tx), v.Owner, v.Context, v.Sealed)
+		if errors.Is(err, ErrShredded) {
+			out.Failed++
+			b.logger().WarnContext(ctx, "a stored value belongs to an owner whose data key was destroyed, so it is not sealed again; clear it",
+				"location", b.location.Spec().Name(), "row", v.Key)
+			continue
+		}
 		if errors.Is(err, ErrSealed) {
 			out.Failed++
 			b.logger().WarnContext(ctx, "a stored value cannot be opened, so it keeps its old format",

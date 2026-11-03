@@ -236,11 +236,11 @@ func (e *Env) SeedSSHRepository(org, project, creator uuid.UUID) SSHRepository {
 	id := uuid.New()
 	sealer, err := e.Wired.Values.Column(sources.DeployKeySpec())
 	require.NoError(e.T, err)
-	sealed, err := sealer.Seal(context.Background(), keys.ProjectOwner(project), []byte("deploy-key:"+id.String()), private)
+	sealed, err := sealer.SealIn(context.Background(), sqlc.New(e.Pool), keys.ProjectOwner(project), []byte("deploy-key:"+id.String()), private)
 	require.NoError(e.T, err)
 	hooks, err := e.Wired.Values.Column(sources.WebhookSecretSpec())
 	require.NoError(e.T, err)
-	hookSecret, err := hooks.Seal(context.Background(), keys.ProjectOwner(project), []byte("webhook-secret:"+id.String()), []byte("seeded-webhook-secret"))
+	hookSecret, err := hooks.SealIn(context.Background(), sqlc.New(e.Pool), keys.ProjectOwner(project), []byte("webhook-secret:"+id.String()), []byte("seeded-webhook-secret"))
 	require.NoError(e.T, err)
 	out := SSHRepository{ID: id, PrivateKey: private, KnownHost: "git.example.com " + hostLine, CloneURL: "ssh://git@git.example.com/team/app.git"}
 	_, err = e.Pool.Exec(context.Background(),

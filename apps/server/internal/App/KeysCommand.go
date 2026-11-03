@@ -35,7 +35,7 @@ const (
 	stdoutPath     = "-"
 	exportFilePerm = 0o600
 	keysUsage      = "usage: dhow-server keys init [--discard-unreadable [--confirm destroy-N-keys]] | status | generate | " +
-		"activate VERSION | export --recipient age1... --out FILE|- | rekey [--grace 10s]; every command takes --file PATH, and the default is " +
+		"activate VERSION | export --recipient age1... --out FILE|- | rekey [--grace 10s, at least 5s]; every command takes --file PATH, and the default is " +
 		config.EnvKeyringFile + " or the systemd credential " + config.CredentialKeyring
 )
 
@@ -90,7 +90,7 @@ func ParseKeysArgs(args []string) (KeysOptions, error) {
 	if err := flags.Parse(rest); err != nil || flags.NArg() != 0 {
 		return KeysOptions{}, ErrKeysUsage
 	}
-	if (opts.Command == KeysExport && (opts.Recipient == "" || opts.Out == "")) || (opts.Confirm != "" && !opts.Discard) || opts.Grace < 0 {
+	if (opts.Command == KeysExport && (opts.Recipient == "" || opts.Out == "")) || (opts.Confirm != "" && !opts.Discard) || (opts.Command == KeysRekey && opts.Grace < config.KeyRekeyMinGrace) {
 		return KeysOptions{}, ErrKeysUsage
 	}
 	return opts, nil

@@ -21,11 +21,11 @@ type OidcResult struct {
 	Version  int64
 }
 
-func (s *Store) sealSecret(ctx context.Context, id, secret string) ([]byte, error) {
+func (s *Store) sealSecret(ctx context.Context, q *sqlc.Queries, id, secret string) ([]byte, error) {
 	if secret == "" {
 		return nil, nil
 	}
-	return s.oidcKeys.Seal(ctx, keys.InstanceOwner(), oidcSealContext(id), []byte(secret))
+	return s.oidcKeys.SealIn(ctx, q, keys.InstanceOwner(), oidcSealContext(id), []byte(secret))
 }
 
 func (s *Store) ApplyOidc(ctx context.Context, c OidcChange, actor uuid.UUID) (OidcResult, error) {
@@ -37,7 +37,7 @@ func (s *Store) ApplyOidc(ctx context.Context, c OidcChange, actor uuid.UUID) (O
 		if err := q.LockOidcProviderList(ctx, config.OidcProvidersLockKey); err != nil {
 			return err
 		}
-		rows, err := s.oidcRows(ctx, q)
+		rows, err := s.oidcRows(ctx, q, true)
 		if err != nil {
 			return err
 		}
@@ -78,7 +78,7 @@ func (s *Store) writeOidc(ctx context.Context, q *sqlc.Queries, op OidcOperation
 		version, err = q.RemoveOidcProvider(ctx, sqlc.RemoveOidcProviderParams{Actor: &actor, ID: p.target.rowID, Version: p.target.version})
 	case OidcCreate:
 		var secret []byte
-		if secret, err = s.sealSecret(ctx, p.next.ID, p.next.ClientSecret); err != nil {
+		if secret, err = s.sealSecret(ctx, q, p.next.ID, p.next.ClientSecret); err != nil {
 			return 0, err
 		}
 		version, err = q.InsertOidcProvider(ctx, sqlc.InsertOidcProviderParams{
@@ -88,7 +88,7 @@ func (s *Store) writeOidc(ctx context.Context, q *sqlc.Queries, op OidcOperation
 	default:
 		secret := p.target.secret
 		if p.target.sealed || p.next.ClientSecret != p.target.cfg.ClientSecret {
-			if secret, err = s.sealSecret(ctx, p.next.ID, p.next.ClientSecret); err != nil {
+			if secret, err = s.sealSecret(ctx, q, p.next.ID, p.next.ClientSecret); err != nil {
 				return 0, err
 			}
 		}

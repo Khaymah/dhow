@@ -11,6 +11,7 @@ import (
 
 	settingspec "github.com/Khaymah/dhow/apps/server/internal/Config/Settings"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtest "github.com/Khaymah/dhow/apps/server/internal/Database/Testing"
 	"github.com/Khaymah/dhow/internal/logging"
 )
@@ -72,7 +73,7 @@ func TestASecretIsSetFromEitherSourceAndNeverShownAsText(t *testing.T) {
 func TestTheSealedSecretsRoundTripOnlyForTheirGroup(t *testing.T) {
 	s := newDBStore(t, dbtest.NewPool(t), nil)
 	raw := settingspec.Raw{settingspec.EnvSMTPHost: "smtp.example.com", settingspec.EnvSMTPPassword: "relay-credential"}
-	value, sealed, err := s.encode(t.Context(), settingspec.GroupMail, raw)
+	value, sealed, err := s.encode(t.Context(), sqlc.New(s.db), settingspec.GroupMail, raw)
 	require.NoError(t, err)
 	assert.NotContains(t, string(value), "relay-credential")
 	assert.NotContains(t, string(sealed), "relay-credential")

@@ -24,6 +24,7 @@ import (
 	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	instancesettings "github.com/Khaymah/dhow/apps/server/internal/Core/Settings"
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 )
 
 const (
@@ -78,11 +79,11 @@ func (w sealedWorld) seedSettings(t *testing.T) {
 	ctx := t.Context()
 	secrets, err := w.env.Wired.Values.Column(instancesettings.SecretsSpec())
 	require.NoError(t, err)
-	mail, err := secrets.Seal(ctx, keys.InstanceOwner(), []byte("instance-settings:mail"), []byte(`{"Password":"`+smtpPassword+`"}`))
+	mail, err := secrets.SealIn(ctx, sqlc.New(w.env.Pool), keys.InstanceOwner(), []byte("instance-settings:mail"), []byte(`{"Password":"`+smtpPassword+`"}`))
 	require.NoError(t, err)
 	oidcKeys, err := w.env.Wired.Values.Column(instancesettings.OidcSecretSpec())
 	require.NoError(t, err)
-	oidc, err := oidcKeys.Seal(ctx, keys.InstanceOwner(), []byte("instance-settings:oidc:corp"), []byte(oidcSecret))
+	oidc, err := oidcKeys.SealIn(ctx, sqlc.New(w.env.Pool), keys.InstanceOwner(), []byte("instance-settings:oidc:corp"), []byte(oidcSecret))
 	require.NoError(t, err)
 	_, err = w.env.Pool.Exec(ctx, `INSERT INTO "InstanceSettings" ("Group", "Value", "Secrets")
 		VALUES ('mail', '{"Host": "smtp.example.com", "From": "dhow@example.com", "Username": "dhow"}'::jsonb, $1)`, mail)
@@ -302,8 +303,9 @@ func TestTheLargestRealValuesFitTheirColumns(t *testing.T) {
 		if spec.Owner != keys.OwnerInstance {
 			owner.ID = uuid.New()
 		}
-		sealed, err := col.Seal(context.Background(), owner, []byte("row"), make([]byte, spec.MaxPlaintext))
+		sealed, err := col.SealIn(context.Background(), sqlc.New(env.Pool), owner, []byte("row"), make([]byte, spec.MaxPlaintext))
 		require.NoError(t, err)
 		assert.LessOrEqual(t, len(sealed), spec.MaxSealed, spec.Name())
 	}
 }
+

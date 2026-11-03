@@ -36,6 +36,17 @@ func (q *Queries) AddKeyRekeyProgress(ctx context.Context, arg AddKeyRekeyProgre
 	return err
 }
 
+const countDataKeysToSupersede = `-- name: CountDataKeysToSupersede :one
+SELECT count(*)::bigint FROM "DataKeys" WHERE "State" = 'active' AND "CreatedAt" < $1
+`
+
+func (q *Queries) CountDataKeysToSupersede(ctx context.Context, cutoff time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, countDataKeysToSupersede, cutoff)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const destroySupersededDataKeys = `-- name: DestroySupersededDataKeys :execrows
 UPDATE "DataKeys"
 SET "State" = 'destroyed', "Wrapped" = NULL, "DestroyedAt" = now(), "UpdatedAt" = now()
@@ -57,6 +68,22 @@ UPDATE "KeyRekeys" SET "DoneAt" = now(), "UpdatedAt" = now() WHERE "Id" = $1
 func (q *Queries) FinishKeyRekey(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, finishKeyRekey, id)
 	return err
+}
+
+const getActiveKeyEncryptionKeyActivatedAt = `-- name: GetActiveKeyEncryptionKeyActivatedAt :one
+SELECT "Version", "ActivatedAt" FROM "KeyEncryptionKeys" WHERE "State" = 'active'
+`
+
+type GetActiveKeyEncryptionKeyActivatedAtRow struct {
+	Version     int32
+	ActivatedAt *time.Time
+}
+
+func (q *Queries) GetActiveKeyEncryptionKeyActivatedAt(ctx context.Context) (GetActiveKeyEncryptionKeyActivatedAtRow, error) {
+	row := q.db.QueryRow(ctx, getActiveKeyEncryptionKeyActivatedAt)
+	var i GetActiveKeyEncryptionKeyActivatedAtRow
+	err := row.Scan(&i.Version, &i.ActivatedAt)
+	return i, err
 }
 
 const getLastKeyRekey = `-- name: GetLastKeyRekey :one
@@ -188,6 +215,30 @@ SELECT "Id" FROM "DataKeys" WHERE "State" = 'superseded' ORDER BY "Id"
 
 func (q *Queries) ListSupersededDataKeyIds(ctx context.Context) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, listSupersededDataKeyIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var Id uuid.UUID
+		if err := rows.Scan(&Id); err != nil {
+			return nil, err
+		}
+		items = append(items, Id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockSupersededDataKeys = `-- name: LockSupersededDataKeys :many
+SELECT "Id" FROM "DataKeys" WHERE "State" = 'superseded' ORDER BY "Id" FOR UPDATE
+`
+
+func (q *Queries) LockSupersededDataKeys(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockSupersededDataKeys)
 	if err != nil {
 		return nil, err
 	}

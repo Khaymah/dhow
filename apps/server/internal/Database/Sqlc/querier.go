@@ -39,6 +39,7 @@ type Querier interface {
 	CountAuditEvents(ctx context.Context, arg CountAuditEventsParams) (int64, error)
 	CountDataKeysByVersion(ctx context.Context) ([]CountDataKeysByVersionRow, error)
 	CountDataKeysOnVersions(ctx context.Context, versions []int32) (int64, error)
+	CountDataKeysToSupersede(ctx context.Context, cutoff time.Time) (int64, error)
 	CountEnvironments(ctx context.Context, arg CountEnvironmentsParams) (int64, error)
 	CountIdentitiesByProvider(ctx context.Context) ([]CountIdentitiesByProviderRow, error)
 	CountInstanceSettingSecretsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
@@ -113,6 +114,7 @@ type Querier interface {
 	FinishUpload(ctx context.Context, arg FinishUploadParams) error
 	GetActiveDataKeyForOwner(ctx context.Context, arg GetActiveDataKeyForOwnerParams) (GetActiveDataKeyForOwnerRow, error)
 	GetActiveKeyEncryptionKey(ctx context.Context) (int32, error)
+	GetActiveKeyEncryptionKeyActivatedAt(ctx context.Context) (GetActiveKeyEncryptionKeyActivatedAtRow, error)
 	GetActiveRunnerSession(ctx context.Context, runnerID uuid.UUID) (GetActiveRunnerSessionRow, error)
 	GetAlertRecipient(ctx context.Context, id uuid.UUID) (GetAlertRecipientRow, error)
 	GetArtifact(ctx context.Context, arg GetArtifactParams) (Artifact, error)
@@ -139,6 +141,7 @@ type Querier interface {
 	GetOpenKeyRekey(ctx context.Context) (GetOpenKeyRekeyRow, error)
 	GetOrganizationByID(ctx context.Context, id uuid.UUID) (GetOrganizationByIDRow, error)
 	GetOrganizationForMember(ctx context.Context, arg GetOrganizationForMemberParams) (GetOrganizationForMemberRow, error)
+	GetOwnerDataKeyStates(ctx context.Context, arg GetOwnerDataKeyStatesParams) (GetOwnerDataKeyStatesRow, error)
 	GetProject(ctx context.Context, arg GetProjectParams) (Project, error)
 	GetProjectBindings(ctx context.Context, arg GetProjectBindingsParams) (GetProjectBindingsRow, error)
 	GetProjectState(ctx context.Context, arg GetProjectStateParams) (string, error)
@@ -238,6 +241,7 @@ type Querier interface {
 	ListMemberRoles(ctx context.Context, arg ListMemberRolesParams) ([]ListMemberRolesRow, error)
 	ListMembers(ctx context.Context, arg ListMembersParams) ([]ListMembersRow, error)
 	ListOidcProviders(ctx context.Context) ([]ListOidcProvidersRow, error)
+	ListOidcProvidersForUpdate(ctx context.Context) ([]ListOidcProvidersForUpdateRow, error)
 	ListOpenInvitations(ctx context.Context, arg ListOpenInvitationsParams) ([]ListOpenInvitationsRow, error)
 	ListOpenProjectRuns(ctx context.Context, arg ListOpenProjectRunsParams) ([]uuid.UUID, error)
 	ListOrganizationBindings(ctx context.Context, organizationID uuid.UUID) ([]ListOrganizationBindingsRow, error)
@@ -263,6 +267,7 @@ type Querier interface {
 	ListenJobsQueued(ctx context.Context) error
 	ListenLogAppended(ctx context.Context) error
 	ListenSettingsChanged(ctx context.Context) error
+	LockActiveDataKeyForOwner(ctx context.Context, arg LockActiveDataKeyForOwnerParams) (LockActiveDataKeyForOwnerRow, error)
 	LockActiveLease(ctx context.Context, arg LockActiveLeaseParams) (LockActiveLeaseRow, error)
 	LockArtifactLease(ctx context.Context, arg LockArtifactLeaseParams) (LockArtifactLeaseRow, error)
 	LockAttemptLog(ctx context.Context, id uuid.UUID) (LockAttemptLogRow, error)
@@ -294,6 +299,7 @@ type Querier interface {
 	LockRunnerLease(ctx context.Context, runnerID uuid.UUID) (uuid.UUID, error)
 	LockRunnerSlots(ctx context.Context, runnerID string) error
 	LockRunnerThrottle(ctx context.Context, key string) (LockRunnerThrottleRow, error)
+	LockSupersededDataKeys(ctx context.Context) ([]uuid.UUID, error)
 	LockTeam(ctx context.Context, arg LockTeamParams) (LockTeamRow, error)
 	LockTeamBinding(ctx context.Context, arg LockTeamBindingParams) (LockTeamBindingRow, error)
 	LockThrottle(ctx context.Context, key string) (LockThrottleRow, error)

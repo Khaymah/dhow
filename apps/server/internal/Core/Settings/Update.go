@@ -75,7 +75,7 @@ func (s *Store) Update(ctx context.Context, g settingspec.Group, version int64, 
 		if len(p.changed) == 0 {
 			return nil
 		}
-		value, secrets, err := s.encode(ctx, g, p.next)
+		value, secrets, err := s.encode(ctx, q, g, p.next)
 		if err != nil {
 			return err
 		}
@@ -111,7 +111,7 @@ func (s *Store) Update(ctx context.Context, g settingspec.Group, version int64, 
 	return res, nil
 }
 
-func (s *Store) encode(ctx context.Context, g settingspec.Group, raw settingspec.Raw) ([]byte, []byte, error) {
+func (s *Store) encode(ctx context.Context, q *sqlc.Queries, g settingspec.Group, raw settingspec.Raw) ([]byte, []byte, error) {
 	values := map[string]any{}
 	secrets := map[string]string{}
 	for _, k := range settingspec.KeysOf(g) {
@@ -141,7 +141,7 @@ func (s *Store) encode(ctx context.Context, g settingspec.Group, raw settingspec
 		return nil, nil, fmt.Errorf("encode instance setting secrets: %w", err)
 	}
 	defer clear(plain)
-	sealed, err := s.secrets.Seal(ctx, keys.InstanceOwner(), sealContext(g), plain)
+	sealed, err := s.secrets.SealIn(ctx, q, keys.InstanceOwner(), sealContext(g), plain)
 	if err != nil {
 		return nil, nil, err
 	}

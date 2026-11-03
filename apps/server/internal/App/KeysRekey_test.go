@@ -31,7 +31,7 @@ func TestKeysRekeyMovesEveryStoredValueToNewDataKeys(t *testing.T) {
 	require.Len(t, before, 4, "one data key for the instance, the user and each of the two projects")
 	cli := &keysCLI{t: t, pool: w.env.Pool, file: keyringFile(t, apptest.TestKeyring(t))}
 
-	require.NoError(t, cli.run("rekey", "--grace", "0s"))
+	require.NoError(t, cli.run("rekey", "--grace", "5s"))
 	out := cli.out.String()
 	assert.Contains(t, out, "4 owners have a new data key, 7 values were sealed again and 4 old data keys were destroyed")
 	for _, m := range keyMaterial(apptest.TestKeyring(t)) {

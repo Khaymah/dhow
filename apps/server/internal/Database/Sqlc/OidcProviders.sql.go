@@ -220,6 +220,63 @@ func (q *Queries) ListOidcProviders(ctx context.Context) ([]ListOidcProvidersRow
 	return items, nil
 }
 
+const listOidcProvidersForUpdate = `-- name: ListOidcProvidersForUpdate :many
+SELECT "Id", "ProviderId", "Type", "Name", "Issuer", "ClientId", "AllowedDomains", "Secret", "Version", "CreatedAt",
+       "UpdatedAt", "UpdatedBy"
+FROM "OidcProviders"
+WHERE NOT "IsDeleted"
+ORDER BY "CreatedAt", "Id"
+FOR UPDATE
+`
+
+type ListOidcProvidersForUpdateRow struct {
+	Id             uuid.UUID
+	ProviderId     string
+	Type           string
+	Name           string
+	Issuer         string
+	ClientId       string
+	AllowedDomains []string
+	Secret         []byte
+	Version        int64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	UpdatedBy      *uuid.UUID
+}
+
+func (q *Queries) ListOidcProvidersForUpdate(ctx context.Context) ([]ListOidcProvidersForUpdateRow, error) {
+	rows, err := q.db.Query(ctx, listOidcProvidersForUpdate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOidcProvidersForUpdateRow{}
+	for rows.Next() {
+		var i ListOidcProvidersForUpdateRow
+		if err := rows.Scan(
+			&i.Id,
+			&i.ProviderId,
+			&i.Type,
+			&i.Name,
+			&i.Issuer,
+			&i.ClientId,
+			&i.AllowedDomains,
+			&i.Secret,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UpdatedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockOidcProviderList = `-- name: LockOidcProviderList :exec
 SELECT pg_advisory_xact_lock($1::bigint)
 `

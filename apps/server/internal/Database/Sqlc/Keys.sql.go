@@ -192,6 +192,30 @@ func (q *Queries) GetDataKey(ctx context.Context, id uuid.UUID) (GetDataKeyRow, 
 	return i, err
 }
 
+const getOwnerDataKeyStates = `-- name: GetOwnerDataKeyStates :one
+SELECT (count(*) FILTER (WHERE "State" = 'destroyed'))::bigint AS "Destroyed",
+       (count(*) FILTER (WHERE "State" <> 'destroyed'))::bigint AS "Live"
+FROM "DataKeys"
+WHERE "OwnerKind" = $1 AND "OwnerId" IS NOT DISTINCT FROM $2::uuid
+`
+
+type GetOwnerDataKeyStatesParams struct {
+	OwnerKind string
+	OwnerID   *uuid.UUID
+}
+
+type GetOwnerDataKeyStatesRow struct {
+	Destroyed int64
+	Live      int64
+}
+
+func (q *Queries) GetOwnerDataKeyStates(ctx context.Context, arg GetOwnerDataKeyStatesParams) (GetOwnerDataKeyStatesRow, error) {
+	row := q.db.QueryRow(ctx, getOwnerDataKeyStates, arg.OwnerKind, arg.OwnerID)
+	var i GetOwnerDataKeyStatesRow
+	err := row.Scan(&i.Destroyed, &i.Live)
+	return i, err
+}
+
 const insertDataKey = `-- name: InsertDataKey :execrows
 INSERT INTO "DataKeys" ("Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped")
 SELECT $1, $2, $3::uuid, k."Version", $4
@@ -368,6 +392,41 @@ func (q *Queries) ListLiveServerInstanceKeks(ctx context.Context, staleAfterSeco
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockActiveDataKeyForOwner = `-- name: LockActiveDataKeyForOwner :one
+SELECT "Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped", "State"
+FROM "DataKeys"
+WHERE "OwnerKind" = $1 AND "OwnerId" IS NOT DISTINCT FROM $2::uuid AND "State" = 'active'
+FOR SHARE
+`
+
+type LockActiveDataKeyForOwnerParams struct {
+	OwnerKind string
+	OwnerID   *uuid.UUID
+}
+
+type LockActiveDataKeyForOwnerRow struct {
+	Id         uuid.UUID
+	OwnerKind  string
+	OwnerId    *uuid.UUID
+	KekVersion int32
+	Wrapped    []byte
+	State      string
+}
+
+func (q *Queries) LockActiveDataKeyForOwner(ctx context.Context, arg LockActiveDataKeyForOwnerParams) (LockActiveDataKeyForOwnerRow, error) {
+	row := q.db.QueryRow(ctx, lockActiveDataKeyForOwner, arg.OwnerKind, arg.OwnerID)
+	var i LockActiveDataKeyForOwnerRow
+	err := row.Scan(
+		&i.Id,
+		&i.OwnerKind,
+		&i.OwnerId,
+		&i.KekVersion,
+		&i.Wrapped,
+		&i.State,
+	)
+	return i, err
 }
 
 const lockKeyring = `-- name: LockKeyring :exec

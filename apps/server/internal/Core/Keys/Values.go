@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 )
 
 const LegacyFormat = byte(1)
@@ -54,7 +55,7 @@ func (v *Values) Column(spec Spec) (*Column, error) {
 	if err := spec.Valid(); err != nil {
 		return nil, err
 	}
-	c := &Column{spec: spec, envelope: v.envelope}
+	c := &Column{spec: spec, envelope: v.envelope, values: v}
 	if len(v.legacy) == 0 {
 		return c, nil
 	}
@@ -69,19 +70,20 @@ func (v *Values) Column(spec Spec) (*Column, error) {
 type Column struct {
 	spec     Spec
 	envelope *Envelope
+	values   *Values
 	legacy   *appcrypto.Sealer
 }
 
 func (c *Column) Spec() Spec { return c.spec }
 
-func (c *Column) Seal(ctx context.Context, owner Owner, rowContext, plaintext []byte) ([]byte, error) {
+func (c *Column) SealIn(ctx context.Context, q *sqlc.Queries, owner Owner, rowContext, plaintext []byte) ([]byte, error) {
 	if owner.Kind != c.spec.Owner {
 		return nil, ErrWrongOwnerKind
 	}
 	if len(plaintext) > c.spec.MaxPlaintext {
 		return nil, fmt.Errorf("%s: %w", c.spec.Name(), ErrTooLarge)
 	}
-	return c.envelope.Seal(ctx, owner, c.spec.Label, rowContext, plaintext)
+	return c.envelope.SealIn(ctx, q, owner, c.spec.Label, rowContext, plaintext)
 }
 
 func (c *Column) Open(ctx context.Context, owner Owner, rowContext, sealed []byte) ([]byte, error) {
@@ -107,13 +109,13 @@ func (c *Column) Open(ctx context.Context, owner Owner, rowContext, sealed []byt
 	return nil, ErrSealed
 }
 
-func (c *Column) Reseal(ctx context.Context, owner Owner, rowContext, sealed []byte) ([]byte, error) {
+func (c *Column) Reseal(ctx context.Context, q *sqlc.Queries, owner Owner, rowContext, sealed []byte) ([]byte, error) {
 	plain, err := c.Open(ctx, owner, rowContext, sealed)
 	if err != nil {
 		return nil, err
 	}
 	defer clear(plain)
-	return c.envelope.Seal(ctx, owner, c.spec.Label, rowContext, plain)
+	return c.envelope.sealIn(ctx, q, owner, c.spec.Label, rowContext, plain, false)
 }
 
 func IsLegacy(sealed []byte) bool { return len(sealed) > 0 && sealed[0] == LegacyFormat }

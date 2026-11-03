@@ -43,18 +43,18 @@ func (s *Service) StartTotp(ctx context.Context) (models.TotpEnrollment, error) 
 		return models.TotpEnrollment{}, err
 	}
 	defer clear(secret)
-	sealed, err := s.totp.Seal(ctx, keys.UserOwner(p.UserID), totpContext(p.UserID), secret)
-	if err != nil {
-		return models.TotpEnrollment{}, err
-	}
 	now := s.now()
 	expires := now.Add(config.TotpEnrollmentTTL)
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
+		sealed, err := s.totp.SealIn(ctx, q, keys.UserOwner(p.UserID), totpContext(p.UserID), secret)
+		if err != nil {
+			return err
+		}
 		if err := q.DiscardPendingTotp(ctx, sqlc.DiscardPendingTotpParams{UserID: p.UserID, Now: now}); err != nil {
 			return err
 		}
 		sessionID := p.SessionID
-		_, err := q.InsertTotpEnrollment(ctx, sqlc.InsertTotpEnrollmentParams{
+		_, err = q.InsertTotpEnrollment(ctx, sqlc.InsertTotpEnrollmentParams{
 			UserID: p.UserID, SessionID: &sessionID, SecretSealed: sealed, ExpiresAt: expires, Now: now,
 		})
 		return err

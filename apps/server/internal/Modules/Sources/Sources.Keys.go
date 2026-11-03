@@ -53,11 +53,11 @@ func newWebhookSecret() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-func (s *Service) sealWebhookSecret(ctx context.Context, project, repo uuid.UUID, secret string) ([]byte, error) {
-	return s.webhooks.Seal(ctx, keys.ProjectOwner(project), sealContext(contextWebhook, repo), []byte(secret))
+func (s *Service) sealWebhookSecret(ctx context.Context, q *sqlc.Queries, project, repo uuid.UUID, secret string) ([]byte, error) {
+	return s.webhooks.SealIn(ctx, q, keys.ProjectOwner(project), sealContext(contextWebhook, repo), []byte(secret))
 }
 
-func (s *Service) newDeployKey(ctx context.Context, project, repo uuid.UUID) (deployKey, error) {
+func (s *Service) newDeployKey(ctx context.Context, q *sqlc.Queries, project, repo uuid.UUID) (deployKey, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return deployKey{}, fmt.Errorf("generate the deploy key: %w", err)
@@ -72,7 +72,7 @@ func (s *Service) newDeployKey(ctx context.Context, project, repo uuid.UUID) (de
 	}
 	private := pem.EncodeToMemory(block)
 	defer clear(private)
-	sealed, err := s.deployKeys.Seal(ctx, keys.ProjectOwner(project), sealContext(contextDeploy, repo), private)
+	sealed, err := s.deployKeys.SealIn(ctx, q, keys.ProjectOwner(project), sealContext(contextDeploy, repo), private)
 	if err != nil {
 		return deployKey{}, err
 	}

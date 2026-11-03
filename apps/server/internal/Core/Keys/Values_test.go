@@ -11,6 +11,8 @@ import (
 
 	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
+	dbtest "github.com/Khaymah/dhow/apps/server/internal/Database/Testing"
 )
 
 func deploySpec() keys.Spec {
@@ -44,8 +46,19 @@ func legacySeal(t *testing.T, secret []byte, label, rowContext string, plain []b
 	return out
 }
 
+func dbEnvelope(t *testing.T) (*keys.Envelope, *sqlc.Queries) {
+	t.Helper()
+	pool := dbtest.NewPool(t)
+	provider, err := keys.NewFake(1)
+	require.NoError(t, err)
+	m := keys.NewManager(pool, provider, nil)
+	_, err = m.Register(t.Context())
+	require.NoError(t, err)
+	return m.Envelope(), sqlc.New(pool)
+}
+
 func TestAColumnReadsBothFormatsAndWritesTheEnvelopeFormat(t *testing.T) {
-	env, _ := newMemoryEnvelope(t)
+	env, q := dbEnvelope(t)
 	secret := secretKey(t)
 	col, err := keys.NewValues(env, secret).Column(deploySpec())
 	require.NoError(t, err)
@@ -58,14 +71,14 @@ func TestAColumnReadsBothFormatsAndWritesTheEnvelopeFormat(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []byte("an old deploy key"), got)
 
-	sealed, err := col.Seal(t.Context(), owner, []byte("deploy-key:1"), []byte("a new deploy key"))
+	sealed, err := col.SealIn(t.Context(), q, owner, []byte("deploy-key:1"), []byte("a new deploy key"))
 	require.NoError(t, err)
 	assert.Equal(t, keys.FormatVersion, sealed[0])
 	got, err = col.Open(t.Context(), owner, []byte("deploy-key:1"), sealed)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("a new deploy key"), got)
 
-	moved, err := col.Reseal(t.Context(), owner, []byte("deploy-key:1"), old)
+	moved, err := col.Reseal(t.Context(), q, owner, []byte("deploy-key:1"), old)
 	require.NoError(t, err)
 	assert.Equal(t, keys.FormatVersion, moved[0], "a reseal writes the envelope format")
 	assert.False(t, bytes.Contains(moved, []byte("an old deploy key")))
@@ -77,7 +90,7 @@ func TestAColumnReadsBothFormatsAndWritesTheEnvelopeFormat(t *testing.T) {
 }
 
 func TestAColumnRefusesEveryValueThatIsNotItsOwn(t *testing.T) {
-	env, _ := newMemoryEnvelope(t)
+	env, q := dbEnvelope(t)
 	secret := secretKey(t)
 	values := keys.NewValues(env, secret)
 	deploy, err := values.Column(deploySpec())
@@ -85,9 +98,9 @@ func TestAColumnRefusesEveryValueThatIsNotItsOwn(t *testing.T) {
 	hooks, err := values.Column(webhookSpec())
 	require.NoError(t, err)
 	owner, other := keys.ProjectOwner(uuid.New()), keys.ProjectOwner(uuid.New())
-	_, err = deploy.Seal(t.Context(), other, []byte("deploy-key:1"), []byte("make the other data key"))
+	_, err = deploy.SealIn(t.Context(), q, other, []byte("deploy-key:1"), []byte("make the other data key"))
 	require.NoError(t, err)
-	sealed, err := deploy.Seal(t.Context(), owner, []byte("deploy-key:1"), []byte("row one"))
+	sealed, err := deploy.SealIn(t.Context(), q, owner, []byte("deploy-key:1"), []byte("row one"))
 	require.NoError(t, err)
 	old := legacySeal(t, secret, labelDeployKey, "deploy-key:1", []byte("row one"))
 	withoutLegacy, err := keys.NewValues(env, nil).Column(deploySpec())
@@ -128,15 +141,15 @@ func TestAColumnRefusesEveryValueThatIsNotItsOwn(t *testing.T) {
 }
 
 func TestAColumnSealsOnlyForItsOwnerKindAndSize(t *testing.T) {
-	env, _ := newMemoryEnvelope(t)
+	env, q := dbEnvelope(t)
 	col, err := keys.NewValues(env, nil).Column(webhookSpec())
 	require.NoError(t, err)
-	_, err = col.Seal(t.Context(), keys.UserOwner(uuid.New()), []byte("webhook-secret:1"), []byte("x"))
+	_, err = col.SealIn(t.Context(), q, keys.UserOwner(uuid.New()), []byte("webhook-secret:1"), []byte("x"))
 	require.ErrorIs(t, err, keys.ErrWrongOwnerKind)
-	_, err = col.Seal(t.Context(), keys.ProjectOwner(uuid.New()), []byte("webhook-secret:1"), make([]byte, 257))
+	_, err = col.SealIn(t.Context(), q, keys.ProjectOwner(uuid.New()), []byte("webhook-secret:1"), make([]byte, 257))
 	require.ErrorIs(t, err, keys.ErrTooLarge)
 	owner := keys.ProjectOwner(uuid.New())
-	sealed, err := col.Seal(t.Context(), owner, []byte("webhook-secret:1"), make([]byte, 256))
+	sealed, err := col.SealIn(t.Context(), q, owner, []byte("webhook-secret:1"), make([]byte, 256))
 	require.NoError(t, err)
 	assert.Len(t, sealed, 256+keys.Overhead)
 	_, err = env.Destroy(t.Context(), owner)
@@ -164,3 +177,4 @@ func TestASpecMustFitItsColumnOnceSealed(t *testing.T) {
 	_, err := keys.NewRegistry(keys.RowLocation[int]{Of: good}, keys.RowLocation[string]{Of: good})
 	require.ErrorIs(t, err, keys.ErrDuplicateLocation)
 }
+

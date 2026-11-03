@@ -17,6 +17,7 @@ const (
 	BackfillPause     = 100 * time.Millisecond
 	BackfillBatch     = 1000
 	KeyRekeyGrace     = 10 * time.Second
+	KeyRekeyMinGrace  = 5 * time.Second
 )
 
 type Keyring struct {
