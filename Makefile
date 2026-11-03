@@ -268,11 +268,14 @@ fuzz-list: ## Print every fuzz target, server and runner, as a JSON list for the
 	@printf '%s\n' $(FUZZ_TARGETS) $(RUNNER_FUZZ) | sed 's/.*/"&"/' | paste -sd, - | sed 's/.*/[&]/'
 
 FUZZ_TARGET ?=
+export FUZZ_TARGET
+fuzz_known = $(and $(filter 1,$(words $(FUZZ_TARGET))),$(if $(findstring %,$(FUZZ_TARGET)),,$(filter $(FUZZ_TARGET),$(FUZZ_TARGETS) $(RUNNER_FUZZ))))
 
 .PHONY: fuzz-one
 fuzz-one: ## Fuzz one target of make fuzz-list for FUZZTIME (FUZZ_TARGET=internal/gitref:FuzzRef)
-	@printf '%s\n' $(FUZZ_TARGETS) $(RUNNER_FUZZ) | grep -qxF -- '$(FUZZ_TARGET)' || { echo "fuzz-one: FUZZ_TARGET must be one of make fuzz-list" >&2; exit 1; }
-	$(GO) test -run '^$$' -fuzz '^$(lastword $(subst :, ,$(FUZZ_TARGET)))$$' -fuzztime $(FUZZTIME) -timeout 0 ./$(firstword $(subst :, ,$(FUZZ_TARGET)))
+	$(if $(fuzz_known),,$(error fuzz-one: FUZZ_TARGET must be one of make fuzz-list))
+	@printf '%s\n' $(FUZZ_TARGETS) $(RUNNER_FUZZ) | grep -qxF -- "$$FUZZ_TARGET" || { echo "fuzz-one: FUZZ_TARGET must be one of make fuzz-list" >&2; exit 1; }
+	$(GO) test -run '^$$' -fuzz "^$${FUZZ_TARGET##*:}$$" -fuzztime $(FUZZTIME) -timeout 0 "./$${FUZZ_TARGET%%:*}"
 
 .PHONY: timing
 timing: ## Run the statistical timing tests against DHOW_TEST_DATABASE_URL (slow, separate CI job)

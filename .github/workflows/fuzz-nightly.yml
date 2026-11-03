@@ -55,17 +55,17 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           echo "dir=${TARGET%%:*}/testdata/fuzz/${TARGET##*:}" >> "$GITHUB_OUTPUT"
-          echo "name=crashers-$(printf '%s' "$TARGET" | tr '/:' '--')" >> "$GITHUB_OUTPUT"
+          echo "name=sensitive-fuzz-crashers-$(printf '%s' "$TARGET" | tr '/:' '--')" >> "$GITHUB_OUTPUT"
       - name: Fuzz
         env:
           TARGET: ${{ matrix.target }}
           FUZZTIME: ${{ inputs.fuzztime || '30m' }}
         run: make fuzz-one FUZZ_TARGET="$TARGET" FUZZTIME="$FUZZTIME"
-      - name: Keep the crashers
+      - name: Keep the crashers for 7 days (an input that crashed a parser may be sensitive)
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.where.outputs.name }}
           path: ${{ steps.where.outputs.dir }}
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 7
