@@ -46,7 +46,7 @@ dhow-server: SCHEMA_TOO_NEW: the database needs dhow 1.4.0 or newer, and this bi
 ```
 
 - **With systemd:** the unit has `RestartPreventExitStatus=78`, so systemd does not restart Dhow over and over. Read the message with `journalctl -u dhow -n 20`.
-- **With Compose:** Docker restarts the container because the policy is `restart: unless-stopped`, and the same message repeats. Read it with `docker compose logs dhow`, then set `DHOW_IMAGE` to the release it needs or restore the backup.
+- **With Compose:** the Docker image sets `DHOW_ON_INCOMPATIBLE=wait`. So Dhow does not exit: it logs the message once and waits to be stopped, while the health check fails. `docker compose ps` shows the container as `unhealthy` instead of restarting it over and over. Read the message with `docker compose logs dhow`, then set `DHOW_IMAGE` to the release it needs or restore the backup.
 - **A development build** (built from source, with the version `dev` or a commit) runs on a database newer than itself only with `DHOW_DEV=true`, because we cannot tell where it sits between releases.
 
 If the database changes while Dhow runs, for example when another server upgrades the same database and raises the floor, the `migrations` check in `/api/v1/health/ready` turns unhealthy and it answers 503.
@@ -59,9 +59,11 @@ The binary has three commands that read the database and change nothing. They ne
 |---|---|
 | `dhow-server migrate status` | The state (`current`, `pending`, `ahead` or `incompatible`), the last migration in the database and in the binary, the floor, the pending migrations, and the servers running on the database now. |
 | `dhow-server migrate plan` | Every migration file, its kind (`expand` or `contract`), its floor, whether it runs in a transaction, and whether it was applied. |
-| `dhow-server migrate dry-run` | Tries the pending migrations on the real database in one transaction, then rolls all of them back. |
+| `dhow-server migrate dry-run [--timeout 60s]` | Tries the pending migrations on the real database in one transaction, then rolls all of them back. It stops after one overall deadline, 60 seconds by default. |
 
 Run them **with the new release** before you replace the current one, so it knows the new migrations.
+
+**Warning:** `dry-run` runs on the live database while Dhow uses it, and takes the same locks the real migration takes. Users may wait until it finishes or reaches its deadline. Run it at a quiet time. For large changes, try it on a restored copy of the database rather than on the live one (U5 will add the `--against-backup` option for that).
 
 With the binary and systemd, put the new file next to the old one and run it with the service's own settings:
 
@@ -84,9 +86,12 @@ What the `dry-run` output means:
 - **`not tried (NO TRANSACTION)`:** files that build indexes `CONCURRENTLY` cannot run inside a transaction, so they are not tried. They are safe to repeat.
 - **`PREFLIGHT_LOCK_TIMEOUT`:** a migration waited more than 3 seconds for a lock on a table, because another process is using it. The real migration would wait for the same lock, so pick a quieter time.
 - **`PREFLIGHT_STATEMENT_TIMEOUT`:** a statement took more than 5 minutes.
+- **`PREFLIGHT_DEADLINE`:** the whole try reached its deadline (`--timeout`). A migration file cannot lift it with `SET statement_timeout = 0`.
+- **`PREFLIGHT_TRANSACTION_CONTROL`:** a migration file contains `COMMIT`, `ROLLBACK`, `BEGIN` or the like. Migrations must not, so nothing is tried.
+- **`PREFLIGHT_TRANSACTION_ENDED`:** a statement ended the transaction anyway. Only in this case may the statements before it be committed, so check the database.
 - **`PREFLIGHT_MIGRATION_FAILED`:** a migration failed, and the message names the file, the statement number and the error. Do not upgrade until you understand why.
 
-In every case the database does not change.
+In every other case the database does not change.
 
 ## Roll back
 
@@ -106,6 +111,6 @@ In every case the database does not change.
 
 ## Several servers on one database
 
-Every server records itself in the `"ServerInstances"` table when it starts: the host name, its version, and the last migration it knows. It updates its last-seen time every 30 seconds and removes itself on a clean stop. A server not seen for 90 seconds counts as stopped. `dhow-server migrate status` lists the servers running now, so before an upgrade you know whether an old release still runs.
+Every server records itself in the `"ServerInstances"` table when it starts: its stable name, the host name, its version, and the last migration it knows. The stable name is `DHOW_INSTANCE_ID`, or the host name when it is not set, and the Compose stack names the container `dhow`. After a restart the server reuses the same row, so the table does not grow. It updates its last-seen time every 30 seconds and marks itself stopped on a clean stop. A server not seen for 90 seconds counts as stopped. `dhow-server migrate status` lists the servers running now, so before an upgrade you know whether an old release still runs.
 
 Because of the `expand` and `contract` rule, the old and the new release can run side by side during an upgrade: upgrade one server, check that it is healthy, then upgrade the rest.
