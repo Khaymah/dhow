@@ -19,7 +19,7 @@ func TestRefPatterns(t *testing.T) {
 	}
 	bad := []string{
 		"", "..", "release/..", "../main", "a..b", "release//x", "/main", "main/", "-main", "ma in", "main\t", "ma~in", "ma^in", "ma:in",
-		"main@{1}", "re[a]", "{a,b}", "a\\b", "a**b", "${{ github.ref }}", "main\x00", strings.Repeat("a", pathglob.MaxLength+1),
+		"main@{1}", "refs/heads/main", "heads/main", "tags/v1", "refs/tags/v1", "ma\u202ein", "ma\u200bin", "\u2066main\u2069", "main\ufeff", "re[a]", "{a,b}", "a\\b", "a**b", "${{ github.ref }}", "main\x00", strings.Repeat("a", pathglob.MaxLength+1),
 	}
 	for _, p := range bad {
 		assert.False(t, environments.ValidRefPattern(p), "%q", p)
@@ -131,4 +131,12 @@ func TestApplyKeepsWhatIsNotSent(t *testing.T) {
 	assert.Empty(t, r.Reviewers.TeamIDs)
 	assert.Equal(t, []models.Ref{{Kind: "branch", Pattern: "main"}, {Kind: "tag", Pattern: "v*"}}, r.AllowedRefs)
 	assert.Equal(t, environments.Normalize(base), environments.Apply(base, nil))
+}
+
+func TestDoubleStarAlsoMatchesTheParent(t *testing.T) {
+	assert.True(t, pathglob.MatchPattern("release/**", "release"), "documented: release/** also matches release itself")
+	assert.True(t, pathglob.MatchPattern("release/**", "release/1.2"))
+	assert.True(t, pathglob.MatchPattern("release/**", "release/2026/1"))
+	assert.False(t, pathglob.MatchPattern("release/*", "release"))
+	assert.False(t, pathglob.MatchPattern("release/**", "releases"))
 }

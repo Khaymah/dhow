@@ -55,21 +55,30 @@ func ValidRefPattern(p string) bool {
 	if strings.HasPrefix(p, "/") || strings.HasSuffix(p, "/") || strings.HasPrefix(p, "-") {
 		return false
 	}
-	return !strings.ContainsFunc(p, func(r rune) bool { return unicode.IsSpace(r) || strings.ContainsRune("~^:", r) })
+	for _, full := range fullRefPrefixes {
+		if strings.HasPrefix(p, full) {
+			return false
+		}
+	}
+	return !strings.ContainsFunc(p, func(r rune) bool { return unicode.IsSpace(r) || invisible(r) || strings.ContainsRune("~^:", r) })
 }
+
+var fullRefPrefixes = []string{"refs/", "heads/", "tags/"}
+
+func invisible(r rune) bool { return unicode.Is(unicode.Cf, r) }
 
 func ValidPluginPrefix(p string) bool {
 	if p == "" || len(p) > models.MaxPluginPrefix || !utf8.ValidString(p) || strings.Contains(p, "..") {
 		return false
 	}
-	return !strings.ContainsFunc(p, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) || r == '\\' })
+	return !strings.ContainsFunc(p, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) || invisible(r) || r == '\\' })
 }
 
 func validText(v string, maxRunes int, required bool) bool {
 	if !utf8.ValidString(v) || utf8.RuneCountInString(v) > maxRunes || (required && strings.TrimSpace(v) == "") {
 		return false
 	}
-	return !strings.ContainsFunc(v, func(r rune) bool { return r != '\n' && unicode.IsControl(r) })
+	return !strings.ContainsFunc(v, func(r rune) bool { return (r != '\n' && unicode.IsControl(r)) || invisible(r) })
 }
 
 func DefaultRules(defaultBranch string) models.Rules {
