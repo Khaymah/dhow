@@ -9,6 +9,9 @@ import (
 const (
 	SystemInstanceSetupCompleted = "system.instance.setupCompleted"
 	SystemSettingsChanged        = "system.settings.changed"
+	SystemKeysActivated          = "system.keys.activated"
+	SystemKeysExported           = "system.keys.exported"
+	SystemKeysDiscarded          = "system.keys.discarded"
 
 	IdentityOrganizationUpdated = "identity.organization.updated"
 
@@ -96,6 +99,9 @@ func AuditedEvents() []string {
 	return []string{
 		SystemInstanceSetupCompleted,
 		SystemSettingsChanged,
+		SystemKeysActivated,
+		SystemKeysExported,
+		SystemKeysDiscarded,
 		IdentityOrganizationUpdated,
 		IdentityOrganizationCreated,
 		IdentityOwnershipTransferred,

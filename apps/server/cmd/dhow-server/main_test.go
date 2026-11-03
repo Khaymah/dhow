@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	app "github.com/Khaymah/dhow/apps/server/internal/App"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 )
 
@@ -59,6 +60,23 @@ type otherExit struct{}
 func (otherExit) Error() string { return "other" }
 
 func (otherExit) ExitCode() int { return 78 }
+
+func TestExitCodeOfAKeyringThatDoesNotFit(t *testing.T) {
+	missing := &keys.Error{Code: keys.CodeKeyringMissingVersion, Version: 2}
+	assert.Equal(t, keys.ExitKeyring, exitCode(missing))
+	assert.Equal(t, 79, exitCode(fmt.Errorf("start: %w", missing)))
+	assert.Equal(t, 1, exitCode(&keys.NotEverywhereError{Version: 2}), "a refused activation is not a boot failure")
+}
+
+func TestRunDispatchesKeys(t *testing.T) {
+	require.ErrorIs(t, run(context.Background(), []string{"keys"}), app.ErrKeysUsage)
+	require.ErrorIs(t, run(context.Background(), []string{"keys", "rotate"}), app.ErrKeysUsage)
+	t.Setenv("DHOW_KEYRING_FILE", "")
+	t.Setenv("CREDENTIALS_DIRECTORY", "")
+	err := run(context.Background(), []string{"keys", "generate"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "DHOW_KEYRING_FILE")
+}
 
 func TestRunDispatchesMigrate(t *testing.T) {
 	require.ErrorIs(t, run(context.Background(), []string{"migrate"}), app.ErrMigrateUsage)

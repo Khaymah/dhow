@@ -53,7 +53,7 @@ func TestEveryValidatorRunsOnTheEnvironmentAndOnASave(t *testing.T) {
 	owner, _, fresh := ownerWithTotp(t, env)
 	for _, tt := range badValues() {
 		t.Run(tt.name+"/env", func(t *testing.T) {
-			vars := map[string]string{config.EnvDatabaseURL: goodDB, config.EnvSecretKey: goodKeyHex, config.EnvPublicURL: "https://dhow.example.com", tt.env: tt.envRaw}
+			vars := map[string]string{config.EnvDatabaseURL: goodDB, config.EnvSecretKey: goodKeyHex, config.EnvPublicURL: "https://dhow.example.com", config.EnvKeyringFile: "/run/secrets/dhow-keyring", tt.env: tt.envRaw}
 			_, err := config.Load(envOf(vars))
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.env)

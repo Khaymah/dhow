@@ -19,6 +19,7 @@ import (
 	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	mailer "github.com/Khaymah/dhow/apps/server/internal/Core/Mail"
 	oidcauth "github.com/Khaymah/dhow/apps/server/internal/Core/Oidc"
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
@@ -74,6 +75,7 @@ type Infra struct {
 	RegistryTLS        *tls.Config
 	ManualJobs         bool
 	PinBudget          time.Duration
+	Keys               *keys.Manager
 }
 
 type Wired struct {
@@ -168,7 +170,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Log:    in.Log,
 		System: system.Deps{
 			DB: in.Pool, Migrations: in.Migrations, Queries: sqlc.New(in.Pool), Build: in.Build, Log: in.Log,
-			Checks: readinessChecks(jobsService, store),
+			Checks: readinessChecks(jobsService, store, in.Keys), Keys: keyringReader(in.Keys),
 		},
 		Identity:  identityService,
 		Session:   sessionService,
@@ -227,11 +229,22 @@ func keysFor(in Infra) (keyset, error) {
 	return k, err
 }
 
-func readinessChecks(jobsService *jobs.Service, store *instancesettings.Store) []system.ReadinessCheck {
-	return []system.ReadinessCheck{
+func readinessChecks(jobsService *jobs.Service, store *instancesettings.Store, km *keys.Manager) []system.ReadinessCheck {
+	checks := []system.ReadinessCheck{
 		{Name: systemmodels.CheckLogPartitions, Run: jobsService.CheckLogPartition},
 		{Name: systemmodels.CheckSettings, Run: store.Ready},
 	}
+	if km != nil {
+		checks = append(checks, system.ReadinessCheck{Name: systemmodels.CheckKeyring, Run: km.Verify})
+	}
+	return checks
+}
+
+func keyringReader(km *keys.Manager) system.KeyringReader {
+	if km == nil {
+		return nil
+	}
+	return km
 }
 
 func settingsFor(

@@ -21,6 +21,7 @@ type Deps struct {
 	Log        *slog.Logger
 	Guard      *auth.Guard
 	Checks     []ReadinessCheck
+	Keys       KeyringReader
 }
 
 func Policies() []policy.Rule {
@@ -28,6 +29,7 @@ func Policies() []policy.Rule {
 		policy.Public(http.MethodGet, "/health/live"),
 		policy.Public(http.MethodGet, "/health/ready"),
 		policy.Public(http.MethodGet, "/meta"),
+		policy.Instance(http.MethodGet, keysPath, policy.InstanceSettingsManage),
 	}
 }
 
@@ -35,7 +37,7 @@ func Routes(r chi.Router, d Deps) {
 	controller := NewController(
 		NewHealthService(d.DB, d.Migrations, d.Log, d.Checks...),
 		NewMetaService(d.Queries, d.Build),
-	)
+	).WithKeys(d.Keys)
 	strict := gen.NewStrictHandlerWithOptions(controller, nil, gen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  middleware.StrictRequestError,
 		ResponseErrorHandlerFunc: middleware.StrictResponseError(d.Log),

@@ -41,6 +41,7 @@ func valid() map[string]string {
 		config.EnvDatabaseURL: goodDB,
 		config.EnvSecretKey:   goodKeyHex,
 		config.EnvPublicURL:   "https://dhow.example.com/",
+		config.EnvKeyringFile: "/run/secrets/dhow-keyring",
 	}
 }
 

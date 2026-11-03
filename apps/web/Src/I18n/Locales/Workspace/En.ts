@@ -50,6 +50,7 @@ export const WorkspaceEn: TWorkspaceMessages = {
   'status.check.migrations': 'Database migrations',
   'status.check.log_partitions': 'Today\'s log storage',
   'status.check.settings': 'Settings reload',
+  'status.check.keyring': 'Keyring',
   'status.state.live': 'Running',
   'status.state.failed': 'Failed',
   'status.summary.ok.title': 'The server is healthy',
@@ -159,6 +160,10 @@ export const WorkspaceEn: TWorkspaceMessages = {
   'checkDetail.settings.fix1': 'Open the server log and look for "instance settings were not reloaded". It names the setting that failed.',
   'checkDetail.settings.fix2': 'If a saved value is not valid, fix it in the database. If the database connection dropped, make sure the database is running.',
   'checkDetail.settings.fix3': 'The server retries on its own at least every 30 seconds, and this check turns healthy after the first successful read.',
+  'checkDetail.keyring.means': 'The keyring file holds the keys that open every stored secret. This check makes sure the keyring this server loaded still matches the keys the database needs.',
+  'checkDetail.keyring.fix1': 'Open the server log and look for KEYRING_MISMATCH or KEYRING_MISSING_VERSION. It names the key version.',
+  'checkDetail.keyring.fix2': 'Put back the keyring file that belongs to this database, from your backup or its export, then restart the server.',
+  'checkDetail.keyring.fix3': 'Run dhow-server doctor on the server. It compares the keyring with the database and never prints a key.',
 
   'pager.label': 'Page navigation',
   'pager.previous': 'Previous page',

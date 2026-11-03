@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	"github.com/Khaymah/dhow/internal/buildinfo"
 )
@@ -48,13 +49,25 @@ func Run(ctx context.Context) error {
 	if err := PrepareSchema(ctx, migrator, log); err != nil {
 		return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
 	}
-	stopHeartbeat, err := StartHeartbeat(ctx, pool, ServerIdentity(build, migrator.Latest(), cfg.InstanceID, os.Hostname, log), log)
+	provider, err := OpenKeyring(cfg.Keyring)
+	if err != nil {
+		log.Error("the keyring file cannot be used; stopping", "code", keys.CodeOf(err), "error", err.Error())
+		return err
+	}
+	keyManager, kekVersions, stopKeys, err := StartKeys(ctx, pool, provider, log)
+	if err != nil {
+		return err
+	}
+	defer stopKeys()
+	ident := ServerIdentity(build, migrator.Latest(), cfg.InstanceID, os.Hostname, log)
+	ident.KekVersions = kekVersions
+	stopHeartbeat, err := StartHeartbeat(ctx, pool, ident, log)
 	if err != nil {
 		return err
 	}
 	defer stopHeartbeat()
 
-	wired, err := Build(ctx, Infra{Config: cfg, Log: log, Pool: pool, Migrations: migrator, Build: build})
+	wired, err := Build(ctx, Infra{Config: cfg, Log: log, Pool: pool, Migrations: migrator, Build: build, Keys: keyManager})
 	if err != nil {
 		return err
 	}
