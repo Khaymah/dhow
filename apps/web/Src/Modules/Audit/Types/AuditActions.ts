@@ -73,6 +73,11 @@ export const AUDIT_ACTIONS: Readonly<Record<string, IAuditAction>> = {
   'project.run_cancel_requested': { Icon: 'layers', Bad: false },
   'project.run_rerun_requested': { Icon: 'layers', Bad: false },
   'project.run_approved': { Icon: 'shield', Bad: false },
+  'environment.created': { Icon: 'shield', Bad: false },
+  'environment.updated': { Icon: 'shield', Bad: false },
+  'environment.removed': { Icon: 'trash', Bad: true },
+  'environment.paused': { Icon: 'stop', Bad: true },
+  'environment.resumed': { Icon: 'play', Bad: false },
   'system.instance.setupCompleted': { Icon: 'shield', Bad: false },
   'system.settings.changed': { Icon: 'settings', Bad: false },
 };
