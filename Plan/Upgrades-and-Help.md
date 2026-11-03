@@ -357,7 +357,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 | M4 | `ADD CONSTRAINT` (CHECK أو FOREIGN KEY) على جدول مش جديد من غير `NOT VALID` | `NOT VALID` هنا و`VALIDATE` في ملف `NO TRANSACTION` |
 | M5 | `CREATE INDEX` على جدول مش جديد من غير `CONCURRENTLY IF NOT EXISTS`، أو `CONCURRENTLY` في ملف من غير `NO TRANSACTION` | قفل الجدول طول بناء الـ index |
 | M6 | `UPDATE` في `expand` من غير `-- dhow:backfill small` | الـ backfill الكبير في الخلفية (U4) |
-| M7 | `contract` من غير `-- dhow:floor X.Y.Z`، أو من غير `UPDATE "Instance" SET "SchemaFloor" = 'X.Y.Z'` بنفس القيمة | الـ floor هو اللي بيحمي الـ binary القديم |
+| M7 | `contract` من غير `-- dhow:floor X.Y.Z`، أو من غير `UPDATE "Instance" SET "SchemaFloor" = 'X.Y.Z'` بنفس القيمة (مع `0.0.0` الـ UPDATE مش مطلوب، لأن العمود مش موجود لحد U2 وقيمته الافتراضية `0.0.0`، ولو موجود لازم يبقى بنفس القيمة) | الـ floor هو اللي بيحمي الـ binary القديم |
 | M8 | `-- dhow:floor` مش `0.0.0` ومفيش tag `vX.Y.Z` في الريبو | الـ floor نسخة اتعمل لها release |
 | M9 | ملف `NO TRANSACTION` فيه statement مش idempotent (`IF NOT EXISTS` أو `IF EXISTS` أو `VALIDATE`) | الملف ده ممكن يقف في النص ويتعاد |
 
@@ -370,7 +370,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 - ملف على `main` مابيتفحصش تاني.
 - الـ 43 migration الموجودين مابيتفحصوش (مش جداد)، وده مكتوب.
 
-**نفس القواعد في CI:** الـ hooks بتشتغل مع الـ agents بس، والبشر بيفتحوا PRs برضه. فـ `apps/server/internal/Database/Migrations/Compat_test.go` بيطبّق نفس القواعد على كل ملف بعد `00043`. والحالات في `apps/server/internal/Database/Migrations/testdata/compat/` (اسم الملف فيه النتيجة المتوقعة، زي `reject_m3_not_null.sql`)، والـ Python والـ Go الاتنين بيمشوا على نفس المجلد، عشان مايبعدوش عن بعض.
+**نفس القواعد في CI:** الـ hooks بتشتغل مع الـ agents بس، والبشر بيفتحوا PRs برضه. فـ `apps/server/internal/Database/Migrations/Compat_test.go` بيطبّق نفس القواعد على كل ملف بعد `00048` (الحد اتنقل من `00043` لأن `00044` و`00045` اتدمجوا من غير directive، و`00048` قبل عمود `"SchemaFloor"`، والـ migrations لحد `00048` متثبّتة بأساميها في الاختبار). والحالات في `apps/server/internal/Database/Migrations/testdata/compat/` (اسم الملف فيه النتيجة المتوقعة، زي `reject_m3_not_null.sql`)، والـ Python والـ Go الاتنين بيمشوا على نفس المجلد، عشان مايبعدوش عن بعض.
 
 ## 6. توافق الإعدادات
 - **الأنواع التلاتة، في جدول واحد في الكود** (`Config/Deprecations.go`): كل صف فيه الاسم القديم والجديد والنسخة اللي بدأ فيها والنسخة اللي هيتشال فيها.
