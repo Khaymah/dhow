@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	settingspec "github.com/Khaymah/dhow/apps/server/internal/Config/Settings"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
+	dbtest "github.com/Khaymah/dhow/apps/server/internal/Database/Testing"
 	"github.com/Khaymah/dhow/internal/logging"
 )
 
@@ -18,7 +20,7 @@ func newStore(t *testing.T, env settingspec.Raw) *Store {
 	key := make([]byte, 32)
 	_, err := rand.Read(key)
 	require.NoError(t, err)
-	s, err := New(Options{SecretKey: key, Env: env, Log: logging.New(io.Discard, slog.LevelError)})
+	s, err := New(Options{Values: keys.NewValues(keys.NewEnvelope(nil, nil), key), Env: env, Log: logging.New(io.Discard, slog.LevelError)})
 	require.NoError(t, err)
 	return s
 }
@@ -68,15 +70,16 @@ func TestASecretIsSetFromEitherSourceAndNeverShownAsText(t *testing.T) {
 }
 
 func TestTheSealedSecretsRoundTripOnlyForTheirGroup(t *testing.T) {
-	s := newStore(t, nil)
+	s := newDBStore(t, dbtest.NewPool(t), nil)
 	raw := settingspec.Raw{settingspec.EnvSMTPHost: "smtp.example.com", settingspec.EnvSMTPPassword: "relay-credential"}
-	value, sealed, err := s.encode(settingspec.GroupMail, raw)
+	value, sealed, err := s.encode(t.Context(), settingspec.GroupMail, raw)
 	require.NoError(t, err)
 	assert.NotContains(t, string(value), "relay-credential")
 	assert.NotContains(t, string(sealed), "relay-credential")
-	back, err := s.decode(settingspec.GroupMail, value, sealed)
+	assert.Equal(t, keys.FormatVersion, sealed[0], "new secrets use the envelope format")
+	back, err := s.decode(t.Context(), settingspec.GroupMail, value, sealed)
 	require.NoError(t, err)
 	assert.Equal(t, raw, back)
-	_, err = s.decode(settingspec.GroupLogs, []byte(`{}`), sealed)
+	_, err = s.decode(t.Context(), settingspec.GroupLogs, []byte(`{}`), sealed)
 	require.ErrorIs(t, err, ErrUndecryptable, "the group is bound into the seal")
 }

@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Sources/Models"
 	"github.com/Khaymah/dhow/internal/gitsource"
@@ -52,11 +53,11 @@ func newWebhookSecret() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-func (s *Service) sealWebhookSecret(repo uuid.UUID, secret string) ([]byte, error) {
-	return s.webhooks.Seal([]byte(secret), sealContext(contextWebhook, repo))
+func (s *Service) sealWebhookSecret(ctx context.Context, project, repo uuid.UUID, secret string) ([]byte, error) {
+	return s.webhooks.Seal(ctx, keys.ProjectOwner(project), sealContext(contextWebhook, repo), []byte(secret))
 }
 
-func (s *Service) newDeployKey(repo uuid.UUID) (deployKey, error) {
+func (s *Service) newDeployKey(ctx context.Context, project, repo uuid.UUID) (deployKey, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return deployKey{}, fmt.Errorf("generate the deploy key: %w", err)
@@ -69,7 +70,9 @@ func (s *Service) newDeployKey(repo uuid.UUID) (deployKey, error) {
 	if err != nil {
 		return deployKey{}, fmt.Errorf("encode the deploy key: %w", err)
 	}
-	sealed, err := s.deployKeys.Seal(pem.EncodeToMemory(block), sealContext(contextDeploy, repo))
+	private := pem.EncodeToMemory(block)
+	defer clear(private)
+	sealed, err := s.deployKeys.Seal(ctx, keys.ProjectOwner(project), sealContext(contextDeploy, repo), private)
 	if err != nil {
 		return deployKey{}, err
 	}
@@ -102,7 +105,7 @@ func (s *Service) deployKeyFor(ctx context.Context, repo models.Repository) ([]b
 	if row.Id != repo.ID {
 		return nil, errors.New("the repository changed")
 	}
-	return s.openDeployKey(row.Id, row.DeployKeySealed)
+	return s.openDeployKey(ctx, row.ProjectId, row.Id, row.DeployKeySealed)
 }
 
 type keyOpener interface {

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	settingspec "github.com/Khaymah/dhow/apps/server/internal/Config/Settings"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 )
 
@@ -83,7 +84,7 @@ func (s *Store) readOidc(ctx context.Context, q *sqlc.Queries) (Oidc, error) {
 	out := Oidc{Source: SourceDatabase, Providers: make([]OidcProvider, 0, len(rows))}
 	var errs []error
 	for _, r := range rows {
-		p, err := s.decodeProvider(r.ProviderId, storedProvider{
+		p, err := s.decodeProvider(ctx, r.ProviderId, storedProvider{
 			Type: r.Type, Name: r.Name, Issuer: r.Issuer, ClientID: r.ClientId, Domains: r.AllowedDomains, Secret: r.Secret,
 		}, false)
 		if err != nil {
@@ -115,13 +116,13 @@ type storedProvider struct {
 	Secret   []byte
 }
 
-func (s *Store) decodeProvider(id string, r storedProvider, tolerant bool) (OidcProvider, error) {
+func (s *Store) decodeProvider(ctx context.Context, id string, r storedProvider, tolerant bool) (OidcProvider, error) {
 	cfg := settingspec.OIDCProvider{
 		ID: id, Kind: r.Type, Name: r.Name, Issuer: r.Issuer, ClientID: r.ClientID, AllowedDomains: r.Domains,
 	}
 	sealed := false
 	if len(r.Secret) > 0 {
-		plain, err := s.sealer.Open(r.Secret, oidcSealContext(id))
+		plain, err := s.oidcKeys.Open(ctx, keys.InstanceOwner(), oidcSealContext(id), r.Secret)
 		switch {
 		case err != nil && !tolerant:
 			return OidcProvider{}, fmt.Errorf("sign-in provider %s (from the database): client secret: %w", id, ErrUndecryptable)

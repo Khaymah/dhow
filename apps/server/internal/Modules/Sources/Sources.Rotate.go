@@ -78,7 +78,7 @@ func (s *Service) RotateDeployKey(ctx context.Context, org, project uuid.UUID) (
 		if current.Transport != models.TransportSSH || !current.DeployKeyPublic.Valid {
 			return false, apperrors.DeployKeyNotApplicable()
 		}
-		key, err := s.newDeployKey(current.Id)
+		key, err := s.newDeployKey(ctx, current.ProjectId, current.Id)
 		if err != nil {
 			return false, err
 		}
@@ -117,7 +117,7 @@ func (s *Service) RotateWebhookSecret(ctx context.Context, org, project uuid.UUI
 		if secret, err = newWebhookSecret(); err != nil {
 			return false, err
 		}
-		u.WebhookSecretSealed, err = s.sealWebhookSecret(current.Id, secret)
+		u.WebhookSecretSealed, err = s.sealWebhookSecret(ctx, current.ProjectId, current.Id, secret)
 		return err == nil, err
 	})
 	if err != nil {

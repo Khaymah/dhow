@@ -70,6 +70,11 @@ func Run(ctx context.Context) error {
 	defer wired.Close()
 	stopSettings := StartSettings(ctx, wired.Settings)
 	defer stopSettings()
+	stopBackfills, err := StartBackfills(ctx, pool, wired.Values, log)
+	if err != nil {
+		return err
+	}
+	defer stopBackfills()
 	setupURL, created, err := wired.Identity.EnsureSetupToken(ctx)
 	if err != nil {
 		return fmt.Errorf("prepare first-run setup: %w", err)

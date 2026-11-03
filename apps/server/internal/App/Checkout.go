@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
@@ -107,11 +108,11 @@ func (c *checkoutSecrets) checkoutCredential(ctx context.Context, req jobs.Secre
 }
 
 func runsFor(
-	in Infra, bus *eventbus.Bus, limiter ratelimit.Limiter, jobsService *jobs.Service, secrets *checkoutSecrets,
+	in Infra, values *keys.Values, bus *eventbus.Bus, limiter ratelimit.Limiter, jobsService *jobs.Service, secrets *checkoutSecrets,
 ) (*pipelines.Service, *sources.Service, *artifacts.Service, error) {
 	pipelinesService := pipelinesFor(in, bus, jobsService.Queue(), limiter)
 	jobsService.UseRunEvents(pipelinesService)
-	sourcesService, err := sourcesFor(in, bus, limiter, pipelinesService)
+	sourcesService, err := sourcesFor(in, values, bus, limiter, pipelinesService)
 	if err != nil {
 		return nil, nil, nil, err
 	}

@@ -62,3 +62,11 @@ func ownerFrom(kind string, id *uuid.UUID) Owner {
 	}
 	return o
 }
+
+func knownKind(k OwnerKind) bool {
+	switch k {
+	case OwnerInstance, OwnerOrganization, OwnerProject, OwnerEnvironment, OwnerUser:
+		return true
+	}
+	return false
+}

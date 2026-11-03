@@ -13,6 +13,7 @@ import (
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 )
 
 func withTotp(t *testing.T) (*apptest.Env, *apptest.Client, apptest.SetupDetails, apptest.TotpEnrollment) {
@@ -77,7 +78,8 @@ func TestTheSecretIsStoredSealedAndNeverLogged(t *testing.T) {
 	require.NoError(t, env.Pool.QueryRow(context.Background(),
 		`SELECT "SecretSealed" FROM "TotpFactors" WHERE "ConfirmedAt" IS NOT NULL AND NOT "IsDeleted"`).Scan(&sealed))
 	assert.NotContains(t, string(sealed), string(enrolled.Secret))
-	assert.Len(t, sealed, 1+12+20+16)
+	assert.Len(t, sealed, keys.Overhead+20, "the envelope format: 97 bytes, inside the CHECK of 128")
+	assert.Equal(t, keys.FormatVersion, sealed[0])
 	var hashes int
 	require.NoError(t, env.Pool.QueryRow(context.Background(), `SELECT count(*) FROM "RecoveryCodes" WHERE octet_length("CodeHash") = 32`).Scan(&hashes))
 	assert.Equal(t, 10, hashes)

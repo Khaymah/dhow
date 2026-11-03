@@ -24,7 +24,7 @@ func TestAFailedReloadRetriesWithABoundedBackoffAndFailsReadinessUntilItRecovers
 	var readyWhileFailing []error
 	var s *Store
 	s, err = New(Options{
-		DB: pool, SecretKey: key, Log: logging.New(io.Discard, slog.LevelError),
+		DB: pool, Values: testValues(t, pool, key), Log: logging.New(io.Discard, slog.LevelError),
 		Wait: func(ctx context.Context, d time.Duration) bool {
 			waits = append(waits, d)
 			readyWhileFailing = append(readyWhileFailing, s.Ready(ctx))
@@ -62,7 +62,7 @@ func TestAReloadStopsRetryingWhenTheServerStops(t *testing.T) {
 	require.NoError(t, err)
 	calls := 0
 	s, err := New(Options{
-		DB: pool, SecretKey: key, Log: logging.New(io.Discard, slog.LevelError),
+		DB: pool, Values: testValues(t, pool, key), Log: logging.New(io.Discard, slog.LevelError),
 		Wait: func(context.Context, time.Duration) bool {
 			calls++
 			return false

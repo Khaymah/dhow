@@ -11,6 +11,7 @@ import (
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Session/Models"
@@ -31,7 +32,7 @@ func (s *Service) verifyTotp(ctx context.Context, q *sqlc.Queries, userID uuid.U
 	if err != nil {
 		return false, err
 	}
-	secret, err := s.sealer.Open(row.SecretSealed, totpContext(userID))
+	secret, err := s.totp.Open(ctx, keys.UserOwner(userID), totpContext(userID), row.SecretSealed)
 	if err != nil {
 		return false, err
 	}

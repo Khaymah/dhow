@@ -258,7 +258,7 @@ func TestAStoredProviderThatIsNotValidStopsStartUp(t *testing.T) {
 		want   string
 	}{
 		{"plain http outside development", "http://sso.example.com", nil, "sign-in provider corp (from the database): Issuer must use https"},
-		{"a secret sealed with another key", "https://sso.example.com", make([]byte, 48), "cannot be decrypted with the current DHOW_SECRET_KEY"},
+		{"a secret sealed with another key", "https://sso.example.com", make([]byte, 48), "cannot be decrypted with the keyring"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

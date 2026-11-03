@@ -148,20 +148,28 @@ func (e *Envelope) newDataKey(ctx context.Context, owner Owner) error {
 	if err != nil {
 		return err
 	}
-	id, err := uuid.NewV7()
-	if err != nil {
-		return fmt.Errorf("make a data key id: %w", err)
-	}
-	dek, err := randomKey()
+	dk, err := wrapNewDataKey(ctx, e.provider, owner, version)
 	if err != nil {
 		return err
 	}
-	defer clear(dek)
-	wrapped, err := e.provider.Wrap(ctx, version, dek, dekAAD(id, owner, version))
+	return e.store.InsertDataKey(ctx, dk)
+}
+
+func wrapNewDataKey(ctx context.Context, provider KeyProvider, owner Owner, version int32) (DataKey, error) {
+	id, err := uuid.NewV7()
 	if err != nil {
-		return fmt.Errorf("wrap a new data key with KEK version %d: %w", version, err)
+		return DataKey{}, fmt.Errorf("make a data key id: %w", err)
 	}
-	return e.store.InsertDataKey(ctx, DataKey{ID: id, Owner: owner, KekVersion: version, Wrapped: wrapped})
+	dek, err := randomKey()
+	if err != nil {
+		return DataKey{}, err
+	}
+	defer clear(dek)
+	wrapped, err := provider.Wrap(ctx, version, dek, dekAAD(id, owner, version))
+	if err != nil {
+		return DataKey{}, fmt.Errorf("wrap a new data key with KEK version %d: %w", version, err)
+	}
+	return DataKey{ID: id, Owner: owner, KekVersion: version, Wrapped: wrapped}, nil
 }
 
 func (e *Envelope) unwrap(ctx context.Context, dk DataKey) ([]byte, error) {
@@ -196,3 +204,11 @@ func dekAAD(id uuid.UUID, owner Owner, version int32) []byte {
 }
 
 func IsSealedV2(value []byte) bool { return len(value) >= Overhead && value[0] == FormatVersion }
+
+func DataKeyIDOf(value []byte) (uuid.UUID, bool) {
+	if !IsSealedV2(value) {
+		return uuid.Nil, false
+	}
+	id, err := uuid.FromBytes(value[1:saltOffset])
+	return id, err == nil
+}

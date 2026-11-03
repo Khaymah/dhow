@@ -14,6 +14,7 @@ import (
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Session/Models"
@@ -42,7 +43,7 @@ func (s *Service) StartTotp(ctx context.Context) (models.TotpEnrollment, error) 
 		return models.TotpEnrollment{}, err
 	}
 	defer clear(secret)
-	sealed, err := s.sealer.Seal(secret, totpContext(p.UserID))
+	sealed, err := s.totp.Seal(ctx, keys.UserOwner(p.UserID), totpContext(p.UserID), secret)
 	if err != nil {
 		return models.TotpEnrollment{}, err
 	}
@@ -85,7 +86,7 @@ func (s *Service) checkEnrollmentCode(ctx context.Context, q *sqlc.Queries, p au
 	if err != nil {
 		return uuid.Nil, 0, err
 	}
-	secret, err := s.sealer.Open(row.SecretSealed, totpContext(p.UserID))
+	secret, err := s.totp.Open(ctx, keys.UserOwner(p.UserID), totpContext(p.UserID), row.SecretSealed)
 	if err != nil {
 		return uuid.Nil, 0, err
 	}

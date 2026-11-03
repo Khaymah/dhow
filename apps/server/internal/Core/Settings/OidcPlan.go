@@ -299,7 +299,7 @@ func (s *Store) oidcRows(ctx context.Context, q *sqlc.Queries) ([]oidcRow, error
 	}
 	out := make([]oidcRow, 0, len(rows))
 	for _, r := range rows {
-		p, err := s.decodeProvider(r.ProviderId, storedProvider{
+		p, err := s.decodeProvider(ctx, r.ProviderId, storedProvider{
 			Type: r.Type, Name: r.Name, Issuer: r.Issuer, ClientID: r.ClientId, Domains: r.AllowedDomains, Secret: r.Secret,
 		}, true)
 		if err != nil {

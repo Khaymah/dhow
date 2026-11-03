@@ -9,6 +9,7 @@ import (
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 )
@@ -20,11 +21,11 @@ type OidcResult struct {
 	Version  int64
 }
 
-func (s *Store) sealSecret(id, secret string) ([]byte, error) {
+func (s *Store) sealSecret(ctx context.Context, id, secret string) ([]byte, error) {
 	if secret == "" {
 		return nil, nil
 	}
-	return s.sealer.Seal([]byte(secret), oidcSealContext(id))
+	return s.oidcKeys.Seal(ctx, keys.InstanceOwner(), oidcSealContext(id), []byte(secret))
 }
 
 func (s *Store) ApplyOidc(ctx context.Context, c OidcChange, actor uuid.UUID) (OidcResult, error) {
@@ -77,7 +78,7 @@ func (s *Store) writeOidc(ctx context.Context, q *sqlc.Queries, op OidcOperation
 		version, err = q.RemoveOidcProvider(ctx, sqlc.RemoveOidcProviderParams{Actor: &actor, ID: p.target.rowID, Version: p.target.version})
 	case OidcCreate:
 		var secret []byte
-		if secret, err = s.sealSecret(p.next.ID, p.next.ClientSecret); err != nil {
+		if secret, err = s.sealSecret(ctx, p.next.ID, p.next.ClientSecret); err != nil {
 			return 0, err
 		}
 		version, err = q.InsertOidcProvider(ctx, sqlc.InsertOidcProviderParams{
@@ -87,7 +88,7 @@ func (s *Store) writeOidc(ctx context.Context, q *sqlc.Queries, op OidcOperation
 	default:
 		secret := p.target.secret
 		if p.target.sealed || p.next.ClientSecret != p.target.cfg.ClientSecret {
-			if secret, err = s.sealSecret(p.next.ID, p.next.ClientSecret); err != nil {
+			if secret, err = s.sealSecret(ctx, p.next.ID, p.next.ClientSecret); err != nil {
 				return 0, err
 			}
 		}
