@@ -10,9 +10,18 @@ import (
 
 func FuzzMatchPattern(f *testing.F) {
 	for _, seed := range [][2]string{
-		{"src/**/*.go", "src/a/b/c.go"}, {"*.lock", "deps.lock"}, {"a?c", "abc"}, {"**", "x/y/z"},
-		{"a/**/b", "a/b"}, {"[a]", "a"}, {"a**", "ab"}, {"*", "a/b"}, {"?", "é"}, {"${{ x }}", "x"},
-		{strings.Repeat("*", 64), strings.Repeat("a", 256)}, {"**/**/**/x", "x"},
+		{"src/**/*.go", "src/a/b/c.go"},
+		{"*.lock", "deps.lock"},
+		{"a?c", "abc"},
+		{"**", "x/y/z"},
+		{"a/**/b", "a/b"},
+		{"[a]", "a"},
+		{"a**", "ab"},
+		{"*", "a/b"},
+		{"?", "é"},
+		{"${{ x }}", "x"},
+		{strings.Repeat("*", 64), strings.Repeat("a", 256)},
+		{"**/**/**/x", "x"},
 	} {
 		f.Add(seed[0], seed[1])
 	}
