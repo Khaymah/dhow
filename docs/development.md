@@ -143,6 +143,7 @@ docker compose -f deploy/dev/compose.yaml up -d runner
 | `AppArmor restrict unprivileged user namespaces` | الجهاز يعمل بـ Ubuntu 24.04 أو أحدث. شغّل `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` على الجهاز، ثم `docker compose -f deploy/dev/compose.yaml restart runner`. |
 | `is more than this machine has` مع `DHOW_RUNNER_MAX_MEMORY` | التشغيل الواحد قد يستخدم 2 GiB من الذاكرة وقرصًا بحجم 4 GiB في الذاكرة، فيحتاج جهاز التشغيل إلى 6 GiB. أعطِ Docker Desktop ذاكرة أكبر (Settings، ثم Resources، ومع WSL2 القيمة `memory=` في `%UserProfile%\.wslconfig`)، أو اخفض `DHOW_DEV_RUNNER_MAX_MEMORY` و`DHOW_DEV_RUNNER_MAX_DISK`. |
 | تتوقف الحاوية فورًا مع رسالة عن الحاويات privileged | ميزة Enhanced Container Isolation في Docker Desktop تمنع الحاويات privileged. أوقفها لهذا المشروع، أو استخدم جهاز التشغيل الوهمي. |
+| `invalid internal status, try resetting the pause process with "podman system migrate"` | توقفت الحاوية وفيها حالة لـ Podman، والصورة القديمة من قبل هذا الإصلاح لا تمسحها. أعد بناء الصورة مرة واحدة بـ `docker compose -f deploy/dev/compose.yaml build runner`، ثم شغّل `docker compose -f deploy/dev/compose.yaml up -d runner`. يمسح جهاز التشغيل هذه الحالة الآن عند كل بدء للحاوية، فلا تحتاج إعادة التشغيل إلى أي تنظيف. |
 | `this runner is already registered` | أعد ضبطه كما سبق. |
 | جهاز التشغيل يعرض `RUNNER_DISABLED` | عطّله أحد من صفحة أجهزة التشغيل، أو عطّله السيرفر بعد أكثر من 3 جلسات جديدة في 10 دقائق. فعّله من هناك، أو أعد ضبطه. |
 

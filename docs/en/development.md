@@ -143,6 +143,7 @@ Read its log first: `docker compose -f deploy/dev/compose.yaml logs runner`.
 | `AppArmor restrict unprivileged user namespaces` | The host is Ubuntu 24.04 or newer. Run `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` on the host, then `docker compose -f deploy/dev/compose.yaml restart runner`. |
 | `is more than this machine has` for `DHOW_RUNNER_MAX_MEMORY` | A job may use 2 GiB of memory and a 4 GiB disk in memory, so the runner needs 6 GiB. Give Docker Desktop more memory (Settings, then Resources; with WSL2, `memory=` in `%UserProfile%\.wslconfig`), or lower `DHOW_DEV_RUNNER_MAX_MEMORY` and `DHOW_DEV_RUNNER_MAX_DISK`. |
 | The container stops at once with a message about privileged containers | Docker Desktop's Enhanced Container Isolation blocks privileged containers. Turn it off for this project, or use the fake runner. |
+| `invalid internal status, try resetting the pause process with "podman system migrate"` | The container stopped while Podman had state in it, and an image from before this was fixed does not clear it. Rebuild the image once with `docker compose -f deploy/dev/compose.yaml build runner`, then run `docker compose -f deploy/dev/compose.yaml up -d runner`. The runner now clears that state at every container start, so a restart needs no cleanup. |
 | `this runner is already registered` | Reset it as above. |
 | The runner shows `RUNNER_DISABLED` | Someone disabled it on the Runners page, or the server did after more than 3 new sessions in 10 minutes. Enable it there, or reset it. |
 
