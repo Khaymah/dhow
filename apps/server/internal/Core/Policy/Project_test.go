@@ -158,3 +158,51 @@ func TestSecondFactorFollowsTheProjectRole(t *testing.T) {
 	assert.True(t, policy.SecondFactorDue(state, time.Minute).IsZero())
 	assert.Equal(t, past.Add(time.Minute), policy.SecondFactorDueAsAdmin(state, time.Minute))
 }
+
+func TestEnvironmentActionsFollowTheProjectRole(t *testing.T) {
+	org, project, other := uuid.New(), uuid.New(), uuid.New()
+	member := func(role policy.Role) policy.Subject {
+		return policy.Subject{UserID: uuid.New(), Memberships: []policy.Membership{{OrganizationID: org, Role: role}}}
+	}
+	on := func(id uuid.UUID, bindings ...policy.Role) policy.Resource {
+		return policy.Resource{OrganizationID: org, ProjectID: id, ProjectBindings: bindings}
+	}
+	tests := []struct {
+		name     string
+		subject  policy.Subject
+		action   policy.Action
+		resource policy.Resource
+		want     bool
+	}{
+		{"an admin manages environments", member(policy.RoleAdmin), policy.EnvironmentManage, on(project), true},
+		{"a maintainer does not manage environments", member(policy.RoleMaintainer), policy.EnvironmentManage, on(project), false},
+		{"a maintainer pauses an environment", member(policy.RoleMaintainer), policy.EnvironmentPause, on(project), true},
+		{"a developer does not pause an environment", member(policy.RoleDeveloper), policy.EnvironmentPause, on(project), false},
+		{"a developer may approve a deployment", member(policy.RoleDeveloper), policy.DeploymentApprove, on(project), true},
+		{"a viewer may not approve a deployment", member(policy.RoleViewer), policy.DeploymentApprove, on(project), false},
+		{"a maintainer may not bypass the rules", member(policy.RoleMaintainer), policy.EnvironmentBypass, on(project), false},
+		{"an admin binding grants manage on its project", member(policy.RoleDeveloper), policy.EnvironmentManage, on(project, policy.RoleAdmin), true},
+		{"an admin binding grants bypass on its project", member(policy.RoleMaintainer), policy.EnvironmentBypass, on(project, policy.RoleAdmin), true},
+		{"an admin binding grants nothing on another project", member(policy.RoleDeveloper), policy.EnvironmentManage, on(other), false},
+		{"a viewer binding stops a maintainer pausing", member(policy.RoleMaintainer), policy.EnvironmentPause, on(project, policy.RoleViewer), false},
+		{"an owner binding never grants manage", member(policy.RoleDeveloper), policy.EnvironmentManage, on(project, policy.RoleOwner), false},
+		{"a token never manages environments", policy.Subject{
+			UserID: uuid.New(), TokenID: uuid.New(), TokenScopes: policy.TokenActions(),
+			Memberships: []policy.Membership{{OrganizationID: org, Role: policy.RoleOwner}},
+		}, policy.EnvironmentManage, on(project), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, policy.Can(tt.subject, tt.action, tt.resource))
+		})
+	}
+	for _, a := range []policy.Action{policy.EnvironmentManage, policy.EnvironmentPause, policy.EnvironmentBypass, policy.DeploymentApprove} {
+		assert.True(t, policy.IsProjectAction(a), "%s", a)
+		assert.False(t, policy.IsTokenAction(a), "%s", a)
+		assert.Contains(t, policy.Actions(), a)
+	}
+	for _, a := range []policy.Action{policy.EnvironmentManage, policy.EnvironmentBypass, policy.DeploymentApprove} {
+		assert.True(t, policy.IsSensitive(a), "%s", a)
+	}
+	assert.False(t, policy.IsSensitive(policy.EnvironmentPause), "pausing during an incident never waits for a second factor")
+}
