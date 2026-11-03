@@ -163,6 +163,45 @@ type CommitStatusReport struct {
 	AbandonedAt    *time.Time
 }
 
+type Environment struct {
+	Id                   uuid.UUID
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	IsDeleted            bool
+	OrganizationId       uuid.UUID
+	ProjectId            uuid.UUID
+	Name                 string
+	Description          string
+	Version              int64
+	RuleVersion          int64
+	AllowedRefs          []byte
+	AllowPullRequests    bool
+	RequiredApprovals    int32
+	AllowSelfApproval    bool
+	WaitMinutes          int32
+	ApprovalTimeoutHours int32
+	RequirePinnedImages  bool
+	AllowedPlugins       []string
+	RequiredIsolation    string
+	AllowAdminBypass     bool
+	SupersedePending     bool
+	PausedAt             *time.Time
+	PausedByUserId       *uuid.UUID
+	PausedReason         pgtype.Text
+	CreatedByUserId      uuid.UUID
+}
+
+type EnvironmentReviewer struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	EnvironmentId  uuid.UUID
+	UserId         *uuid.UUID
+	TeamId         *uuid.UUID
+}
+
 type GitConnection struct {
 	Id              uuid.UUID
 	CreatedAt       time.Time

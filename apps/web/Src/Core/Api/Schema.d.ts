@@ -1504,6 +1504,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/environments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the environments of a project
+         * @description Needs `project.read` on the project, after its role bindings. By name, with their protection rules and reviewers.
+         */
+        get: operations["listEnvironments"];
+        put?: never;
+        /**
+         * Create an environment
+         * @description Needs `environment.manage` on the project (Admin and Owner, or an Admin binding on this project). A pipeline file never creates an environment: a job that names a missing one fails with `ENVIRONMENT_NOT_FOUND`. The name is unique among the project's environments (409 `ENVIRONMENT_EXISTS`) and never changes. Rules left out take their defaults, and `AllowedRefs` defaults to the default branch of the linked repository (`main` without one). A reviewer who is not a member, or whose role on the project is below Developer, or a team of another organization, answers 422 `REVIEWER_NOT_ELIGIBLE`. An archived project answers 409 `PROJECT_ARCHIVED`.
+         */
+        post: operations["createEnvironment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read an environment
+         * @description Needs `project.read` on the project. Its rules, reviewers and whether it is paused.
+         */
+        get: operations["getEnvironment"];
+        /**
+         * Change the description or the protection rules of an environment
+         * @description Needs `environment.manage` on the project and a fresh `CurrentFactor`. Changes only the fields that are sent. `Version` is the one the caller read: an older one answers 409 `ENVIRONMENT_VERSION_CONFLICT` and changes nothing. Any change to the rules or the reviewers raises `RuleVersion`, so an approval given before it no longer counts. A Maintainer may pause an environment but never change its rules.
+         */
+        put: operations["updateEnvironment"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove an environment
+         * @description Needs `environment.manage` on the project and a fresh `CurrentFactor`. The environment and its reviewers are marked deleted and its name can be used again. A job that still names it fails with `ENVIRONMENT_NOT_FOUND`.
+         */
+        post: operations["removeEnvironment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop new deploys to an environment
+         * @description Needs `environment.pause` on the project (Maintainer and above), without a second factor so it never waits during an incident. Jobs already running finish; new ones wait. Pausing a paused environment changes nothing. Raises `RuleVersion`. Only `environment.manage` resumes it.
+         */
+        post: operations["pauseEnvironment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Allow deploys to a paused environment again
+         * @description Needs `environment.manage` on the project and a fresh `CurrentFactor`, so a Maintainer who paused cannot resume. Resuming an environment that is not paused changes nothing. Raises `RuleVersion`.
+         */
+        post: operations["resumeEnvironment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/projects/{projectId}/repository": {
         parameters: {
             query?: never;
@@ -2289,7 +2397,7 @@ export interface components {
         };
         ErrorDetail: {
             /**
-             * @description Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED` or `FORK_POLICY_NOT_ALLOWED`.
+             * @description Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`, `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT` or `REVIEWER_NOT_ELIGIBLE`.
              * @example INTERNAL
              */
             Code: string;
@@ -3367,6 +3475,110 @@ export interface components {
             PipelinePath?: string;
             ForkPolicy?: components["schemas"]["ForkPolicy"];
         };
+        /** @enum {string} */
+        EnvironmentRefKind: "branch" | "tag";
+        EnvironmentRef: {
+            Kind: components["schemas"]["EnvironmentRefKind"];
+            /** @description A glob on the branch or tag name: `*` and `?` within one part between slashes, `**` alone for any number of parts. Without `..`, `//`, a leading or trailing slash, spaces, `~`, `^`, `:`, brackets or braces. */
+            Pattern: string;
+        };
+        EnvironmentReviewers: {
+            UserIds: string[];
+            TeamIds: string[];
+        };
+        /** @enum {string} */
+        EnvironmentIsolation: "container";
+        EnvironmentRules: {
+            /** @description The branches and tags that may deploy here. Empty means nothing deploys. Never bypassed. */
+            AllowedRefs: components["schemas"]["EnvironmentRef"][];
+            /** @description Pull requests from the same repository may deploy here. Pull requests from forks never do. */
+            AllowPullRequests: boolean;
+            Reviewers: components["schemas"]["EnvironmentReviewers"];
+            /** @description One reviewer in Community. */
+            RequiredApprovals: number;
+            /** @description The person who started the run may approve it. Off by default; only `environment.manage` turns it on, for a team of one. */
+            AllowSelfApproval: boolean;
+            WaitMinutes: number;
+            ApprovalTimeoutHours: number;
+            /** @description Every image is pinned by digest in the pipeline file itself. */
+            RequirePinnedImages: boolean;
+            /** @description Image name prefixes of the plugins allowed here. Empty allows any plugin. */
+            AllowedPlugins: string[];
+            RequiredIsolation: components["schemas"]["EnvironmentIsolation"];
+            /** @description An Admin may skip the reviewers and the timer, with a reason and a second factor. */
+            AllowAdminBypass: boolean;
+            /** @description A newer run on the same ref replaces an older run still waiting for approval. */
+            SupersedePending: boolean;
+        };
+        /** @description Any subset of the rules. A field left out keeps its current value, or its default on create. */
+        EnvironmentRulesInput: {
+            AllowedRefs?: components["schemas"]["EnvironmentRef"][];
+            AllowPullRequests?: boolean;
+            Reviewers?: components["schemas"]["EnvironmentReviewers"];
+            RequiredApprovals?: number;
+            AllowSelfApproval?: boolean;
+            WaitMinutes?: number;
+            ApprovalTimeoutHours?: number;
+            RequirePinnedImages?: boolean;
+            AllowedPlugins?: string[];
+            RequiredIsolation?: components["schemas"]["EnvironmentIsolation"];
+            AllowAdminBypass?: boolean;
+            SupersedePending?: boolean;
+        };
+        Environment: {
+            /** Format: uuid */
+            Id: string;
+            /** Format: uuid */
+            OrganizationId: string;
+            /** Format: uuid */
+            ProjectId: string;
+            Name: string;
+            Description: string;
+            /**
+             * Format: int64
+             * @description Rises with every change. Send it back to change the environment.
+             */
+            Version: number;
+            /**
+             * Format: int64
+             * @description Rises with every change to the rules, the reviewers or the pause. Approvals are bound to it.
+             */
+            RuleVersion: number;
+            Rules: components["schemas"]["EnvironmentRules"];
+            Paused: boolean;
+            /** Format: date-time */
+            PausedAt?: string;
+            /** Format: uuid */
+            PausedByUserId?: string;
+            PausedReason?: string;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            UpdatedAt: string;
+        };
+        EnvironmentResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Environment"];
+        };
+        EnvironmentListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Environment"][];
+        };
+        CreateEnvironmentRequest: {
+            /** @description The name a job writes in `environment:`. Lowercase letters, digits, `_` and `-`. */
+            Name: string;
+            Description?: string;
+            Rules?: components["schemas"]["EnvironmentRulesInput"];
+        };
+        UpdateEnvironmentRequest: {
+            /** Format: int64 */
+            Version: number;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+            Description?: string;
+            Rules?: components["schemas"]["EnvironmentRulesInput"];
+        };
+        PauseEnvironmentRequest: {
+            /** @description Shown to everyone who can read the project, and kept in the audit log. */
+            Reason: string;
+        };
         /**
          * @description `awaiting_approval`: a pull request from a fork waits for a Maintainer. `pending`: the server reads the pipeline file and pins its images. `queued`: the run waits for an older run of its concurrency group. `skipped`: the pipeline file is missing or does not run on this trigger.
          * @enum {string}
@@ -3680,6 +3892,7 @@ export interface components {
         ProjectId: string;
         RunId: string;
         ArtifactId: string;
+        EnvironmentName: string;
         Page: number;
         Limit: number;
     };
@@ -5939,6 +6152,202 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listEnvironments: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of environments. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEnvironmentRequest"];
+            };
+        };
+        responses: {
+            /** @description The new environment. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The environment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEnvironmentRequest"];
+            };
+        };
+        responses: {
+            /** @description The changed environment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CurrentFactorRequest"];
+            };
+        };
+        responses: {
+            /** @description The removed environment, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    pauseEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PauseEnvironmentRequest"];
+            };
+        };
+        responses: {
+            /** @description The paused environment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    resumeEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CurrentFactorRequest"];
+            };
+        };
+        responses: {
+            /** @description The environment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentResponse"];
                 };
             };
             default: components["responses"]["Error"];
