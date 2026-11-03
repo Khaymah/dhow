@@ -1,0 +1,103 @@
+-- name: LockKeyring :exec
+SELECT pg_advisory_xact_lock(hashtextextended('dhow.keyring', 0));
+
+-- name: TryLockKeyRewrap :one
+SELECT pg_try_advisory_xact_lock(hashtextextended('dhow.keyring-rewrap', 0))::boolean;
+
+-- name: ListKeyEncryptionKeys :many
+SELECT "Version", "CheckValue", "Provider", "State", "ActivatedAt", "RetiredAt", "LastExportedAt"
+FROM "KeyEncryptionKeys"
+ORDER BY "Version";
+
+-- name: InsertKeyEncryptionKey :exec
+INSERT INTO "KeyEncryptionKeys" ("Version", "CheckValue", "Provider", "State", "ActivatedAt")
+VALUES (@version, @check_value, @provider, @state, CASE WHEN @state::text = 'pending' THEN NULL ELSE now() END);
+
+-- name: GetActiveKeyEncryptionKey :one
+SELECT "Version" FROM "KeyEncryptionKeys" WHERE "State" = 'active';
+
+-- name: DemoteActiveKeyEncryptionKey :execrows
+UPDATE "KeyEncryptionKeys"
+SET "State" = 'retiring', "UpdatedAt" = now()
+WHERE "State" = 'active';
+
+-- name: PromoteKeyEncryptionKey :execrows
+UPDATE "KeyEncryptionKeys"
+SET "State" = 'active', "ActivatedAt" = now(), "RetiredAt" = NULL, "UpdatedAt" = now()
+WHERE "Version" = @version AND "State" IN ('pending', 'retiring');
+
+-- name: RetireDrainedKeyEncryptionKeys :many
+UPDATE "KeyEncryptionKeys" AS k
+SET "State" = 'retired', "RetiredAt" = now(), "UpdatedAt" = now()
+WHERE k."State" = 'retiring'
+  AND NOT EXISTS (SELECT 1 FROM "DataKeys" AS d WHERE d."KekVersion" = k."Version" AND d."State" = 'active')
+RETURNING k."Version";
+
+-- name: RetireKeyEncryptionKey :execrows
+UPDATE "KeyEncryptionKeys"
+SET "State" = 'retired', "RetiredAt" = now(), "UpdatedAt" = now()
+WHERE "Version" = @version AND "State" <> 'retired';
+
+-- name: ReplaceKeyEncryptionKeyCheck :execrows
+UPDATE "KeyEncryptionKeys"
+SET "CheckValue" = @check_value, "State" = 'pending', "ActivatedAt" = NULL, "RetiredAt" = NULL, "UpdatedAt" = now()
+WHERE "Version" = @version;
+
+-- name: MarkKeyringExported :execrows
+UPDATE "KeyEncryptionKeys"
+SET "LastExportedAt" = now(), "UpdatedAt" = now()
+WHERE "Version" = ANY(@versions::integer[]);
+
+-- name: GetDataKey :one
+SELECT "Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped", "State"
+FROM "DataKeys"
+WHERE "Id" = @id;
+
+-- name: GetActiveDataKeyForOwner :one
+SELECT "Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped", "State"
+FROM "DataKeys"
+WHERE "OwnerKind" = @owner_kind AND "OwnerId" IS NOT DISTINCT FROM sqlc.narg('owner_id')::uuid AND "State" = 'active';
+
+-- name: InsertDataKey :execrows
+INSERT INTO "DataKeys" ("Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped")
+VALUES (@id, @owner_kind, sqlc.narg('owner_id')::uuid, @kek_version, @wrapped)
+ON CONFLICT DO NOTHING;
+
+-- name: DestroyDataKeysOfOwner :execrows
+UPDATE "DataKeys"
+SET "State" = 'destroyed', "Wrapped" = NULL, "DestroyedAt" = now(), "UpdatedAt" = now()
+WHERE "OwnerKind" = @owner_kind AND "OwnerId" IS NOT DISTINCT FROM sqlc.narg('owner_id')::uuid AND "State" = 'active';
+
+-- name: DestroyDataKeysOnVersions :execrows
+UPDATE "DataKeys"
+SET "State" = 'destroyed', "Wrapped" = NULL, "DestroyedAt" = now(), "UpdatedAt" = now()
+WHERE "KekVersion" = ANY(@versions::integer[]) AND "State" = 'active';
+
+-- name: ListDataKeysToRewrap :many
+SELECT "Id", "OwnerKind", "OwnerId", "KekVersion", "Wrapped"
+FROM "DataKeys"
+WHERE "State" = 'active' AND "KekVersion" <> @active_version
+ORDER BY "Id"
+LIMIT @batch
+FOR UPDATE SKIP LOCKED;
+
+-- name: RewrapDataKey :execrows
+UPDATE "DataKeys"
+SET "KekVersion" = @kek_version, "Wrapped" = @wrapped, "UpdatedAt" = now()
+WHERE "Id" = @id AND "State" = 'active' AND "KekVersion" = @from_version;
+
+-- name: CountDataKeysByVersion :many
+SELECT "KekVersion", count(*)::bigint AS "Count"
+FROM "DataKeys"
+WHERE "State" = 'active'
+GROUP BY "KekVersion"
+ORDER BY "KekVersion";
+
+-- name: CountDataKeysOnVersions :one
+SELECT count(*)::bigint FROM "DataKeys" WHERE "State" = 'active' AND "KekVersion" = ANY(@versions::integer[]);
+
+-- name: ListLiveServerInstanceKeks :many
+SELECT "InstanceKey", "Hostname", "KekVersions"
+FROM "ServerInstances"
+WHERE NOT "IsDeleted" AND "LastSeenAt" >= now() - make_interval(secs => @stale_after_seconds::double precision)
+ORDER BY "InstanceKey";

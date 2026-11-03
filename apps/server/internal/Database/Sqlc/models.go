@@ -163,6 +163,19 @@ type CommitStatusReport struct {
 	AbandonedAt    *time.Time
 }
 
+type DataKey struct {
+	Id          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	IsDeleted   bool
+	OwnerKind   string
+	OwnerId     *uuid.UUID
+	KekVersion  int32
+	Wrapped     []byte
+	State       string
+	DestroyedAt *time.Time
+}
+
 type Environment struct {
 	Id                   uuid.UUID
 	CreatedAt            time.Time
@@ -322,6 +335,20 @@ type JobAttempt struct {
 	LogTruncatedAt     *time.Time
 	LateResultLoggedAt *time.Time
 	LogMaxBytes        pgtype.Int8
+}
+
+type KeyEncryptionKey struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	Version        int32
+	CheckValue     []byte
+	Provider       string
+	State          string
+	ActivatedAt    *time.Time
+	RetiredAt      *time.Time
+	LastExportedAt *time.Time
 }
 
 type Lease struct {
@@ -690,6 +717,7 @@ type ServerInstance struct {
 	SchemaVersion int64
 	StartedAt     time.Time
 	LastSeenAt    time.Time
+	KekVersions   []int32
 }
 
 type Session struct {

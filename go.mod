@@ -8,6 +8,7 @@ godebug multipathtcp=0
 
 require (
 	connectrpc.com/connect v1.21.1
+	filippo.io/age v1.3.2
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-playground/validator/v10 v10.30.6
@@ -27,6 +28,7 @@ require (
 
 require (
 	cel.dev/expr v0.25.1 // indirect
+	filippo.io/hpke v0.4.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
