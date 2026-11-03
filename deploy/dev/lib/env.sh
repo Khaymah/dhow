@@ -114,11 +114,13 @@ collect_settings() {
 }
 
 write_env() {
-  local tmp line
+  local tmp line keyring
+  keyring="$(cd -- "$(dirname -- "$env_file")" && pwd)/.dhow-dev-keyring"
+  write_dev_keyring "$keyring"
   tmp=$(mktemp "$env_file.XXXXXX")
   {
     for line in "DHOW_DEV=true" "DHOW_PUBLIC_URL=http://localhost:$http_port" "DHOW_LISTEN_ADDR=127.0.0.1:$http_port" \
-      "DHOW_DATABASE_URL=$db_url" "DHOW_TEST_DATABASE_URL=$db_test_url" "DHOW_SECRET_KEY=$secret_key" \
+      "DHOW_DATABASE_URL=$db_url" "DHOW_TEST_DATABASE_URL=$db_test_url" "DHOW_SECRET_KEY=$secret_key" "DHOW_KEYRING_FILE=$keyring" \
       "DHOW_SMTP_HOST=$smtp_host" "DHOW_SMTP_PORT=$smtp_port" "DHOW_SMTP_TLS=$smtp_tls" \
       "DHOW_SMTP_USERNAME=$smtp_user" "DHOW_SMTP_PASSWORD=$smtp_password" "DHOW_SMTP_FROM=$smtp_from"; do
       if [[ -n ${line#*=} && ( $line != DHOW_SMTP_* || -n $smtp_host ) ]]; then

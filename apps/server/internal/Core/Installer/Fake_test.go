@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -175,6 +176,9 @@ func (f *fakeSys) Stat(p string) (FileInfo, error) {
 	uid := 0
 	if file.mode.Owner != "" && file.mode.Owner != "root" {
 		uid = 1000
+		if n, err := strconv.Atoi(file.mode.Owner); err == nil {
+			uid = n
+		}
 	}
 	mode := file.mode.Perm
 	if file.dir {

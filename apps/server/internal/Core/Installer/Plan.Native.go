@@ -5,6 +5,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 )
 
 func (b *Builder) nativeSteps() []Step {
@@ -17,6 +19,7 @@ func (b *Builder) nativeSteps() []Step {
 		DirStep(b.Sys, b.M.T(KeyStepConfigDir), ConfigDir, modeRootDir),
 		DirStep(b.Sys, b.M.T(KeyStepCredentialsDir), CredentialsDir, modeRootDir),
 		b.track(SecretFileStep(b.Sys, b.M.T(KeyStepSecretKey), SecretKeyPath, generateSecretKey)),
+		b.track(SecretFileStep(b.Sys, b.M.T(KeyStepKeyring), KeyringPath, generateKeyring)),
 	)
 	if b.A.Database.Mode == DatabaseInstall {
 		steps = append(steps, b.track(b.databaseStep()))
@@ -41,6 +44,15 @@ func generateSecretKey() ([]byte, error) {
 		return nil, err
 	}
 	return []byte(key + "\n"), nil
+}
+
+func generateKeyring() ([]byte, error) {
+	ring, err := keys.GenerateKeyring(1)
+	if err != nil {
+		return nil, err
+	}
+	defer ring.Destroy()
+	return ring.Marshal(), nil
 }
 
 func (b *Builder) userStep() Step {

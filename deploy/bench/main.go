@@ -140,7 +140,7 @@ func runConfig(ctx context.Context, o options, limits Limits, log *slog.Logger) 
 	res := ConfigResult{Limits: limits}
 	st := &Stack{
 		Root: o.root, Project: o.project, Image: o.image, DBImage: o.dbImage, Port: o.port, CPUs: o.cpus,
-		Limits: limits, Socket: o.socket,
+		Limits: limits, Socket: o.socket, Work: o.work,
 	}
 	defer st.Down(context.WithoutCancel(ctx))
 	runners := &Runners{Binary: o.runner, Dir: o.work, URL: st.BaseURL()}

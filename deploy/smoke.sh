@@ -64,6 +64,7 @@ printf 'DHOW_RATE_LIMIT_PUBLIC=20\nDHOW_RATE_LIMIT_INVITES_USER=3\n' >>"$work/.e
 expect "the smoke stack runs with low rate limits" grep -q '^DHOW_RATE_LIMIT_PUBLIC=20$' "$work/.env"
 expect ".env is mode 600" test "$(stat -c %a "$work/.env")" = 600
 expect "init.sh refuses to overwrite .env" bash -c '! "$1" >/dev/null 2>&1' _ "$work/init.sh"
+expect "the keyring is mode 600 and belongs to the container user" test "$(stat -c '%a %u' "$work/secrets/dhow-keyring")" = "600 65532"
 
 printf 'The image refuses to start without configuration\n'
 set +e
@@ -72,6 +73,7 @@ noenv_status=$?
 set -e
 expect "exits non-zero without config" test "$noenv_status" -ne 0
 expect "names the missing secret key" grep -q DHOW_SECRET_KEY <<<"$noenv"
+expect "names the missing keyring" grep -q DHOW_KEYRING_FILE <<<"$noenv"
 
 printf 'Starting the stack\n'
 compose up --detach --wait --wait-timeout 120
@@ -84,6 +86,10 @@ printf 'HTTP behaviour\n'
 status=$(http "$work/ready" /api/v1/health/ready)
 expect "/api/v1/health/ready answers 200" test "$status" = 200
 expect "/api/v1/health/ready reports ok" grep -q '"Status":"ok"' "$work/ready.body"
+expect "/api/v1/health/ready checks the keyring" grep -q '"Name":"keyring","Ok":true' "$work/ready.body"
+kek_text=$(sudo -n cat "$work/secrets/dhow-keyring" 2>/dev/null || cat "$work/secrets/dhow-keyring" 2>/dev/null || true)
+kek=${kek_text##* }
+expect "the logs never show the keyring key" bash -c '[[ -n "$1" ]] && ! grep -qF -- "$1" <<<"$2"' _ "$kek" "$(compose logs --no-color dhow 2>&1)"
 
 status=$(http "$work/meta" /api/v1/meta)
 expect "/api/v1/meta answers 200" test "$status" = 200

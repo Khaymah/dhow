@@ -16,6 +16,8 @@ export DHOW_LISTEN_ADDR=0.0.0.0:8080
 export DHOW_PUBLIC_URL="http://localhost:${web_port}"
 export DHOW_DATABASE_URL="postgres://dhow:dhow-dev-only@db:5432/dhow?sslmode=disable"
 export DHOW_TEST_DATABASE_URL="postgres://dhow:dhow-dev-only@db:5432/dhow_test?sslmode=disable"
+install -m 600 /src/.dhow-dev-keyring /tmp/dhow-keyring
+export DHOW_KEYRING_FILE=/tmp/dhow-keyring
 
 say() {
   printf '\033[1;36m[dev]\033[0m %s\n' "$*"

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 )
 
@@ -30,12 +31,26 @@ func TestUnitUsesTheInstallerPaths(t *testing.T) {
 	for _, want := range []string{
 		"User=" + ServiceUser, "ExecStart=" + BinaryPath, "EnvironmentFile=" + EnvFilePath,
 		"LoadCredential=dhow-secret-key:" + SecretKeyPath, "LoadCredential=dhow-database-url:" + DatabaseURLPath,
+		"LoadCredential=dhow-keyring:" + KeyringPath,
 		"CapabilityBoundingSet=\n", "NoNewPrivileges=yes", "ProtectSystem=strict", "UMask=0077",
-		"RestartPreventExitStatus=" + strconv.Itoa(migrations.ExitSchemaTooNew) + "\n",
+		"RestartPreventExitStatus=" + strconv.Itoa(migrations.ExitSchemaTooNew) + " " + strconv.Itoa(keys.ExitKeyring) + "\n",
 	} {
 		assert.Contains(t, unit, want)
 	}
 	assert.NotContains(t, unit, "Environment=DHOW_SECRET_KEY")
+	assert.NotContains(t, unit, "DHOW_KEYRING")
+}
+
+func TestComposeMountsTheKeyringAsASecret(t *testing.T) {
+	compose := string(ComposeFile)
+	for _, want := range []string{
+		"DHOW_KEYRING_FILE: /run/secrets/dhow-keyring\n", "    secrets:\n      - dhow-keyring\n",
+		"secrets:\n  dhow-keyring:\n    file: ./secrets/dhow-keyring\n",
+	} {
+		assert.Contains(t, compose, want)
+	}
+	assert.NotContains(t, compose, "DHOW_KEYRING:")
+	assert.Equal(t, ComposeDir+"/secrets/dhow-keyring", ComposeKeyring)
 }
 
 func TestProxyFixturesMatchPhaseA(t *testing.T) {

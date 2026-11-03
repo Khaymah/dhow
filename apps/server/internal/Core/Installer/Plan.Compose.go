@@ -35,6 +35,8 @@ func (b *Builder) composeSteps() []Step {
 		DirStep(b.Sys, b.M.T(KeyStepConfigDir), ConfigDir, modeRootDir),
 		DirStep(b.Sys, b.M.T(KeyStepComposeDir), ComposeDir, modeRootDir),
 		FileStep(b.Sys, b.M.T(KeyStepComposeFile), ComposeFilePath, ComposeFile, modeRootPublic),
+		DirStep(b.Sys, b.M.T(KeyStepSecretsDir), ComposeSecrets, modeRootDir),
+		b.track(ContainerSecretFileStep(b.Sys, b.M.T(KeyStepKeyring), ComposeKeyring, generateKeyring)),
 		b.composeEnvStep(),
 		b.answersStep(),
 		CommandStep(b.Sys, b.M.T(KeyStepComposeUp), nil, []Command{composeUp()}, nil),

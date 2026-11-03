@@ -91,6 +91,16 @@ random_hex() {
   od -An -tx1 -N"$1" /dev/urandom | tr -d ' \n'
 }
 
+write_dev_keyring() {
+  local file=$1 tmp
+  [[ -f $file ]] && return 0
+  tmp=$(mktemp "$file.XXXXXX")
+  printf 'kek 1 %s\n' "$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')" >"$tmp"
+  chmod 600 "$tmp"
+  mv -f "$tmp" "$file"
+  printf 'Wrote the development keyring %s (mode 600)\n' "$file"
+}
+
 version_ge() {
   [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
 }

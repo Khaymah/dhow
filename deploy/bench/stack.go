@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -20,9 +23,10 @@ import (
 )
 
 const (
-	publicURL   = "https://dhow.bench.test"
-	upTimeout   = 4 * time.Minute
-	statTimeout = 5 * time.Second
+	publicURL    = "https://dhow.bench.test"
+	upTimeout    = 4 * time.Minute
+	statTimeout  = 5 * time.Second
+	containerUID = 65532
 )
 
 var setupLinkRe = regexp.MustCompile(regexp.QuoteMeta(publicURL) + `/setup#([A-Za-z0-9_-]{43})`)
@@ -43,6 +47,8 @@ type Stack struct {
 	CPUs     string
 	Limits   Limits
 	Socket   string
+	Work     string
+	keyring  string
 	started  time.Time
 	docker   *http.Client
 	ids      map[string]string
@@ -66,6 +72,7 @@ func (s *Stack) env() []string {
 		"DHOW_PUBLIC_URL=" + publicURL,
 		"POSTGRES_PASSWORD=" + s.password,
 		"DHOW_SECRET_KEY=" + s.secret,
+		"BENCH_KEYRING_FILE=" + s.keyring,
 		"DHOW_BREACHED_PASSWORD_CHECK=false",
 		"DHOW_TRUSTED_PROXIES=172.16.0.0/12,192.168.0.0/16",
 		"DHOW_RATE_LIMIT_PUBLIC=100000",
@@ -80,6 +87,30 @@ func (s *Stack) env() []string {
 		env = append(env, "BENCH_POSTGRES_IMAGE="+s.DBImage)
 	}
 	return env
+}
+
+func writeKeyring(ctx context.Context, work string) (string, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return "", err
+	}
+	dir := filepath.Join(work, "keyring")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("create the keyring directory: %w", err)
+	}
+	path := filepath.Join(dir, "dhow-keyring")
+	_ = os.Remove(path)
+	if err := os.WriteFile(path, []byte("kek 1 "+base64.RawURLEncoding.EncodeToString(key)+"\n"), 0o600); err != nil {
+		return "", fmt.Errorf("write the keyring: %w", err)
+	}
+	if os.Geteuid() == 0 {
+		return path, os.Chown(path, containerUID, containerUID)
+	}
+	owner := strconv.Itoa(containerUID) + ":" + strconv.Itoa(containerUID)
+	if out, err := exec.CommandContext(ctx, "sudo", "chown", "--", owner, path).CombinedOutput(); err != nil { //nolint:gosec // A fixed argv on a path this program made.
+		return "", fmt.Errorf("give the keyring to the container user %d: %w: %s", containerUID, err, out)
+	}
+	return path, nil
 }
 
 func (s *Stack) compose(ctx context.Context, args ...string) ([]byte, error) {
@@ -104,6 +135,9 @@ func (s *Stack) Up(ctx context.Context) error {
 		return err
 	}
 	if s.secret, err = randomHex(32); err != nil {
+		return err
+	}
+	if s.keyring, err = writeKeyring(ctx, s.Work); err != nil {
 		return err
 	}
 	s.docker = &http.Client{Transport: &http.Transport{

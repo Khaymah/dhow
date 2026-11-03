@@ -128,23 +128,38 @@ func ids(mode FileMode) (int, int, error) {
 	if group == "" {
 		group = "root"
 	}
-	u, err := user.Lookup(owner)
+	uid, err := numericID(owner, func(name string) (string, error) {
+		u, err := user.Lookup(name)
+		if err != nil {
+			return "", err
+		}
+		return u.Uid, nil
+	})
 	if err != nil {
 		return 0, 0, fmt.Errorf("look up user %s: %w", owner, err)
 	}
-	g, err := user.LookupGroup(group)
+	gid, err := numericID(group, func(name string) (string, error) {
+		g, err := user.LookupGroup(name)
+		if err != nil {
+			return "", err
+		}
+		return g.Gid, nil
+	})
 	if err != nil {
 		return 0, 0, fmt.Errorf("look up group %s: %w", group, err)
 	}
-	uid, err := strconv.Atoi(u.Uid)
-	if err != nil {
-		return 0, 0, fmt.Errorf("user %s: %w", owner, err)
-	}
-	gid, err := strconv.Atoi(g.Gid)
-	if err != nil {
-		return 0, 0, fmt.Errorf("group %s: %w", group, err)
-	}
 	return uid, gid, nil
+}
+
+func numericID(name string, lookup func(string) (string, error)) (int, error) {
+	if n, err := strconv.Atoi(name); err == nil && n >= 0 {
+		return n, nil
+	}
+	id, err := lookup(name)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(id)
 }
 
 func (Host) Stat(path string) (FileInfo, error) {

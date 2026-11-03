@@ -24,11 +24,14 @@ const (
 	AnswersPath     = ConfigDir + "/answers.yaml"
 	SecretKeyPath   = CredentialsDir + "/" + config.CredentialSecretKey
 	DatabaseURLPath = CredentialsDir + "/" + config.CredentialDatabaseURL
+	KeyringPath     = CredentialsDir + "/" + config.CredentialKeyring
 	UnitPath        = "/etc/systemd/system/" + ServiceName + ".service"
 	StateDir        = "/var/lib/dhow"
 	ComposeDir      = ConfigDir + "/compose"
 	ComposeFilePath = ComposeDir + "/compose.yaml"
 	ComposeEnvPath  = ComposeDir + "/.env"
+	ComposeSecrets  = ComposeDir + "/secrets"
+	ComposeKeyring  = ComposeSecrets + "/" + config.CredentialKeyring
 	PostgresSocket  = "/var/run/postgresql"
 )
 
@@ -56,6 +59,7 @@ const (
 	ComposeProject = "dhow"
 	ComposeImage   = "ghcr.io/khaymah/dhow"
 	ComposeEdgeNet = "dhow_edge"
+	ContainerUser  = "65532"
 )
 
 var (
@@ -75,4 +79,5 @@ var (
 	modeRootExec    = FileMode{Perm: 0o755}
 	modeRootDir     = FileMode{Perm: 0o700}
 	modePublicDir   = FileMode{Perm: 0o755}
+	modeContainer   = FileMode{Perm: 0o600, Owner: ContainerUser, Group: ContainerUser}
 )
