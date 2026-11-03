@@ -17,6 +17,27 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ManualInputType.
+const (
+	Boolean ManualInputType = "boolean"
+	Choice  ManualInputType = "choice"
+	String  ManualInputType = "string"
+)
+
+// Valid indicates whether the value is a known member of the ManualInputType enum.
+func (e ManualInputType) Valid() bool {
+	switch e {
+	case Boolean:
+		return true
+	case Choice:
+		return true
+	case String:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunIssueSeverity.
 const (
 	RunIssueSeverityError   RunIssueSeverity = "error"
@@ -163,6 +184,51 @@ type ErrorFieldDetail struct {
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
 	Error ErrorDetail `json:"Error"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// ManualInput defines model for ManualInput.
+type ManualInput struct {
+	// Default The default as text. For a boolean it is `true` or `false`.
+	Default     *string `json:"Default,omitempty"`
+	Description *string `json:"Description,omitempty"`
+	Name        string  `json:"Name"`
+
+	// Options The allowed values of a `choice`. Empty for the other types.
+	Options  []string        `json:"Options"`
+	Required bool            `json:"Required"`
+	Type     ManualInputType `json:"Type"`
+}
+
+// ManualInputType defines model for ManualInputType.
+type ManualInputType string
+
+// ManualInputs defines model for ManualInputs.
+type ManualInputs struct {
+	// Enabled The pipeline file has `on.manual`.
+	Enabled bool          `json:"Enabled"`
+	Inputs  []ManualInput `json:"Inputs"`
+
+	// Known False while no run of the default branch has read the pipeline file.
+	Known bool `json:"Known"`
+
+	// Ref The default branch, as `refs/heads/<name>`.
+	Ref string `json:"Ref"`
+
+	// Sha The commit the inputs were read from.
+	Sha *string `json:"Sha,omitempty"`
+}
+
+// ManualInputsResponse defines model for ManualInputsResponse.
+type ManualInputsResponse struct {
+	Data  *ManualInputs `json:"Data,omitempty"`
+	Error *ErrorDetail  `json:"Error,omitempty"`
 
 	// Message An i18n key such as `system.meta.loaded`. The client translates it.
 	//
@@ -365,6 +431,9 @@ type TriggerRunJSONRequestBody = TriggerRunRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetManualInputs Read the inputs a manual run asks for
+	// (GET /organizations/{id}/projects/{projectId}/manual-inputs)
+	GetManualInputs(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId)
 	// ListRuns List the runs of a project
 	// (GET /organizations/{id}/projects/{projectId}/runs)
 	ListRuns(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, params ListRunsParams)
@@ -388,6 +457,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// GetManualInputs Read the inputs a manual run asks for
+// (GET /organizations/{id}/projects/{projectId}/manual-inputs)
+func (_ Unimplemented) GetManualInputs(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // ListRuns List the runs of a project
 // (GET /organizations/{id}/projects/{projectId}/runs)
@@ -433,6 +508,41 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetManualInputs operation middleware
+func (siw *ServerInterfaceWrapper) GetManualInputs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetManualInputs(w, r, id, projectId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListRuns operation middleware
 func (siw *ServerInterfaceWrapper) ListRuns(w http.ResponseWriter, r *http.Request) {
@@ -866,11 +976,54 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/runs/{runId}/approve", wrapper.ApproveRun)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/manual-inputs", wrapper.GetManualInputs)
+	})
 
 	return r
 }
 
 type ErrorJSONResponse ErrorResponse
+
+type GetManualInputsRequestObject struct {
+	Id        Id        `json:"id"`
+	ProjectId ProjectId `json:"projectId"`
+}
+
+type GetManualInputsResponseObject interface {
+	VisitGetManualInputsResponse(w http.ResponseWriter) error
+}
+
+type GetManualInputs200JSONResponse ManualInputsResponse
+
+func (response GetManualInputs200JSONResponse) VisitGetManualInputsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetManualInputsdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response GetManualInputsdefaultJSONResponse) VisitGetManualInputsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type ListRunsRequestObject struct {
 	Id        Id        `json:"id"`
@@ -1120,6 +1273,9 @@ func (response RerunFailedRundefaultJSONResponse) VisitRerunFailedRunResponse(w 
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetManualInputs Read the inputs a manual run asks for
+	// (GET /organizations/{id}/projects/{projectId}/manual-inputs)
+	GetManualInputs(ctx context.Context, request GetManualInputsRequestObject) (GetManualInputsResponseObject, error)
 	// ListRuns List the runs of a project
 	// (GET /organizations/{id}/projects/{projectId}/runs)
 	ListRuns(ctx context.Context, request ListRunsRequestObject) (ListRunsResponseObject, error)
@@ -1177,6 +1333,33 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetManualInputs operation middleware
+func (sh *strictHandler) GetManualInputs(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId) {
+	var request GetManualInputsRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetManualInputs(ctx, request.(GetManualInputsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetManualInputs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetManualInputsResponseObject); ok {
+		if err := validResponse.VisitGetManualInputsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListRuns operation middleware

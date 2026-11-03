@@ -67,6 +67,7 @@ export const AUDIT_ACTIONS: Readonly<Record<string, IAuditAction>> = {
   'project.deploy_key_rotated': { Icon: 'key', Bad: false },
   'project.deploy_key_confirmed': { Icon: 'key', Bad: false },
   'project.webhook_secret_rotated': { Icon: 'key', Bad: false },
+  'project.repository_unlinked': { Icon: 'trash', Bad: true },
   'project.run_created': { Icon: 'layers', Bad: false },
   'project.run_started': { Icon: 'layers', Bad: false },
   'project.run_cancel_requested': { Icon: 'layers', Bad: false },

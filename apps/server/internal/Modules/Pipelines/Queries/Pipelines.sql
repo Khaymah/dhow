@@ -276,3 +276,18 @@ JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."Organi
     AND r."State" IN ('pending', 'running') AND NOT r."IsDeleted"
 WHERE j."Id" = @job_id AND j."OrganizationId" = @organization_id AND j."OriginKind" = 'pipeline' AND NOT j."IsDeleted"
   AND r."RepositoryId" IS NOT NULL;
+
+-- name: GetManualDefinition :one
+SELECT r."DefaultBranch", d."DefinitionSource", d."DefinitionSha"
+FROM "Projects" p
+JOIN "Repositories" r ON r."ProjectId" = p."Id" AND r."OrganizationId" = p."OrganizationId" AND NOT r."IsDeleted"
+LEFT JOIN LATERAL (
+    SELECT pr."DefinitionSource", pr."DefinitionSha"
+    FROM "PipelineRuns" pr
+    WHERE pr."ProjectId" = p."Id" AND pr."OrganizationId" = p."OrganizationId" AND pr."RepositoryId" = r."Id"
+      AND pr."Ref" = 'refs/heads/' || r."DefaultBranch" AND NOT pr."IsFork" AND pr."DefinitionPath" = p."PipelinePath"
+      AND pr."DefinitionSource" IS NOT NULL AND NOT pr."IsDeleted"
+    ORDER BY pr."Number" DESC
+    LIMIT 1
+) d ON true
+WHERE p."Id" = @project_id AND p."OrganizationId" = @organization_id AND NOT p."IsDeleted";

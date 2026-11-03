@@ -3,6 +3,7 @@ package sources
 import (
 	"context"
 	"errors"
+	"net/url"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -123,4 +124,35 @@ func (s *Service) RotateWebhookSecret(ctx context.Context, org, project uuid.UUI
 		return models.Linked{}, err
 	}
 	return models.Linked{Repository: repo, WebhookSecret: secret}, s.audit(ctx, p, eventbus.ProjectWebhookSecretRotated, repo, nil)
+}
+
+func (s *Service) Unlink(ctx context.Context, org, project uuid.UUID) (models.Repository, error) {
+	p, err := principalOf(ctx)
+	if err != nil {
+		return models.Repository{}, err
+	}
+	var row sqlc.Repository
+	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
+		if err := activeProject(ctx, q, org, project); err != nil {
+			return err
+		}
+		current, err := q.LockRepositoryByProject(ctx, sqlc.LockRepositoryByProjectParams{ProjectID: project, OrganizationID: org})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.RepositoryNotLinked()
+		}
+		if err != nil {
+			return err
+		}
+		row, err = q.UnlinkRepository(ctx, sqlc.UnlinkRepositoryParams{ID: current.Id, OrganizationID: org, Now: s.now()})
+		return err
+	})
+	if err != nil {
+		return models.Repository{}, err
+	}
+	repo := s.repositoryOf(row)
+	data := map[string]string{"Transport": repo.Transport}
+	if u, err := url.Parse(repo.CloneURL); err == nil && u.Hostname() != "" {
+		data["Host"] = u.Hostname()
+	}
+	return repo, s.audit(ctx, p, eventbus.ProjectRepositoryUnlinked, repo, data)
 }

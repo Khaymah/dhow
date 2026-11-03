@@ -247,6 +247,9 @@ type ConfirmHostKeyJSONRequestBody = ConfirmHostKeyRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// UnlinkRepository Unlink the repository from a project
+	// (DELETE /organizations/{id}/projects/{projectId}/repository)
+	UnlinkRepository(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId)
 	// GetRepository Read the repository linked to a project
 	// (GET /organizations/{id}/projects/{projectId}/repository)
 	GetRepository(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId)
@@ -270,6 +273,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// UnlinkRepository Unlink the repository from a project
+// (DELETE /organizations/{id}/projects/{projectId}/repository)
+func (_ Unimplemented) UnlinkRepository(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // GetRepository Read the repository linked to a project
 // (GET /organizations/{id}/projects/{projectId}/repository)
@@ -315,6 +324,41 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// UnlinkRepository operation middleware
+func (siw *ServerInterfaceWrapper) UnlinkRepository(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnlinkRepository(w, r, id, projectId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetRepository operation middleware
 func (siw *ServerInterfaceWrapper) GetRepository(w http.ResponseWriter, r *http.Request) {
@@ -640,6 +684,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/organizations/{id}/projects/{projectId}/repository", wrapper.UnlinkRepository)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/repository", wrapper.GetRepository)
 	})
 	r.Group(func(r chi.Router) {
@@ -662,6 +709,46 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 }
 
 type ErrorJSONResponse ErrorResponse
+
+type UnlinkRepositoryRequestObject struct {
+	Id        Id        `json:"id"`
+	ProjectId ProjectId `json:"projectId"`
+}
+
+type UnlinkRepositoryResponseObject interface {
+	VisitUnlinkRepositoryResponse(w http.ResponseWriter) error
+}
+
+type UnlinkRepository200JSONResponse RepositoryResponse
+
+func (response UnlinkRepository200JSONResponse) VisitUnlinkRepositoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkRepositorydefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response UnlinkRepositorydefaultJSONResponse) VisitUnlinkRepositoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type GetRepositoryRequestObject struct {
 	Id        Id        `json:"id"`
@@ -921,6 +1008,9 @@ func (response RotateWebhookSecretdefaultJSONResponse) VisitRotateWebhookSecretR
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// UnlinkRepository Unlink the repository from a project
+	// (DELETE /organizations/{id}/projects/{projectId}/repository)
+	UnlinkRepository(ctx context.Context, request UnlinkRepositoryRequestObject) (UnlinkRepositoryResponseObject, error)
 	// GetRepository Read the repository linked to a project
 	// (GET /organizations/{id}/projects/{projectId}/repository)
 	GetRepository(ctx context.Context, request GetRepositoryRequestObject) (GetRepositoryResponseObject, error)
@@ -978,6 +1068,33 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// UnlinkRepository operation middleware
+func (sh *strictHandler) UnlinkRepository(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId) {
+	var request UnlinkRepositoryRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnlinkRepository(ctx, request.(UnlinkRepositoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnlinkRepository")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnlinkRepositoryResponseObject); ok {
+		if err := validResponse.VisitUnlinkRepositoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetRepository operation middleware

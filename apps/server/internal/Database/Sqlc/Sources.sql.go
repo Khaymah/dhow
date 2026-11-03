@@ -505,6 +505,54 @@ func (q *Queries) TryLockWebhookPartitions(ctx context.Context) (bool, error) {
 	return column_1, err
 }
 
+const unlinkRepository = `-- name: UnlinkRepository :one
+UPDATE "Repositories"
+SET "IsDeleted" = true, "UpdatedAt" = $1
+WHERE "Id" = $2 AND "OrganizationId" = $3 AND NOT "IsDeleted"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Provider", "ConnectionId", "ExternalId", "FullName", "CloneUrl", "Transport", "DefaultBranch", "HostKey", "HostKeyConfirmedAt", "HostKeyConfirmedByUserId", "PendingHostKey", "PendingHostKeyFetchedAt", "DeployKeyPublic", "DeployKeySealed", "PreviousDeployKeyPublic", "PreviousDeployKeySealed", "PreviousDeployKeyExpiresAt", "WebhookSecretSealed", "HookId", "LastDeliveryAt", "CreatedByUserId"
+`
+
+type UnlinkRepositoryParams struct {
+	Now            time.Time
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) UnlinkRepository(ctx context.Context, arg UnlinkRepositoryParams) (Repository, error) {
+	row := q.db.QueryRow(ctx, unlinkRepository, arg.Now, arg.ID, arg.OrganizationID)
+	var i Repository
+	err := row.Scan(
+		&i.Id,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.OrganizationId,
+		&i.ProjectId,
+		&i.Provider,
+		&i.ConnectionId,
+		&i.ExternalId,
+		&i.FullName,
+		&i.CloneUrl,
+		&i.Transport,
+		&i.DefaultBranch,
+		&i.HostKey,
+		&i.HostKeyConfirmedAt,
+		&i.HostKeyConfirmedByUserId,
+		&i.PendingHostKey,
+		&i.PendingHostKeyFetchedAt,
+		&i.DeployKeyPublic,
+		&i.DeployKeySealed,
+		&i.PreviousDeployKeyPublic,
+		&i.PreviousDeployKeySealed,
+		&i.PreviousDeployKeyExpiresAt,
+		&i.WebhookSecretSealed,
+		&i.HookId,
+		&i.LastDeliveryAt,
+		&i.CreatedByUserId,
+	)
+	return i, err
+}
+
 const updateRepository = `-- name: UpdateRepository :one
 UPDATE "Repositories"
 SET "FullName"                   = $1,

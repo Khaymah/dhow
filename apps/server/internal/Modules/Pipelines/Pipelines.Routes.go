@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	runsPath = "/organizations/{id}/projects/{projectId}/runs"
-	runPath  = runsPath + "/{runId}"
+	runsPath   = "/organizations/{id}/projects/{projectId}/runs"
+	runPath    = runsPath + "/{runId}"
+	inputsPath = "/organizations/{id}/projects/{projectId}/manual-inputs"
 )
 
 type Deps struct {
@@ -31,6 +32,7 @@ func Policies() []policy.Rule {
 		policy.Project(http.MethodPost, runPath+"/cancel", policy.RunCancel, "id", "projectId").AllowTokens(),
 		policy.Project(http.MethodPost, runPath+"/rerun-failed", policy.RunTrigger, "id", "projectId").AllowTokens(),
 		policy.Project(http.MethodPost, runPath+"/approve", policy.RunApprove, "id", "projectId"),
+		policy.Project(http.MethodGet, inputsPath, policy.RunRead, "id", "projectId").AllowTokens(),
 	}
 }
 

@@ -1522,7 +1522,11 @@ export interface paths {
          */
         put: operations["linkRepository"];
         post?: never;
-        delete?: never;
+        /**
+         * Unlink the repository from a project
+         * @description Needs `project.manage` on the project. The deploy key and the webhook stop working at once: a webhook to the old address answers 401, and no new run starts until a repository is linked again, with a new deploy key, host key and webhook secret. Runs that already started keep their checkout. A project without a repository answers 404 `REPOSITORY_NOT_LINKED`, and an archived project 409 `PROJECT_ARCHIVED`.
+         */
+        delete: operations["unlinkRepository"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1744,6 +1748,26 @@ export interface paths {
          * @description Needs `artifact.read` on the project. Streams the tar.gz archive as an attachment named after the artifact (`<name>.tar.gz`, with every character outside letters, digits, `.`, `_` and `-` replaced). An expired artifact is 404 `ARTIFACT_NOT_FOUND`, and a stored file that is missing or does not match its SHA-256 is 410 `ARTIFACT_GONE`.
          */
         get: operations["downloadArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/manual-inputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the inputs a manual run asks for
+         * @description Needs `run.read` on the project. Dhow reads the pipeline file only for a run, so the answer comes from the file of the latest run on the default branch that was not from a fork. `Known` is false when no such run read a file yet. `Enabled` says whether that file allows manual runs (`on.manual`), and `Inputs` lists what `on.manual.inputs` declares, by name. A project without a repository answers 404 `REPOSITORY_NOT_LINKED`.
+         */
+        get: operations["getManualInputs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3305,6 +3329,8 @@ export interface components {
             UpdatedAt: string;
             /** Format: date-time */
             ArchivedAt?: string;
+            /** @description The caller's role on this project after its role bindings, so a client can hide what the caller may not do. Only in the answers about one project (read, change, archive), not in the list. */
+            CallerRole?: components["schemas"]["Role"];
         };
         ProjectResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["Project"];
@@ -3427,6 +3453,32 @@ export interface components {
         };
         RunResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["Run"];
+        };
+        /** @enum {string} */
+        ManualInputType: "string" | "boolean" | "choice";
+        ManualInput: {
+            Name: string;
+            Type: components["schemas"]["ManualInputType"];
+            Description?: string;
+            Required: boolean;
+            /** @description The default as text. For a boolean it is `true` or `false`. */
+            Default?: string;
+            /** @description The allowed values of a `choice`. Empty for the other types. */
+            Options: string[];
+        };
+        ManualInputs: {
+            /** @description False while no run of the default branch has read the pipeline file. */
+            Known: boolean;
+            /** @description The pipeline file has `on.manual`. */
+            Enabled: boolean;
+            /** @description The default branch, as `refs/heads/<name>`. */
+            Ref: string;
+            /** @description The commit the inputs were read from. */
+            Sha?: string;
+            Inputs: components["schemas"]["ManualInput"][];
+        };
+        ManualInputsResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["ManualInputs"];
         };
         Artifact: {
             /** Format: uuid */
@@ -5931,6 +5983,30 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    unlinkRepository: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The repository as it was before the unlink. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     confirmHostKey: {
         parameters: {
             query?: never;
@@ -6236,6 +6312,30 @@ export interface operations {
                 };
                 content: {
                     "application/gzip": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getManualInputs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The manual inputs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualInputsResponse"];
                 };
             };
             default: components["responses"]["Error"];

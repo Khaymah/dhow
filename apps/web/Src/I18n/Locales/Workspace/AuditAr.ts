@@ -60,6 +60,7 @@ export const AuditAr = {
   'audit.action.project.deploy_key_rotated': 'تجديد مفتاح المستودع',
   'audit.action.project.deploy_key_confirmed': 'إيقاف مفتاح المستودع السابق',
   'audit.action.project.webhook_secret_rotated': 'تجديد سر الإشعارات',
+  'audit.action.project.repository_unlinked': 'فصل المستودع عن المشروع',
   'audit.action.project.run_created': 'طلب تنفيذ لخطوات النشر',
   'audit.action.project.run_started': 'بدء تنفيذ لخطوات النشر',
   'audit.action.project.run_cancel_requested': 'طلب إلغاء تنفيذ',

@@ -32,6 +32,7 @@ func Policies() []policy.Rule {
 	return []policy.Rule{
 		policy.Project(http.MethodGet, repositoryPath, policy.ProjectRead, "id", "projectId").AllowTokens(),
 		policy.Project(http.MethodPut, repositoryPath, policy.ProjectManage, "id", "projectId").AllowTokens(),
+		policy.Project(http.MethodDelete, repositoryPath, policy.ProjectManage, "id", "projectId").AllowTokens(),
 		policy.Project(http.MethodPost, repositoryPath+"/confirm-host-key", policy.ProjectManage, "id", "projectId").AllowTokens(),
 		policy.Project(http.MethodPost, repositoryPath+"/rotate-deploy-key", policy.ProjectManage, "id", "projectId").AllowTokens(),
 		policy.Project(http.MethodPost, repositoryPath+"/confirm-deploy-key", policy.ProjectManage, "id", "projectId").AllowTokens(),

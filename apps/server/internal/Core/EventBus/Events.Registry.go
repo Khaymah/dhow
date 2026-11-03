@@ -77,6 +77,7 @@ const (
 	ProjectDeployKeyRotated     = "project.deploy_key_rotated"
 	ProjectDeployKeyConfirmed   = "project.deploy_key_confirmed"
 	ProjectWebhookSecretRotated = "project.webhook_secret_rotated"
+	ProjectRepositoryUnlinked   = "project.repository_unlinked"
 
 	RunCreated         = "project.run_created"
 	RunStarted         = "project.run_started"
@@ -148,6 +149,7 @@ func AuditedEvents() []string {
 		ProjectDeployKeyRotated,
 		ProjectDeployKeyConfirmed,
 		ProjectWebhookSecretRotated,
+		ProjectRepositoryUnlinked,
 		RunCreated,
 		RunStarted,
 		RunCancelRequested,

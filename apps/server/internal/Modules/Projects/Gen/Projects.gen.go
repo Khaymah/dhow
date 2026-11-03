@@ -53,6 +53,33 @@ func (e ProjectState) Valid() bool {
 	}
 }
 
+// Defines values for Role.
+const (
+	Admin      Role = "admin"
+	Developer  Role = "developer"
+	Maintainer Role = "maintainer"
+	Owner      Role = "owner"
+	Viewer     Role = "viewer"
+)
+
+// Valid indicates whether the value is a known member of the Role enum.
+func (e Role) Valid() bool {
+	switch e {
+	case Admin:
+		return true
+	case Developer:
+		return true
+	case Maintainer:
+		return true
+	case Owner:
+		return true
+	case Viewer:
+		return true
+	default:
+		return false
+	}
+}
+
 // CreateProjectRequest defines model for CreateProjectRequest.
 type CreateProjectRequest struct {
 	// ForkPolicy `approval`: a pull request from a fork waits until a Maintainer or above approves it. `automatic`: it runs at once, still without secrets or environments.
@@ -123,6 +150,7 @@ type PageMeta struct {
 // Project defines model for Project.
 type Project struct {
 	ArchivedAt *time.Time `json:"ArchivedAt,omitempty"`
+	CallerRole *Role      `json:"CallerRole,omitempty"`
 	CreatedAt  time.Time  `json:"CreatedAt"`
 
 	// ForkPolicy `approval`: a pull request from a fork waits until a Maintainer or above approves it. `automatic`: it runs at once, still without secrets or environments.
@@ -166,6 +194,9 @@ type ProjectResponse struct {
 
 // ProjectState defines model for ProjectState.
 type ProjectState string
+
+// Role defines model for Role.
+type Role string
 
 // UpdateProjectRequest defines model for UpdateProjectRequest.
 type UpdateProjectRequest struct {

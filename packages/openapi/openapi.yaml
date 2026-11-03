@@ -2392,6 +2392,31 @@ paths:
                 $ref: "#/components/schemas/LinkRepositoryResponse"
         default:
           $ref: "#/components/responses/Error"
+    delete:
+      operationId: unlinkRepository
+      tags: [sources]
+      summary: Unlink the repository from a project
+      description: >-
+        Needs `project.manage` on the project. The deploy key and the webhook stop working at once: a webhook to the old
+        address answers 401, and no new run starts until a repository is linked again, with a new deploy key, host key
+        and webhook secret. Runs that already started keep their checkout. A project without a repository answers 404
+        `REPOSITORY_NOT_LINKED`, and an archived project 409 `PROJECT_ARCHIVED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: The repository as it was before the unlink.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/projects/{projectId}/repository/confirm-host-key:
     post:
       operationId: confirmHostKey
@@ -2726,6 +2751,31 @@ paths:
               schema:
                 type: string
                 format: binary
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/manual-inputs:
+    get:
+      operationId: getManualInputs
+      tags: [pipelines]
+      summary: Read the inputs a manual run asks for
+      description: >-
+        Needs `run.read` on the project. Dhow reads the pipeline file only for a run, so the answer comes from the
+        file of the latest run on the default branch that was not from a fork. `Known` is false when no such run read a
+        file yet. `Enabled` says whether that file allows manual runs (`on.manual`), and `Inputs` lists what
+        `on.manual.inputs` declares, by name. A project without a repository answers 404 `REPOSITORY_NOT_LINKED`.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: The manual inputs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManualInputsResponse"
         default:
           $ref: "#/components/responses/Error"
   /organizations/{id}/overview:
@@ -5969,6 +6019,11 @@ components:
         ArchivedAt:
           type: string
           format: date-time
+        CallerRole:
+          $ref: "#/components/schemas/Role"
+          description: >-
+            The caller's role on this project after its role bindings, so a client can hide what the caller may not do.
+            Only in the answers about one project (read, change, archive), not in the list.
     ProjectResponse:
       allOf:
         - $ref: "#/components/schemas/Envelope"
@@ -6217,6 +6272,58 @@ components:
           properties:
             Data:
               $ref: "#/components/schemas/Run"
+    ManualInputType:
+      type: string
+      enum: [string, boolean, choice]
+    ManualInput:
+      type: object
+      additionalProperties: false
+      required: [Name, Type, Required, Options]
+      properties:
+        Name:
+          type: string
+        Type:
+          $ref: "#/components/schemas/ManualInputType"
+        Description:
+          type: string
+        Required:
+          type: boolean
+        Default:
+          type: string
+          description: The default as text. For a boolean it is `true` or `false`.
+        Options:
+          type: array
+          description: The allowed values of a `choice`. Empty for the other types.
+          items:
+            type: string
+    ManualInputs:
+      type: object
+      additionalProperties: false
+      required: [Known, Enabled, Ref, Inputs]
+      properties:
+        Known:
+          type: boolean
+          description: False while no run of the default branch has read the pipeline file.
+        Enabled:
+          type: boolean
+          description: The pipeline file has `on.manual`.
+        Ref:
+          type: string
+          description: The default branch, as `refs/heads/<name>`.
+        Sha:
+          type: string
+          description: The commit the inputs were read from.
+        Inputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ManualInput"
+    ManualInputsResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/ManualInputs"
     Artifact:
       type: object
       additionalProperties: false

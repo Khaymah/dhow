@@ -3,6 +3,9 @@ package projects
 import (
 	"context"
 
+	"github.com/google/uuid"
+
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	response "github.com/Khaymah/dhow/apps/server/internal/Core/Response"
 	gen "github.com/Khaymah/dhow/apps/server/internal/Modules/Projects/Gen"
@@ -33,6 +36,17 @@ func toGen(p models.Project) gen.Project {
 		ForkPolicy: gen.ForkPolicy(p.ForkPolicy), State: gen.ProjectState(p.State), CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt,
 		ArchivedAt: p.ArchivedAt,
 	}
+}
+
+func withCallerRole(ctx context.Context, org, id uuid.UUID, data gen.Project) gen.Project {
+	p, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return data
+	}
+	if role := projectRole(p, org, id); role != "" {
+		data.CallerRole = ptrOf(gen.Role(role))
+	}
+	return data
 }
 
 func policyOf(v *gen.ForkPolicy) *string {
@@ -83,7 +97,7 @@ func (c *Controller) GetProject(ctx context.Context, req gen.GetProjectRequestOb
 	if err != nil {
 		return nil, err
 	}
-	data := toGen(p)
+	data := withCallerRole(ctx, req.Id, req.ProjectId, toGen(p))
 	return gen.GetProject200JSONResponse{Success: true, Message: ptrOf(messageLoaded), Data: &data}, nil
 }
 
@@ -97,7 +111,7 @@ func (c *Controller) UpdateProject(ctx context.Context, req gen.UpdateProjectReq
 	if err != nil {
 		return nil, err
 	}
-	data := toGen(p)
+	data := withCallerRole(ctx, req.Id, req.ProjectId, toGen(p))
 	return gen.UpdateProject200JSONResponse{Success: true, Message: ptrOf(messageUpdated), Data: &data}, nil
 }
 
@@ -106,6 +120,6 @@ func (c *Controller) ArchiveProject(ctx context.Context, req gen.ArchiveProjectR
 	if err != nil {
 		return nil, err
 	}
-	data := toGen(p)
+	data := withCallerRole(ctx, req.Id, req.ProjectId, toGen(p))
 	return gen.ArchiveProject200JSONResponse{Success: true, Message: ptrOf(messageArchived), Data: &data}, nil
 }

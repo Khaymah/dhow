@@ -49,6 +49,12 @@ SET "FullName"                   = @full_name,
 WHERE "Id" = @id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"
 RETURNING *;
 
+-- name: UnlinkRepository :one
+UPDATE "Repositories"
+SET "IsDeleted" = true, "UpdatedAt" = @now
+WHERE "Id" = @id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"
+RETURNING *;
+
 -- name: ExpirePreviousDeployKeys :execrows
 UPDATE "Repositories"
 SET "PreviousDeployKeyPublic" = NULL, "PreviousDeployKeySealed" = NULL, "PreviousDeployKeyExpiresAt" = NULL, "UpdatedAt" = @now
