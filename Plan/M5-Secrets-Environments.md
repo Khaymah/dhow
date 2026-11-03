@@ -606,6 +606,11 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
   - الـ audit: `deployment.approval_requested` و`deployment.approved` و`deployment.rejected` و`deployment.approval_expired` و`environment.bypassed` و`deployment.started` و`deployment.finished`.
   - `docs/guides/environments.md` و`pipeline-spec.md` §9 بالنسختين.
   - ADR للقرارات 17 لـ 20، وقراري Sabry 2 و5 (الإيقاف اليدوي، وإعداد `PreventSelfReview` اللي Admin بس يقفله، والقبول بيختبر الاتنين).
+- **ملاحظات ملزمة من مراجعة M5.3 الأمنية:**
+  - الموافقة مربوطة بـ `"Id"` البيئة ومعاه `"RuleVersion"`، عمرها ما بتتربط بالاسم. بيئة اتمسحت واتعملت تاني بنفس الاسم بتبدأ من الأول.
+  - وقت الموافقة بيتفحص تاني دور كل موافق وعضويته الحالية وأدوار أعضاء الفريق. صفوف `"EnvironmentReviewers"` المتخزّنة عمرها ما بتتصدّق لوحدها.
+  - المطابقة بنوع الـ ref (`branch` أو `tag`) ومعاه الـ pattern، مش بالـ pattern بس.
+  - «نفسه» = اللي شغّل التنفيذ، وكمان صاحب التوكن اللي شغّله.
 - **قبول:**
   - **قرار Sabry:** push على `feature/x` لبيئة `main` بس: `skipped` بـ `ENVIRONMENT_REF_NOT_ALLOWED`، والـ run مابيفشلش بسببه، ومفيش سر اتفك.
   - **الموافقة:** push على `main`: `"Gate" = 'approval'`. اللي شغّل بيوافق: `SELF_REVIEW_NOT_ALLOWED`. مراجع من غير خطوة تانية: `REVIEWER_NEEDS_SECOND_FACTOR`. مراجع بالخطوة: الـ job بيتدرج بأسرار البيئة، وصف النشر `succeeded`.

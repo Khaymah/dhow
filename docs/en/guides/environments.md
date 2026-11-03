@@ -14,7 +14,7 @@ Until the deploy gate arrives (M5.6), a job with `environment:` is still skipped
 | Pause deploys to an environment | Maintainer and above |
 | Create an environment, change its rules, resume it and remove it | Admin and owner |
 
-The role on the project is your organization role after the bindings of teams and members on the project, so an Admin binding on one project lets you manage the environments of that project only. API tokens can read environments but never change them.
+The role on the project is your organization role after the bindings of teams and members on the project, so an Admin binding on one project lets you manage the environments of that project only. API tokens can read environments but never change them. Reviewer ids show only to people who can manage the environment; everyone else, and every API token, sees how many reviewers there are.
 
 ## Create an environment
 
@@ -22,10 +22,10 @@ A pipeline file never creates an environment. A job that names a missing one wil
 
 ```http
 POST /api/v1/organizations/{id}/projects/{projectId}/environments
-{"Name": "production", "Description": "Live site", "Rules": {"WaitMinutes": 10}}
+{"Name": "production", "CurrentFactor": {"Method": "totp", "Code": "123456"}, "Description": "Live site", "Rules": {"WaitMinutes": 10}}
 ```
 
-The name uses lowercase letters, digits, `_` and `-` (up to 64), is unique in the project, and never changes. Rules you leave out take their defaults.
+Creating needs your second step (`CurrentFactor`), like every change, because a new environment can open self-approval or the admin bypass. The name uses lowercase letters, digits, `_` and `-` (up to 64), is unique in the project, and never changes. Rules you leave out take their defaults.
 
 ## Protection rules
 
@@ -43,7 +43,9 @@ The name uses lowercase letters, digits, `_` and `-` (up to 64), is unique in th
 | `AllowAdminBypass`: an Admin may skip the reviewers and the timer | No | Never skips the refs or the pause |
 | `SupersedePending`: a newer run on the same ref replaces a waiting one | Yes | |
 
-A pattern matches the branch or tag name: `*` and `?` inside one part between slashes, and `**` alone for any number of parts, such as `release/*` or `hotfix/**`. A pattern with `..`, `//`, a slash at either end, a space, `~`, `^`, `:`, brackets or braces is refused, as is one longer than 256 characters. An empty list means nothing deploys.
+A pattern matches the short branch or tag name, and `Kind` says which of the two it is: write `main`, never `refs/heads/main`, `heads/main` or `tags/v1`. `*` and `?` match inside one part between slashes, and `**` alone matches any number of parts, none included, so `release/**` matches `release` as well as `release/1.2` (use `release/*` to leave `release` out). A pattern with `..`, `//`, a slash at either end, a space, an invisible character, `~`, `^`, `:`, brackets or braces is refused, as is one longer than 256 characters. An empty list means nothing deploys.
+
+Names, patterns, the description and the pause reason never accept invisible characters such as bidi overrides or zero-width spaces, so what you read is what the server checks.
 
 A reviewer must be a member of the organization with the Developer role or above on the project, and a team must belong to the same organization. Otherwise the request answers `REVIEWER_NOT_ELIGIBLE` with the reviewer that failed.
 
@@ -76,4 +78,6 @@ Jobs that already run finish. Only an Admin resumes, with the second step (`.../
 
 ## The audit log
 
-Every change is in the audit log: `environment.created`, `environment.updated` with the changed fields and their old and new values, `environment.removed`, `environment.paused` with the reason, and `environment.resumed`.
+Every change is in the audit log, written in the same transaction as the change, so a change without its event never stays: `environment.created` with the initial rules, `environment.updated` with the changed fields and their old and new values, `environment.removed`, `environment.paused` with the reason, and `environment.resumed`.
+
+Each rule has its own entry. The lists (`AllowedRefs` and `AllowedPlugins`) always carry their count and a SHA-256 of the old and new values, and the values themselves only when they fit in 256 characters. Reviewers carry the ids added and removed, their count and a digest. When a value does not fit, the event says `Truncated: true` and keeps the digest, so a hidden change still shows.
