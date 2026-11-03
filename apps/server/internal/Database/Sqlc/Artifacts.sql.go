@@ -662,6 +662,19 @@ func (q *Queries) ProjectCacheBytes(ctx context.Context, projectID uuid.UUID) (i
 	return Bytes, err
 }
 
+const projectUntrustedArtifactBytes = `-- name: ProjectUntrustedArtifactBytes :one
+SELECT COALESCE(sum("SizeBytes"), 0)::bigint AS "Bytes"
+FROM "Artifacts"
+WHERE "ProjectId" = $1 AND "Untrusted" AND NOT "IsDeleted" AND "ExpiresAt" > now()
+`
+
+func (q *Queries) ProjectUntrustedArtifactBytes(ctx context.Context, projectID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, projectUntrustedArtifactBytes, projectID)
+	var Bytes int64
+	err := row.Scan(&Bytes)
+	return Bytes, err
+}
+
 const releaseBlobSweepLock = `-- name: ReleaseBlobSweepLock :one
 SELECT pg_advisory_unlock($1::bigint) AS "Released"
 `

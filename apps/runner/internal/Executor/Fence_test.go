@@ -16,12 +16,16 @@ import (
 
 type beatAPI struct {
 	API
-	beats atomic.Int32
-	fail  atomic.Bool
+	beats   atomic.Int32
+	fail    atomic.Bool
+	release chan struct{}
 }
 
 func (b *beatAPI) Heartbeat(context.Context, *runnerv1.LeaseRef) (*runnerv1.LeaseControl, error) {
 	b.beats.Add(1)
+	if b.release != nil {
+		<-b.release
+	}
 	if b.fail.Load() {
 		return nil, errors.New("unavailable")
 	}
@@ -46,13 +50,16 @@ func TestAFenceWhoseDeadlineHasPassedLosesWithoutARace(t *testing.T) {
 }
 
 func TestTheFirstHeartbeatGoesOutAtOnce(t *testing.T) {
-	api := &beatAPI{}
+	api := &beatAPI{release: make(chan struct{})}
 	f := newFence(api, &runnerv1.LeaseRef{}, DefaultTiming(), time.Now().Add(-20*time.Second), 45*time.Second, quiet(), nil, nil)
 	go f.run(context.Background())
 	defer f.Stop()
 	require.Eventually(t, func() bool { return api.beats.Load() > 0 }, time.Second, 10*time.Millisecond,
 		"a grant that waited in a long poll gets its heartbeat right away, not after a full interval")
-	assert.Greater(t, time.Until(f.Deadline()), 30*time.Second, "the heartbeat moved the deadline")
+	assert.Less(t, time.Until(f.Deadline()), 30*time.Second, "the deadline moves only once the server answered")
+	close(api.release)
+	require.Eventually(t, func() bool { return time.Until(f.Deadline()) > 30*time.Second }, time.Second, 10*time.Millisecond,
+		"the answer to the heartbeat moved the deadline")
 }
 
 func TestHeartbeatsComeFasterAsTheDeadlineNears(t *testing.T) {

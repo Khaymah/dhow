@@ -232,22 +232,50 @@ test: ## Run Go tests with the race detector
 	$(GO) test -race -count=1 -coverprofile=coverage.out $(PKG)
 
 FUZZTIME     ?= 10s
+SERVER_FUZZ_DIR := apps/server/internal
 FUZZ_TARGETS := \
-	Core/Auth:FuzzHashSessionToken Core/Auth:FuzzAPITokenHash Core/Auth:FuzzAuthorizationHeader Core/Auth:FuzzTotp \
-	Core/Auth:FuzzRecoveryCode Core/Auth:FuzzEmailAndName Core/Auth:FuzzPasswordLength Core/Auth:FuzzWebAuthnResponses \
-	Core/I18n:FuzzParseAcceptLanguage Core/Middleware:FuzzClientIP Core/RateLimit:FuzzNetwork \
+	$(addprefix $(SERVER_FUZZ_DIR)/,Core/Auth:FuzzHashSessionToken Core/Auth:FuzzAPITokenHash Core/Auth:FuzzAuthorizationHeader \
+	Core/Auth:FuzzTotp Core/Auth:FuzzRecoveryCode Core/Auth:FuzzEmailAndName Core/Auth:FuzzPasswordLength \
+	Core/Auth:FuzzWebAuthnResponses Core/I18n:FuzzParseAcceptLanguage Core/Middleware:FuzzClientIP Core/RateLimit:FuzzNetwork \
 	Core/Oidc:FuzzEmailVerifiedClaim Core/Oidc:FuzzAcceptedEmail Modules/Sources/Test/Edge:FuzzWebhook \
-	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName
+	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName) \
+	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare \
+	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
+	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern
+
+define fuzz_listed
+	@found=$$(grep -rhoE '^func Fuzz[A-Za-z0-9]+' $(1) --include='*_test.go' | sed 's/^func //' | sort); \
+	listed=$$(printf '%s\n' $(2) | sed 's/.*://' | sort); \
+	test "$$found" = "$$listed" || { echo "fuzz: $(3) does not match the Fuzz functions in $(1)" >&2; exit 1; }
+endef
+
+define fuzz_run
+	set -e; for t in $(1); do \
+		echo "fuzz $${t##*:} for $(FUZZTIME)"; \
+		$(GO) test -run '^$$' -fuzz "^$${t##*:}$$" -fuzztime $(FUZZTIME) ./$${t%%:*}; \
+	done
+endef
 
 .PHONY: fuzz
-fuzz: ## Fuzz the auth inputs, FUZZTIME per target (default 10s; the M2.5 bar is 60s)
-	@found=$$(grep -rhoE '^func Fuzz[A-Za-z0-9]+' apps/server/internal --include='*_test.go' | sed 's/^func //' | sort); \
-	listed=$$(printf '%s\n' $(FUZZ_TARGETS) | sed 's/.*://' | sort); \
-	test "$$found" = "$$listed" || { echo "fuzz: FUZZ_TARGETS does not match the Fuzz functions in the code" >&2; exit 1; }
-	set -e; for t in $(FUZZ_TARGETS); do \
-		echo "fuzz $${t#*:} for $(FUZZTIME)"; \
-		$(GO) test -run '^$$' -fuzz "^$${t#*:}$$" -fuzztime $(FUZZTIME) ./apps/server/internal/$${t%%:*}; \
-	done
+fuzz: ## Fuzz the server and shared inputs, FUZZTIME per target (default 10s; the M2.5 bar is 60s, the nightly run 30m)
+	$(call fuzz_listed,$(SERVER_FUZZ_DIR) internal,$(FUZZ_TARGETS),FUZZ_TARGETS)
+	$(call fuzz_run,$(FUZZ_TARGETS))
+
+.PHONY: fuzz-list
+fuzz-list: ## Print every fuzz target, server and runner, as a JSON list for the nightly workflow
+	$(call fuzz_listed,$(SERVER_FUZZ_DIR) internal,$(FUZZ_TARGETS),FUZZ_TARGETS)
+	$(call fuzz_listed,apps/runner,$(RUNNER_FUZZ),RUNNER_FUZZ)
+	@printf '%s\n' $(FUZZ_TARGETS) $(RUNNER_FUZZ) | sed 's/.*/"&"/' | paste -sd, - | sed 's/.*/[&]/'
+
+FUZZ_TARGET ?=
+export FUZZ_TARGET
+fuzz_known = $(and $(filter 1,$(words $(FUZZ_TARGET))),$(if $(findstring %,$(FUZZ_TARGET)),,$(filter $(FUZZ_TARGET),$(FUZZ_TARGETS) $(RUNNER_FUZZ))))
+
+.PHONY: fuzz-one
+fuzz-one: ## Fuzz one target of make fuzz-list for FUZZTIME (FUZZ_TARGET=internal/gitref:FuzzRef)
+	$(if $(fuzz_known),,$(error fuzz-one: FUZZ_TARGET must be one of make fuzz-list))
+	@printf '%s\n' $(FUZZ_TARGETS) $(RUNNER_FUZZ) | grep -qxF -- "$$FUZZ_TARGET" || { echo "fuzz-one: FUZZ_TARGET must be one of make fuzz-list" >&2; exit 1; }
+	$(GO) test -run '^$$' -fuzz "^$${FUZZ_TARGET##*:}$$" -fuzztime $(FUZZTIME) -timeout 0 "./$${FUZZ_TARGET%%:*}"
 
 .PHONY: timing
 timing: ## Run the statistical timing tests against DHOW_TEST_DATABASE_URL (slow, separate CI job)
@@ -288,15 +316,14 @@ runner-chaos: ## Run the chaos scenarios: the real server and runner on Podman, 
 	$(CHAOS_RUN) env DHOW_CHAOS_BIN=$(CHAOS_DIR) DHOW_CHAOS_BUSYBOX=$(CHAOS_BUSYBOX) \
 		$(CHAOS_DIR)/chaos.test -test.v -test.count=1 -test.timeout 60m
 
-RUNNER_FUZZ := Masking:FuzzMasker Masking:FuzzMaskerKeepsCleanText Logs:FuzzChunker Logs:FuzzSpillRecords \
-	Journal:FuzzJournalOpen Executor:FuzzVerifyGrant Sandbox/Wire:FuzzDecode Executor/Plugin:FuzzManifest Executor/Plugin:FuzzOutputs \
-	Sandbox/Archive:FuzzUnpack
+RUNNER_FUZZ := $(addprefix apps/runner/internal/,Masking:FuzzMasker Masking:FuzzMaskerKeepsCleanText Logs:FuzzChunker \
+	Logs:FuzzSpillRecords Journal:FuzzJournalOpen Executor:FuzzVerifyGrant Sandbox/Wire:FuzzDecode Executor/Plugin:FuzzManifest \
+	Executor/Plugin:FuzzOutputs Sandbox/Archive:FuzzUnpack Egress:FuzzProxyRequest)
 
 .PHONY: fuzz-runner
-fuzz-runner: ## Fuzz every runner target for FUZZTIME each (default 10s; the M3.5 bar is 60s)
-	set -e; for t in $(RUNNER_FUZZ); do \
-		$(GO) test -run '^$$' -fuzz "^$${t##*:}$$" -fuzztime $(FUZZTIME) ./apps/runner/internal/$${t%%:*}; \
-	done
+fuzz-runner: ## Fuzz every runner target for FUZZTIME each (default 10s; the M3.5 bar is 60s, the nightly run 30m)
+	$(call fuzz_listed,apps/runner,$(RUNNER_FUZZ),RUNNER_FUZZ)
+	$(call fuzz_run,$(RUNNER_FUZZ))
 
 .PHONY: vuln
 vuln: ## Scan Go dependencies for known vulnerabilities

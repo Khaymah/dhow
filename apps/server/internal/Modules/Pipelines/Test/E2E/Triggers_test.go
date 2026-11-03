@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -14,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 )
 
@@ -213,4 +216,24 @@ func TestStartingRunsByHandIsRateLimited(t *testing.T) {
 		require.Equal(t, http.StatusCreated, res.Status, string(res.Raw))
 	}
 	assert.Equal(t, 1, limited, "a user starts at most 60 runs in ten minutes")
+}
+
+func TestWebhookRunsAreLimitedPerProject(t *testing.T) {
+	w := newWorld(t)
+	sha := func(i int) string { return fmt.Sprintf("%040x", i+1) }
+	for i := range config.PipelineWebhookRunsPerProject {
+		w.defs.Put(sha(i), pipeline(simplePipeline))
+		got, err := w.env.TryDeliver(w.trigger(triggers.EventPush, "refs/heads/main", sha(i)))
+		require.NoError(t, err, "push %d of %d", i+1, config.PipelineWebhookRunsPerProject)
+		require.True(t, got.Created)
+	}
+	_, err := w.env.TryDeliver(w.trigger(triggers.EventPush, "refs/heads/main", "f"+strings.Repeat("0", 39)))
+	var limited *apperrors.AppError
+	require.ErrorAs(t, err, &limited, "one push more than %d an hour makes no run", config.PipelineWebhookRunsPerProject)
+	assert.Equal(t, http.StatusTooManyRequests, limited.Status)
+	assert.Positive(t, limited.RetryAfter, "the provider is told when to deliver again")
+	again, err := w.env.TryDeliver(w.trigger(triggers.EventPush, "refs/heads/main", sha(0)))
+	require.NoError(t, err, "a delivery of a commit that already has a run is not charged")
+	assert.False(t, again.Created)
+	assert.Equal(t, config.PipelineWebhookRunsPerProject, w.env.CountRows(`SELECT count(*) FROM "PipelineRuns"`))
 }

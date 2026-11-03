@@ -1,0 +1,111 @@
+x-repo-read-only: &repo-read-only
+  type: bind
+  source: ../..
+  target: /src
+  read_only: true
+
+x-work: &work
+  type: bind
+  source: ${DHOW_DEMO_WORK:?run deploy/m4-demo/run.sh}
+  target: ${DHOW_DEMO_WORK:?run deploy/m4-demo/run.sh}
+
+services:
+  init:
+    entrypoint: ["true"]
+    volumes: !reset []
+
+  server:
+    entrypoint: ["bash", "/src/deploy/m4-demo/server.sh"]
+    environment:
+      DHOW_DEMO_PUBLIC_URL: http://localhost:${DHOW_DEV_WEB_PORT}
+      DHOW_DEMO_CHECKOUT_IMAGE: ${DHOW_DEMO_CHECKOUT_IMAGE:-}
+      DHOW_GIT_ALLOW_PRIVATE_CIDRS: ${DHOW_DEMO_FORGEJO_IP}/32
+    volumes:
+      - *repo-read-only
+      - type: bind
+        source: ${DHOW_DEMO_WORK}/server
+        target: /run/dhow-demo
+        read_only: true
+      - blobs:/var/lib/dhow-demo
+
+  runner:
+    environment:
+      DHOW_DEV_RUNNER_CHECKOUT_IMAGE: ${DHOW_DEMO_CHECKOUT_IMAGE:-}
+      DHOW_DEV_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS: ${DHOW_DEMO_FORGEJO_IP}/32
+    volumes:
+      - type: bind
+        source: ${DHOW_DEMO_WORK}/certs/ca.crt
+        target: /etc/containers/certs.d/registry.dhow-demo.test/ca.crt
+        read_only: true
+
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:11@sha256:946243edbab116d5bb78b73ea68af6f3d69229ba1b1ed958dd82c3481167f3e0
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      FORGEJO__database__DB_TYPE: sqlite3
+      FORGEJO__security__INSTALL_LOCK: "true"
+      FORGEJO__server__DOMAIN: git.dhow-demo.test
+      FORGEJO__server__SSH_DOMAIN: git.dhow-demo.test
+      FORGEJO__server__ROOT_URL: http://git.dhow-demo.test:3000/
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__webhook__ALLOWED_HOST_LIST: private
+      FORGEJO__webhook__DELIVER_TIMEOUT: "20"
+      FORGEJO__log__LEVEL: Warn
+    networks:
+      default:
+        ipv4_address: ${DHOW_DEMO_FORGEJO_IP}
+        aliases: [git.dhow-demo.test]
+
+  registry:
+    image: mirror.gcr.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:443
+      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/registry.crt
+      REGISTRY_HTTP_TLS_KEY: /certs/registry.key
+    ports:
+      - "127.0.0.1:${DHOW_DEMO_REGISTRY_PORT}:443"
+    volumes:
+      - type: bind
+        source: ${DHOW_DEMO_WORK}/certs
+        target: /certs
+        read_only: true
+    networks:
+      default:
+        aliases: [registry.dhow-demo.test]
+
+  tools:
+    image: ${DHOW_DEV_GO_IMAGE:-golang:1.27.3-bookworm}
+    init: true
+    working_dir: /src
+    entrypoint: ["sleep", "infinity"]
+    environment:
+      GOTOOLCHAIN: auto
+      GOFLAGS: -buildvcs=false
+      GIT_CONFIG_NOSYSTEM: "1"
+    volumes:
+      - *repo-read-only
+      - *work
+      - gomod:/go/pkg/mod
+      - gocache:/root/.cache/go-build
+      - type: volume
+        source: runner-state
+        target: /sweep/runner-state
+        read_only: true
+      - type: volume
+        source: runner-dev
+        target: /sweep/runner-dev
+        read_only: true
+      - type: volume
+        source: blobs
+        target: /sweep/blobs
+        read_only: true
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${DHOW_DEMO_SUBNET}
+
+volumes:
+  blobs: {}

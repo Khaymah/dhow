@@ -136,13 +136,19 @@ type RunJobView struct {
 
 func (e *Env) Deliver(t triggers.Trigger) triggers.Accepted {
 	e.T.Helper()
+	out, err := e.TryDeliver(t)
+	require.NoError(e.T, err)
+	return out
+}
+
+func (e *Env) TryDeliver(t triggers.Trigger) (triggers.Accepted, error) {
 	var out triggers.Accepted
-	require.NoError(e.T, dbtx.Run(context.Background(), e.Pool, func(q *sqlc.Queries) error {
+	err := dbtx.Run(context.Background(), e.Pool, func(q *sqlc.Queries) error {
 		var err error
 		out, err = e.Wired.Pipelines.Deliver(context.Background(), q, t)
 		return err
-	}))
-	return out
+	})
+	return out, err
 }
 
 func (e *Env) StartRuns() {

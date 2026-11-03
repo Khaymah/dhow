@@ -300,3 +300,10 @@ WHERE "ProjectId" = @project_id AND "OrganizationId" = @organization_id AND NOT 
   AND "State" IN ('awaiting_approval', 'pending', 'queued', 'running')
 ORDER BY "Number"
 FOR UPDATE;
+
+-- name: CountRecentWebhookRuns :one
+SELECT count(*)::bigint AS "Runs",
+       COALESCE(ceil(EXTRACT(EPOCH FROM (min("CreatedAt") + make_interval(secs => @window_seconds::double precision) - now()))), 0)::bigint AS "RetryAfterSeconds"
+FROM "PipelineRuns"
+WHERE "ProjectId" = @project_id AND "DeliveryId" IS NOT NULL
+  AND "CreatedAt" > now() - make_interval(secs => @window_seconds::double precision);

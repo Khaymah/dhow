@@ -133,12 +133,8 @@ func (s *Service) claimUpload(ctx context.Context, r *http.Request, ref leaseRef
 			return errTooLarge()
 		}
 		if kind == config.BlobKindArtifact {
-			used, err := q.OrganizationArtifactBytes(ctx, l.row.OrganizationId)
-			if err != nil {
+			if err := s.quotaFits(ctx, q, l, r.ContentLength); err != nil {
 				return err
-			}
-			if used+r.ContentLength > s.cfg.OrgMaxBytes {
-				return errQuota()
 			}
 		}
 		up.org = l.row.OrganizationId

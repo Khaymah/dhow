@@ -42,7 +42,7 @@ func (g grants) issue(kind byte, subject uuid.UUID, d blob.Digest, expires time.
 }
 
 func (g grants) verify(token string, d blob.Digest, input, lease uuid.UUID, now time.Time) bool {
-	raw, err := base64.RawURLEncoding.DecodeString(token)
+	raw, err := base64.RawURLEncoding.Strict().DecodeString(token)
 	if err != nil || len(raw) != grantBytes {
 		return false
 	}

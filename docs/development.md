@@ -74,6 +74,7 @@ docker compose -f deploy/dev/compose.yaml up
 | `DHOW_DEV_DB_PORT` | `55432` | PostgreSQL، لـ `psql` أو الأدوات المباشرة. ليس 5432، حتى لا يمنعه PostgreSQL مثبّت على الجهاز. يحتفظ `.env.dev` بمنفذ أول تشغيل |
 | `DHOW_DEV_POLL_SECONDS` | `1` | كم مرة يفحص السيرفر وجهاز التشغيل ملفات Go |
 | `DHOW_DEV_RUNNER_MAX_MEMORY`، `DHOW_DEV_RUNNER_MAX_DISK` | `2GiB`، `4GiB` | أكبر ذاكرة وقرص يطلبهما تشغيل واحد (`DHOW_RUNNER_MAX_MEMORY` و`DHOW_RUNNER_MAX_DISK`). اخفضهما على جهاز صغير، ولا تطلب أكثر منهما في `Resources` الخاصة بالتشغيل |
+| `DHOW_DEV_RUNNER_CHECKOUT_IMAGE`، `DHOW_DEV_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS` | فارغ | صورة سحب الكود (`DHOW_RUNNER_CHECKOUT_IMAGE`) والنطاقات الخاصة التي يصل إليها التشغيل (`DHOW_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS`)، لسيرفر Git داخل الحزمة، مثل Forgejo في عرض M4 |
 | `DHOW_DEV_POSTGRES_IMAGE`، `DHOW_DEV_GO_IMAGE`، `DHOW_DEV_NODE_IMAGE` | `postgres:18`، `golang:1.27.3-bookworm`، `node:26-bookworm-slim` | سجل صور أو مرآة أخرى، مثل `mirror.gcr.io/library/postgres:18` |
 
 على Linux وmacOS: `DHOW_DEV_DB_PORT=55433 docker compose -f deploy/dev/compose.yaml up`. وفي PowerShell: `$env:DHOW_DEV_DB_PORT = "55433"` أولًا.
@@ -326,6 +327,19 @@ pnpm -C apps/web test
 pnpm -C apps/web build
 pnpm -C apps/web size
 ```
+
+### عرض M3 وعرض M4
+
+`deploy/m4-demo/run.sh` يشغّل مسار M4 كاملًا في Docker ويطبع PASS أو FAIL لكل فحص. يبدأ Forgejo وPostgreSQL والسيرفر وجهاز تشغيل Podman من الحزمة السابقة، وسجل صور بـ TLS لصورة `dhow-git`. ثم يربط مستودعًا فيه `.dhow.yml` بـ DAG وmatrix وملف ناتج يمر عبر `needs` وcache، ويرفع مرتين، ويرسل webhook مزوّرًا وآخر مُعادًا، وينتهي بـ `deploy/m4-demo/leak-sweep.sh` الذي يبحث عن كل بيانات دخول مكتوبة كنص واضح. و`deploy/m3-demo/run.sh` يشغّل تشغيلات بلا خطوات نشر: البيئة المعزولة، وترتيب التشغيلات، وجهاز تشغيل يتوقف فجأة.
+
+الاثنان يحتاجان إلى cgroup v2، ويحذفان حاوياتهما ومساحات التخزين في النهاية (`DHOW_DEMO_KEEP=1` يبقيها)، ويستخدمان منافذ خاصة بهما (`DHOW_DEMO_PORT`، و`8480` افتراضيًا)، فيعملان بجانب حزمة التطوير. ويشغّلهما CI على Ubuntu 26.04 (`demo.yml`).
+
+### اختبارات المزوّدين في CI
+
+`providers.yml` سيختبر حسابات GitHub وGitLab حقيقية بعد M4.5 وM4.6. يعمل ليلًا ويدويًا فقط، وعلى `main` فقط، وفقط عندما يكون متغير المستودع `DHOW_PROVIDERS_ENABLED` قيمته `true`. ولا يعمل أبدًا لأي pull request، فلا يرى كود من فرع أسراره أبدًا. أسراره في البيئة `providers`. وقبل أن يضيفها أحد، يجب على مسؤول المستودع أن يفعل شيئين في إعدادات المستودع على GitHub (Settings، ثم Environments، ثم `providers`):
+
+1. في الفروع المسموح لها بالنشر، اسمح بـ `main` فقط.
+2. اطلب مراجِعًا، حتى ينتظر كل تشغيل الموافقة قبل أن يحصل على الأسرار.
 
 `make gen` يعيد توليد الكود من `packages/openapi/openapi.yaml` واستعلامات SQL، و`pnpm -C apps/web gen:api` يعيد توليد أنواع الـ API في الواجهة. لا تعدّل الملفات المولَّدة يدويًا أبدًا.
 

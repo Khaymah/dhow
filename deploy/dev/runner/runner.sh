@@ -49,11 +49,7 @@ delegate() {
   for c in "${controllers[@]}"; do
     printf '+%s\n' "$c" >"$cgroup/cgroup.subtree_control" || die "could not enable the $c controller for the runner"
   done
-  mkdir -p "$slice"
-  chown "$user:$user" "$slice" "$slice/cgroup.procs" "$slice/cgroup.subtree_control" "$slice/cgroup.threads"
-  if [[ -e $slice/memory.swap.max ]]; then
-    printf '0\n' >"$slice/memory.swap.max"
-  fi
+  fresh_slice
   say "the runner gets its own cgroup with the ${controllers[*]} controllers, as systemd Delegate=yes gives it"
 }
 
@@ -64,6 +60,23 @@ fresh_runtime() {
     rm -rf --one-file-system -- "$state/run" "/tmp/storage-run-$uid" "/tmp/podman-run-$uid" "/tmp/containers-user-$uid" "/dev/shm/libpod_rootless_lock_$uid" ||
     die "could not clear the rootless Podman state that the last run of this container left behind"
   say "cleared the rootless Podman state that the last run of this container left behind (pause process, runtime and libpod tmp directories, locks); the identity and the images stay"
+}
+
+fresh_slice() {
+  if [[ -d $slice ]]; then
+    printf '1\n' >"$slice/cgroup.kill" 2>/dev/null || true
+    for _ in $(seq 50); do
+      [[ -z $(find "$slice" -name cgroup.procs -exec cat -- {} + 2>/dev/null) ]] && break
+      sleep 0.2
+    done
+    find "$slice" -mindepth 1 -depth -type d -exec rmdir -- {} + 2>/dev/null || true
+    rmdir -- "$slice" || die "could not remove the cgroup the last runner left, as systemd does before it starts a unit again"
+  fi
+  mkdir "$slice"
+  chown "$user:$user" "$slice" "$slice/cgroup.procs" "$slice/cgroup.subtree_control" "$slice/cgroup.threads"
+  if [[ -e $slice/memory.swap.max ]]; then
+    printf '0\n' >"$slice/memory.swap.max"
+  fi
 }
 
 forward() {
@@ -105,9 +118,14 @@ hint() {
 
 start() {
   say "starting the runner"
+  if [[ $mode == podman ]]; then
+    fresh_slice
+    fresh_runtime
+  fi
   (
-    if [[ $mode == podman ]]; then
-      printf '%s\n' "$BASHPID" >"$slice/cgroup.procs"
+    if [[ $mode == podman ]] && ! printf '%s\n' "$BASHPID" >"$slice/cgroup.procs"; then
+      say "could not move the runner into its cgroup $slice" >&2
+      exit 1
     fi
     as_runner "$bin" run --dev
   ) &

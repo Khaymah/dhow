@@ -204,7 +204,7 @@ An artifact keeps files of one job for the jobs that need it, and for people to 
 - **Cache key:** the server evaluates `cache.key`; each `hash_files()` call is left for the runner, which fills it with a SHA-256 of the matching files (sorted by path, each with its own SHA-256) at the start of the job. `hash_files()` takes glob patterns (`*`, `**`, `?`) relative to the workspace; a key may use its result only as text, so `size(hash_files(...))` or a condition on it is refused. The final key is 1 to 512 characters.
 - **Cache scope:** a scope belongs to the linked repository, so linking the project to another repository starts with an empty cache. A push or a manual run of a branch writes into the scope of that branch, a tag into its tag, and a pull request from the same repository into the scope of that pull request. A lookup tries the run's own scope, then the default branch. A pull request from a fork reads the default branch and never writes. A pull request can never write into the scope of `main`. A manual or API run whose commit is not the latest one pushed to its branch only reads the cache, so only the head of a branch writes it.
 - **Saving:** the cache is saved only when the job succeeded and the key was not found at the start. An existing key is never replaced. When a project's entries pass `DHOW_CACHE_MAX_BYTES_PER_PROJECT`, the least recently used entries of other scopes go first; the default branch's entries are never removed to make room for another branch, a tag or a pull request, and an entry that still does not fit is not kept. A cache that cannot be read or saved is a warning in the job log, not a failure.
-- **One upload each:** a job uploads each declared artifact and its cache once. The artifacts of an organization share `DHOW_ARTIFACT_MAX_BYTES_PER_ORG` (`ARTIFACT_QUOTA_EXCEEDED` past it).
+- **One upload each:** a job uploads each declared artifact and its cache once. The artifacts of an organization share `DHOW_ARTIFACT_MAX_BYTES_PER_ORG` (`ARTIFACT_QUOTA_EXCEEDED` past it). The artifacts of fork runs of one project together get at most a tenth of it, so forks, also under the `automatic` fork policy, cannot fill the quota of the project's own runs.
 - **Forks:** the artifacts of a run from a fork's pull request are marked `Untrusted` and can never feed a deploy.
 
 ## 4. Expressions
@@ -307,7 +307,7 @@ A run is one pass of the pipeline over one commit. The server makes it from a tr
 
 ### 12.1 What starts a run
 
-- **`push` and `tag`:** a webhook. A commit runs once per ref: the same commit sent again for the same ref makes no new run, even after the webhook deliveries are deleted (they are kept 30 days).
+- **`push` and `tag`:** a webhook. A commit runs once per ref: the same commit sent again for the same ref makes no new run, even after the webhook deliveries are deleted (they are kept 30 days). Webhooks start at most 600 runs per project in an hour, far above a busy repository. Past that, the webhook answers `429` with `Retry-After`, nothing is recorded, and the provider can deliver it again later.
 - **`pull_request`:** a webhook from GitHub or GitLab (M4.5 and M4.6). The run uses the head commit, not a merge commit, so the check shows on the commit you pushed.
 - **`manual`:** a person with `run.trigger` on the project, through `POST /organizations/{id}/projects/{projectId}/runs` with `Ref`, an optional `Sha` and `Inputs`.
 - **`api`:** the same request with an API token that has the `run.trigger` scope.
