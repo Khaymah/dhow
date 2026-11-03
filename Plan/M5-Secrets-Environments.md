@@ -497,6 +497,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 كل PR بيعدّي `make check` وCI أخضر، وفيه اختبارات سلبية لكل مسار أمني، وبيحدّث `Plan/Progress/` في يومه، وبيكتب الـ ADR بتاع قراراته في أوله، وعليه مراجعة أمنية مستقلة قبل الـ merge. والأوامر بتفترض نفس `DHOW_TEST_DATABASE_URL` بتاع M3 وM4.
 
 ### M5.1: سلسلة المفاتيح والتشفير المغلّف (`Core/Keys`)
+- **الحالة:** على `feat/keyring-m51`، والقرارات في [ADR-0081](ADR/0081-keyring-and-envelope-encryption.md).
 - **الحجم:** M. **الاعتماد:** U2 (`"ServerInstances"` و`"SchemaFloor"`) 
 - **المحتوى:**
   - `apps/server/internal/Core/Keys` (`package keys`): قراية السلسلة وفحصها، و`KeyProvider` بـ `file` و`fake`، و`Envelope.Seal` و`Open` بالصاحب والغرض والـ context، والـ DEK lazy (`INSERT ... ON CONFLICT DO NOTHING` وبعده `SELECT`)، و`Destroy(owner)`.

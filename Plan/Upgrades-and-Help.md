@@ -303,7 +303,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 
 ## 4. النسخ الاحتياطي
 - **الأوامر** (root): `dhow-server backup create [--out DIR]` و`list` و`verify FILE` و`restore FILE`، وفي Compose نفس الأوامر من الـ host بتنادي `docker compose exec -T postgres pg_dump` بـ argv.
-- **المحتوى:** `pg_dump --format=custom` للقاعدة كلها (فيها الـ logs والـ audit)، و`/etc/dhow` كله أو `.env` في Compose (فيه `DHOW_SECRET_KEY`)، و`manifest.json` (النسخة، والـ schema version، والـ floor، والتاريخ، والـ sha256 لكل جزء). **مش فيها:** `DHOW_BLOB_DIR` (الـ artifacts والـ cache بتاعة M4 بتتعمل تاني)، ومكتوب في الصفحة.
+- **المحتوى:** `pg_dump --format=custom` للقاعدة كلها (فيها الـ logs والـ audit)، و`/etc/dhow` كله (فيه `DHOW_SECRET_KEY` و`credentials/dhow-keyring`) أو `.env` والمجلد `./secrets/` في Compose (فيهم `DHOW_SECRET_KEY` وسلسلة المفاتيح، M5.1)، و`manifest.json` (النسخة، والـ schema version، والـ floor، والتاريخ، والـ sha256 لكل جزء). **مش فيها:** `DHOW_BLOB_DIR` (الـ artifacts والـ cache بتاعة M4 بتتعمل تاني)، ومكتوب في الصفحة.
 - **الملف:** `dhow-backup-<version>-<UTC timestamp>.dhowbak`، صيغة بسيطة: header ثابت ورقم الصيغة، وبعده chunks كل واحد 1 MiB بـ AES-256-GCM و nonce = عدّاد، وآخر chunk معلَّم (STREAM)، عشان القطع أو إعادة الترتيب يتكشف. من الـ standard library بس.
 - **المفتاح:** `/etc/dhow/credentials/dhow-backup-key` (32 byte عشوائي، root، `0600`)، بيعمله الـ installer. مش `DHOW_SECRET_KEY`، عشان تسريب واحد منهم لوحده مايكفيش. والمجلد `/var/lib/dhow-update/backups` بـ `0700` لـ root.
 - **الحجم والتدوير:** آخر 3 نسخ قبل الترقية، وبحد إجمالي (`DHOW_BACKUP_MAX_BYTES`، الافتراضي أقل قيمة بين 20% من المساحة الفاضية وقت التنصيب و10 GiB). نسخة النسخة المتنصّبة دلوقتي مابتتمسحش قبل 7 أيام من نجاح الترقية اللي بعدها. لو المساحة مش كفاية: الترقية بتتأجّل بإشعار «فضّي مساحة أو كبّر الحد»، ولـ الـ patch الأمني فيه زرار «ثبّت من غير نسخة احتياطية» للمالك بخطوة تانية وتأكيد.
@@ -487,11 +487,12 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 
 ### U5: النسخ الاحتياطي والاسترجاع
 - **الحجم:** M. **الاعتماد:** U2. **التوقيت:** M9، وهو اللي بيستخدمه تمرين الاسترجاع.
-- **المحتوى:** `internal/backup` (الصيغة والتشفير والـ manifest)، و`dhow-server backup create|list|verify|restore`، ومفتاح النسخ في الـ installer، والتدوير والحد، و`dhow-backup.timer` الاختياري، وتحديث `docs/install/{compose,binary-systemd}.md` بالأوامر الجديدة بالنسختين.
+- **المحتوى:** `internal/backup` (الصيغة والتشفير والـ manifest)، و`dhow-server backup create|list|verify|restore` (النسخة فيها سلسلة المفاتيح، و`./secrets/` في Compose، و`restore` بيقارن الـ check values في `"KeyEncryptionKeys"` المسترجعة بالسلسلة اللي في النسخة قبل ما السيرفر يبدأ، وبيقف لو مش متطابقين، [ADR-0081](ADR/0081-keyring-and-envelope-encryption.md))، ومفتاح النسخ في الـ installer، والتدوير والحد، و`dhow-backup.timer` الاختياري، وتحديث `docs/install/{compose,binary-systemd}.md` بالأوامر الجديدة بالنسختين.
 - **قبول:**
-  - النسخة بتترجع على جهاز جديد بالمفتاح، والـ secret key بيرجع معاها.
+  - النسخة بتترجع على جهاز جديد بالمفتاح، والـ secret key وسلسلة المفاتيح بيرجعوا معاها.
+  - استرجاع قاعدة مع سلسلة مش بتاعتها (أو من غير إصدار محتاجاه) بيقف قبل ما السيرفر يبدأ بـ `KEYRING_MISMATCH` أو `KEYRING_MISSING_VERSION`.
   - byte واحد متغيّر، أو chunk ناقص، أو chunk متبدّل مكانه: `verify` بيفشل.
-  - النسخة على القرص مافيهاش أي نص صريح: `grep` على المفتاح السري وكلمة سر القاعدة وأسرار M4 مالقاش حاجة.
+  - النسخة على القرص مافيهاش أي نص صريح: `grep` على المفتاح السري وسلسلة المفاتيح وكلمة سر القاعدة وأسرار M4 مالقاش حاجة.
   - المساحة الناقصة بتوقف قبل الكتابة.
   - الملفات `0600` والمجلد `0700` لـ root.
 - **التحقق:** `go test -race -count=1 ./internal/backup/...` وfuzz على قارئ الصيغة (`FuzzBackupReader` 60 ثانية) و`make check` وتمرين M9.
