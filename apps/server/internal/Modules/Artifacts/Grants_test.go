@@ -1,6 +1,7 @@
 package artifacts
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -37,4 +38,18 @@ func TestAGrantOpensOneDigestForOneSubjectUntilItExpires(t *testing.T) {
 	raw := []byte(input)
 	raw[0] = 'C'
 	assert.False(t, g.verify(string(raw), d, runJob, lease, now), "the kind is part of the MAC")
+}
+
+func TestAGrantIsAcceptedOnlyInItsOwnEncoding(t *testing.T) {
+	g := grants{key: []byte("0123456789abcdef0123456789abcdef")}
+	now := time.Unix(1_800_000_000, 0)
+	runJob, lease := uuid.New(), uuid.New()
+	d := blob.Digest{1, 2, 3}
+	token := g.issue(grantInput, runJob, d, now.Add(time.Hour))
+	alphabet := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+	last := strings.IndexByte(alphabet, token[len(token)-1])
+	for spare := 1; spare < 4; spare++ {
+		other := token[:len(token)-1] + string(alphabet[last^spare])
+		assert.False(t, g.verify(other, d, runJob, lease, now), "a token whose unused trailing bits differ")
+	}
 }
