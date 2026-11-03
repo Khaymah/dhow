@@ -2399,7 +2399,9 @@ paths:
       description: >-
         Needs `project.manage` on the project. The deploy key and the webhook stop working at once: a webhook to the old
         address answers 401, and no new run starts until a repository is linked again, with a new deploy key, host key
-        and webhook secret. Runs that already started keep their checkout. A project without a repository answers 404
+        and webhook secret. The project's open runs (waiting for approval, pending, queued or running) are canceled with
+        `REPOSITORY_UNLINKED`, its unsent commit statuses are abandoned, and the stored deploy keys and webhook secret
+        are erased. A project without a repository answers 404
         `REPOSITORY_NOT_LINKED`, and an archived project 409 `PROJECT_ARCHIVED`.
       security:
         - SessionCookie: []
@@ -2652,7 +2654,7 @@ paths:
       summary: Run the failed and canceled jobs of a finished run again
       description: >-
         Needs `run.trigger` on the project. Only a run that ended `failed` or `canceled` can be run again (409
-        `RUN_NOT_RERUNNABLE` otherwise). Every job that failed, was canceled or was skipped because of them waits again
+        `RUN_NOT_RERUNNABLE` otherwise), and only while a repository is linked (404 `REPOSITORY_NOT_LINKED`). Every job that failed, was canceled or was skipped because of them waits again
         and gets a new job; the jobs that succeeded keep their result. The run uses the same pipeline file and the
         same image digests as before.
       security:
@@ -2679,7 +2681,7 @@ paths:
       summary: Approve a run from a fork's pull request
       description: >-
         Needs `run.approve` on the project (Maintainer and above). Only a run that waits for approval can be approved
-        (409 `RUN_NOT_AWAITING_APPROVAL` otherwise). The run still has no secrets and no environments, and reads its
+        (409 `RUN_NOT_AWAITING_APPROVAL` otherwise), and only while a repository is linked (404 `REPOSITORY_NOT_LINKED`). The run still has no secrets and no environments, and reads its
         pipeline file from the base branch.
       security:
         - SessionCookie: []
@@ -2759,7 +2761,7 @@ paths:
       tags: [pipelines]
       summary: Read the inputs a manual run asks for
       description: >-
-        Needs `run.read` on the project. Dhow reads the pipeline file only for a run, so the answer comes from the
+        Needs `run.trigger` on the project. Dhow reads the pipeline file only for a run, so the answer comes from the
         file of the latest run on the default branch that was not from a fork. `Known` is false when no such run read a
         file yet. `Enabled` says whether that file allows manual runs (`on.manual`), and `Inputs` lists what
         `on.manual.inputs` declares, by name. A project without a repository answers 404 `REPOSITORY_NOT_LINKED`.
@@ -5836,6 +5838,9 @@ components:
         RunnerId:
           type: string
           format: uuid
+        RunnerName:
+          type: string
+          description: The runner's name, when the runner still exists.
         FencingToken:
           type: integer
           format: int64
@@ -5865,6 +5870,24 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/JobAttemptStep"
+    JobRun:
+      type: object
+      additionalProperties: false
+      required: [ProjectId, ProjectName, RunId, RunNumber]
+      description: The pipeline run this job belongs to. Absent for a job that no run made.
+      properties:
+        ProjectId:
+          type: string
+          format: uuid
+        ProjectName:
+          type: string
+        RunId:
+          type: string
+          format: uuid
+        RunNumber:
+          type: integer
+          format: int64
+          minimum: 1
     JobDetail:
       type: object
       additionalProperties: false
@@ -5874,6 +5897,8 @@ components:
           $ref: "#/components/schemas/Job"
         Spec:
           $ref: "#/components/schemas/JobSpec"
+        Run:
+          $ref: "#/components/schemas/JobRun"
         Attempts:
           type: array
           items:
@@ -5991,7 +6016,7 @@ components:
     Project:
       type: object
       additionalProperties: false
-      required: [Id, OrganizationId, Slug, Name, PipelinePath, ForkPolicy, State, CreatedAt, UpdatedAt]
+      required: [Id, OrganizationId, Slug, Name, PipelinePath, ForkPolicy, State, RepositoryLinked, CreatedAt, UpdatedAt]
       properties:
         Id:
           type: string
@@ -6010,6 +6035,9 @@ components:
           $ref: "#/components/schemas/ForkPolicy"
         State:
           $ref: "#/components/schemas/ProjectState"
+        RepositoryLinked:
+          type: boolean
+          description: A repository is linked, so `getRepository` answers it instead of 404 `REPOSITORY_NOT_LINKED`.
         CreatedAt:
           type: string
           format: date-time
@@ -6088,6 +6116,12 @@ components:
     RunTrigger:
       type: string
       enum: [push, tag, pull_request, manual, api]
+    RunJobKind:
+      type: string
+      enum: [job, discovery]
+      description: >-
+        `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a
+        client names it from the kind.
     RunJobState:
       type: string
       enum: [waiting, active, succeeded, failed, canceled, skipped]
@@ -6160,7 +6194,8 @@ components:
           type: string
           description: >-
             Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`,
-            `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server
+            `JOBS_FAILED`, `CANCELED`, `REPOSITORY_UNLINKED` (the repository was unlinked while the run was open),
+            `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server
             could not make the run's jobs), `RUN_STATE_INVALID` (a stored value of the run could not be read),
             `SHA_NOT_ON_REF` (the commit is not in the history of its ref), `DISCOVERY_FAILED` (the job that reads the file
             of a generic repository failed), `DEFINITION_UNVERIFIED` (the git objects that job handed over do not prove the
@@ -6202,7 +6237,7 @@ components:
     RunJob:
       type: object
       additionalProperties: false
-      required: [Id, Key, JobId, Name, Matrix, Needs, State, Attempts]
+      required: [Id, Key, Kind, JobId, Name, Matrix, Needs, State, Attempts]
       properties:
         Id:
           type: string
@@ -6210,6 +6245,8 @@ components:
         Key:
           type: string
           description: The job's id, with its matrix values for a matrix job, such as `build (node=20, os=debian)`.
+        Kind:
+          $ref: "#/components/schemas/RunJobKind"
         JobId:
           type: string
           description: The id of the job in the pipeline file.

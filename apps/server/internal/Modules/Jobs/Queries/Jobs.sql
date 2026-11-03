@@ -316,3 +316,17 @@ FROM "Jobs" j
 JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
 JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
 WHERE j."Id" = @id AND j."OrganizationId" = @organization_id AND j."OriginKind" = 'pipeline';
+
+-- name: GetJobRun :one
+SELECT p."Id" AS "ProjectId", p."Name" AS "ProjectName", r."Id" AS "RunId", r."Number" AS "RunNumber"
+FROM "Jobs" j
+JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
+JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+JOIN "Projects" p ON p."Id" = r."ProjectId" AND p."OrganizationId" = r."OrganizationId"
+WHERE j."Id" = @job_id AND j."OrganizationId" = @organization_id AND j."OriginKind" = 'pipeline'
+  AND NOT j."IsDeleted" AND NOT r."IsDeleted" AND NOT p."IsDeleted";
+
+-- name: GetRunnerNames :many
+SELECT "Id", "Name"
+FROM "Runners"
+WHERE "OrganizationId" = @organization_id AND "Id" = ANY(@ids::uuid[]);

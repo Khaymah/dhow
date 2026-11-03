@@ -160,10 +160,13 @@ type Project struct {
 	OrganizationId openapi_types.UUID `json:"OrganizationId"`
 
 	// PipelinePath Where the pipeline file lives in the repository, relative to its root.
-	PipelinePath string       `json:"PipelinePath"`
-	Slug         string       `json:"Slug"`
-	State        ProjectState `json:"State"`
-	UpdatedAt    time.Time    `json:"UpdatedAt"`
+	PipelinePath string `json:"PipelinePath"`
+
+	// RepositoryLinked A repository is linked, so `getRepository` answers it instead of 404 `REPOSITORY_NOT_LINKED`.
+	RepositoryLinked bool         `json:"RepositoryLinked"`
+	Slug             string       `json:"Slug"`
+	State            ProjectState `json:"State"`
+	UpdatedAt        time.Time    `json:"UpdatedAt"`
 }
 
 // ProjectListResponse defines model for ProjectListResponse.

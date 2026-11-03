@@ -264,9 +264,12 @@ type JobAttempt struct {
 	MutationStartedAt *time.Time         `json:"MutationStartedAt,omitempty"`
 	Number            int                `json:"Number"`
 	RunnerId          openapi_types.UUID `json:"RunnerId"`
-	StartedAt         *time.Time         `json:"StartedAt,omitempty"`
-	State             JobAttemptState    `json:"State"`
-	Steps             []JobAttemptStep   `json:"Steps"`
+
+	// RunnerName The runner's name, when the runner still exists.
+	RunnerName *string          `json:"RunnerName,omitempty"`
+	StartedAt  *time.Time       `json:"StartedAt,omitempty"`
+	State      JobAttemptState  `json:"State"`
+	Steps      []JobAttemptStep `json:"Steps"`
 }
 
 // JobAttemptState defines model for JobAttemptState.
@@ -288,7 +291,10 @@ type JobAttemptStep struct {
 type JobDetail struct {
 	Attempts []JobAttempt `json:"Attempts"`
 	Job      Job          `json:"Job"`
-	Spec     JobSpec      `json:"Spec"`
+
+	// Run The pipeline run this job belongs to. Absent for a job that no run made.
+	Run  *JobRun `json:"Run,omitempty"`
+	Spec JobSpec `json:"Spec"`
 }
 
 // JobDetailResponse defines model for JobDetailResponse.
@@ -395,6 +401,14 @@ type JobResponse struct {
 	Message *string   `json:"Message,omitempty"`
 	Meta    *PageMeta `json:"Meta,omitempty"`
 	Success bool      `json:"Success"`
+}
+
+// JobRun The pipeline run this job belongs to. Absent for a job that no run made.
+type JobRun struct {
+	ProjectId   openapi_types.UUID `json:"ProjectId"`
+	ProjectName string             `json:"ProjectName"`
+	RunId       openapi_types.UUID `json:"RunId"`
+	RunNumber   int64              `json:"RunNumber"`
 }
 
 // JobSecretRef defines model for JobSecretRef.

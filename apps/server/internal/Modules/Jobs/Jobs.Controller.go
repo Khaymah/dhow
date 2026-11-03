@@ -111,6 +111,9 @@ func (c *Controller) GetJob(ctx context.Context, req gen.GetJobRequestObject) (g
 		return nil, err
 	}
 	data := detailToGen(d)
+	if err := c.withOrigin(ctx, req.Id, req.JobId, &data); err != nil {
+		return nil, err
+	}
 	return gen.GetJob200JSONResponse{Success: true, Message: ptrOf(messageLoaded), Data: &data}, nil
 }
 

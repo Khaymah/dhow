@@ -170,3 +170,15 @@ func (s *Service) audit(ctx context.Context, p auth.Principal, name string, proj
 		TargetID: project.ID.String(), IP: auth.RequestMetaFrom(ctx).IPString(), Data: data,
 	}})
 }
+
+func (s *Service) Linked(ctx context.Context, org uuid.UUID, ids ...uuid.UUID) (map[uuid.UUID]bool, error) {
+	rows, err := s.queries().LinkedProjects(ctx, sqlc.LinkedProjectsParams{OrganizationID: org, ProjectIds: ids})
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID]bool, len(rows))
+	for _, id := range rows {
+		out[id] = true
+	}
+	return out, nil
+}
