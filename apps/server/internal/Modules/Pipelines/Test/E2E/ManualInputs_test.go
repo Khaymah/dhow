@@ -77,7 +77,10 @@ func TestManualInputsComeFromTheLatestFileOfTheDefaultBranch(t *testing.T) {
 	assert.Empty(t, latest.Inputs)
 
 	viewer := w.env.SeedSession(w.env.SeedUser(w.org, "viewer-inputs@example.com", "a long password for the viewer", "viewer"))
-	assert.True(t, w.manualInputs(t, viewer).Known)
+	refused := viewer.Get(apptest.OrgPath(w.org, "/projects/"+w.project.String()+"/manual-inputs"))
+	require.Equal(t, http.StatusForbidden, refused.Status, "only who may start a run reads its inputs: %s", refused.Raw)
+	developer := w.env.SeedSession(w.env.SeedUser(w.org, "dev-inputs@example.com", "a long password for the developer", "developer"))
+	assert.True(t, w.manualInputs(t, developer).Known)
 
 	bare := w.env.SeedProject(w.org, w.ownerID)
 	res := w.owner.Get(apptest.OrgPath(w.org, "/projects/"+bare.String()+"/manual-inputs"))

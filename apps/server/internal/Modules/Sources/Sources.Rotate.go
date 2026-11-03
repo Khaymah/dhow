@@ -143,7 +143,13 @@ func (s *Service) Unlink(ctx context.Context, org, project uuid.UUID) (models.Re
 		if err != nil {
 			return err
 		}
-		row, err = q.UnlinkRepository(ctx, sqlc.UnlinkRepositoryParams{ID: current.Id, OrganizationID: org, Now: s.now()})
+		if err := s.triggers.Unlinked(ctx, q, org, project); err != nil {
+			return err
+		}
+		if row, err = q.UnlinkRepository(ctx, sqlc.UnlinkRepositoryParams{ID: current.Id, OrganizationID: org, Now: s.now()}); err != nil {
+			return err
+		}
+		_, err = q.AbandonCommitStatuses(ctx, sqlc.AbandonCommitStatusesParams{RepositoryID: current.Id, OrganizationID: org, Now: s.now()})
 		return err
 	})
 	if err != nil {

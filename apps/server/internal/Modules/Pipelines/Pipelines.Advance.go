@@ -278,7 +278,7 @@ func (s *Service) settle(ctx context.Context, q *sqlc.Queries, st *step) error {
 	case failed:
 		state, reason, status = models.RunFailed, models.ReasonJobsFailed, commitstatus.StateFailed
 	case canceled || st.run.CancelRequestedAt != nil:
-		state, reason, status = models.RunCanceled, models.ReasonCanceled, commitstatus.StateCanceled
+		state, reason, status = models.RunCanceled, cancelReason(st.run), commitstatus.StateCanceled
 	}
 	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: st.run.Id, State: state, FailureReason: reason}); err != nil {
 		return err

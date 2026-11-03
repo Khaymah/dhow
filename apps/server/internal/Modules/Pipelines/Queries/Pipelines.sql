@@ -136,7 +136,8 @@ WHERE "Id" = @id AND "State" = 'awaiting_approval';
 -- name: RequestRunCancel :exec
 UPDATE "PipelineRuns"
 SET "CancelRequestedAt" = COALESCE("CancelRequestedAt", now()),
-    "CancelRequestedBy" = COALESCE("CancelRequestedBy", sqlc.narg('user_id')::uuid), "UpdatedAt" = now()
+    "CancelRequestedBy" = COALESCE("CancelRequestedBy", sqlc.narg('user_id')::uuid),
+    "FailureReason" = CASE WHEN "CancelRequestedAt" IS NULL THEN @reason ELSE "FailureReason" END, "UpdatedAt" = now()
 WHERE "Id" = @id;
 
 -- name: ReopenRun :exec
@@ -291,3 +292,11 @@ LEFT JOIN LATERAL (
     LIMIT 1
 ) d ON true
 WHERE p."Id" = @project_id AND p."OrganizationId" = @organization_id AND NOT p."IsDeleted";
+
+-- name: ListOpenProjectRuns :many
+SELECT "Id"
+FROM "PipelineRuns"
+WHERE "ProjectId" = @project_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"
+  AND "State" IN ('awaiting_approval', 'pending', 'queued', 'running')
+ORDER BY "Number"
+FOR UPDATE;

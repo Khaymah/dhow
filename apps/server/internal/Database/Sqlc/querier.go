@@ -12,6 +12,7 @@ import (
 )
 
 type Querier interface {
+	AbandonCommitStatuses(ctx context.Context, arg AbandonCommitStatusesParams) (int64, error)
 	ActivateRunJob(ctx context.Context, arg ActivateRunJobParams) (int64, error)
 	AdvanceAttemptLog(ctx context.Context, arg AdvanceAttemptLogParams) error
 	AdvanceTotpStep(ctx context.Context, arg AdvanceTotpStepParams) (int64, error)
@@ -94,6 +95,7 @@ type Querier interface {
 	GetInstance(ctx context.Context) (Instance, error)
 	GetJob(ctx context.Context, arg GetJobParams) (Job, error)
 	GetJobProject(ctx context.Context, arg GetJobProjectParams) (uuid.UUID, error)
+	GetJobRun(ctx context.Context, arg GetJobRunParams) (GetJobRunRow, error)
 	GetLastAuditHash(ctx context.Context, organizationID *uuid.UUID) ([]byte, error)
 	GetLeaseAttempt(ctx context.Context, id uuid.UUID) (GetLeaseAttemptRow, error)
 	GetLogAttempt(ctx context.Context, arg GetLogAttemptParams) (GetLogAttemptRow, error)
@@ -115,6 +117,7 @@ type Querier interface {
 	GetRunProject(ctx context.Context, arg GetRunProjectParams) (GetRunProjectRow, error)
 	GetRunner(ctx context.Context, arg GetRunnerParams) (Runner, error)
 	GetRunnerIdentity(ctx context.Context, id uuid.UUID) (GetRunnerIdentityRow, error)
+	GetRunnerNames(ctx context.Context, arg GetRunnerNamesParams) ([]GetRunnerNamesRow, error)
 	GetTeam(ctx context.Context, arg GetTeamParams) (GetTeamRow, error)
 	GetTokenMembership(ctx context.Context, arg GetTokenMembershipParams) (GetTokenMembershipRow, error)
 	GetUsableSetupToken(ctx context.Context, arg GetUsableSetupTokenParams) (GetUsableSetupTokenRow, error)
@@ -172,6 +175,7 @@ type Querier interface {
 	JobExists(ctx context.Context, arg JobExistsParams) (bool, error)
 	KnownBlobs(ctx context.Context, digests [][]byte) ([][]byte, error)
 	LatestTrustedSha(ctx context.Context, arg LatestTrustedShaParams) (string, error)
+	LinkedProjects(ctx context.Context, arg LinkedProjectsParams) ([]uuid.UUID, error)
 	ListAcceptedInvitations(ctx context.Context, arg ListAcceptedInvitationsParams) ([]ListAcceptedInvitationsRow, error)
 	ListActiveUserSessions(ctx context.Context, arg ListActiveUserSessionsParams) ([]ListActiveUserSessionsRow, error)
 	ListApiTokens(ctx context.Context, arg ListApiTokensParams) ([]ListApiTokensRow, error)
@@ -186,6 +190,7 @@ type Querier interface {
 	ListMembers(ctx context.Context, arg ListMembersParams) ([]ListMembersRow, error)
 	ListOidcProviders(ctx context.Context) ([]ListOidcProvidersRow, error)
 	ListOpenInvitations(ctx context.Context, arg ListOpenInvitationsParams) ([]ListOpenInvitationsRow, error)
+	ListOpenProjectRuns(ctx context.Context, arg ListOpenProjectRunsParams) ([]uuid.UUID, error)
 	ListOrganizationBindings(ctx context.Context, organizationID uuid.UUID) ([]ListOrganizationBindingsRow, error)
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error)
 	ListQueuedRuns(ctx context.Context, batch int32) ([]ListQueuedRunsRow, error)

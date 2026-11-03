@@ -257,7 +257,7 @@ func (s *Service) admit(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineR
 				return false, err
 			}
 			for _, id := range older {
-				if err := s.cancelLocked(ctx, q, id, nil); err != nil {
+				if err := s.cancelLocked(ctx, q, id, nil, models.ReasonCanceled); err != nil {
 					return false, err
 				}
 			}

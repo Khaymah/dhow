@@ -60,6 +60,7 @@ const (
 	ReasonStateInvalid          = "RUN_STATE_INVALID"
 	ReasonOutputsTruncated      = "OUTPUTS_TRUNCATED"
 	ReasonRepositoryUnavailable = "REPOSITORY_UNAVAILABLE"
+	ReasonRepositoryUnlinked    = "REPOSITORY_UNLINKED"
 	ReasonShaNotOnRef           = "SHA_NOT_ON_REF"
 	ReasonArtifactUntrusted     = "ARTIFACT_UNTRUSTED"
 	ReasonArtifactsUnavailable  = "ARTIFACTS_UNAVAILABLE"
@@ -141,6 +142,7 @@ type Run struct {
 type RunJob struct {
 	ID            uuid.UUID
 	Key           string
+	Kind          string
 	JobID         string
 	Name          string
 	Matrix        map[string]string

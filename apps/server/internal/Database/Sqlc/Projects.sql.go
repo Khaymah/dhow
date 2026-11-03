@@ -176,6 +176,37 @@ func (q *Queries) InsertProject(ctx context.Context, arg InsertProjectParams) (P
 	return i, err
 }
 
+const linkedProjects = `-- name: LinkedProjects :many
+SELECT "ProjectId"
+FROM "Repositories"
+WHERE "OrganizationId" = $1 AND "ProjectId" = ANY($2::uuid[]) AND NOT "IsDeleted"
+`
+
+type LinkedProjectsParams struct {
+	OrganizationID uuid.UUID
+	ProjectIds     []uuid.UUID
+}
+
+func (q *Queries) LinkedProjects(ctx context.Context, arg LinkedProjectsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, linkedProjects, arg.OrganizationID, arg.ProjectIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var ProjectId uuid.UUID
+		if err := rows.Scan(&ProjectId); err != nil {
+			return nil, err
+		}
+		items = append(items, ProjectId)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProjects = `-- name: ListProjects :many
 SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId"
 FROM "Projects"

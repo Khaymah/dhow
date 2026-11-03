@@ -51,7 +51,8 @@ RETURNING *;
 
 -- name: UnlinkRepository :one
 UPDATE "Repositories"
-SET "IsDeleted" = true, "UpdatedAt" = @now
+SET "IsDeleted" = true, "DeployKeySealed" = NULL, "PreviousDeployKeySealed" = NULL, "WebhookSecretSealed" = NULL,
+    "PendingHostKey" = NULL, "PendingHostKeyFetchedAt" = NULL, "UpdatedAt" = @now
 WHERE "Id" = @id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"
 RETURNING *;
 
@@ -143,9 +144,15 @@ WHERE c."Id" IN (
     LIMIT @batch
     FOR UPDATE SKIP LOCKED
 )
-  AND r."Id" = c."RepositoryId" AND r."OrganizationId" = c."OrganizationId"
+  AND r."Id" = c."RepositoryId" AND r."OrganizationId" = c."OrganizationId" AND NOT r."IsDeleted"
 RETURNING c."Id", c."OrganizationId", c."RepositoryId", c."Sha", c."RunId", c."TargetUrl", c."DesiredState", c."DesiredAt",
     c."Attempts", r."Provider", r."CloneUrl";
+
+-- name: AbandonCommitStatuses :execrows
+UPDATE "CommitStatusReports"
+SET "AbandonedAt" = @now::timestamptz, "UpdatedAt" = @now::timestamptz
+WHERE "RepositoryId" = @repository_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted" AND "AbandonedAt" IS NULL
+  AND "SentState" IS DISTINCT FROM "DesiredState";
 
 -- name: MarkCommitStatusSent :exec
 UPDATE "CommitStatusReports"

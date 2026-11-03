@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
@@ -17,6 +18,7 @@ import (
 type FakeTriggers struct {
 	mu       sync.Mutex
 	received []triggers.Trigger
+	unlinked []uuid.UUID
 	err      error
 }
 
@@ -28,6 +30,19 @@ func (f *FakeTriggers) Deliver(_ context.Context, _ *sqlc.Queries, t triggers.Tr
 	}
 	f.received = append(f.received, t)
 	return triggers.Accepted{Created: true}, nil
+}
+
+func (f *FakeTriggers) Unlinked(_ context.Context, _ *sqlc.Queries, _, project uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.unlinked = append(f.unlinked, project)
+	return f.err
+}
+
+func (f *FakeTriggers) UnlinkedProjects() []uuid.UUID {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]uuid.UUID(nil), f.unlinked...)
 }
 
 func (f *FakeTriggers) FailWith(err error) {

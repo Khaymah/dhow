@@ -60,7 +60,7 @@ func detailToGen(d models.Detail) gen.RunDetail {
 	}
 	for _, j := range d.Jobs {
 		out.Jobs = append(out.Jobs, gen.RunJob{
-			Id: j.ID, Key: j.Key, JobId: j.JobID, Name: j.Name, Matrix: j.Matrix, Needs: j.Needs, State: gen.RunJobState(j.State),
+			Id: j.ID, Key: j.Key, Kind: gen.RunJobKind(j.Kind), JobId: j.JobID, Name: j.Name, Matrix: j.Matrix, Needs: j.Needs, State: gen.RunJobState(j.State),
 			FailureReason: optional(j.FailureReason), CurrentJobId: j.CurrentJobID, Attempts: j.Attempts, StartedAt: j.StartedAt,
 			FinishedAt: j.FinishedAt,
 		})

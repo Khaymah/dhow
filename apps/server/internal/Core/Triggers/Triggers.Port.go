@@ -53,4 +53,5 @@ type Accepted struct {
 
 type Sink interface {
 	Deliver(ctx context.Context, tx *sqlc.Queries, t Trigger) (Accepted, error)
+	Unlinked(ctx context.Context, tx *sqlc.Queries, organization, project uuid.UUID) error
 }

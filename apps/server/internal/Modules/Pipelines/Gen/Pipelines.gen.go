@@ -56,6 +56,24 @@ func (e RunIssueSeverity) Valid() bool {
 	}
 }
 
+// Defines values for RunJobKind.
+const (
+	Discovery RunJobKind = "discovery"
+	Job       RunJobKind = "job"
+)
+
+// Valid indicates whether the value is a known member of the RunJobKind enum.
+func (e RunJobKind) Valid() bool {
+	switch e {
+	case Discovery:
+		return true
+	case Job:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunJobState.
 const (
 	RunJobStateActive    RunJobState = "active"
@@ -263,7 +281,7 @@ type Run struct {
 	// DefinitionSha The commit the pipeline file was read from. For a fork's pull request it is the base.
 	DefinitionSha *string `json:"DefinitionSha,omitempty"`
 
-	// FailureReason Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs), `RUN_STATE_INVALID` (a stored value of the run could not be read), `SHA_NOT_ON_REF` (the commit is not in the history of its ref), `DISCOVERY_FAILED` (the job that reads the file of a generic repository failed), `DEFINITION_UNVERIFIED` (the git objects that job handed over do not prove the file is in the run's commit) or `REPOSITORY_UNAVAILABLE`.
+	// FailureReason Why the run ended the way it did, for example `PIPELINE_INVALID`, `IMAGE_PIN_FAILED`, `CHECKOUT_UNAVAILABLE`, `JOBS_FAILED`, `CANCELED`, `REPOSITORY_UNLINKED` (the repository was unlinked while the run was open), `DEFINITION_NOT_FOUND`, `TRIGGER_NOT_ENABLED`, `RUN_EXPANSION_FAILED` (the server could not make the run's jobs), `RUN_STATE_INVALID` (a stored value of the run could not be read), `SHA_NOT_ON_REF` (the commit is not in the history of its ref), `DISCOVERY_FAILED` (the job that reads the file of a generic repository failed), `DEFINITION_UNVERIFIED` (the git objects that job handed over do not prove the file is in the run's commit) or `REPOSITORY_UNAVAILABLE`.
 	FailureReason *string            `json:"FailureReason,omitempty"`
 	FinishedAt    *time.Time         `json:"FinishedAt,omitempty"`
 	Id            openapi_types.UUID `json:"Id"`
@@ -345,13 +363,19 @@ type RunJob struct {
 	JobId string `json:"JobId"`
 
 	// Key The job's id, with its matrix values for a matrix job, such as `build (node=20, os=debian)`.
-	Key       string            `json:"Key"`
+	Key string `json:"Key"`
+
+	// Kind `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a client names it from the kind.
+	Kind      RunJobKind        `json:"Kind"`
 	Matrix    map[string]string `json:"Matrix"`
 	Name      string            `json:"Name"`
 	Needs     []string          `json:"Needs"`
 	StartedAt *time.Time        `json:"StartedAt,omitempty"`
 	State     RunJobState       `json:"State"`
 }
+
+// RunJobKind `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a client names it from the kind.
+type RunJobKind string
 
 // RunJobState defines model for RunJobState.
 type RunJobState string

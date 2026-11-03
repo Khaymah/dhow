@@ -730,6 +730,40 @@ func (q *Queries) ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobs
 	return items, nil
 }
 
+const listOpenProjectRuns = `-- name: ListOpenProjectRuns :many
+SELECT "Id"
+FROM "PipelineRuns"
+WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+  AND "State" IN ('awaiting_approval', 'pending', 'queued', 'running')
+ORDER BY "Number"
+FOR UPDATE
+`
+
+type ListOpenProjectRunsParams struct {
+	ProjectID      uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) ListOpenProjectRuns(ctx context.Context, arg ListOpenProjectRunsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listOpenProjectRuns, arg.ProjectID, arg.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var Id uuid.UUID
+		if err := rows.Scan(&Id); err != nil {
+			return nil, err
+		}
+		items = append(items, Id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listQueuedRuns = `-- name: ListQueuedRuns :many
 SELECT h."Id", h."ProjectId", h."ConcurrencyGroup"
 FROM (SELECT DISTINCT ON (r."ProjectId", r."ConcurrencyGroup") r."Id", r."ProjectId", r."ConcurrencyGroup", r."Number"
@@ -1186,17 +1220,19 @@ func (q *Queries) ReopenRun(ctx context.Context, id uuid.UUID) error {
 const requestRunCancel = `-- name: RequestRunCancel :exec
 UPDATE "PipelineRuns"
 SET "CancelRequestedAt" = COALESCE("CancelRequestedAt", now()),
-    "CancelRequestedBy" = COALESCE("CancelRequestedBy", $1::uuid), "UpdatedAt" = now()
-WHERE "Id" = $2
+    "CancelRequestedBy" = COALESCE("CancelRequestedBy", $1::uuid),
+    "FailureReason" = CASE WHEN "CancelRequestedAt" IS NULL THEN $2 ELSE "FailureReason" END, "UpdatedAt" = now()
+WHERE "Id" = $3
 `
 
 type RequestRunCancelParams struct {
 	UserID *uuid.UUID
+	Reason string
 	ID     uuid.UUID
 }
 
 func (q *Queries) RequestRunCancel(ctx context.Context, arg RequestRunCancelParams) error {
-	_, err := q.db.Exec(ctx, requestRunCancel, arg.UserID, arg.ID)
+	_, err := q.db.Exec(ctx, requestRunCancel, arg.UserID, arg.Reason, arg.ID)
 	return err
 }
 
