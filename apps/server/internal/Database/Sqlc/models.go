@@ -196,6 +196,7 @@ type Instance struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	SetupCompletedAt *time.Time
+	SchemaFloor      string
 }
 
 type InstanceSetting struct {
@@ -636,6 +637,19 @@ type RunnerThrottle struct {
 	Failures      int32
 	LastFailureAt time.Time
 	LockedUntil   *time.Time
+}
+
+type ServerInstance struct {
+	Id            uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	IsDeleted     bool
+	Hostname      string
+	Version       string
+	Commit        string
+	SchemaVersion int64
+	StartedAt     time.Time
+	LastSeenAt    time.Time
 }
 
 type Session struct {
