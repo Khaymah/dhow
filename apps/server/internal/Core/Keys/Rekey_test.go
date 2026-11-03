@@ -344,3 +344,49 @@ func snapshotDataKeys(t *testing.T, pool *pgxpool.Pool) snapshotStore {
 	}
 	return out
 }
+
+func TestAReplacedKeyIsRewrappedOnRotationAndShreddedWithItsOwner(t *testing.T) {
+	ring, err := keys.GenerateKeyring(1)
+	require.NoError(t, err)
+	oldProvider, err := keys.NewFakeFrom(ring)
+	require.NoError(t, err)
+	f := newRekeyFixture(t, oldProvider, 2, 2)
+	f.location.failAfter.Store(1)
+	_, err = f.manager.Rekey(t.Context(), f.pool, f.values, f.registry, keys.RekeyOptions{Wait: noWait})
+	require.ErrorIs(t, err, errInjected)
+
+	both, _, err := ring.WithNextVersion()
+	require.NoError(t, err)
+	provider, err := keys.NewFakeFrom(both)
+	require.NoError(t, err)
+	m := keys.NewManager(f.pool, provider, nil)
+	_, err = m.Register(t.Context())
+	require.NoError(t, err)
+	_, err = m.Activate(t.Context(), 2, 90)
+	require.NoError(t, err)
+	res, err := m.Rewrap(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, 4, res.Rewrapped, "two replaced and two new data keys move to the new KEK")
+	assert.Equal(t, []int32{1}, res.Retired)
+	values := keys.NewValues(m.Envelope(), nil)
+	current, err := values.Column(f.location.Spec())
+	require.NoError(t, err)
+	f.openAll(t, current)
+
+	owners := f.owners(t)
+	var victim uuid.UUID
+	for _, project := range owners {
+		victim = project
+		break
+	}
+	n, err := m.Envelope().Destroy(t.Context(), keys.ProjectOwner(victim))
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, n, "the replaced key goes with the new one")
+	for id, sealed := range f.rows(t) {
+		if owners[id] != victim {
+			continue
+		}
+		_, err := current.Open(t.Context(), keys.ProjectOwner(victim), rowContext(id.String()), sealed)
+		require.ErrorIs(t, err, keys.ErrShredded)
+	}
+}

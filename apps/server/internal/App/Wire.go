@@ -115,11 +115,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	values, err := valuesFor(in)
-	if err != nil {
-		return nil, err
-	}
-	store, err := settingsStore(ctx, in, values)
+	values, store, err := valuesAndSettings(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -212,11 +208,13 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	return wired, nil
 }
 
-func valuesFor(in Infra) (*keys.Values, error) {
+func valuesAndSettings(ctx context.Context, in Infra) (*keys.Values, *instancesettings.Store, error) {
 	if in.Keys == nil {
-		return nil, errors.New("the keyring is not loaded; every sealed value needs it")
+		return nil, nil, errors.New("the keyring is not loaded; every sealed value needs it")
 	}
-	return keys.NewValues(in.Keys.Envelope(), in.Config.SecretKey), nil
+	values := keys.NewValues(in.Keys.Envelope(), in.Config.SecretKey)
+	store, err := settingsStore(ctx, in, values)
+	return values, store, err
 }
 
 type keyset struct {
