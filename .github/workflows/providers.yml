@@ -1,0 +1,45 @@
+name: Providers
+
+on:
+  schedule:
+    - cron: "11 4 * * *"
+  workflow_dispatch:
+  pull_request:
+    types: [labeled, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: providers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  providers:
+    if: >-
+      vars.DHOW_PROVIDERS_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+      (!github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'providers') &&
+      github.event.pull_request.head.repo.full_name == github.repository))
+    name: Real GitHub, GitLab.com and GitLab CE
+    runs-on: ubuntu-26.04
+    environment: providers
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Provider tests
+        env:
+          DHOW_GITHUB_APP_ID: ${{ secrets.DHOW_GITHUB_APP_ID }}
+          DHOW_GITHUB_APP_PRIVATE_KEY: ${{ secrets.DHOW_GITHUB_APP_PRIVATE_KEY }}
+          DHOW_GITHUB_TEST_REPOSITORY: ${{ vars.DHOW_GITHUB_TEST_REPOSITORY }}
+          DHOW_GITHUB_FORK_TOKEN: ${{ secrets.DHOW_GITHUB_FORK_TOKEN }}
+          DHOW_GITLAB_TOKEN: ${{ secrets.DHOW_GITLAB_TOKEN }}
+          DHOW_GITLAB_TEST_PROJECT: ${{ vars.DHOW_GITLAB_TEST_PROJECT }}
+        run: |
+          echo "::error::The provider tests come with M4.5 (GitHub) and M4.6 (GitLab); unset DHOW_PROVIDERS_ENABLED until they exist"
+          exit 1
