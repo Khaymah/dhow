@@ -66,17 +66,34 @@ func auditActions(t *testing.T, pool *pgxpool.Pool) []string {
 
 func TestParseKeysArgs(t *testing.T) {
 	good := [][]string{
-		{"init"}, {"init", "--file", "/k"}, {"init", "--discard-unreadable"}, {"init", "--discard-unreadable", "--confirm", app.DiscardConfirmation},
-		{"status"}, {"generate"}, {"activate", "2"}, {"activate", "2", "--file", "/k"}, {"export", "--recipient", "age1x", "--out", "-"},
+		{"init"},
+		{"init", "--file", "/k"},
+		{"init", "--discard-unreadable"},
+		{"init", "--discard-unreadable", "--confirm", app.DiscardConfirmation},
+		{"status"},
+		{"generate"},
+		{"activate", "2"},
+		{"activate", "2", "--file", "/k"},
+		{"export", "--recipient", "age1x", "--out", "-"},
 	}
 	for _, args := range good {
 		_, err := app.ParseKeysArgs(args)
 		require.NoError(t, err, "%v", args)
 	}
 	bad := [][]string{
-		{}, {"rotate"}, {"activate"}, {"activate", "0"}, {"activate", "two"}, {"activate", "-1"}, {"status", "extra"},
-		{"init", "--confirm", app.DiscardConfirmation}, {"export"}, {"export", "--recipient", "age1x"}, {"export", "--out", "x"},
-		{"generate", "--recipient", "age1x"}, {"status", "--discard-unreadable"},
+		{},
+		{"rotate"},
+		{"activate"},
+		{"activate", "0"},
+		{"activate", "two"},
+		{"activate", "-1"},
+		{"status", "extra"},
+		{"init", "--confirm", app.DiscardConfirmation},
+		{"export"},
+		{"export", "--recipient", "age1x"},
+		{"export", "--out", "x"},
+		{"generate", "--recipient", "age1x"},
+		{"status", "--discard-unreadable"},
 	}
 	for _, args := range bad {
 		_, err := app.ParseKeysArgs(args)
@@ -137,7 +154,7 @@ func TestKeysCommandsRotateExportAndNeverPrintAKey(t *testing.T) {
 	require.NoError(t, cli.run("export", "--recipient", identity.Recipient().String(), "--out", exported))
 	require.Error(t, cli.run("export", "--recipient", identity.Recipient().String(), "--out", exported), "never overwrites")
 
-	data, err := os.ReadFile(exported) //nolint:gosec // A file this test wrote.
+	data, err := os.ReadFile(exported)
 	require.NoError(t, err)
 	assert.False(t, bytes.Contains(data, []byte("kek ")))
 	decrypted, err := age.Decrypt(armor.NewReader(bytes.NewReader(data)), identity)

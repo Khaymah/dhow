@@ -28,6 +28,12 @@ func Run(ctx context.Context) error {
 		log.Warn("DHOW_DEV=true: plain HTTP and unencrypted database connections are allowed. Never use this in production.")
 	}
 
+	provider, err := OpenKeyring(cfg.Keyring)
+	if err != nil {
+		log.Error("the keyring file cannot be used; stopping", "code", keys.CodeOf(err), "error", err.Error())
+		return err
+	}
+
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -49,23 +55,11 @@ func Run(ctx context.Context) error {
 	if err := PrepareSchema(ctx, migrator, log); err != nil {
 		return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
 	}
-	provider, err := OpenKeyring(cfg.Keyring)
-	if err != nil {
-		log.Error("the keyring file cannot be used; stopping", "code", keys.CodeOf(err), "error", err.Error())
-		return err
-	}
-	keyManager, kekVersions, stopKeys, err := StartKeys(ctx, pool, provider, log)
+	keyManager, stopInstance, err := StartInstance(ctx, pool, provider, ServerIdentity(build, migrator.Latest(), cfg.InstanceID, os.Hostname, log), log)
 	if err != nil {
 		return err
 	}
-	defer stopKeys()
-	ident := ServerIdentity(build, migrator.Latest(), cfg.InstanceID, os.Hostname, log)
-	ident.KekVersions = kekVersions
-	stopHeartbeat, err := StartHeartbeat(ctx, pool, ident, log)
-	if err != nil {
-		return err
-	}
-	defer stopHeartbeat()
+	defer stopInstance()
 
 	wired, err := Build(ctx, Infra{Config: cfg, Log: log, Pool: pool, Migrations: migrator, Build: build, Keys: keyManager})
 	if err != nil {

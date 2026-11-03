@@ -9,6 +9,7 @@ import (
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
+	serverinstances "github.com/Khaymah/dhow/apps/server/internal/Core/ServerInstances"
 )
 
 func OpenKeyring(cfg config.Keyring) (*keys.FileProvider, error) {
@@ -37,5 +38,24 @@ func StartKeys(ctx context.Context, pool *pgxpool.Pool, provider keys.KeyProvide
 	return manager, reg.Versions, func() {
 		cancel()
 		background.Wait()
+	}, nil
+}
+
+func StartInstance(
+	ctx context.Context, pool *pgxpool.Pool, provider keys.KeyProvider, ident serverinstances.Identity, log *slog.Logger,
+) (*keys.Manager, func(), error) {
+	manager, versions, stopKeys, err := StartKeys(ctx, pool, provider, log)
+	if err != nil {
+		return nil, nil, err
+	}
+	ident.KekVersions = versions
+	stopHeartbeat, err := StartHeartbeat(ctx, pool, ident, log)
+	if err != nil {
+		stopKeys()
+		return nil, nil, err
+	}
+	return manager, func() {
+		stopHeartbeat()
+		stopKeys()
 	}, nil
 }

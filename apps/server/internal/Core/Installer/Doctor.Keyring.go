@@ -81,7 +81,7 @@ func (d Doctor) keyring(ctx context.Context) []Finding {
 	if !known {
 		return []Finding{ok(title)}
 	}
-	if problems := keyringProblems(ring, stored); len(problems) > 0 {
+	if problems := keyringProblems(ctx, ring, stored); len(problems) > 0 {
 		return failed(strings.Join(problems, "; "))
 	}
 	return append([]Finding{ok(title)}, d.keyringAdvisories(stored, time.Now())...)
@@ -114,7 +114,7 @@ func (d Doctor) storedKeks(ctx context.Context) ([]StoredKek, bool) {
 	return stored, err == nil
 }
 
-func keyringProblems(ring *keys.Keyring, stored []StoredKek) []string {
+func keyringProblems(ctx context.Context, ring *keys.Keyring, stored []StoredKek) []string {
 	provider, err := keys.NewFileProvider(ring)
 	if err != nil {
 		return []string{err.Error()}
@@ -127,7 +127,7 @@ func keyringProblems(ring *keys.Keyring, stored []StoredKek) []string {
 			}
 			continue
 		}
-		check, err := provider.CheckValue(context.Background(), s.Version)
+		check, err := provider.CheckValue(ctx, s.Version)
 		if err != nil || !hmac.Equal(check, s.CheckValue) {
 			out = append(out, fmt.Sprintf("%s: KEK version %d", keys.CodeKeyringMismatch, s.Version))
 		}
