@@ -4,23 +4,17 @@ on:
   schedule:
     - cron: "11 4 * * *"
   workflow_dispatch:
-  pull_request:
-    types: [labeled, synchronize, ready_for_review]
 
 permissions:
   contents: read
 
 concurrency:
-  group: providers-${{ github.ref }}
-  cancel-in-progress: true
+  group: providers
+  cancel-in-progress: false
 
 jobs:
   providers:
-    if: >-
-      vars.DHOW_PROVIDERS_ENABLED == 'true' &&
-      (github.event_name != 'pull_request' ||
-      (!github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'providers') &&
-      github.event.pull_request.head.repo.full_name == github.repository))
+    if: github.ref == 'refs/heads/main' && vars.DHOW_PROVIDERS_ENABLED == 'true'
     name: Real GitHub, GitLab.com and GitLab CE
     runs-on: ubuntu-26.04
     environment: providers

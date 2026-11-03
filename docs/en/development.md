@@ -333,6 +333,13 @@ pnpm -C apps/web size
 
 Both need cgroup v2, remove their containers and volumes at the end (`DHOW_DEMO_KEEP=1` keeps them), and use their own ports (`DHOW_DEMO_PORT`, `8480` by default), so they can run beside the development stack. CI runs them on Ubuntu 26.04 (`demo.yml`).
 
+### The provider tests in CI
+
+`providers.yml` will test real GitHub and GitLab accounts once M4.5 and M4.6 exist. It runs only at night and by hand, only on `main`, and only when the repository variable `DHOW_PROVIDERS_ENABLED` is `true`. It never runs for a pull request, so code from a branch never sees its secrets. Its secrets live in the `providers` environment. Before anyone adds them, a maintainer must do two things in the repository settings on GitHub (Settings, then Environments, then `providers`):
+
+1. Under deployment branches, allow `main` only.
+2. Require a reviewer, so each run waits for approval before it gets the secrets.
+
 `make gen` regenerates the code from `packages/openapi/openapi.yaml` and the SQL queries, and `pnpm -C apps/web gen:api` regenerates the web API types. Never edit generated files by hand.
 
 ## The runner
