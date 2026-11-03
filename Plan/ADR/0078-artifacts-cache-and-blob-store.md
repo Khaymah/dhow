@@ -66,3 +66,18 @@
 - الـ runner اللي من غير صورة checkout مابياخدش jobs فيها artifacts أو cache (`NO_MATCHING_RUNNER` ظاهر).
 - كل artifact بيعدّي على قرص الـ runner مرة (ملف في مجلد الـ attempt) قبل الرفع أو الفك، فقرص الـ runner لازم يكفي أكبر artifact.
 - **لسه:** أسماء أسباب الفشل الجديدة وقايمة الـ artifacts في الواجهة (M4.10)، وS3، و`hash_files()` بيتحسب مرة في بداية الـ job (ملف بيتغيّر بعدها مابيغيّرش المفتاح).
+
+## تعديلات بعد المراجعة الأمنية لـ M4.9
+- **(Medium) ملكية الـ blob لكل مؤسسة:** جدول `"BlobOwners"` (migration `00047`، expand بس). الـ `PUT` بيكتب صف (المؤسسة، الـ digest)، و`ArtifactService.Commit` و`CacheService.Commit` بيطلبوا الصف ده لمؤسسة الـ lease. والـ blob المش موجود والـ blob بتاع مؤسسة تانية والحجم الغلط كلهم نفس الإجابة `BLOB_NOT_FOUND`، فالـ commit مايقدرش يعرف إذا كان digest موجود في أي حتة على السيرفر. والـ sweep بيشيل صفوف الملكية مع الـ blob. وسجل الـ job بيكتب أول 12 حرف من الـ digest بس.
+- **(Medium) القرص للكل:**
+  - `PUT` واحد لكل artifact معلن ولكل cache في الـ lease (`Dhow-Blob-Name` لاسم الـ artifact، وجدول `"BlobUploads"`)، وأي `PUT` تاني `409 UPLOAD_ALREADY_USED`. الرفع اللي فشل (digest غلط مثلًا) ينفع يتعاد.
+  - الـ disk store بيعدّ البايتات اللي لسه بتترفع (`claim` تحت mutex)، والرفع الجديد بيتقبل بس لو المساحة الفاضية ناقص اللي بيترفع تكفيه زائد الاحتياطي، فرفعات بالتوازي ماتعدّيش الاحتياطي.
+  - حد لكل مؤسسة `DHOW_ARTIFACT_MAX_BYTES_PER_ORG` (افتراضيًا 50 GiB) لمجموع الـ artifacts اللي لسه ماانتهتش: الـ `PUT` اللي مايكفيهوش المكان بيترفض قبل القراية، والـ commit بيتأكد تاني تحت قفل للمؤسسة (`ARTIFACT_QUOTA_EXCEEDED`).
+- **(Low) ملفات يتيمة:** صف الـ blob بيتكتب قبل الـ `rename` جوه نفس الـ transaction، والـ sweep بيمسح أي ملف مالوش صف وعدّى عليه 6 ساعات، تحت نفس القفل.
+- **(Low) run اتمسح:** التنزيل بيتأكد إن الـ run مش ممسوح.
+- **(Low) احتفاظ الـ logs:** `org.security` (المالك بس)، وخطوة تانية جديدة، وأقل حاجة 7 أيام، والتغيير وسطر الـ audit في نفس الـ transaction (`eventbus.Audited.Tx`، والـ audit بيكتب جوه transaction اللي نادى).
+- **الـ scope والإخلاء:**
+  - الـ scope بقى فيه الـ repository (`repo:<id>/branch:main`)، فربط المشروع بمستودع تاني بيبدأ من غير cache.
+  - الإخلاء بيبدأ بالـ scopes التانية، ومدخلات الفرع الافتراضي عمرها ما بتتمسح عشان فرع أو tag أو PR، والمدخل اللي مالقاش مكان بعد كده مابيتحفظش.
+  - التنفيذ اليدوي أو من الـ API لـ sha مش آخر sha وصل للـ ref ده بيقرا بس، فآخر commit في الفرع بس هو اللي بيكتب `branch:main`.
+- **قواعد:** أخطاء `io.Copy` و`Write` و`Set*Deadline` بقت متعالجة، وأخطاء القاعدة في التنزيل مابقتش `BLOB_NOT_FOUND`، والـ runner بيتأكد من أي digest من السيرفر بـ `jobspec.ValidDigest` قبل ما يستخدمه.
