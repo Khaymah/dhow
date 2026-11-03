@@ -25,7 +25,7 @@ func tableExists(t *testing.T, pool *pgxpool.Pool, name string) bool {
 func TestMigrationsGoUpAndDownCleanly(t *testing.T) {
 	pool := dbtest.NewEmptyPool(t)
 	ctx := context.Background()
-	m, err := migrations.NewMigrator(pool)
+	m, err := migrations.NewMigrator(pool, migrations.Binary{})
 	require.NoError(t, err)
 	defer func() { require.NoError(t, m.Close()) }()
 
@@ -49,9 +49,9 @@ func TestMigrationsGoUpAndDownCleanly(t *testing.T) {
 	require.NoError(t, m.DownTo(ctx, 0))
 	_, err = m.Up(ctx)
 	require.NoError(t, err)
-	current, err := m.Current(ctx)
+	state, err := m.State(ctx)
 	require.NoError(t, err)
-	assert.True(t, current)
+	assert.Equal(t, migrations.SchemaCurrent, state)
 }
 
 func TestEveryTableFollowsTheConventions(t *testing.T) {

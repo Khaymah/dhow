@@ -14,7 +14,7 @@ import (
 func TestTheJobsMigrationRollsBackCompletely(t *testing.T) {
 	pool := dbtest.NewEmptyPool(t)
 	ctx := context.Background()
-	m, err := migrations.NewMigrator(pool)
+	m, err := migrations.NewMigrator(pool, migrations.Binary{})
 	require.NoError(t, err)
 	defer func() { require.NoError(t, m.Close()) }()
 	_, err = m.Up(ctx)

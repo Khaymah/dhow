@@ -36,7 +36,7 @@ func Run(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	migrator, err := migrations.NewMigrator(pool)
+	migrator, err := migrations.NewMigrator(pool, schemaBinary(cfg, build))
 	if err != nil {
 		return err
 	}
@@ -45,11 +45,14 @@ func Run(ctx context.Context) error {
 			log.Warn("close migrator", "error", err)
 		}
 	}()
-	version, err := migrator.Up(ctx)
+	if err := PrepareSchema(ctx, migrator, log); err != nil {
+		return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
+	}
+	stopHeartbeat, err := StartHeartbeat(ctx, pool, ServerIdentity(build, migrator.Latest(), cfg.InstanceID, os.Hostname, log), log)
 	if err != nil {
 		return err
 	}
-	log.Info("database schema is current", "version", version)
+	defer stopHeartbeat()
 
 	wired, err := Build(ctx, Infra{Config: cfg, Log: log, Pool: pool, Migrations: migrator, Build: build})
 	if err != nil {

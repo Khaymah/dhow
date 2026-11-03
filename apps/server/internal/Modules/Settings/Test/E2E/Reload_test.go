@@ -18,6 +18,7 @@ import (
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	settingspec "github.com/Khaymah/dhow/apps/server/internal/Config/Settings"
 	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	dbtest "github.com/Khaymah/dhow/apps/server/internal/Database/Testing"
 	"github.com/Khaymah/dhow/internal/buildinfo"
 	"github.com/Khaymah/dhow/internal/logging"
@@ -62,7 +63,9 @@ func TestASaveReachesEveryInstanceOnTheDatabaseWithoutARestart(t *testing.T) {
 
 type currentMigrations struct{}
 
-func (currentMigrations) Current(context.Context) (bool, error) { return true, nil }
+func (currentMigrations) State(context.Context) (migrations.SchemaState, error) {
+	return migrations.SchemaCurrent, nil
+}
 
 func build(t *testing.T, secret []byte, env settingspec.Raw, pool *pgxpool.Pool) error {
 	t.Helper()

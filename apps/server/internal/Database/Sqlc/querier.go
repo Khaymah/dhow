@@ -122,6 +122,7 @@ type Querier interface {
 	GetRunner(ctx context.Context, arg GetRunnerParams) (Runner, error)
 	GetRunnerIdentity(ctx context.Context, id uuid.UUID) (GetRunnerIdentityRow, error)
 	GetRunnerNames(ctx context.Context, arg GetRunnerNamesParams) ([]GetRunnerNamesRow, error)
+	GetSchemaFloor(ctx context.Context) (string, error)
 	GetTeam(ctx context.Context, arg GetTeamParams) (GetTeamRow, error)
 	GetTokenMembership(ctx context.Context, arg GetTokenMembershipParams) (GetTokenMembershipRow, error)
 	GetUsableSetupToken(ctx context.Context, arg GetUsableSetupTokenParams) (GetUsableSetupTokenRow, error)
@@ -190,9 +191,11 @@ type Querier interface {
 	ListEnvironmentReviewers(ctx context.Context, arg ListEnvironmentReviewersParams) ([]ListEnvironmentReviewersRow, error)
 	ListEnvironments(ctx context.Context, arg ListEnvironmentsParams) ([]Environment, error)
 	ListInstanceSettings(ctx context.Context) ([]ListInstanceSettingsRow, error)
+	ListInvalidIndexDrops(ctx context.Context, names []string) ([]string, error)
 	ListJobAttempts(ctx context.Context, arg ListJobAttemptsParams) ([]JobAttempt, error)
 	ListJobSteps(ctx context.Context, arg ListJobStepsParams) ([]AttemptStep, error)
 	ListJobs(ctx context.Context, arg ListJobsParams) ([]ListJobsRow, error)
+	ListLiveServerInstances(ctx context.Context, staleAfterSeconds float64) ([]ListLiveServerInstancesRow, error)
 	ListLogChunks(ctx context.Context, arg ListLogChunksParams) ([]ListLogChunksRow, error)
 	ListMemberRoles(ctx context.Context, arg ListMemberRolesParams) ([]ListMemberRolesRow, error)
 	ListMembers(ctx context.Context, arg ListMembersParams) ([]ListMembersRow, error)
@@ -305,6 +308,7 @@ type Querier interface {
 	RecordPasskeyUse(ctx context.Context, arg RecordPasskeyUseParams) (int64, error)
 	RefundRunnerThrottle(ctx context.Context, arg RefundRunnerThrottleParams) error
 	RefundThrottle(ctx context.Context, arg RefundThrottleParams) error
+	RegisterServerInstance(ctx context.Context, arg RegisterServerInstanceParams) (uuid.UUID, error)
 	RehashUserPassword(ctx context.Context, arg RehashUserPasswordParams) error
 	ReissueInvitation(ctx context.Context, arg ReissueInvitationParams) (int64, error)
 	ReleaseBlobSweepLock(ctx context.Context, lockKey int64) (bool, error)
@@ -337,6 +341,8 @@ type Querier interface {
 	RetireConfirmedTotp(ctx context.Context, arg RetireConfirmedTotpParams) (int64, error)
 	RetireExpiredInvitations(ctx context.Context, arg RetireExpiredInvitationsParams) error
 	RetireRecoveryCodes(ctx context.Context, arg RetireRecoveryCodesParams) (int64, error)
+	RetireServerInstance(ctx context.Context, id uuid.UUID) error
+	RetireStaleServerInstances(ctx context.Context, staleAfterSeconds float64) (int64, error)
 	RetireUserPasskeys(ctx context.Context, arg RetireUserPasskeysParams) (int64, error)
 	RetireUserRecoveryCodes(ctx context.Context, arg RetireUserRecoveryCodesParams) (int64, error)
 	RetireUserTotp(ctx context.Context, arg RetireUserTotpParams) (int64, error)
@@ -365,6 +371,7 @@ type Querier interface {
 	SetMfaChallengeWebauthn(ctx context.Context, arg SetMfaChallengeWebauthnParams) (int64, error)
 	SetOrganizationLogRetention(ctx context.Context, arg SetOrganizationLogRetentionParams) (SetOrganizationLogRetentionRow, error)
 	SetOrganizationSecondFactor(ctx context.Context, arg SetOrganizationSecondFactorParams) (SetOrganizationSecondFactorRow, error)
+	SetPreflightTimeouts(ctx context.Context, arg SetPreflightTimeoutsParams) error
 	SetRunDefinition(ctx context.Context, arg SetRunDefinitionParams) error
 	SetRunIssues(ctx context.Context, arg SetRunIssuesParams) error
 	SetRunSource(ctx context.Context, arg SetRunSourceParams) error
@@ -385,6 +392,7 @@ type Querier interface {
 	TouchRepositoryDelivery(ctx context.Context, arg TouchRepositoryDeliveryParams) error
 	TouchRun(ctx context.Context, id uuid.UUID) error
 	TouchRunner(ctx context.Context, arg TouchRunnerParams) error
+	TouchServerInstance(ctx context.Context, id uuid.UUID) (int64, error)
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
 	TrustedShaOnRef(ctx context.Context, arg TrustedShaOnRefParams) (bool, error)
 	TryBlobSweepLock(ctx context.Context, lockKey int64) (bool, error)

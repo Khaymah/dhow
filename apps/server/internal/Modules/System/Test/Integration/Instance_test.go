@@ -24,7 +24,7 @@ func testPool(t *testing.T) *pgxpool.Pool {
 
 func newMigrator(t *testing.T, pool *pgxpool.Pool) *migrations.Migrator {
 	t.Helper()
-	m, err := migrations.NewMigrator(pool)
+	m, err := migrations.NewMigrator(pool, migrations.Binary{})
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, m.Close()) })
 	return m
@@ -36,9 +36,9 @@ func TestMigrationsLifecycle(t *testing.T) {
 	m := newMigrator(t, pool)
 
 	require.NoError(t, m.DownTo(ctx, 0))
-	current, err := m.Current(ctx)
+	state, err := m.State(ctx)
 	require.NoError(t, err)
-	assert.False(t, current, "an empty schema is not current")
+	assert.Equal(t, migrations.SchemaPending, state, "an empty schema is not current")
 
 	var wg sync.WaitGroup
 	errs := make(chan error, 4)
@@ -46,7 +46,7 @@ func TestMigrationsLifecycle(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			mm, err := migrations.NewMigrator(pool)
+			mm, err := migrations.NewMigrator(pool, migrations.Binary{})
 			if err != nil {
 				errs <- err
 				return
@@ -66,9 +66,9 @@ func TestMigrationsLifecycle(t *testing.T) {
 	v, err := m.Up(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, m.Latest(), v, "a second Up is a no-op")
-	current, err = m.Current(ctx)
+	state, err = m.State(ctx)
 	require.NoError(t, err)
-	assert.True(t, current)
+	assert.Equal(t, migrations.SchemaCurrent, state)
 }
 
 func TestInstanceSingleton(t *testing.T) {

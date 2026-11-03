@@ -21,6 +21,8 @@ sql:
       - internal/Core/RateLimit/Queries
       - internal/Core/Settings/Queries
       - internal/Database/Retention/Queries
+      - internal/Database/Migrations/Queries
+      - internal/Core/ServerInstances/Queries
     gen:
       go:
         package: sqlc

@@ -69,7 +69,7 @@ func NewEmptyPool(t testing.TB) *pgxpool.Pool {
 func NewPool(t testing.TB) *pgxpool.Pool {
 	t.Helper()
 	pool := NewEmptyPool(t)
-	m, err := migrations.NewMigrator(pool)
+	m, err := migrations.NewMigrator(pool, migrations.Binary{})
 	require.NoError(t, err)
 	defer func() { require.NoError(t, m.Close()) }()
 	_, err = m.Up(context.Background())

@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	reCaseName      = regexp.MustCompile(`^(accept|reject)_(m[1-9])_[a-z0-9_]+\.sql$`)
+	reCaseName      = regexp.MustCompile(`^(accept|reject)_(m(?:1[01]|[1-9]))_[a-z0-9_]+\.sql$`)
 	reMigrationName = regexp.MustCompile(`^(\d+)_[a-z0-9_]+\.sql$`)
 )
 
@@ -68,7 +68,7 @@ func TestCompatCases(t *testing.T) {
 			t.Errorf("%s: verdict %q, want %q", e.Name(), got, want)
 		}
 	}
-	for n := 1; n <= 9; n++ {
+	for n := 1; n <= 11; n++ {
 		for _, kind := range []string{"accept", "reject"} {
 			if key := kind + "_m" + strconv.Itoa(n); !covered[key] {
 				t.Errorf("no %s case for M%d in %s", kind, n, dir)

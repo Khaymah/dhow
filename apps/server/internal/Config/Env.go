@@ -51,6 +51,9 @@ type Config struct {
 	Settings settingspec.Raw
 
 	OIDCProviders []OIDCProvider
+
+	OnIncompatible string
+	InstanceID     string
 }
 
 func LoadFromEnv() (Config, error) { return Load(os.Getenv) }
@@ -111,6 +114,12 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if cfg.OIDCProviders, err = loadOIDCProviders(getenv, dev); err != nil {
 		errs = append(errs, err)
+	}
+	if cfg.OnIncompatible, err = parseOnIncompatible(getenv(EnvOnIncompatible)); err != nil {
+		errs = append(errs, fmt.Errorf("%s: %w", EnvOnIncompatible, err))
+	}
+	if cfg.InstanceID, err = parseInstanceID(getenv(EnvInstanceID)); err != nil {
+		errs = append(errs, fmt.Errorf("%s: %w", EnvInstanceID, err))
 	}
 
 	if len(errs) > 0 {
