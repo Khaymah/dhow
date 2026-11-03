@@ -199,3 +199,73 @@ Each class of vulnerability found in Deploy Center v3, and the design rule in Dh
 | Notification URLs allowed SSRF and blocked the single worker | A separate notification queue with timeouts, plus an SSRF guard that checks the resolved IP |
 | An idempotency cache was not bound to the user and replayed cookies | Idempotency keys are scoped to the authenticated principal. Auth endpoints and `Set-Cookie` are never cached |
 | Coverage gates excluded files that were never loaded, and integration tests bypassed the real middleware stack | Coverage is measured over all packages. E2E tests run against the real server binary, and CI fails if a required service is missing |
+
+## 12. Threat review of the runner plane and pipelines (M3.13, M4.11)
+
+The review of 2026-11-03 covers what M3 and M4 added. Each row is one STRIDE threat (**S**poofing, **T**ampering, **R**epudiation, **I**nformation disclosure, **D**enial of service, **E**levation of privilege), the control that stops it, and the test that proves the control. GitHub and GitLab (M4.5, M4.6) are not built yet, so they are not in the review.
+
+### 12.1 Threats, controls and proofs
+
+| Area | STRIDE | Threat | Control | Proof |
+|---|---|---|---|---|
+| Runner plane | S | A stolen or copied runner identity takes jobs | Pinned Ed25519 key, 15-minute access tokens, and a runner that opens more than 3 new sessions in 10 minutes is disabled | `apps/server/internal/Modules/Runners/Test/E2E/Clone_test.go`, `Auth_test.go` |
+| Runner plane | T | A proxy or a fake server injects a job | Every lease grant is signed with the key the runner pinned at registration | `apps/runner/internal/Executor/Grant_test.go`, `FuzzVerifyGrant` |
+| Runner plane | T | A runner that lost its lease keeps writing results | Fencing tokens only grow and every mutating call carries the current one | `apps/server/internal/Modules/Jobs/Test/E2E/Fencing_test.go`, `apps/runner/internal/Executor/Fence_test.go` |
+| Runner plane | D | Killing the runner, the server or Postgres mid-job loses or doubles work | Leases, the reconciler and the runner journal; a job retries at most once, never after a mutating step began | `apps/runner/Test/Chaos/Scenarios_test.go` (`make runner-chaos`) |
+| Runner plane | E | A job escapes to the host, the runner or another job | Rootless Podman, a user-namespace range per attempt, seccomp, no capabilities, read-only root, cgroup v2 limits | `apps/runner/Test/Isolation/Escape_test.go`, `Limits_test.go`, `Leftovers_test.go` (`make runner-isolation`) |
+| Runner plane | I | A secret reaches Podman, its storage or another step | Secrets go to the agent over its control socket, as a file only during their step, and the files are swept before the exit is reported | `apps/runner/Test/Isolation/Escape_test.go` (`TestSecretsNeverReachPodman`), `apps/runner/internal/Agent/Secrets_test.go` |
+| Runner plane | T | A malformed frame from the sandbox crashes or confuses the runner | Length-prefixed protobuf frames with a size cap, decoded by one function | `apps/runner/internal/Sandbox/Wire/Wire_test.go` (`FuzzDecode`) |
+| Egress | E | A job reaches the metadata service, the LAN or loopback | No network interface but loopback; the runner's proxy resolves, checks every address and refuses private, link-local and metadata ranges | `apps/runner/Test/Isolation/Network_test.go`, `apps/runner/internal/Egress/Egress_test.go`, `FuzzProxyRequest`, `FuzzAllowlist` |
+| Pipelines | T | A YAML or CEL bomb, or a huge matrix, stalls the server | Limits on size, depth, jobs and matrix copies; CEL cost and time limits and no `matches()` | `internal/pipelinespec/fuzz_test.go` (`FuzzParse`, `FuzzCEL`, `FuzzMatrix`) |
+| Pipelines | E | A job spec from the server asks for more than the runner allows | The runner checks the spec again with `jobspec.Prepare` before anything starts | `internal/jobspec/jobspec_test.go`, `FuzzPrepare` |
+| Pipelines | T | A runner hands over a forged `.dhow.yml` for a generic repository | The server hashes the raw Git objects and follows them from the run's commit id | `apps/server/internal/Modules/Pipelines/Test/E2E/Proof_test.go`, `FuzzDefinitionProof` |
+| Pipelines | I | An output or a computed value shows a secret in the API | Derived values are `[REDACTED]` for every role, and the masker drops outputs that join into a secret | `apps/server/internal/Modules/Pipelines/Test/E2E/Redact_test.go`, `apps/runner/internal/Masking/Masker_test.go` |
+| Pipelines | D | One organization's broken runs starve the others | Per-organization queue caps and a poison run that never blocks other organizations | `apps/server/internal/Modules/Pipelines/Test/Edge/Poison_test.go`, `Starvation_test.go` |
+| Providers (generic Git) | S | A link points at a private or metadata address (SSRF) | `netguard` dials only public addresses unless `DHOW_GIT_ALLOW_PRIVATE_CIDRS` allows a range | `apps/server/internal/Modules/Sources/Test/E2E/Repository_test.go` (`TestLinkRefusesPrivateAndMetadataAddresses`) |
+| Providers (generic Git) | S | A changed host key lets a MITM serve the code | The host key is pinned only after a person confirms its fingerprint, and never automatically | `Repository_test.go` (`TestLinkAnSSHRepositoryPinsTheHostKeyOnlyAfterConfirmation`), `apps/runner/internal/Agent/Checkout/Checkout_test.go` |
+| Providers (generic Git) | I | The API shows a deploy key or a webhook secret | Both are sealed with AES-256-GCM, the secret is shown once, and the private key never | `Repository_test.go` (`TestLinkAnHTTPSRepositoryShowsTheWebhookSecretOnce`), `apps/server/internal/Modules/Sources/Test/Unit/Credential_test.go` |
+| Webhooks | S | A forged delivery starts a run | HMAC on the body in four formats, checked in constant time, the same `401` for every failure | `apps/server/internal/Modules/Sources/Test/Unit/Webhook_test.go`, `apps/server/internal/Modules/Sources/Test/E2E/Webhook_test.go`, `FuzzWebhook` |
+| Webhooks | R | A captured delivery is sent again later | Dedupe on the delivery id for 72 hours and on the body digest for 31 days; one run per commit | `Webhook_test.go` (`TestASignedPushTriggersOnceAndADuplicateDoesNothing`), `apps/server/internal/Modules/Pipelines/Test/E2E/Triggers_test.go` |
+| Webhooks | D | A flood of large or bad deliveries | Body cap, a shared byte budget, and rate limits per address, per hook and per failing hook | `Webhook_test.go` (`TestWebhookRequestLimits`, `TestFailedSignaturesAreLimitedPerHookWithoutStarvingRealDeliveries`) |
+| Checkout | I | A step or a plugin reads the checkout credential | The credential lives only in the checkout sandbox, and only for the current job of a live run on the same repository | `apps/runner/Test/Isolation/Workspace_test.go` (`TestTheCheckoutCredentialNeverReachesAUserStep`), `apps/server/internal/Modules/Pipelines/Test/E2E/Credential_test.go` |
+| Checkout | T | A force push or a ref trick checks out another commit | The commit must be in the history of the ref (`CHECKOUT_REF_MOVED` otherwise), refs and URLs are validated and passed after `--` | `Checkout_test.go`, `internal/gitref/gitref_test.go` (`FuzzRef`), `internal/gitsource/gitsource_test.go` (`FuzzCloneUrl`) |
+| Plugins | E | A plugin gets secrets or settings of other steps | A plugin gets only its inputs, `DHOW_OUTPUT`, its egress and the secrets of its own step; the manifest is checked before it starts | `apps/runner/internal/App/Checkout_test.go`, `internal/pipelinespec/build_test.go`, `apps/runner/internal/Executor/Plugin` (`FuzzManifest`, `FuzzOutputs`) |
+| Plugins | T | A plugin image changes after review | `uses:` must be pinned by digest, or the file is refused (`USES_NOT_PINNED`), and the runner refuses a tag again | `internal/pipelinespec/pipelinespectest/cases.go`, `internal/jobspec/jobspec_test.go` |
+| Artifacts | T | A tampered artifact reaches the next job | SHA-256 checked on the server and again on the runner before unpacking | `apps/server/internal/Modules/Artifacts/Test/E2E/Artifacts_test.go` |
+| Artifacts | E | An archive writes outside the workspace | The unpacker refuses `..`, absolute paths, escaping links, devices and FIFOs, and runs in the job's user namespace | `apps/runner/internal/Sandbox/Archive/Archive_test.go` (`FuzzUnpack`), `apps/runner/Test/Isolation/Transfer_test.go` |
+| Artifacts | I | A runner reads a blob of another organization | A download needs a grant for that exact digest, a live lease and the current fencing token | `Artifacts_test.go`, `apps/server/internal/Modules/Artifacts/Test/E2E/Review_test.go` |
+| Cache | T | A branch or a pull request poisons the cache of `main` | Scopes per branch, tag and pull request; a pull request never writes `main`, a fork never writes | `apps/server/internal/Modules/Artifacts/Test/E2E/Cache_test.go` |
+| Cache | D | Cache entries fill the disk | A cap per project with least-recently-used removal that never removes the default branch for another scope | `Cache_test.go`, `internal/cachekey` (`FuzzRender`), `internal/pathglob` (`FuzzMatchPattern`) |
+| Forks | E | A fork pull request changes the pipeline, the images or the egress | The file comes from the base commit, the run waits for approval, and it gets no secrets or environments | `apps/server/internal/Modules/Pipelines/Test/E2E/Control_test.go`, `Checkout_test.go` (`TestAForkRunReadsTheFileOfTheBase`) |
+| Forks | T | A fork's artifact feeds a deploy | Artifacts of a fork run are `Untrusted` and never feed a deploy | `Artifacts_test.go` (`TestArtifactsOfAForkRunAreUntrustedAndNeverFeedADeploy`) |
+| Dev stack runner | E | The privileged development container is used in production | ADR-0079: the Podman runner runs `privileged` for development only, and the docs say production never runs that way | Accepted risk (12.2) |
+| Update plan | T | A malicious update reaches every server | ADR-0077: a TUF feed with keys pinned in the binary, rollback and freeze protection, and keys kept offline | Not built yet (12.2) |
+| All of the above | I | A credential is written in clear to the database, a log or a container store | Write-only secrets, sealed at rest, masked on the stream | `deploy/m4-demo/leak-sweep.sh` (12.3), `apps/server/internal/Modules/Pipelines/Test/E2E/Checkout_test.go` (`TestTheKeyCheckFindsAKeyPlantedInALogChunk`) |
+
+### 12.2 Accepted risks and gaps
+
+- **The update targets key alone can ship an update (ADR-0077).** Sabry accepted it: one key that never leaves two encrypted USB drives and is unlocked only on an offline system. The updater is not built yet, so nothing tests it.
+- **The dev stack runner (ADR-0079)** runs in a `privileged` container without the unit's hardening. One local privilege escalation separates a job that escapes to `dhow-runner` from root on the Docker machine. It is for development only.
+- **No secret store until M5.** A spec that references secrets fails with `SECRETS_UNAVAILABLE`, so the secret paths of plugins and steps are proven with the runner's tests and fakes, not end to end.
+- **GitHub and GitLab (M4.5, M4.6) are not built.** The `providers` CI job is a skeleton, skipped until its environment is set up.
+- **The sandbox:** no I/O limit, 32-bit `socketcall` still allowed, cgroup v1 and SELinux enforcing not supported (ADR-0067).
+- **Masking:** a secret shorter than 4 characters cannot be masked, and the job log says so.
+- **Read access of a runner:** a runner that runs a checkout job gets the repository's read-only deploy key for that job. A compromised runner host can keep it until the key is rotated.
+- **Cache trust:** whoever can push to a branch can fill that branch's cache; this is the same trust as the branch's code.
+- **Audit:** `runner.revoked` is published after the commit, so a crash between them loses the audit event (no outbox yet).
+- **External review:** moved to M9 (ADR-0040). The checklist below is what it starts from.
+
+### 12.3 Credential leak sweep
+
+`deploy/m4-demo/leak-sweep.sh` runs at the end of `deploy/m4-demo/run.sh`. After a full flow (a linked repository, a webhook, a checkout, an artifact through `needs` and a cache hit), it collects `pg_dump`, the server and runner logs, the runner's state directory with its Podman storage, the server's blob store and the systemd journal when there is one. A test with the `leaksweep` build tag opens the sealed deploy keys and webhook secrets with the server key and looks for each credential in every file: the deploy key (whole, and its private seed as raw bytes, hex and base64 at every alignment), the webhook secret, the API token and the runner registration token. It prints only the name of a credential and the file it was found in, never the value.
+
+### 12.4 Checklist for the external review
+
+- Run `make runner-isolation` and `make runner-chaos` on a cgroup v2 host, and read the escape probes in `apps/runner/Test/Isolation/Probe`.
+- Try to escape the egress proxy: IPv6 forms, DNS rebinding, `CONNECT` to an address, and redirects.
+- Forge, replay and resize webhooks against the four signature formats.
+- Try to get the checkout credential from a step, a plugin, an artifact or the cache.
+- Hand the server forged Git objects for `.dhow.yml`, and tar files that leave the workspace.
+- Check that fork pull requests never get secrets, environments or a write to the cache.
+- Run `deploy/m4-demo/run.sh` and read its leak sweep.
+- Read the accepted risks above and say which ones should not be accepted.

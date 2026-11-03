@@ -199,3 +199,73 @@
 | روابط الإشعارات سمحت بـ SSRF وعطّلت العامل الوحيد | طابور إشعارات منفصل بمهل، مع حماية SSRF تفحص عنوان IP بعد الحل |
 | cache لمنع التكرار لم يُربط بالمستخدم وأعاد إرسال الكوكيز | مفاتيح منع التكرار محصورة في الهوية المسجّلة الدخول. مسارات الدخول و`Set-Cookie` لا تُخزَّن مؤقتًا أبدًا |
 | بوابات التغطية استثنت ملفات لم تُحمَّل أبدًا، واختبارات التكامل تجاوزت سلسلة الـ middleware الحقيقية | نقيس التغطية على كل الحزم. اختبارات E2E تعمل على الملف التنفيذي الحقيقي للسيرفر، ويفشل CI إذا غابت خدمة مطلوبة |
+
+## 12. مراجعة التهديدات لقناة أجهزة التشغيل وخطوات النشر (M3.13، M4.11)
+
+مراجعة 2026-11-03 تغطي ما أضافته M3 وM4. كل صف تهديد واحد بتصنيف STRIDE (**S** انتحال، **T** تلاعب، **R** إنكار، **I** كشف معلومات، **D** تعطيل الخدمة، **E** رفع الصلاحيات)، والضابط الذي يمنعه، والاختبار الذي يثبت الضابط. GitHub وGitLab (M4.5 وM4.6) لم يُبنيا بعد، فهما خارج المراجعة.
+
+### 12.1 التهديدات والضوابط والإثبات
+
+| الجزء | STRIDE | التهديد | الضابط | الإثبات |
+|---|---|---|---|---|
+| قناة أجهزة التشغيل | S | هوية جهاز تشغيل مسروقة أو منسوخة تأخذ تشغيلات | مفتاح Ed25519 مثبّت، ورموز وصول لمدة 15 دقيقة، وجهاز التشغيل الذي يفتح أكثر من 3 جلسات جديدة في 10 دقائق يتوقف | `apps/server/internal/Modules/Runners/Test/E2E/Clone_test.go`، `Auth_test.go` |
+| قناة أجهزة التشغيل | T | وسيط أو سيرفر مزيّف يدسّ تشغيلًا | كل منحة حجز موقّعة بالمفتاح الذي ثبّته جهاز التشغيل عند التسجيل | `apps/runner/internal/Executor/Grant_test.go`، `FuzzVerifyGrant` |
+| قناة أجهزة التشغيل | T | جهاز تشغيل فقد حجزه يستمر في كتابة النتائج | رموز الـ fencing تزيد فقط، وكل طلب يغيّر الحالة يحمل الرمز الحالي | `apps/server/internal/Modules/Jobs/Test/E2E/Fencing_test.go`، `apps/runner/internal/Executor/Fence_test.go` |
+| قناة أجهزة التشغيل | D | إيقاف جهاز التشغيل أو السيرفر أو Postgres في منتصف التشغيل يضيّع العمل أو يكرّره | الحجوزات والـ reconciler وسجل جهاز التشغيل؛ التشغيل يُعاد مرة واحدة على الأكثر، ولا يُعاد أبدًا بعد بدء خطوة تغيّر شيئًا | `apps/runner/Test/Chaos/Scenarios_test.go` (`make runner-chaos`) |
+| قناة أجهزة التشغيل | E | تشغيل يهرب إلى الجهاز أو جهاز التشغيل أو تشغيل آخر | Podman بدون root، ونطاق user namespace لكل محاولة، وseccomp، وبلا capabilities، وجذر للقراءة فقط، وحدود cgroup v2 | `apps/runner/Test/Isolation/Escape_test.go`، `Limits_test.go`، `Leftovers_test.go` (`make runner-isolation`) |
+| قناة أجهزة التشغيل | I | سرّ يصل إلى Podman أو تخزينه أو خطوة أخرى | الأسرار تصل إلى الـ agent عبر قناة التحكم، كملف أثناء خطوتها فقط، وتُمسح الملفات قبل إعلان نهاية الخطوة | `apps/runner/Test/Isolation/Escape_test.go` (`TestSecretsNeverReachPodman`)، `apps/runner/internal/Agent/Secrets_test.go` |
+| قناة أجهزة التشغيل | T | إطار تالف من البيئة المعزولة يوقف جهاز التشغيل أو يربكه | إطارات protobuf بطول في أولها وحد للحجم، تفكّها دالة واحدة | `apps/runner/internal/Sandbox/Wire/Wire_test.go` (`FuzzDecode`) |
+| الاتصال بالخارج | E | تشغيل يصل إلى خدمة metadata أو الشبكة المحلية أو loopback | لا واجهة شبكة غير loopback؛ وكيل جهاز التشغيل يحل الاسم ويفحص كل عنوان ويرفض النطاقات الخاصة والمحلية وmetadata | `apps/runner/Test/Isolation/Network_test.go`، `apps/runner/internal/Egress/Egress_test.go`، `FuzzProxyRequest`، `FuzzAllowlist` |
+| خطوات النشر | T | ملف YAML أو تعبير CEL ضخم، أو matrix كبير جدًا، يعطّل السيرفر | حدود للحجم والعمق وعدد التشغيلات ونسخ الـ matrix؛ وحدود تكلفة ووقت لـ CEL، وبلا `matches()` | `internal/pipelinespec/fuzz_test.go` (`FuzzParse`، `FuzzCEL`، `FuzzMatrix`) |
+| خطوات النشر | E | مواصفات تشغيل من السيرفر تطلب أكثر مما يسمح به جهاز التشغيل | جهاز التشغيل يفحص المواصفات مرة أخرى بـ `jobspec.Prepare` قبل أن يبدأ أي شيء | `internal/jobspec/jobspec_test.go`، `FuzzPrepare` |
+| خطوات النشر | T | جهاز تشغيل يسلّم ملف `.dhow.yml` مزوّرًا لمستودع Git عام | السيرفر يحسب hash لكائنات Git الخام ويتتبعها من رقم commit التنفيذ | `apps/server/internal/Modules/Pipelines/Test/E2E/Proof_test.go`، `FuzzDefinitionProof` |
+| خطوات النشر | I | ناتج أو قيمة محسوبة تُظهر سرًا في الـ API | القيم المحسوبة تظهر `[REDACTED]` لكل الأدوار، والإخفاء يحذف النواتج التي تكوّن سرًا عند جمعها | `apps/server/internal/Modules/Pipelines/Test/E2E/Redact_test.go`، `apps/runner/internal/Masking/Masker_test.go` |
+| خطوات النشر | D | تنفيذات معطوبة لمؤسسة واحدة تعطّل باقي المؤسسات | حدود للطابور لكل مؤسسة، والتنفيذ المعطوب لا يوقف مؤسسات أخرى أبدًا | `apps/server/internal/Modules/Pipelines/Test/Edge/Poison_test.go`، `Starvation_test.go` |
+| المزوّدون (Git العام) | S | ربط يشير إلى عنوان خاص أو عنوان metadata (SSRF) | `netguard` يتصل بالعناوين العامة فقط، إلا إذا سمح `DHOW_GIT_ALLOW_PRIVATE_CIDRS` بنطاق | `apps/server/internal/Modules/Sources/Test/E2E/Repository_test.go` (`TestLinkRefusesPrivateAndMetadataAddresses`) |
+| المزوّدون (Git العام) | S | مفتاح جهاز متغيّر يسمح لوسيط بتقديم الكود | مفتاح الجهاز لا يُثبّت إلا بعد أن يؤكد شخص بصمته، ولا يُثبّت تلقائيًا أبدًا | `Repository_test.go` (`TestLinkAnSSHRepositoryPinsTheHostKeyOnlyAfterConfirmation`)، `apps/runner/internal/Agent/Checkout/Checkout_test.go` |
+| المزوّدون (Git العام) | I | الـ API يُظهر مفتاح المستودع أو سر الإشعارات | الاثنان مختومان بـ AES-256-GCM، والسر يظهر مرة واحدة، والمفتاح الخاص لا يظهر أبدًا | `Repository_test.go` (`TestLinkAnHTTPSRepositoryShowsTheWebhookSecretOnce`)، `apps/server/internal/Modules/Sources/Test/Unit/Credential_test.go` |
+| الـ webhooks | S | إشعار مزوّر يبدأ تنفيذًا | HMAC على المحتوى بأربع صيغ، بمقارنة ثابتة الوقت، ونفس الرد `401` لكل فشل | `apps/server/internal/Modules/Sources/Test/Unit/Webhook_test.go`، `apps/server/internal/Modules/Sources/Test/E2E/Webhook_test.go`، `FuzzWebhook` |
+| الـ webhooks | R | إشعار ملتقط يُرسل مرة أخرى لاحقًا | منع التكرار برقم الإشعار لمدة 72 ساعة وبـ digest المحتوى لمدة 31 يومًا؛ تنفيذ واحد لكل commit | `Webhook_test.go` (`TestASignedPushTriggersOnceAndADuplicateDoesNothing`)، `apps/server/internal/Modules/Pipelines/Test/E2E/Triggers_test.go` |
+| الـ webhooks | D | سيل من الإشعارات الكبيرة أو الخاطئة | حد للمحتوى، وميزانية بايتات مشتركة، وحدود طلبات لكل عنوان ولكل webhook ولكل webhook يفشل | `Webhook_test.go` (`TestWebhookRequestLimits`، `TestFailedSignaturesAreLimitedPerHookWithoutStarvingRealDeliveries`) |
+| سحب الكود | I | خطوة أو إضافة تقرأ بيانات دخول سحب الكود | بيانات الدخول موجودة في بيئة سحب الكود فقط، وللتشغيل الحالي فقط من تنفيذ مفتوح على نفس المستودع | `apps/runner/Test/Isolation/Workspace_test.go` (`TestTheCheckoutCredentialNeverReachesAUserStep`)، `apps/server/internal/Modules/Pipelines/Test/E2E/Credential_test.go` |
+| سحب الكود | T | force push أو حيلة في الـ ref تسحب commit آخر | الـ commit يجب أن يكون في تاريخ الـ ref (وإلا `CHECKOUT_REF_MOVED`)، ونتحقق من الـ refs والعناوين ونمررها بعد `--` | `Checkout_test.go`، `internal/gitref/gitref_test.go` (`FuzzRef`)، `internal/gitsource/gitsource_test.go` (`FuzzCloneUrl`) |
+| الإضافات | E | إضافة تحصل على أسرار أو إعدادات خطوات أخرى | الإضافة تحصل فقط على مدخلاتها و`DHOW_OUTPUT` واتصالها بالخارج وأسرار خطوتها؛ ونفحص الـ manifest قبل أن تبدأ | `apps/runner/internal/App/Checkout_test.go`، `internal/pipelinespec/build_test.go`، `apps/runner/internal/Executor/Plugin` (`FuzzManifest`، `FuzzOutputs`) |
+| الإضافات | T | صورة الإضافة تتغير بعد مراجعتها | `uses:` يجب أن يُثبّت بالـ digest وإلا يُرفض الملف (`USES_NOT_PINNED`)، وجهاز التشغيل يرفض الـ tag مرة أخرى | `internal/pipelinespec/pipelinespectest/cases.go`، `internal/jobspec/jobspec_test.go` |
+| الملفات الناتجة | T | ملف ناتج متلاعب به يصل إلى التشغيل التالي | نفحص SHA-256 في السيرفر ثم في جهاز التشغيل قبل الفك | `apps/server/internal/Modules/Artifacts/Test/E2E/Artifacts_test.go` |
+| الملفات الناتجة | E | أرشيف يكتب خارج مساحة العمل | الفك يرفض `..` والمسارات المطلقة والروابط التي تخرج والأجهزة وFIFO، ويعمل في user namespace التشغيل | `apps/runner/internal/Sandbox/Archive/Archive_test.go` (`FuzzUnpack`)، `apps/runner/Test/Isolation/Transfer_test.go` |
+| الملفات الناتجة | I | جهاز تشغيل يقرأ ملفًا لمؤسسة أخرى | التنزيل يحتاج إلى منحة لهذا الـ digest بالضبط، وحجز مفتوح، ورمز الـ fencing الحالي | `Artifacts_test.go`، `apps/server/internal/Modules/Artifacts/Test/E2E/Review_test.go` |
+| الـ cache | T | فرع أو pull request يفسد cache الفرع `main` | نطاق لكل فرع وtag وpull request؛ الـ pull request لا يكتب في `main` أبدًا، والـ fork لا يكتب أبدًا | `apps/server/internal/Modules/Artifacts/Test/E2E/Cache_test.go` |
+| الـ cache | D | عناصر الـ cache تملأ القرص | حد لكل مشروع يحذف الأقل استخدامًا مؤخرًا، ولا يحذف الفرع الأساسي لصالح نطاق آخر أبدًا | `Cache_test.go`، `internal/cachekey` (`FuzzRender`)، `internal/pathglob` (`FuzzMatchPattern`) |
+| الـ forks | E | pull request من fork يغيّر خطوات النشر أو الصور أو الاتصال بالخارج | الملف يأتي من commit الأساس، والتنفيذ ينتظر الموافقة، وبلا أسرار أو بيئات | `apps/server/internal/Modules/Pipelines/Test/E2E/Control_test.go`، `Checkout_test.go` (`TestAForkRunReadsTheFileOfTheBase`) |
+| الـ forks | T | ملف ناتج من fork يصل إلى نشر | الملفات الناتجة من تنفيذ fork تُعلَّم `Untrusted` ولا تصل إلى نشر أبدًا | `Artifacts_test.go` (`TestArtifactsOfAForkRunAreUntrustedAndNeverFeedADeploy`) |
+| جهاز التشغيل في حزمة التطوير | E | حاوية التطوير الـ privileged تُستخدم في الإنتاج | ADR-0079: جهاز تشغيل Podman يعمل `privileged` للتطوير فقط، والوثائق تقول إن الإنتاج لا يعمل هكذا أبدًا | خطر مقبول (12.2) |
+| خطة التحديث | T | تحديث خبيث يصل إلى كل السيرفرات | ADR-0077: feed بـ TUF بمفاتيح مثبّتة في الملف التنفيذي، وحماية من الرجوع لنسخة أقدم ومن التجميد، ومفاتيح محفوظة بلا شبكة | لم يُبنَ بعد (12.2) |
+| كل ما سبق | I | بيانات دخول تُكتب كنص واضح في قاعدة البيانات أو سجل أو تخزين الحاويات | الأسرار للكتابة فقط، ومختومة عند التخزين، ومخفية في السجل المباشر | `deploy/m4-demo/leak-sweep.sh` (12.3)، `apps/server/internal/Modules/Pipelines/Test/E2E/Checkout_test.go` (`TestTheKeyCheckFindsAKeyPlantedInALogChunk`) |
+
+### 12.2 المخاطر المقبولة والفجوات
+
+- **مفتاح targets وحده يكفي لنشر تحديث (ADR-0077).** وافق Sabry على ذلك: مفتاح واحد لا يخرج أبدًا من قرصي USB مشفّرين، ولا يُفتح إلا على نظام بلا شبكة. أداة التحديث لم تُبنَ بعد، فلا يوجد اختبار لها.
+- **جهاز التشغيل في حزمة التطوير (ADR-0079)** يعمل في حاوية `privileged` بدون تقوية الـ unit. بين تشغيل يهرب إلى `dhow-runner` وبين root على جهاز Docker ثغرة رفع صلاحيات محلية واحدة. هذا للتطوير فقط.
+- **لا يوجد مخزن أسرار حتى M5.** المواصفات التي تشير إلى أسرار تفشل بـ `SECRETS_UNAVAILABLE`، لذلك نثبت مسارات الأسرار في الإضافات والخطوات باختبارات جهاز التشغيل والبدائل الوهمية، لا من البداية إلى النهاية.
+- **GitHub وGitLab (M4.5 وM4.6) لم يُبنيا.** job `providers` في CI هيكل فقط، ويُتخطّى حتى تُجهَّز بيئته.
+- **البيئة المعزولة:** لا حد للـ I/O، و`socketcall` على 32-bit ما زال مسموحًا، وcgroup v1 وSELinux بوضع enforcing غير مدعومين (ADR-0067).
+- **الإخفاء:** السر الأقصر من 4 أحرف لا يمكن إخفاؤه، وسجل التشغيل يقول ذلك.
+- **قراءة جهاز التشغيل للمستودع:** جهاز التشغيل الذي ينفذ تشغيلًا فيه سحب كود يحصل على مفتاح المستودع للقراءة فقط لهذا التشغيل. جهاز مخترَق يستطيع الاحتفاظ به حتى يتغيّر المفتاح.
+- **الثقة في الـ cache:** من يستطيع الرفع إلى فرع يستطيع ملء cache هذا الفرع؛ وهذه نفس الثقة في كود الفرع.
+- **سجل الأحداث:** `runner.revoked` يُنشر بعد الـ commit، فتوقف العملية بينهما يضيّع حدث السجل (لا يوجد outbox بعد).
+- **المراجعة الخارجية:** انتقلت إلى M9 (ADR-0040). القائمة التالية هي نقطة بدايتها.
+
+### 12.3 البحث عن تسريب بيانات الدخول
+
+`deploy/m4-demo/leak-sweep.sh` يعمل في آخر `deploy/m4-demo/run.sh`. بعد مسار كامل (مستودع مربوط، وwebhook، وسحب كود، وملف ناتج عبر `needs`، وإصابة في الـ cache) يجمع `pg_dump`، وسجلات السيرفر وجهاز التشغيل، ومجلد حالة جهاز التشغيل مع تخزين Podman، ومخزن ملفات السيرفر، وسجل systemd إن وُجد. ثم يفتح اختبار بالوسم `leaksweep` مفاتيح المستودعات وأسرار الإشعارات المختومة بمفتاح السيرفر، ويبحث عن كل بيانات دخول في كل ملف: مفتاح المستودع (كاملًا، وبذرته الخاصة كبايتات خام وhex وbase64 بكل محاذاة)، وسر الإشعارات، ومفتاح الـ API، ورمز تسجيل جهاز التشغيل. ولا يطبع إلا اسم بيانات الدخول والملف الذي وُجدت فيه، ولا يطبع القيمة أبدًا.
+
+### 12.4 قائمة فحص للمراجعة الخارجية
+
+- شغّل `make runner-isolation` و`make runner-chaos` على جهاز بـ cgroup v2، واقرأ محاولات الهروب في `apps/runner/Test/Isolation/Probe`.
+- حاول الخروج من وكيل الاتصال بالخارج: صيغ IPv6، وDNS rebinding، و`CONNECT` إلى عنوان، والتحويلات.
+- زوّر الـ webhooks وأعد إرسالها وغيّر حجمها مع صيغ التوقيع الأربع.
+- حاول الحصول على بيانات دخول سحب الكود من خطوة أو إضافة أو ملف ناتج أو الـ cache.
+- سلّم السيرفر كائنات Git مزوّرة لملف `.dhow.yml`، وملفات tar تخرج من مساحة العمل.
+- تأكد أن pull requests من الـ forks لا تحصل أبدًا على أسرار أو بيئات أو كتابة في الـ cache.
+- شغّل `deploy/m4-demo/run.sh` واقرأ نتيجة البحث عن التسريب.
+- اقرأ المخاطر المقبولة أعلاه وقل أيها لا يجب قبوله.
