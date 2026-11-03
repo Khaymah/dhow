@@ -75,6 +75,13 @@ func KeysDiscardedEvent(tx *sqlc.Queries, versions []int32, dataKeys int64) even
 	return ev
 }
 
+func KeysRekeyedEvent(superseded, resealed, destroyed int64) eventbus.Event {
+	return keysEvent(eventbus.SystemKeysRekeyed, map[string]string{
+		"Superseded": strconv.FormatInt(superseded, 10), "Resealed": strconv.FormatInt(resealed, 10),
+		"Destroyed": strconv.FormatInt(destroyed, 10), eventbus.SeverityKey: eventbus.SeverityHigh,
+	})
+}
+
 func keysEvent(name string, data map[string]string) eventbus.Event {
 	return eventbus.Event{Name: name, Payload: eventbus.Audited{TargetType: "keyring", Data: data}}
 }

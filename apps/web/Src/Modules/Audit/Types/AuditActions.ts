@@ -83,6 +83,7 @@ export const AUDIT_ACTIONS: Readonly<Record<string, IAuditAction>> = {
   'system.keys.activated': { Icon: 'key', Bad: false },
   'system.keys.exported': { Icon: 'key', Bad: false },
   'system.keys.discarded': { Icon: 'alert', Bad: true },
+  'system.keys.rekeyed': { Icon: 'key', Bad: false },
 };
 
 const GROUPS = ['auth', 'identity', 'runner', 'job', 'project', 'system'] as const;

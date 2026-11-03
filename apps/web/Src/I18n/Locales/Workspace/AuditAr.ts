@@ -11,6 +11,7 @@ export const AuditAr = {
   'audit.action.system.keys.activated': 'تفعيل إصدار جديد من مفتاح التغليف',
   'audit.action.system.keys.exported': 'تصدير سلسلة المفاتيح',
   'audit.action.system.keys.discarded': 'مسح الأسرار التي لا يمكن فتحها',
+  'audit.action.system.keys.rekeyed': 'تغيير مفاتيح البيانات وإعادة تشفير كل القيم',
   'audit.action.auth.mfa_pending': 'كلمة سر صحيحة بانتظار الخطوة الثانية',
   'audit.action.auth.mfa_failed': 'فشل الخطوة الثانية',
   'audit.action.auth.recovery_code_used': 'استخدام كود طوارئ',

@@ -27,7 +27,7 @@ var allowedDataKeys = map[string]struct{}{
 	"AllowedRefsCount": {}, "AllowedRefsDigest": {}, "AllowedRefsFrom": {}, "AllowedRefsTo": {},
 	"AllowedPluginsCount": {}, "AllowedPluginsDigest": {}, "AllowedPluginsFrom": {}, "AllowedPluginsTo": {},
 	"ReviewersCount": {}, "ReviewersDigest": {}, "ReviewersAdded": {}, "ReviewersRemoved": {}, "ReasonDigest": {}, "Truncated": {},
-	"KekVersions": {}, "DataKeys": {},
+	"KekVersions": {}, "DataKeys": {}, "Superseded": {}, "Resealed": {}, "Destroyed": {},
 }
 
 var credentialMarkers = []string{config.APITokenPrefix, config.RunnerAccessTokenPrefix, config.RunnerRegistrationTokenPrefix}

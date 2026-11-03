@@ -75,6 +75,8 @@ func TestParseKeysArgs(t *testing.T) {
 		{"activate", "2"},
 		{"activate", "2", "--file", "/k"},
 		{"export", "--recipient", "age1x", "--out", "-"},
+		{"rekey"},
+		{"rekey", "--grace", "0s", "--file", "/k"},
 	}
 	for _, args := range good {
 		_, err := app.ParseKeysArgs(args)
@@ -94,6 +96,9 @@ func TestParseKeysArgs(t *testing.T) {
 		{"export", "--out", "x"},
 		{"generate", "--recipient", "age1x"},
 		{"status", "--discard-unreadable"},
+		{"rekey", "--grace", "-1s"},
+		{"rekey", "now"},
+		{"activate", "2", "--grace", "1s"},
 	}
 	for _, args := range bad {
 		_, err := app.ParseKeysArgs(args)
