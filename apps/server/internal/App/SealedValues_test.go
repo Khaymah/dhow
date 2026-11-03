@@ -238,7 +238,7 @@ var notSealed = map[string]string{
 	"PipelineRuns.DefinitionDigest": "digest", "WebhookDeliveries.PayloadDigest": "digest",
 	"Passkeys.Aaguid": "public", "Passkeys.CredentialId": "public", "Passkeys.PublicKey": "public key", "Users.WebauthnHandle": "public",
 	"Runners.EncryptionPublicKey": "public key", "Runners.SigningPublicKey": "public key", "RunnerSessions.ChallengeNonce": "public nonce",
-	"LogChunks.Data": "job logs, masked by the runner",
+	"LogChunks.Data":   "job logs, masked by the runner",
 	"DataKeys.Wrapped": "the keyring wraps it", "KeyEncryptionKeys.CheckValue": "an HMAC of the KEK",
 	"GitConnections.TokenSealed": "nothing writes it until M4.6, which must register it",
 }

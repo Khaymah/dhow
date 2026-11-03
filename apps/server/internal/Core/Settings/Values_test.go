@@ -132,7 +132,7 @@ func TestASaveOfAProviderNeverWritesBackASecretThatWasJustSealedAgain(t *testing
 	}()
 	time.Sleep(300 * time.Millisecond)
 	require.NoError(t, tx.Commit(t.Context()))
-	_ = <-saved
+	require.Error(t, <-saved, "the locked read sees the value sealed again, which this store cannot open, so the save is refused")
 	var stored []byte
 	require.NoError(t, pool.QueryRow(t.Context(), `SELECT "Secret" FROM "OidcProviders" WHERE "ProviderId" = 'corp'`).Scan(&stored))
 	assert.NotEqual(t, old, stored, "the save did not write the stale copy back over the value sealed again")
