@@ -146,17 +146,17 @@ func TestServerRefusesInvisibleCharacters(t *testing.T) {
 		name string
 		res  apptest.Response
 	}{
-		{"a name with a bidi override", w.create(w.owner, map[string]any{"Name": "prod‮"})},
+		{"a name with a bidi override", w.create(w.owner, map[string]any{"Name": "prod\u202e"})},
 		{"a pattern with a bidi override", w.create(w.owner, map[string]any{"Name": "p1", "Rules": map[string]any{
-			"AllowedRefs": []map[string]string{{"Kind": "branch", "Pattern": "ma‮in"}},
+			"AllowedRefs": []map[string]string{{"Kind": "branch", "Pattern": "ma\u202ein"}},
 		}})},
 		{"a pattern with a zero-width space", w.create(w.owner, map[string]any{"Name": "p2", "Rules": map[string]any{
-			"AllowedRefs": []map[string]string{{"Kind": "branch", "Pattern": "ma​in"}},
+			"AllowedRefs": []map[string]string{{"Kind": "branch", "Pattern": "ma\u200bin"}},
 		}})},
 		{"a description with a bidi isolate", w.update(w.owner, "production", map[string]any{
-			"Version": e.Version, "Description": "live ⁦site⁩", "CurrentFactor": w.ownerFactor(),
+			"Version": e.Version, "Description": "live \u2066site\u2069", "CurrentFactor": w.ownerFactor(),
 		})},
-		{"a reason with a zero-width joiner", w.post(w.owner, "production", "pause", map[string]string{"Reason": "bad‍release"})},
+		{"a reason with a zero-width joiner", w.post(w.owner, "production", "pause", map[string]string{"Reason": "bad\u200drelease"})},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			requireError(t, tt.res, http.StatusUnprocessableEntity, "VALIDATION_FAILED")
