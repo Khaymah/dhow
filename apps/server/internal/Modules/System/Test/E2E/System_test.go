@@ -183,7 +183,7 @@ func TestFullStackWithPostgres(t *testing.T) {
 	pool, err := config.OpenDatabase(ctx, testDSN(t))
 	require.NoError(t, err)
 	t.Cleanup(pool.Close)
-	migrator, err := migrations.NewMigrator(pool)
+	migrator, err := migrations.NewMigrator(pool, migrations.Binary{})
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, migrator.Close()) })
 

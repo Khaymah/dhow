@@ -165,6 +165,7 @@ dev-env: ## Write .env.dev once: DHOW_DEV, a fresh secret key and the local data
 		echo "DHOW_PUBLIC_URL=http://localhost:8080"; \
 		echo "DHOW_DATABASE_URL=$(DEV_DB_URL)/dhow?sslmode=disable"; \
 		echo "DHOW_TEST_DATABASE_URL=$(DEV_DB_URL)/dhow_test?sslmode=disable"; \
+		echo "DHOW_TEST_PG_DUMP=\"$(DEV_DB_ENGINE) run --rm --network host docker.io/library/postgres:18 pg_dump\""; \
 		echo "DHOW_SECRET_KEY=$$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"; \
 	} > $(DEV_ENV); echo "wrote $(DEV_ENV)"
 

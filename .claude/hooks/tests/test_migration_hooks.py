@@ -58,7 +58,7 @@ class SharedCases(unittest.TestCase):
 
     def test_every_rule_has_an_accept_and_a_reject_case(self):
         names = case_files()
-        for n in range(1, 10):
+        for n in range(1, 12):
             for kind in ("accept", "reject"):
                 self.assertTrue(any(f.startswith(f"{kind}_m{n}_") for f in names), f"{kind} M{n}")
 
@@ -139,6 +139,21 @@ class Rules(unittest.TestCase):
         self.assertRule("M9", no_tx('ALTER TABLE "Jobs" ADD COLUMN "X" TEXT;'))
         self.assertIsNone(write(NEW, no_tx('ALTER TABLE "Jobs" ADD COLUMN IF NOT EXISTS "X" TEXT;')))
 
+    def test_m10_transaction_control(self):
+        for stmt in ("COMMIT;", "end;", "ROLLBACK;", "ABORT;", "BEGIN;", "START TRANSACTION;", "SAVEPOINT s;",
+                     "RELEASE SAVEPOINT s;", "PREPARE TRANSACTION 'x';", "COMMIT PREPARED 'x';"):
+            self.assertRule("M10", expand('ALTER TABLE "Jobs" ADD COLUMN "A" TEXT;\n' + stmt))
+        self.assertRule("M10", no_tx('CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_A" ON "Jobs" ("Id");\nCOMMIT;'))
+        block = '-- +goose StatementBegin\nALTER TABLE "Jobs" ADD COLUMN "A" TEXT; COMMIT; SELECT 1;\n-- +goose StatementEnd'
+        self.assertRule("M10", expand(block))
+        self.assertIsNone(write(NEW, expand("SELECT 'COMMIT; END;'; -- ROLLBACK;\nALTER TABLE \"Jobs\" ADD COLUMN \"End\" TEXT;")))
+        self.assertIsNone(write(NEW, expand('ALTER TABLE "Jobs" ADD COLUMN "A" TEXT;\n\n-- +goose Down\nCOMMIT;')))
+
+    def test_m11_empty_block(self):
+        self.assertRule("M11", expand("-- +goose StatementBegin\n-- +goose StatementEnd\nSELECT 1;"))
+        self.assertRule("M11", expand("-- +goose StatementBegin\n-- only a note\n\n-- +goose StatementEnd\nSELECT 1;"))
+        self.assertIsNone(write(NEW, expand("-- +goose StatementBegin\nSELECT 1;\n-- +goose StatementEnd")))
+
     def test_statement_begin_end_is_one_statement(self):
         body = ("-- +goose StatementBegin\nCREATE FUNCTION \"F\"() RETURNS trigger LANGUAGE plpgsql AS $$\n"
                 "BEGIN\n  DELETE FROM \"Jobs\";\n  RETURN NEW;\nEND\n$$;\n-- +goose StatementEnd")
@@ -167,6 +182,15 @@ class Scope(unittest.TestCase):
                                                                      final_content=content), name)
             failing += migration_rules.verdict(content, set()) is not None
         self.assertGreater(failing, 0)
+
+    def test_no_migration_controls_transactions_or_has_an_empty_block(self):
+        names = sorted(f for f in os.listdir(MIGRATIONS) if f.endswith(".sql"))
+        self.assertGreater(len(names), 26)
+        for name in names:
+            _, up = migration_rules.sections(read(os.path.join(MIGRATIONS, name)))
+            self.assertFalse(migration_rules.empty_block(up), name)
+            for stmt in migration_rules.statements(up):
+                self.assertIsNone(migration_rules.m10(stmt, {}, {}), name)
 
     def test_other_paths_are_not_checked(self):
         for rel in ("apps/server/internal/Database/Migrations/testdata/compat/reject_m1_x.sql",

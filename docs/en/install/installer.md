@@ -182,7 +182,7 @@ Every finding comes with its fix: a command, such as restarting the service, ren
 
 ## Upgrade
 
-Run the installer of the newer release, for example `bash get.sh --version 1.3.0`. With the saved answers as defaults, the plan replaces the binary and the unit if they changed, keeps the secrets, the configuration and the data, and restarts the service. Migrations run automatically when Dhow starts, under a lock. If a migration fails Dhow does not start and the old schema stays in place; migrations only move forward, so take a backup first.
+Run the installer of the newer release, for example `bash get.sh --version 1.3.0`. With the saved answers as defaults, the plan replaces the binary and the unit if they changed, keeps the secrets, the configuration and the data, and restarts the service. Migrations run automatically when Dhow starts, under a lock. If a migration fails Dhow does not start and the old schema stays in place. Take a backup first, and see [Upgrades and rolling back](upgrades.md) for when going back to the previous release is enough.
 
 For Compose, the installer pins `DHOW_IMAGE` to its own version unless you pinned a digest in `.env`, which it keeps.
 

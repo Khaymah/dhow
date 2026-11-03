@@ -10,7 +10,7 @@ import (
 )
 
 const getInstance = `-- name: GetInstance :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "SetupCompletedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "SetupCompletedAt", "SchemaFloor"
 FROM "Instance"
 WHERE "Id" = 1
 `
@@ -23,6 +23,7 @@ func (q *Queries) GetInstance(ctx context.Context) (Instance, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SetupCompletedAt,
+		&i.SchemaFloor,
 	)
 	return i, err
 }

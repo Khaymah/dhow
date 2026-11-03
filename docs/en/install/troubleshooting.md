@@ -40,6 +40,10 @@ With `verify-ca` or `verify-full`, Dhow could not verify the server's certificat
 - `certificate signed by unknown authority`: point `sslrootcert` at the CA that signed the server's certificate.
 - `certificate is not valid for any names, but wanted to match ...` or `... is not valid for ...`: the host name in the URL is not in the certificate. Connect with the name the certificate was issued for, or use `verify-ca`, which checks the CA but not the name.
 
+### `SCHEMA_TOO_NEW`
+
+A newer release upgraded the database, and one of its migrations raised the floor above this binary's version. Dhow exits with code `78`, and the message names the version it needs. Install that version or a newer one, or restore the backup you took before the upgrade. The details are in [Upgrades and rolling back](upgrades.md).
+
 ## Setup or sign-in fails with `CSRF_FAILED`
 
 Every request that is not `GET`, `HEAD` or `OPTIONS` must have an `Origin` header equal to `DHOW_PUBLIC_URL`. When it does not, Dhow answers `403` with `CSRF_FAILED` and "The request could not be verified. Reload the page and try again."

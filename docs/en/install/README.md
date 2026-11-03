@@ -70,4 +70,5 @@ Go through this list before other people use the instance.
 - [Kernel security advisories](../security/kernel-advisories.md): kernel flaws that affect Dhow, how to check the host, and how to mitigate them.
 - [Configuration](configuration.md): every `DHOW_*` variable, its default and its validation.
 - [Sign in with OIDC](../guides/oidc.md): sign-in with Google, Keycloak, GitHub or any OIDC provider.
+- [Upgrades and rolling back](upgrades.md): when going back to the previous binary is enough, when you need to restore the backup, and how to try the migrations before an upgrade.
 - [Troubleshooting](troubleshooting.md): `CSRF_FAILED`, cookies that are not stored, the public URL and `sslmode` errors, the wrong client address, locked-out sign-ins, and the setup link.

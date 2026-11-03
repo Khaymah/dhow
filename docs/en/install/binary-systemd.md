@@ -120,7 +120,7 @@ journalctl -u dhow | grep setup_url
 | `MemoryDenyWriteExecute=yes`, `LockPersonality=yes`, `RestrictNamespaces=yes`, `RestrictRealtime=yes`, `RestrictSUIDSGID=yes`, `RemoveIPC=yes`, `KeyringMode=private` | No writable and executable memory, no new namespaces, no realtime scheduling, no setuid files. |
 | `UMask=0077` | Anything Dhow writes is private to it. |
 | `LoadCredential=`, `EnvironmentFile=/etc/dhow/dhow.env` | Secrets come from `$CREDENTIALS_DIRECTORY`, settings from the env file, both read by systemd as root. |
-| `Restart=on-failure` | systemd restarts Dhow after a crash, but not after a clean stop. |
+| `Restart=on-failure`, `RestartPreventExitStatus=78` | systemd restarts Dhow after a crash, but not after a clean stop, and not when Dhow refuses a database newer than itself (code `78`, see [Upgrades and rolling back](upgrades.md)). |
 
 The unit orders itself after `postgresql.service` and `postgresql-18.service` when they exist, so a local database is up first.
 
@@ -137,7 +137,7 @@ The unit orders itself after `postgresql.service` and `postgresql-18.service` wh
    dhow-server healthcheck
    ```
 
-Migrations run when Dhow starts, under a lock, so only one process migrates at a time. If a migration fails Dhow does not start and the old schema stays. Migrations only move forward: to go back, restore the backup.
+Migrations run when Dhow starts, under a lock, so only one process migrates at a time. If a migration fails Dhow does not start and the old schema stays. To try the migrations before you upgrade, and to go back to the previous release, see [Upgrades and rolling back](upgrades.md). Going back with the binary alone is enough in most cases; you need the backup when a migration raised the database floor.
 
 ## Back up and restore
 

@@ -2,10 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	app "github.com/Khaymah/dhow/apps/server/internal/App"
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 )
 
 func TestRunRejectsUnknownCommands(t *testing.T) {
@@ -39,4 +44,29 @@ func TestRunDispatchesInstallerCommands(t *testing.T) {
 	err := run(context.Background(), []string{"install", "--bogus"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "flag provided but not defined")
+}
+
+func TestExitCodeOfASchemaTooNew(t *testing.T) {
+	tooNew := &migrations.IncompatibleError{Status: migrations.Evaluate(60, 50, "2.0.0", migrations.Binary{Version: "1.0.0"})}
+	assert.Equal(t, 78, exitCode(tooNew))
+	assert.Equal(t, 78, exitCode(fmt.Errorf("start: %w", tooNew)))
+	assert.Equal(t, 1, exitCode(errors.New("anything else")))
+	assert.Equal(t, 1, exitCode(otherExit{}), "only a schema too new for the binary exits with 78")
+}
+
+type otherExit struct{}
+
+func (otherExit) Error() string { return "other" }
+
+func (otherExit) ExitCode() int { return 78 }
+
+func TestRunDispatchesMigrate(t *testing.T) {
+	require.ErrorIs(t, run(context.Background(), []string{"migrate"}), app.ErrMigrateUsage)
+	require.ErrorIs(t, run(context.Background(), []string{"migrate", "up"}), app.ErrMigrateUsage)
+	t.Setenv("DHOW_DATABASE_URL", "")
+	t.Setenv("DHOW_DATABASE_URL_FILE", "")
+	t.Setenv("CREDENTIALS_DIRECTORY", "")
+	err := run(context.Background(), []string{"migrate", "status"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "DHOW_DATABASE_URL")
 }

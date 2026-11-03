@@ -11,6 +11,7 @@ import (
 
 	app "github.com/Khaymah/dhow/apps/server/internal/App"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	system "github.com/Khaymah/dhow/apps/server/internal/Modules/System"
 )
@@ -21,10 +22,19 @@ func (f FakeDB) Ping(context.Context) error { return f.Err }
 
 type FakeMigrations struct {
 	Pending bool
+	Schema  migrations.SchemaState
 	Err     error
 }
 
-func (f FakeMigrations) Current(context.Context) (bool, error) { return !f.Pending, f.Err }
+func (f FakeMigrations) State(context.Context) (migrations.SchemaState, error) {
+	switch {
+	case f.Schema != "":
+		return f.Schema, f.Err
+	case f.Pending:
+		return migrations.SchemaPending, f.Err
+	}
+	return migrations.SchemaCurrent, f.Err
+}
 
 type FakeQueries struct {
 	Instance sqlc.Instance

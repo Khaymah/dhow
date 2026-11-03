@@ -2,11 +2,14 @@ package installer
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 )
 
 const repoRoot = "../../../../../"
@@ -28,6 +31,7 @@ func TestUnitUsesTheInstallerPaths(t *testing.T) {
 		"User=" + ServiceUser, "ExecStart=" + BinaryPath, "EnvironmentFile=" + EnvFilePath,
 		"LoadCredential=dhow-secret-key:" + SecretKeyPath, "LoadCredential=dhow-database-url:" + DatabaseURLPath,
 		"CapabilityBoundingSet=\n", "NoNewPrivileges=yes", "ProtectSystem=strict", "UMask=0077",
+		"RestartPreventExitStatus=" + strconv.Itoa(migrations.ExitSchemaTooNew) + "\n",
 	} {
 		assert.Contains(t, unit, want)
 	}
@@ -96,4 +100,13 @@ func TestEnvFiles(t *testing.T) {
 	assert.Contains(t, compose, "DHOW_IMAGE=ghcr.io/khaymah/dhow@sha256:abc\n", "a pinned image is kept")
 	assert.Equal(t, "ghcr.io/khaymah/dhow:1.2.3", ComposeImageFor("v1.2.3"))
 	assert.Equal(t, "ghcr.io/khaymah/dhow:latest", ComposeImageFor("dev"))
+}
+
+func TestOnlyTheImageWaitsOnASchemaTooNew(t *testing.T) {
+	dockerfile, err := os.ReadFile(repoRoot + "deploy/docker/Dockerfile")
+	require.NoError(t, err)
+	assert.Contains(t, string(dockerfile), "\nENV DHOW_ON_INCOMPATIBLE=wait\n", "the image waits instead of exiting into Compose's restart loop")
+	assert.NotContains(t, string(UnitFile), "DHOW_ON_INCOMPATIBLE", "systemd keeps exit code 78")
+	assert.NotContains(t, string(ComposeFile), "DHOW_ON_INCOMPATIBLE")
+	assert.Contains(t, string(ComposeFile), "    hostname: dhow\n", "a stable host name keeps one ServerInstances row across container restarts")
 }

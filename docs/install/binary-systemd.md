@@ -120,7 +120,7 @@ journalctl -u dhow | grep setup_url
 | `MemoryDenyWriteExecute=yes`، `LockPersonality=yes`، `RestrictNamespaces=yes`، `RestrictRealtime=yes`، `RestrictSUIDSGID=yes`، `RemoveIPC=yes`، `KeyringMode=private` | لا ذاكرة قابلة للكتابة والتنفيذ معًا، ولا namespaces جديدة، ولا جدولة realtime، ولا ملفات setuid. |
 | `UMask=0077` | كل ما يكتبه داو خاص به. |
 | `LoadCredential=`، `EnvironmentFile=/etc/dhow/dhow.env` | الأسرار تأتي من `$CREDENTIALS_DIRECTORY`، والإعدادات من ملف البيئة، ويقرأ systemd الاثنين كـ root. |
-| `Restart=on-failure` | يعيد systemd تشغيل داو بعد أي انهيار، لكن ليس بعد إيقاف سليم. |
+| `Restart=on-failure`، `RestartPreventExitStatus=78` | يعيد systemd تشغيل داو بعد أي انهيار، لكن ليس بعد إيقاف سليم، ولا عندما يرفض داو قاعدة بيانات أحدث منه (الرمز `78`، راجع [الترقية والرجوع](upgrades.md)). |
 
 ترتّب الخدمة نفسها بعد `postgresql.service` و`postgresql-18.service` إذا كانتا موجودتين، حتى تعمل قاعدة البيانات المحلية أولًا.
 
@@ -137,7 +137,7 @@ journalctl -u dhow | grep setup_url
    dhow-server healthcheck
    ```
 
-تحديثات قاعدة البيانات تعمل عند بدء داو، تحت قفل، فلا تطبّقها إلا عملية واحدة في كل مرة. إذا فشل تحديث، لا يبدأ داو ويبقى الجدول القديم. التحديثات تتقدم فقط. للرجوع، استرجع النسخة الاحتياطية.
+تحديثات قاعدة البيانات تعمل عند بدء داو، تحت قفل، فلا تطبّقها إلا عملية واحدة في كل مرة. إذا فشل تحديث، لا يبدأ داو ويبقى الجدول القديم. لتجربة التحديثات قبل الترقية، وللرجوع إلى الإصدار السابق، راجع [الترقية والرجوع إلى إصدار أقدم](upgrades.md). الرجوع بالملف التنفيذي وحده يكفي في أغلب الحالات، والنسخة الاحتياطية تلزم عندما يرفع تحديث الحد الأدنى لقاعدة البيانات.
 
 ## النسخ الاحتياطي والاسترجاع
 

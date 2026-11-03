@@ -126,3 +126,9 @@ const (
 	MaxPageLimit     = 100
 	MaxPage          = 100_000
 )
+
+const (
+	ServerHeartbeatEvery     = 30 * time.Second
+	ServerInstanceStaleAfter = 3 * ServerHeartbeatEvery
+	ServerRetireTimeout      = 5 * time.Second
+)
