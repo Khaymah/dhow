@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,8 +32,8 @@ func TestTheSweepRemovesUnusedBlobsAfterTheGraceAndKeepsTheRest(t *testing.T) {
 	used := w.env.SeedArtifact(w.project, "web", []byte("still referenced"), false)
 	usedHex := apptest.DigestHex(used.Content)
 	orphan, fresh := []byte("nobody points here"), []byte("uploaded a moment ago")
-	require.Equal(t, http.StatusCreated, w.runner.PutBlob(g.Ref, "artifact", orphan).Status)
-	require.Equal(t, http.StatusCreated, w.runner.PutBlob(g.Ref, "artifact", fresh).Status)
+	require.Equal(t, http.StatusCreated, w.runner.PutBlob(g.Ref, "artifact", "web", orphan).Status)
+	require.Equal(t, http.StatusCreated, w.runner.PutBlob(g.Ref, "cache", "", fresh).Status)
 	w.age(t, apptest.DigestHex(orphan), "7 hours")
 	w.age(t, usedHex, "7 hours")
 
@@ -75,4 +76,22 @@ func TestAMissingStoredFileIsGoneNotAnError(t *testing.T) {
 	assert.Equal(t, http.StatusGone, res.Status, string(res.Raw))
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "ARTIFACT_GONE", res.Error.Code)
+}
+
+func TestAFileLeftByACrashBetweenTheRenameAndTheCommitIsRemoved(t *testing.T) {
+	w := newWorld(t)
+	old, recent := []byte("renamed, then the server died"), []byte("renamed a moment ago")
+	for _, data := range [][]byte{old, recent} {
+		require.NoError(t, w.env.Wired.Artifacts.StoreWithoutRecord(context.Background(), data))
+	}
+	past := time.Now().Add(-7 * time.Hour)
+	require.NoError(t, os.Chtimes(w.blobFile(apptest.DigestHex(old)), past, past))
+
+	report, err := w.env.Wired.Artifacts.Sweep(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 1, report.Orphans)
+	_, err = os.Stat(w.blobFile(apptest.DigestHex(old)))
+	assert.ErrorIs(t, err, os.ErrNotExist, "a file without a row is removed after the grace period")
+	_, err = os.Stat(w.blobFile(apptest.DigestHex(recent)))
+	assert.NoError(t, err, "a recent file may still be waiting for its commit")
 }

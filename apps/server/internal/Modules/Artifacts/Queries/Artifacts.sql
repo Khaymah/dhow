@@ -1,7 +1,13 @@
 -- name: LockArtifactLease :one
 SELECT l."Id" AS "LeaseId", l."JobId", l."OrganizationId", j."Spec", j."OriginKind", j."OriginId",
        rj."Id" AS "RunJobId", rj."Key" AS "RunJobKey", r."Id" AS "RunId", r."ProjectId", r."Trigger", r."Ref", r."IsFork",
-       r."PrNumber", COALESCE(repo."DefaultBranch", '')::text AS "DefaultBranch"
+       r."PrNumber", r."Sha", r."RepositoryId", COALESCE(repo."DefaultBranch", '')::text AS "DefaultBranch",
+       COALESCE((SELECT h."Sha"
+                 FROM "PipelineRuns" h
+                 WHERE h."RepositoryId" = r."RepositoryId" AND h."Ref" = r."Ref" AND h."Trigger" IN ('push', 'tag')
+                   AND NOT h."IsFork" AND NOT h."IsDeleted" AND h."Sha" IS NOT NULL
+                 ORDER BY h."CreatedAt" DESC, h."Id" DESC
+                 LIMIT 1), '')::text AS "RefHead"
 FROM "Leases" l
 JOIN "Jobs" j ON j."Id" = l."JobId"
 LEFT JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId" AND j."OriginKind" = 'pipeline'
@@ -26,6 +32,48 @@ VALUES (@digest, @size_bytes, @storage_key)
 ON CONFLICT ("Digest") WHERE NOT "IsDeleted"
 DO UPDATE SET "LastUsedAt" = now(), "UpdatedAt" = now()
 RETURNING *;
+
+-- name: ClaimUpload :one
+INSERT INTO "BlobUploads" ("OrganizationId", "LeaseId", "Kind", "Name")
+VALUES (@organization_id, @lease_id, @kind, @name)
+ON CONFLICT ("LeaseId", "Kind", "Name")
+DO UPDATE SET "State" = 'uploading', "UpdatedAt" = now()
+WHERE "BlobUploads"."State" = 'failed'
+RETURNING "Id";
+
+-- name: FinishUpload :exec
+UPDATE "BlobUploads"
+SET "State" = @state, "Digest" = sqlc.narg(digest), "UpdatedAt" = now()
+WHERE "Id" = @id;
+
+-- name: UpsertBlobOwner :exec
+INSERT INTO "BlobOwners" ("OrganizationId", "Digest")
+VALUES (@organization_id, @digest)
+ON CONFLICT ("OrganizationId", "Digest") WHERE NOT "IsDeleted" DO NOTHING;
+
+-- name: OwnedBlobSize :one
+SELECT b."SizeBytes"
+FROM "Blobs" b
+JOIN "BlobOwners" o ON o."Digest" = b."Digest" AND o."OrganizationId" = @organization_id AND NOT o."IsDeleted"
+WHERE b."Digest" = @digest AND NOT b."IsDeleted";
+
+-- name: RetireBlobOwners :exec
+UPDATE "BlobOwners"
+SET "IsDeleted" = true, "UpdatedAt" = now()
+WHERE "Digest" = ANY (@digests::bytea[]) AND NOT "IsDeleted";
+
+-- name: KnownBlobs :many
+SELECT "Digest"
+FROM "Blobs"
+WHERE "Digest" = ANY (@digests::bytea[]) AND NOT "IsDeleted";
+
+-- name: LockOrganizationArtifacts :exec
+SELECT pg_advisory_xact_lock(hashtextextended('dhow-artifacts:' || @organization_id::text, 0));
+
+-- name: OrganizationArtifactBytes :one
+SELECT COALESCE(sum("SizeBytes"), 0)::bigint AS "Bytes"
+FROM "Artifacts"
+WHERE "OrganizationId" = @organization_id AND NOT "IsDeleted" AND "ExpiresAt" > now();
 
 -- name: TouchBlob :one
 UPDATE "Blobs"
@@ -78,10 +126,11 @@ SELECT EXISTS (SELECT 1
                  AND NOT "IsDeleted")::boolean AS "Visible";
 
 -- name: GetArtifact :one
-SELECT *
-FROM "Artifacts"
-WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "ProjectId" = @project_id
-  AND NOT "IsDeleted" AND "ExpiresAt" > now();
+SELECT a.*
+FROM "Artifacts" a
+JOIN "PipelineRuns" r ON r."Id" = a."RunId" AND r."OrganizationId" = a."OrganizationId"
+WHERE a."Id" = @id AND a."OrganizationId" = @organization_id AND a."ProjectId" = @project_id
+  AND NOT a."IsDeleted" AND a."ExpiresAt" > now() AND NOT r."IsDeleted";
 
 -- name: FindCacheEntry :one
 UPDATE "CacheEntries"
@@ -110,8 +159,8 @@ WHERE "ProjectId" = @project_id AND NOT "IsDeleted";
 -- name: OldestCacheEntries :many
 SELECT "Id", "SizeBytes"
 FROM "CacheEntries"
-WHERE "ProjectId" = @project_id AND NOT "IsDeleted"
-ORDER BY "LastUsedAt", "Id"
+WHERE "ProjectId" = @project_id AND NOT "IsDeleted" AND (@include_protected::boolean OR "Scope" <> @protected_scope::text)
+ORDER BY ("Scope" = @protected_scope::text), "LastUsedAt", "Id"
 LIMIT @max_rows;
 
 -- name: EvictCacheEntries :execrows
@@ -140,3 +189,8 @@ WHERE "Id" IN (SELECT b."Id"
                LIMIT @batch
                FOR UPDATE SKIP LOCKED)
 RETURNING "Digest";
+
+-- name: ArtifactSize :one
+SELECT "SizeBytes"
+FROM "Artifacts"
+WHERE "RunId" = @run_id AND "Name" = @name AND NOT "IsDeleted" AND "ExpiresAt" > now();

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -27,6 +28,7 @@ on:
   push:
     branches: ["**"]
   pull_request: {}
+  manual: {}
 jobs:
   build:
     image: IMAGE
@@ -47,15 +49,32 @@ jobs:
 )
 
 type world struct {
-	env     *apptest.Env
-	owner   *apptest.Client
-	ownerID uuid.UUID
-	org     uuid.UUID
-	project uuid.UUID
-	repo    uuid.UUID
-	defs    *apptest.FakeDefinitions
-	runner  *apptest.TestRunner
+	env      *apptest.Env
+	owner    *apptest.Client
+	ownerID  uuid.UUID
+	org      uuid.UUID
+	project  uuid.UUID
+	repo     uuid.UUID
+	defs     *apptest.FakeDefinitions
+	runner   *apptest.TestRunner
+	password string
 }
+
+func (w world) tenant(t *testing.T) world {
+	t.Helper()
+	org := w.env.SeedOrganization("Other tenant", "other-"+strings.ToLower(uuid.NewString()[:8]))
+	owner := w.env.SeedUser(org, "owner-"+uuid.NewString()[:8]+"@example.com", "a long password for the other owner", "owner")
+	project := w.env.SeedProject(org, owner)
+	runner := w.env.SeedConnectedRunner(org, owner, apptest.SeedRunnerSpec{
+		Capacity: 8, Features: []string{"artifacts", "cache", "checkout", "plugins"},
+	})
+	return world{
+		env: w.env, owner: w.env.SeedSession(owner), ownerID: owner, org: org, project: project,
+		repo: w.env.SeedRepository(org, project, owner), defs: w.defs, runner: runner,
+	}
+}
+
+func (w world) scope(s string) string { return "repo:" + w.repo.String() + "/" + s }
 
 func newWorld(t *testing.T) world {
 	t.Helper()
@@ -75,7 +94,7 @@ func newWorldWith(t *testing.T, profile func(*config.Config)) world {
 	})
 	w := world{
 		env: env, owner: owner, ownerID: ownerID, org: org, project: project, repo: env.SeedRepository(org, project, ownerID),
-		defs: defs, runner: runner,
+		defs: defs, runner: runner, password: d.Password,
 	}
 	w.defs.Put(shaA, pipeline(buildAndCheck))
 	w.defs.Put(shaB, pipeline(buildAndCheck))
@@ -110,9 +129,25 @@ func (w world) pullRequest(t *testing.T, number int, sha string, origin triggers
 	return got.RunID
 }
 
+func (w world) lease(t *testing.T) *apptest.Grant {
+	t.Helper()
+	for range 50 {
+		g, err := w.runner.Lease(context.Background(), 1, 0)
+		if reason(err) == "LEASE_RATE_LIMITED" {
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+		require.NoError(t, err)
+		return g
+	}
+	t.Fatal("the runner stayed rate limited")
+	return nil
+}
+
 func (w world) next(t *testing.T) *apptest.Grant {
 	t.Helper()
-	g := w.runner.MustLease(0)
+	g := w.lease(t)
+	require.NotNil(t, g, "expected a lease")
 	_, err := w.runner.Start(g)
 	require.NoError(t, err)
 	return g
@@ -127,12 +162,11 @@ func (w world) succeed(t *testing.T, g *apptest.Grant) {
 func (w world) drain(t *testing.T) {
 	t.Helper()
 	for {
-		g, err := w.runner.Lease(context.Background(), 1, 0)
-		require.NoError(t, err)
+		g := w.lease(t)
 		if g == nil {
 			return
 		}
-		_, err = w.runner.Start(g)
+		_, err := w.runner.Start(g)
 		require.NoError(t, err)
 		w.succeed(t, g)
 	}

@@ -79,4 +79,5 @@ type Store interface {
 	Open(ctx context.Context, d Digest) (Reader, error)
 	Remove(ctx context.Context, d Digest) error
 	SweepTemp(ctx context.Context, olderThan int64) (int, error)
+	Stored(ctx context.Context, olderThan int64) ([]Digest, error)
 }

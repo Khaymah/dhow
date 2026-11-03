@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	blob "github.com/Khaymah/dhow/apps/server/internal/Core/Blob"
@@ -17,6 +18,7 @@ type SweepReport struct {
 	Ran      bool
 	Expired  int64
 	Removed  int
+	Orphans  int
 	TempGone int
 }
 
@@ -47,8 +49,8 @@ func (s *Service) Sweep(ctx context.Context) (SweepReport, error) {
 			break
 		}
 	}
-	removed, ran, err := s.sweepBlobs(ctx)
-	report.Removed, report.Ran = removed, ran
+	removed, orphans, ran, err := s.sweepBlobs(ctx)
+	report.Removed, report.Orphans, report.Ran = removed, orphans, ran
 	if err != nil {
 		return report, err
 	}
@@ -57,16 +59,16 @@ func (s *Service) Sweep(ctx context.Context) (SweepReport, error) {
 	return report, err
 }
 
-func (s *Service) sweepBlobs(ctx context.Context) (removed int, ran bool, err error) {
+func (s *Service) sweepBlobs(ctx context.Context) (removed, orphans int, ran bool, err error) {
 	conn, err := s.db.Acquire(ctx)
 	if err != nil {
-		return 0, false, fmt.Errorf("acquire a connection for the blob sweep: %w", err)
+		return 0, 0, false, fmt.Errorf("acquire a connection for the blob sweep: %w", err)
 	}
 	defer conn.Release()
 	q := sqlc.New(conn)
 	locked, err := q.TryBlobSweepLock(ctx, config.BlobSweepLockKey)
 	if err != nil || !locked {
-		return 0, false, err
+		return 0, 0, false, err
 	}
 	defer func() {
 		released, unlockErr := q.ReleaseBlobSweepLock(context.WithoutCancel(ctx), config.BlobSweepLockKey)
@@ -76,15 +78,28 @@ func (s *Service) sweepBlobs(ctx context.Context) (removed int, ran bool, err er
 		}
 	}()
 	before := s.now().Add(-config.BlobSweepGrace)
+	if removed, err = s.markAndSweep(ctx, conn, before); err != nil {
+		return removed, 0, true, err
+	}
+	orphans, err = s.sweepOrphans(ctx, q, before)
+	return removed, orphans, true, err
+}
+
+func (s *Service) markAndSweep(ctx context.Context, conn *pgxpool.Conn, before time.Time) (int, error) {
+	removed := 0
 	for {
 		var digests [][]byte
 		err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 			var err error
-			digests, err = sqlc.New(tx).MarkUnusedBlobs(ctx, sqlc.MarkUnusedBlobsParams{Before: before, Batch: config.BlobSweepBatch})
-			return err
+			txq := sqlc.New(tx)
+			digests, err = txq.MarkUnusedBlobs(ctx, sqlc.MarkUnusedBlobsParams{Before: before, Batch: config.BlobSweepBatch})
+			if err != nil || len(digests) == 0 {
+				return err
+			}
+			return txq.RetireBlobOwners(ctx, digests)
 		})
 		if err != nil {
-			return removed, true, fmt.Errorf("mark unused blobs: %w", err)
+			return removed, fmt.Errorf("mark unused blobs: %w", err)
 		}
 		for _, raw := range digests {
 			d, ok := blob.DigestOf(raw)
@@ -92,12 +107,47 @@ func (s *Service) sweepBlobs(ctx context.Context) (removed int, ran bool, err er
 				continue
 			}
 			if err := s.store.Remove(ctx, d); err != nil {
-				return removed, true, err
+				return removed, err
 			}
 			removed++
 		}
 		if len(digests) < config.BlobSweepBatch {
-			return removed, true, nil
+			return removed, nil
 		}
 	}
+}
+
+func (s *Service) sweepOrphans(ctx context.Context, q *sqlc.Queries, before time.Time) (int, error) {
+	stored, err := s.store.Stored(ctx, before.UnixNano())
+	if err != nil {
+		return 0, err
+	}
+	removed := 0
+	for start := 0; start < len(stored); start += config.BlobSweepBatch {
+		batch := stored[start:min(start+config.BlobSweepBatch, len(stored))]
+		raw := make([][]byte, 0, len(batch))
+		for i := range batch {
+			raw = append(raw, batch[i][:])
+		}
+		known, err := q.KnownBlobs(ctx, raw)
+		if err != nil {
+			return removed, fmt.Errorf("look up stored blobs: %w", err)
+		}
+		keep := make(map[blob.Digest]bool, len(known))
+		for _, k := range known {
+			if d, ok := blob.DigestOf(k); ok {
+				keep[d] = true
+			}
+		}
+		for _, d := range batch {
+			if keep[d] {
+				continue
+			}
+			if err := s.store.Remove(ctx, d); err != nil {
+				return removed, err
+			}
+			removed++
+		}
+	}
+	return removed, nil
 }

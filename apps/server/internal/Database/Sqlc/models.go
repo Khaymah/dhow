@@ -108,6 +108,28 @@ type Blob struct {
 	StorageKey string
 }
 
+type BlobOwner struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	Digest         []byte
+}
+
+type BlobUpload struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	LeaseId        uuid.UUID
+	Kind           string
+	Name           string
+	State          string
+	Digest         []byte
+}
+
 type CacheEntry struct {
 	Id             uuid.UUID
 	CreatedAt      time.Time

@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
@@ -47,21 +48,19 @@ func (h cacheHandler) Commit(ctx context.Context, req *connect.Request[runnerv1.
 	return connect.NewResponse(&runnerv1.CacheServiceCommitResponse{Stored: stored}), nil
 }
 
-func touchBlob(ctx context.Context, q *sqlc.Queries, d blob.Digest, size int64) error {
+func touchBlob(ctx context.Context, q *sqlc.Queries, org uuid.UUID, d blob.Digest, size int64) error {
 	if err := q.LockBlobsShared(ctx, config.BlobSweepLockKey); err != nil {
 		return err
 	}
-	got, err := q.TouchBlob(ctx, d[:])
-	if errors.Is(err, pgx.ErrNoRows) {
+	got, err := q.OwnedBlobSize(ctx, sqlc.OwnedBlobSizeParams{OrganizationID: org, Digest: d[:]})
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && got != size) {
 		return errBlobMissing()
 	}
 	if err != nil {
 		return err
 	}
-	if got != size {
-		return errInvalid("SizeBytes")
-	}
-	return nil
+	_, err = q.TouchBlob(ctx, d[:])
+	return err
 }
 
 func (s *Service) CommitArtifact(ctx context.Context, lease *runnerv1.LeaseRef, name, digest string, size int64) error {
@@ -84,7 +83,10 @@ func (s *Service) CommitArtifact(ctx context.Context, lease *runnerv1.LeaseRef, 
 		if size < 0 || size > s.cfg.MaxBytes {
 			return errInvalid("SizeBytes")
 		}
-		if err := touchBlob(ctx, q, d, size); err != nil {
+		if err := touchBlob(ctx, q, l.row.OrganizationId, d, size); err != nil {
+			return err
+		}
+		if err := s.withinQuota(ctx, q, l.row.OrganizationId, name, *l.row.RunId, size); err != nil {
 			return err
 		}
 		owner, err := q.ArtifactOwner(ctx, sqlc.ArtifactOwnerParams{RunID: *l.row.RunId, Name: name})
@@ -108,4 +110,23 @@ func (s *Service) CommitArtifact(ctx context.Context, lease *runnerv1.LeaseRef, 
 		})
 		return err
 	})
+}
+
+func (s *Service) withinQuota(ctx context.Context, q *sqlc.Queries, org uuid.UUID, name string, run uuid.UUID, size int64) error {
+	if err := q.LockOrganizationArtifacts(ctx, org.String()); err != nil {
+		return err
+	}
+	used, err := q.OrganizationArtifactBytes(ctx, org)
+	if err != nil {
+		return err
+	}
+	if replaced, err := q.ArtifactSize(ctx, sqlc.ArtifactSizeParams{RunID: run, Name: name}); err == nil {
+		used -= replaced
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	if used+size > s.cfg.OrgMaxBytes {
+		return errQuota()
+	}
+	return nil
 }

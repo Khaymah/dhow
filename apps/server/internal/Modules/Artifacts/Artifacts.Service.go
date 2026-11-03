@@ -1,7 +1,9 @@
 package artifacts
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -60,6 +62,9 @@ func NewService(o Options) (*Service, error) {
 	if cfg.CacheMaxBytes <= 0 {
 		cfg.CacheMaxBytes = config.CacheMaxBytesDefault
 	}
+	if cfg.OrgMaxBytes <= 0 {
+		cfg.OrgMaxBytes = config.ArtifactOrgMaxBytesDefault
+	}
 	if cfg.RetentionDays <= 0 {
 		cfg.RetentionDays = config.ArtifactRetentionDefault
 	}
@@ -115,5 +120,15 @@ func (s *Service) SeedBlob(ctx context.Context, d blob.Digest, body io.Reader, s
 		return err
 	}
 	_, err = s.queries().UpsertBlob(ctx, sqlc.UpsertBlobParams{Digest: d[:], SizeBytes: stored.Size, StorageKey: stored.Key})
+	return err
+}
+
+func (s *Service) StoreWithoutRecord(ctx context.Context, data []byte) error {
+	d := blob.Digest(sha256.Sum256(data))
+	pending, err := s.store.Stage(ctx, blob.Put{Digest: d, Size: int64(len(data)), MaxBytes: max(int64(len(data)), 1), Body: bytes.NewReader(data)})
+	if err != nil {
+		return err
+	}
+	_, err = pending.Commit()
 	return err
 }

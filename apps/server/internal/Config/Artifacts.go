@@ -14,6 +14,7 @@ const (
 	EnvArtifactMaxBytes        = "DHOW_ARTIFACT_MAX_BYTES"
 	EnvArtifactRetentionDays   = "DHOW_ARTIFACT_RETENTION_DAYS"
 	EnvCacheMaxBytesPerProject = "DHOW_CACHE_MAX_BYTES_PER_PROJECT"
+	EnvArtifactMaxBytesPerOrg  = "DHOW_ARTIFACT_MAX_BYTES_PER_ORG"
 )
 
 const (
@@ -27,6 +28,9 @@ const (
 	CacheMaxBytesDefault         = 5 << 30
 	CacheMaxBytesMin             = 16 << 20
 	CacheMaxBytesMax             = 1 << 40
+	ArtifactOrgMaxBytesDefault   = 50 << 30
+	ArtifactOrgMaxBytesMin       = 16 << 20
+	ArtifactOrgMaxBytesMax       = 1 << 50
 	BlobFreeSpaceReserve         = 512 << 20
 	BlobSpaceCheckEvery          = 64 << 20
 	BlobsPath                    = "/blobs/"
@@ -34,6 +38,7 @@ const (
 	BlobFencingHeader            = "Dhow-Fencing-Token"
 	BlobDownloadTokenHeader      = "Dhow-Download-Token"
 	BlobKindHeader               = "Dhow-Blob-Kind"
+	BlobNameHeader               = "Dhow-Blob-Name"
 	BlobKindArtifact             = "artifact"
 	BlobKindCache                = "cache"
 	BlobIdleTimeout              = time.Minute
@@ -59,12 +64,13 @@ type Artifacts struct {
 	MaxBytes      int64
 	RetentionDays int
 	CacheMaxBytes int64
+	OrgMaxBytes   int64
 }
 
 func DefaultArtifacts() Artifacts {
 	return Artifacts{
 		BlobDir: BlobDirDefault, MaxBytes: ArtifactMaxBytesDefault, RetentionDays: ArtifactRetentionDefault,
-		CacheMaxBytes: CacheMaxBytesDefault,
+		CacheMaxBytes: CacheMaxBytesDefault, OrgMaxBytes: ArtifactOrgMaxBytesDefault,
 	}
 }
 
@@ -101,6 +107,10 @@ func loadArtifacts(getenv func(string) string, dev bool) (Artifacts, []error) {
 	}
 	if out.CacheMaxBytes, err = boundedBytes(EnvCacheMaxBytesPerProject, getenv(EnvCacheMaxBytesPerProject), CacheMaxBytesDefault,
 		CacheMaxBytesMin, CacheMaxBytesMax); err != nil {
+		errs = append(errs, err)
+	}
+	if out.OrgMaxBytes, err = boundedBytes(EnvArtifactMaxBytesPerOrg, getenv(EnvArtifactMaxBytesPerOrg), ArtifactOrgMaxBytesDefault,
+		ArtifactOrgMaxBytesMin, ArtifactOrgMaxBytesMax); err != nil {
 		errs = append(errs, err)
 	}
 	days, err := boundedSmall(getenv(EnvArtifactRetentionDays), ArtifactRetentionDefault, 1, ArtifactRetentionMax)

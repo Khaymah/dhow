@@ -90,14 +90,14 @@ func (r *TestRunner) blob(method, digest string, ref *runnerv1.LeaseRef, body []
 	return out
 }
 
-func (r *TestRunner) PutBlob(ref *runnerv1.LeaseRef, kind string, data []byte) BlobResponse {
+func (r *TestRunner) PutBlob(ref *runnerv1.LeaseRef, kind, name string, data []byte) BlobResponse {
 	r.T.Helper()
-	return r.blob(http.MethodPut, DigestHex(data), ref, data, map[string]string{"Dhow-Blob-Kind": kind})
+	return r.PutBlobAs(ref, kind, name, DigestHex(data), data)
 }
 
-func (r *TestRunner) PutBlobAs(ref *runnerv1.LeaseRef, kind, digest string, data []byte) BlobResponse {
+func (r *TestRunner) PutBlobAs(ref *runnerv1.LeaseRef, kind, name, digest string, data []byte) BlobResponse {
 	r.T.Helper()
-	return r.blob(http.MethodPut, digest, ref, data, map[string]string{"Dhow-Blob-Kind": kind})
+	return r.blob(http.MethodPut, digest, ref, data, map[string]string{"Dhow-Blob-Kind": kind, "Dhow-Blob-Name": name})
 }
 
 func (r *TestRunner) GetBlob(ref *runnerv1.LeaseRef, digest, token string) BlobResponse {

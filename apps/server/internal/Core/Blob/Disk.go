@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -38,6 +39,9 @@ type Disk struct {
 	reserve    int64
 	checkEvery int64
 	free       func(dir string) (int64, error)
+
+	mu       sync.Mutex
+	inflight int64
 }
 
 var _ Store = (*Disk)(nil)
@@ -98,6 +102,33 @@ func (d *Disk) path(dg Digest) (string, string) {
 	return shard, filepath.Join(shard, s)
 }
 
+func (d *Disk) claim(n int64) (func(), error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	free, err := d.free(d.dir)
+	if err != nil {
+		return nil, fmt.Errorf("read the free space of the blob store: %w", err)
+	}
+	if free-d.inflight < n+d.reserve {
+		return nil, ErrNoSpace
+	}
+	d.inflight += n
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			d.mu.Lock()
+			d.inflight -= n
+			d.mu.Unlock()
+		})
+	}, nil
+}
+
+func (d *Disk) InFlight() int64 {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.inflight
+}
+
 func (d *Disk) roomFor(n int64) error {
 	free, err := d.free(d.dir)
 	if err != nil {
@@ -143,11 +174,15 @@ func (d *Disk) Stage(ctx context.Context, p Put) (Pending, error) {
 	if p.MaxBytes <= 0 || p.Size > p.MaxBytes {
 		return nil, ErrTooLarge
 	}
-	if p.Size >= 0 {
-		if err := d.roomFor(p.Size); err != nil {
-			return nil, err
-		}
+	want := p.Size
+	if want < 0 {
+		want = p.MaxBytes
 	}
+	release, err := d.claim(want)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	shard, final := d.path(p.Digest)
 	if err := os.Mkdir(shard, shardMode); err != nil && !errors.Is(err, fs.ErrExist) {
 		return nil, fmt.Errorf("create the blob shard: %w", err)
@@ -312,4 +347,34 @@ func (d *Disk) SweepTemp(ctx context.Context, olderThan int64) (int, error) {
 		}
 	}
 	return removed, nil
+}
+
+func (d *Disk) Stored(ctx context.Context, olderThan int64) ([]Digest, error) {
+	shards, err := os.ReadDir(d.dir)
+	if err != nil {
+		return nil, fmt.Errorf("list the blob store: %w", err)
+	}
+	var out []Digest
+	for _, shard := range shards {
+		if !shard.IsDir() || len(shard.Name()) != 2 {
+			continue
+		}
+		entries, err := os.ReadDir(filepath.Join(d.dir, shard.Name()))
+		if err != nil {
+			return out, fmt.Errorf("list a blob shard: %w", err)
+		}
+		for _, e := range entries {
+			if ctx.Err() != nil {
+				return out, ctx.Err()
+			}
+			dg, err := ParseDigest(e.Name())
+			if err != nil || !strings.HasPrefix(e.Name(), shard.Name()) || !e.Type().IsRegular() {
+				continue
+			}
+			if info, err := e.Info(); err == nil && info.ModTime().UnixNano() <= olderThan {
+				out = append(out, dg)
+			}
+		}
+	}
+	return out, nil
 }

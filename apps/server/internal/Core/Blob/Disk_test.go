@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,4 +170,32 @@ func FuzzParseDigest(f *testing.F) {
 			t.Fatalf("a parsed digest does not round trip to a key inside its shard: %q -> %q", s, d.Key())
 		}
 	})
+}
+
+func TestParallelUploadsCannotOvershootTheReserve(t *testing.T) {
+	d, dir := store(t, 10<<20)
+	first := bytes.Repeat([]byte("a"), 6<<20)
+	r, w := io.Pipe()
+	done := make(chan error, 1)
+	go func() {
+		p, err := d.Stage(context.Background(), blob.Put{Digest: sha256.Sum256(first), Size: int64(len(first)), MaxBytes: 8 << 20, Body: r})
+		if err == nil {
+			p.Abort()
+		}
+		done <- err
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for d.InFlight() == 0 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	require.EqualValues(t, len(first), d.InFlight(), "the first upload holds its size while it streams")
+	second := bytes.Repeat([]byte("b"), 6<<20)
+	_, err := d.Stage(context.Background(), put(second, int64(len(second)), 8<<20))
+	assert.ErrorIs(t, err, blob.ErrNoSpace, "the second upload counts the first one's bytes")
+	_, err = w.Write(first)
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+	require.NoError(t, <-done)
+	assert.Zero(t, d.InFlight())
+	assert.Empty(t, files(t, dir))
 }

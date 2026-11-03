@@ -16,10 +16,13 @@ import (
 )
 
 const (
-	branchPrefix = "refs/heads/"
-	tagPrefix    = "refs/tags/"
-	triggerPR    = "pull_request"
-	triggerTag   = "tag"
+	branchPrefix  = "refs/heads/"
+	tagPrefix     = "refs/tags/"
+	triggerPR     = "pull_request"
+	triggerTag    = "tag"
+	triggerManual = "manual"
+	triggerAPI    = "api"
+	noRepository  = "none"
 )
 
 type leaseRef struct {
@@ -61,35 +64,60 @@ func (l scope) runJob() uuid.UUID {
 
 func (l scope) fork() bool { return !l.row.IsFork.Valid || l.row.IsFork.Bool }
 
-func (l scope) writeScope() (string, bool) {
+func (l scope) repository() string {
+	if l.row.RepositoryId == nil {
+		return "repo:" + noRepository + "/"
+	}
+	return "repo:" + l.row.RepositoryId.String() + "/"
+}
+
+func (l scope) ownScope() (string, bool) {
 	ref := l.row.Ref.String
 	switch {
-	case l.fork():
-		return "", false
 	case l.row.Trigger.String == triggerPR:
 		if !l.row.PrNumber.Valid || l.row.PrNumber.Int32 <= 0 {
 			return "", false
 		}
-		return "pr:" + strconv.Itoa(int(l.row.PrNumber.Int32)), true
+		return l.repository() + "pr:" + strconv.Itoa(int(l.row.PrNumber.Int32)), true
 	case l.row.Trigger.String == triggerTag && strings.HasPrefix(ref, tagPrefix):
-		return "tag:" + strings.TrimPrefix(ref, tagPrefix), true
+		return l.repository() + "tag:" + strings.TrimPrefix(ref, tagPrefix), true
 	case strings.HasPrefix(ref, branchPrefix):
-		return "branch:" + strings.TrimPrefix(ref, branchPrefix), true
+		return l.repository() + "branch:" + strings.TrimPrefix(ref, branchPrefix), true
 	default:
 		return "", false
 	}
 }
 
+func (l scope) atHead() bool {
+	switch l.row.Trigger.String {
+	case triggerManual, triggerAPI:
+		return l.row.Sha.Valid && l.row.RefHead != "" && l.row.Sha.String == l.row.RefHead
+	default:
+		return true
+	}
+}
+
+func (l scope) writeScope() (string, bool) {
+	if l.fork() || !l.atHead() {
+		return "", false
+	}
+	return l.ownScope()
+}
+
+func (l scope) defaultScope() string {
+	if l.row.DefaultBranch == "" {
+		return ""
+	}
+	return l.repository() + "branch:" + l.row.DefaultBranch
+}
+
 func (l scope) restoreScopes() []string {
 	var out []string
-	if own, ok := l.writeScope(); ok {
+	if own, ok := l.ownScope(); ok && !l.fork() {
 		out = append(out, own)
 	}
-	if b := l.row.DefaultBranch; b != "" {
-		def := "branch:" + b
-		if len(out) == 0 || out[0] != def {
-			out = append(out, def)
-		}
+	if def := l.defaultScope(); def != "" && (len(out) == 0 || out[0] != def) {
+		out = append(out, def)
 	}
 	return out
 }

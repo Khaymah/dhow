@@ -23,6 +23,8 @@ const (
 	CodeValidationFailed  = "VALIDATION_FAILED"
 	CodeInternal          = "INTERNAL"
 	CodeUnauthenticated   = "UNAUTHENTICATED"
+	CodeQuotaExceeded     = "ARTIFACT_QUOTA_EXCEEDED"
+	CodeUploadUsed        = "UPLOAD_ALREADY_USED"
 )
 
 type rejection struct {
@@ -43,6 +45,14 @@ func errLeaseLost() *rejection {
 
 func errUnauthenticated() *rejection {
 	return reject(http.StatusUnauthorized, connect.CodeUnauthenticated, CodeUnauthenticated)
+}
+
+func errQuota() *rejection {
+	return reject(http.StatusRequestEntityTooLarge, connect.CodeOutOfRange, CodeQuotaExceeded)
+}
+
+func errUploadUsed() *rejection {
+	return reject(http.StatusConflict, connect.CodeAlreadyExists, CodeUploadUsed)
 }
 
 func errGrant() *rejection {

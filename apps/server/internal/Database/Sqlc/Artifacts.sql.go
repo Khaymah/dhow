@@ -31,6 +31,24 @@ func (q *Queries) ArtifactOwner(ctx context.Context, arg ArtifactOwnerParams) (s
 	return RunJobKey, err
 }
 
+const artifactSize = `-- name: ArtifactSize :one
+SELECT "SizeBytes"
+FROM "Artifacts"
+WHERE "RunId" = $1 AND "Name" = $2 AND NOT "IsDeleted" AND "ExpiresAt" > now()
+`
+
+type ArtifactSizeParams struct {
+	RunID uuid.UUID
+	Name  string
+}
+
+func (q *Queries) ArtifactSize(ctx context.Context, arg ArtifactSizeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, artifactSize, arg.RunID, arg.Name)
+	var SizeBytes int64
+	err := row.Scan(&SizeBytes)
+	return SizeBytes, err
+}
+
 const blobSize = `-- name: BlobSize :one
 SELECT "SizeBytes"
 FROM "Blobs"
@@ -42,6 +60,34 @@ func (q *Queries) BlobSize(ctx context.Context, digest []byte) (int64, error) {
 	var SizeBytes int64
 	err := row.Scan(&SizeBytes)
 	return SizeBytes, err
+}
+
+const claimUpload = `-- name: ClaimUpload :one
+INSERT INTO "BlobUploads" ("OrganizationId", "LeaseId", "Kind", "Name")
+VALUES ($1, $2, $3, $4)
+ON CONFLICT ("LeaseId", "Kind", "Name")
+DO UPDATE SET "State" = 'uploading', "UpdatedAt" = now()
+WHERE "BlobUploads"."State" = 'failed'
+RETURNING "Id"
+`
+
+type ClaimUploadParams struct {
+	OrganizationID uuid.UUID
+	LeaseID        uuid.UUID
+	Kind           string
+	Name           string
+}
+
+func (q *Queries) ClaimUpload(ctx context.Context, arg ClaimUploadParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, claimUpload,
+		arg.OrganizationID,
+		arg.LeaseID,
+		arg.Kind,
+		arg.Name,
+	)
+	var Id uuid.UUID
+	err := row.Scan(&Id)
+	return Id, err
 }
 
 const evictCacheEntries = `-- name: EvictCacheEntries :execrows
@@ -112,11 +158,29 @@ func (q *Queries) FindCacheEntry(ctx context.Context, arg FindCacheEntryParams) 
 	return i, err
 }
 
+const finishUpload = `-- name: FinishUpload :exec
+UPDATE "BlobUploads"
+SET "State" = $1, "Digest" = $2, "UpdatedAt" = now()
+WHERE "Id" = $3
+`
+
+type FinishUploadParams struct {
+	State  string
+	Digest []byte
+	ID     uuid.UUID
+}
+
+func (q *Queries) FinishUpload(ctx context.Context, arg FinishUploadParams) error {
+	_, err := q.db.Exec(ctx, finishUpload, arg.State, arg.Digest, arg.ID)
+	return err
+}
+
 const getArtifact = `-- name: GetArtifact :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RunId", "RunJobId", "RunJobKey", "JobId", "Name", "Digest", "SizeBytes", "Untrusted", "ExpiresAt"
-FROM "Artifacts"
-WHERE "Id" = $1 AND "OrganizationId" = $2 AND "ProjectId" = $3
-  AND NOT "IsDeleted" AND "ExpiresAt" > now()
+SELECT a."Id", a."CreatedAt", a."UpdatedAt", a."IsDeleted", a."OrganizationId", a."ProjectId", a."RunId", a."RunJobId", a."RunJobKey", a."JobId", a."Name", a."Digest", a."SizeBytes", a."Untrusted", a."ExpiresAt"
+FROM "Artifacts" a
+JOIN "PipelineRuns" r ON r."Id" = a."RunId" AND r."OrganizationId" = a."OrganizationId"
+WHERE a."Id" = $1 AND a."OrganizationId" = $2 AND a."ProjectId" = $3
+  AND NOT a."IsDeleted" AND a."ExpiresAt" > now() AND NOT r."IsDeleted"
 `
 
 type GetArtifactParams struct {
@@ -235,6 +299,32 @@ func (q *Queries) InsertCacheEntry(ctx context.Context, arg InsertCacheEntryPara
 	return Id, err
 }
 
+const knownBlobs = `-- name: KnownBlobs :many
+SELECT "Digest"
+FROM "Blobs"
+WHERE "Digest" = ANY ($1::bytea[]) AND NOT "IsDeleted"
+`
+
+func (q *Queries) KnownBlobs(ctx context.Context, digests [][]byte) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, knownBlobs, digests)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := [][]byte{}
+	for rows.Next() {
+		var Digest []byte
+		if err := rows.Scan(&Digest); err != nil {
+			return nil, err
+		}
+		items = append(items, Digest)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRunArtifacts = `-- name: ListRunArtifacts :many
 SELECT a."Id", a."CreatedAt", a."UpdatedAt", a."IsDeleted", a."OrganizationId", a."ProjectId", a."RunId", a."RunJobId", a."RunJobKey", a."JobId", a."Name", a."Digest", a."SizeBytes", a."Untrusted", a."ExpiresAt"
 FROM "Artifacts" a
@@ -346,7 +436,13 @@ func (q *Queries) ListRunJobArtifacts(ctx context.Context, arg ListRunJobArtifac
 const lockArtifactLease = `-- name: LockArtifactLease :one
 SELECT l."Id" AS "LeaseId", l."JobId", l."OrganizationId", j."Spec", j."OriginKind", j."OriginId",
        rj."Id" AS "RunJobId", rj."Key" AS "RunJobKey", r."Id" AS "RunId", r."ProjectId", r."Trigger", r."Ref", r."IsFork",
-       r."PrNumber", COALESCE(repo."DefaultBranch", '')::text AS "DefaultBranch"
+       r."PrNumber", r."Sha", r."RepositoryId", COALESCE(repo."DefaultBranch", '')::text AS "DefaultBranch",
+       COALESCE((SELECT h."Sha"
+                 FROM "PipelineRuns" h
+                 WHERE h."RepositoryId" = r."RepositoryId" AND h."Ref" = r."Ref" AND h."Trigger" IN ('push', 'tag')
+                   AND NOT h."IsFork" AND NOT h."IsDeleted" AND h."Sha" IS NOT NULL
+                 ORDER BY h."CreatedAt" DESC, h."Id" DESC
+                 LIMIT 1), '')::text AS "RefHead"
 FROM "Leases" l
 JOIN "Jobs" j ON j."Id" = l."JobId"
 LEFT JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId" AND j."OriginKind" = 'pipeline'
@@ -378,7 +474,10 @@ type LockArtifactLeaseRow struct {
 	Ref            pgtype.Text
 	IsFork         pgtype.Bool
 	PrNumber       pgtype.Int4
+	Sha            pgtype.Text
+	RepositoryId   *uuid.UUID
 	DefaultBranch  string
+	RefHead        string
 }
 
 func (q *Queries) LockArtifactLease(ctx context.Context, arg LockArtifactLeaseParams) (LockArtifactLeaseRow, error) {
@@ -399,7 +498,10 @@ func (q *Queries) LockArtifactLease(ctx context.Context, arg LockArtifactLeasePa
 		&i.Ref,
 		&i.IsFork,
 		&i.PrNumber,
+		&i.Sha,
+		&i.RepositoryId,
 		&i.DefaultBranch,
+		&i.RefHead,
 	)
 	return i, err
 }
@@ -410,6 +512,15 @@ SELECT pg_advisory_xact_lock_shared($1::bigint)
 
 func (q *Queries) LockBlobsShared(ctx context.Context, lockKey int64) error {
 	_, err := q.db.Exec(ctx, lockBlobsShared, lockKey)
+	return err
+}
+
+const lockOrganizationArtifacts = `-- name: LockOrganizationArtifacts :exec
+SELECT pg_advisory_xact_lock(hashtextextended('dhow-artifacts:' || $1::text, 0))
+`
+
+func (q *Queries) LockOrganizationArtifacts(ctx context.Context, organizationID string) error {
+	_, err := q.db.Exec(ctx, lockOrganizationArtifacts, organizationID)
 	return err
 }
 
@@ -464,14 +575,16 @@ func (q *Queries) MarkUnusedBlobs(ctx context.Context, arg MarkUnusedBlobsParams
 const oldestCacheEntries = `-- name: OldestCacheEntries :many
 SELECT "Id", "SizeBytes"
 FROM "CacheEntries"
-WHERE "ProjectId" = $1 AND NOT "IsDeleted"
-ORDER BY "LastUsedAt", "Id"
-LIMIT $2
+WHERE "ProjectId" = $1 AND NOT "IsDeleted" AND ($2::boolean OR "Scope" <> $3::text)
+ORDER BY ("Scope" = $3::text), "LastUsedAt", "Id"
+LIMIT $4
 `
 
 type OldestCacheEntriesParams struct {
-	ProjectID uuid.UUID
-	MaxRows   int32
+	ProjectID        uuid.UUID
+	IncludeProtected bool
+	ProtectedScope   string
+	MaxRows          int32
 }
 
 type OldestCacheEntriesRow struct {
@@ -480,7 +593,12 @@ type OldestCacheEntriesRow struct {
 }
 
 func (q *Queries) OldestCacheEntries(ctx context.Context, arg OldestCacheEntriesParams) ([]OldestCacheEntriesRow, error) {
-	rows, err := q.db.Query(ctx, oldestCacheEntries, arg.ProjectID, arg.MaxRows)
+	rows, err := q.db.Query(ctx, oldestCacheEntries,
+		arg.ProjectID,
+		arg.IncludeProtected,
+		arg.ProtectedScope,
+		arg.MaxRows,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -497,6 +615,38 @@ func (q *Queries) OldestCacheEntries(ctx context.Context, arg OldestCacheEntries
 		return nil, err
 	}
 	return items, nil
+}
+
+const organizationArtifactBytes = `-- name: OrganizationArtifactBytes :one
+SELECT COALESCE(sum("SizeBytes"), 0)::bigint AS "Bytes"
+FROM "Artifacts"
+WHERE "OrganizationId" = $1 AND NOT "IsDeleted" AND "ExpiresAt" > now()
+`
+
+func (q *Queries) OrganizationArtifactBytes(ctx context.Context, organizationID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, organizationArtifactBytes, organizationID)
+	var Bytes int64
+	err := row.Scan(&Bytes)
+	return Bytes, err
+}
+
+const ownedBlobSize = `-- name: OwnedBlobSize :one
+SELECT b."SizeBytes"
+FROM "Blobs" b
+JOIN "BlobOwners" o ON o."Digest" = b."Digest" AND o."OrganizationId" = $1 AND NOT o."IsDeleted"
+WHERE b."Digest" = $2 AND NOT b."IsDeleted"
+`
+
+type OwnedBlobSizeParams struct {
+	OrganizationID uuid.UUID
+	Digest         []byte
+}
+
+func (q *Queries) OwnedBlobSize(ctx context.Context, arg OwnedBlobSizeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, ownedBlobSize, arg.OrganizationID, arg.Digest)
+	var SizeBytes int64
+	err := row.Scan(&SizeBytes)
+	return SizeBytes, err
 }
 
 const projectCacheBytes = `-- name: ProjectCacheBytes :one
@@ -536,6 +686,17 @@ type RetireArtifactParams struct {
 
 func (q *Queries) RetireArtifact(ctx context.Context, arg RetireArtifactParams) error {
 	_, err := q.db.Exec(ctx, retireArtifact, arg.RunID, arg.Name)
+	return err
+}
+
+const retireBlobOwners = `-- name: RetireBlobOwners :exec
+UPDATE "BlobOwners"
+SET "IsDeleted" = true, "UpdatedAt" = now()
+WHERE "Digest" = ANY ($1::bytea[]) AND NOT "IsDeleted"
+`
+
+func (q *Queries) RetireBlobOwners(ctx context.Context, digests [][]byte) error {
+	_, err := q.db.Exec(ctx, retireBlobOwners, digests)
 	return err
 }
 
@@ -612,4 +773,20 @@ func (q *Queries) UpsertBlob(ctx context.Context, arg UpsertBlobParams) (Blob, e
 		&i.StorageKey,
 	)
 	return i, err
+}
+
+const upsertBlobOwner = `-- name: UpsertBlobOwner :exec
+INSERT INTO "BlobOwners" ("OrganizationId", "Digest")
+VALUES ($1, $2)
+ON CONFLICT ("OrganizationId", "Digest") WHERE NOT "IsDeleted" DO NOTHING
+`
+
+type UpsertBlobOwnerParams struct {
+	OrganizationID uuid.UUID
+	Digest         []byte
+}
+
+func (q *Queries) UpsertBlobOwner(ctx context.Context, arg UpsertBlobOwnerParams) error {
+	_, err := q.db.Exec(ctx, upsertBlobOwner, arg.OrganizationID, arg.Digest)
+	return err
 }

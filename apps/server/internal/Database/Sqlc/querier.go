@@ -18,12 +18,14 @@ type Querier interface {
 	ApproveRun(ctx context.Context, arg ApproveRunParams) error
 	ArchiveProject(ctx context.Context, arg ArchiveProjectParams) (Project, error)
 	ArtifactOwner(ctx context.Context, arg ArtifactOwnerParams) (string, error)
+	ArtifactSize(ctx context.Context, arg ArtifactSizeParams) (int64, error)
 	BlobSize(ctx context.Context, digest []byte) (int64, error)
 	CancelQueuedJob(ctx context.Context, arg CancelQueuedJobParams) (Job, error)
 	CheckoutRepositoryOfJob(ctx context.Context, arg CheckoutRepositoryOfJobParams) (CheckoutRepositoryOfJobRow, error)
 	ClaimCommitStatuses(ctx context.Context, arg ClaimCommitStatusesParams) ([]ClaimCommitStatusesRow, error)
 	ClaimPendingRun(ctx context.Context, arg ClaimPendingRunParams) (PipelineRun, error)
 	ClaimQueuedJob(ctx context.Context, arg ClaimQueuedJobParams) (Job, error)
+	ClaimUpload(ctx context.Context, arg ClaimUploadParams) (uuid.UUID, error)
 	ClearMfaReset(ctx context.Context, arg ClearMfaResetParams) error
 	CompleteInstanceSetup(ctx context.Context, completedAt time.Time) error
 	ConfirmTotpFactor(ctx context.Context, arg ConfirmTotpFactorParams) error
@@ -81,6 +83,7 @@ type Querier interface {
 	FinishJob(ctx context.Context, arg FinishJobParams) (Job, error)
 	FinishRun(ctx context.Context, arg FinishRunParams) error
 	FinishRunJob(ctx context.Context, arg FinishRunJobParams) (int64, error)
+	FinishUpload(ctx context.Context, arg FinishUploadParams) error
 	GetActiveRunnerSession(ctx context.Context, runnerID uuid.UUID) (GetActiveRunnerSessionRow, error)
 	GetAlertRecipient(ctx context.Context, id uuid.UUID) (GetAlertRecipientRow, error)
 	GetArtifact(ctx context.Context, arg GetArtifactParams) (Artifact, error)
@@ -166,6 +169,7 @@ type Querier interface {
 	IsMemberByEmail(ctx context.Context, arg IsMemberByEmailParams) (bool, error)
 	JobCancelRequestedAt(ctx context.Context, id uuid.UUID) (*time.Time, error)
 	JobExists(ctx context.Context, arg JobExistsParams) (bool, error)
+	KnownBlobs(ctx context.Context, digests [][]byte) ([][]byte, error)
 	LatestTrustedSha(ctx context.Context, arg LatestTrustedShaParams) (string, error)
 	ListAcceptedInvitations(ctx context.Context, arg ListAcceptedInvitationsParams) ([]ListAcceptedInvitationsRow, error)
 	ListActiveUserSessions(ctx context.Context, arg ListActiveUserSessionsParams) ([]ListActiveUserSessionsRow, error)
@@ -219,6 +223,7 @@ type Querier interface {
 	LockOidcProvidersShared(ctx context.Context, lockKey int64) error
 	LockOpenInvitation(ctx context.Context, arg LockOpenInvitationParams) (LockOpenInvitationRow, error)
 	LockOrganization(ctx context.Context, id uuid.UUID) (LockOrganizationRow, error)
+	LockOrganizationArtifacts(ctx context.Context, organizationID string) error
 	LockOrganizationQueue(ctx context.Context, organizationID string) error
 	LockPendingTotp(ctx context.Context, arg LockPendingTotpParams) (LockPendingTotpRow, error)
 	LockProject(ctx context.Context, arg LockProjectParams) (Project, error)
@@ -260,8 +265,10 @@ type Querier interface {
 	NotifySettingsChanged(ctx context.Context, groupName string) error
 	OlderGroupRuns(ctx context.Context, arg OlderGroupRunsParams) ([]uuid.UUID, error)
 	OldestCacheEntries(ctx context.Context, arg OldestCacheEntriesParams) ([]OldestCacheEntriesRow, error)
+	OrganizationArtifactBytes(ctx context.Context, organizationID uuid.UUID) (int64, error)
 	OrganizationsWithLogRetention(ctx context.Context) ([]OrganizationsWithLogRetentionRow, error)
 	OriginUsedElsewhere(ctx context.Context, arg OriginUsedElsewhereParams) (bool, error)
+	OwnedBlobSize(ctx context.Context, arg OwnedBlobSizeParams) (int64, error)
 	PeekPendingTotp(ctx context.Context, arg PeekPendingTotpParams) (PeekPendingTotpRow, error)
 	PickCanceledUnstartedLease(ctx context.Context, graceSeconds float64) (uuid.UUID, error)
 	PickExpiredLease(ctx context.Context, graceSeconds float64) (uuid.UUID, error)
@@ -306,6 +313,7 @@ type Querier interface {
 	ResolveSession(ctx context.Context, arg ResolveSessionParams) (ResolveSessionRow, error)
 	RetentionClock(ctx context.Context) (time.Time, error)
 	RetireArtifact(ctx context.Context, arg RetireArtifactParams) error
+	RetireBlobOwners(ctx context.Context, digests [][]byte) error
 	RetireConfirmedTotp(ctx context.Context, arg RetireConfirmedTotpParams) (int64, error)
 	RetireExpiredInvitations(ctx context.Context, arg RetireExpiredInvitationsParams) error
 	RetireRecoveryCodes(ctx context.Context, arg RetireRecoveryCodesParams) (int64, error)
@@ -372,6 +380,7 @@ type Querier interface {
 	UpdateTeam(ctx context.Context, arg UpdateTeamParams) (UpdateTeamRow, error)
 	UpdateThrottle(ctx context.Context, arg UpdateThrottleParams) error
 	UpsertBlob(ctx context.Context, arg UpsertBlobParams) (Blob, error)
+	UpsertBlobOwner(ctx context.Context, arg UpsertBlobOwnerParams) error
 	UpsertCommitStatus(ctx context.Context, arg UpsertCommitStatusParams) (CommitStatusReport, error)
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (time.Time, error)
 	UseMfaChallenge(ctx context.Context, arg UseMfaChallengeParams) (int64, error)

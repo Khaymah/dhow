@@ -3,10 +3,14 @@ package artifacts
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	blob "github.com/Khaymah/dhow/apps/server/internal/Core/Blob"
@@ -15,7 +19,18 @@ import (
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 )
 
-const digestParam = "digest"
+const (
+	digestParam  = "digest"
+	uploadFailed = "failed"
+	uploadStored = "stored"
+)
+
+func extendDeadline(set func(time.Time) error, idle time.Duration) error {
+	if err := set(time.Now().Add(idle)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		return fmt.Errorf("extend the transfer deadline: %w", err)
+	}
+	return nil
+}
 
 type idleReader struct {
 	r    io.Reader
@@ -24,7 +39,9 @@ type idleReader struct {
 }
 
 func (i idleReader) Read(p []byte) (int, error) {
-	_ = i.rc.SetReadDeadline(time.Now().Add(i.idle))
+	if err := extendDeadline(i.rc.SetReadDeadline, i.idle); err != nil {
+		return 0, err
+	}
 	return i.r.Read(p)
 }
 
@@ -35,7 +52,9 @@ type idleWriter struct {
 }
 
 func (i idleWriter) Write(p []byte) (int, error) {
-	_ = i.rc.SetWriteDeadline(time.Now().Add(i.idle))
+	if err := extendDeadline(i.rc.SetWriteDeadline, i.idle); err != nil {
+		return 0, err
+	}
 	return i.w.Write(p)
 }
 
@@ -61,27 +80,77 @@ func (s *Service) respond(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
-func (s *Service) uploadLimit(l scope, kind string) (int64, error) {
+type upload struct {
+	limit int64
+	name  string
+	claim uuid.UUID
+	org   uuid.UUID
+}
+
+func (s *Service) uploadSlot(l scope, kind, name string) (upload, error) {
 	if !l.pipeline() {
-		return 0, errNotPipeline()
+		return upload{}, errNotPipeline()
 	}
 	switch kind {
 	case config.BlobKindArtifact:
-		if len(l.spec.GetArtifacts()) == 0 {
-			return 0, errNotDeclared()
+		decl, ok := declaredArtifact(l.spec, name)
+		if !ok {
+			return upload{}, errNotDeclared()
 		}
-		return s.cfg.MaxBytes, nil
+		limit := s.cfg.MaxBytes
+		if m := decl.GetMaxBytes(); m > 0 && m < limit {
+			limit = m
+		}
+		return upload{limit: limit, name: name}, nil
 	case config.BlobKindCache:
 		if l.spec.GetCache() == nil {
-			return 0, errNotDeclared()
+			return upload{}, errNotDeclared()
 		}
 		if _, ok := l.writeScope(); !ok || l.spec.GetCache().GetReadOnly() {
-			return 0, errReadOnly()
+			return upload{}, errReadOnly()
 		}
-		return s.cfg.CacheMaxBytes, nil
+		return upload{limit: s.cfg.CacheMaxBytes}, nil
 	default:
-		return 0, errInvalid("Kind")
+		return upload{}, errInvalid("Kind")
 	}
+}
+
+func (s *Service) claimUpload(ctx context.Context, r *http.Request, ref leaseRef) (upload, error) {
+	kind := r.Header.Get(config.BlobKindHeader)
+	var up upload
+	err := dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
+		l, err := lockLease(ctx, q, ref)
+		if err != nil {
+			return err
+		}
+		if up, err = s.uploadSlot(l, kind, r.Header.Get(config.BlobNameHeader)); err != nil {
+			return err
+		}
+		switch {
+		case r.ContentLength < 0:
+			return errLength()
+		case r.ContentLength > up.limit:
+			return errTooLarge()
+		}
+		if kind == config.BlobKindArtifact {
+			used, err := q.OrganizationArtifactBytes(ctx, l.row.OrganizationId)
+			if err != nil {
+				return err
+			}
+			if used+r.ContentLength > s.cfg.OrgMaxBytes {
+				return errQuota()
+			}
+		}
+		up.org = l.row.OrganizationId
+		up.claim, err = q.ClaimUpload(ctx, sqlc.ClaimUploadParams{
+			OrganizationID: l.row.OrganizationId, LeaseID: l.row.LeaseId, Kind: kind, Name: up.name,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errUploadUsed()
+		}
+		return err
+	})
+	return up, err
 }
 
 func (s *Service) PutBlob(w http.ResponseWriter, r *http.Request) {
@@ -96,29 +165,32 @@ func (s *Service) putBlob(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	var limit int64
-	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
-		l, err := lockLease(ctx, q, ref)
-		if err != nil {
-			return err
+	up, err := s.claimUpload(ctx, r, ref)
+	if err != nil {
+		return err
+	}
+	stored, err := s.storeBlob(ctx, w, r, d, ref, up)
+	if err != nil {
+		if ferr := s.queries().FinishUpload(context.WithoutCancel(ctx), sqlc.FinishUploadParams{ID: up.claim, State: uploadFailed}); ferr != nil {
+			return errors.Join(err, ferr)
 		}
-		limit, err = s.uploadLimit(l, r.Header.Get(config.BlobKindHeader))
-		return err
-	})
-	if err != nil {
 		return err
 	}
-	switch {
-	case r.ContentLength < 0:
-		return errLength()
-	case r.ContentLength > limit:
-		return errTooLarge()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	body := `{"Digest":"` + stored.Digest.String() + `","SizeBytes":` + strconv.FormatInt(stored.Size, 10) + "}"
+	if _, err := io.WriteString(w, body); err != nil {
+		s.log.WarnContext(ctx, "the blob was stored but the answer did not reach the runner", "request_id", middleware.RequestIDFrom(ctx), "error", err)
 	}
+	return nil
+}
+
+func (s *Service) storeBlob(ctx context.Context, w http.ResponseWriter, r *http.Request, d blob.Digest, ref leaseRef, up upload) (blob.Stored, error) {
 	rc := http.NewResponseController(w)
-	body := idleReader{r: http.MaxBytesReader(w, r.Body, limit), rc: rc, idle: config.BlobIdleTimeout}
-	pending, err := s.store.Stage(ctx, blob.Put{Digest: d, Size: r.ContentLength, MaxBytes: limit, Body: body})
+	body := idleReader{r: http.MaxBytesReader(w, r.Body, up.limit), rc: rc, idle: config.BlobIdleTimeout}
+	pending, err := s.store.Stage(ctx, blob.Put{Digest: d, Size: r.ContentLength, MaxBytes: up.limit, Body: body})
 	if err != nil {
-		return stageError(err)
+		return blob.Stored{}, stageError(err)
 	}
 	defer pending.Abort()
 	var out blob.Stored
@@ -130,20 +202,20 @@ func (s *Service) putBlob(w http.ResponseWriter, r *http.Request) error {
 		if err := q.LockBlobsShared(commitCtx, config.BlobSweepLockKey); err != nil {
 			return err
 		}
-		var err error
-		if out, err = pending.Commit(); err != nil {
+		if _, err := q.UpsertBlob(commitCtx, sqlc.UpsertBlobParams{Digest: d[:], SizeBytes: r.ContentLength, StorageKey: d.Key()}); err != nil {
 			return err
 		}
-		_, err = q.UpsertBlob(commitCtx, sqlc.UpsertBlobParams{Digest: d[:], SizeBytes: out.Size, StorageKey: out.Key})
+		if err := q.UpsertBlobOwner(commitCtx, sqlc.UpsertBlobOwnerParams{OrganizationID: up.org, Digest: d[:]}); err != nil {
+			return err
+		}
+		if err := q.FinishUpload(commitCtx, sqlc.FinishUploadParams{ID: up.claim, State: uploadStored, Digest: d[:]}); err != nil {
+			return err
+		}
+		var err error
+		out, err = pending.Commit()
 		return err
 	})
-	if err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_, _ = w.Write([]byte(`{"Digest":"` + out.Digest.String() + `","SizeBytes":` + strconv.FormatInt(out.Size, 10) + "}"))
-	return nil
+	return out, err
 }
 
 func stageError(err error) error {
@@ -177,10 +249,11 @@ func (s *Service) getBlob(w http.ResponseWriter, r *http.Request) error {
 		if !s.grants.verify(token, d, l.runJob(), l.row.LeaseId, s.now()) {
 			return errGrant()
 		}
-		if _, err := q.TouchBlob(ctx, d[:]); err != nil {
+		_, err := q.TouchBlob(ctx, d[:])
+		if errors.Is(err, pgx.ErrNoRows) {
 			return errBlobMissing()
 		}
-		return nil
+		return err
 	})
 	if err != nil {
 		return err
@@ -197,6 +270,8 @@ func (s *Service) getBlob(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("Content-Length", strconv.FormatInt(f.Size(), 10))
 	w.WriteHeader(http.StatusOK)
 	rc := http.NewResponseController(w)
-	_, _ = io.Copy(idleWriter{w: w, rc: rc, idle: config.BlobIdleTimeout}, f)
+	if _, err := io.Copy(idleWriter{w: w, rc: rc, idle: config.BlobIdleTimeout}, f); err != nil {
+		s.log.WarnContext(ctx, "a blob download stopped before its end", "request_id", middleware.RequestIDFrom(ctx), "error", err)
+	}
 	return nil
 }

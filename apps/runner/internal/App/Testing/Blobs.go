@@ -42,9 +42,11 @@ type blobState struct {
 	puts      int
 }
 
-func InputToken(digest string) string { return "in-" + digest[:16] }
+func prefix(digest string) string { return digest[:min(len(digest), 16)] }
 
-func cacheToken(digest string) string { return "ca-" + digest[:16] }
+func InputToken(digest string) string { return "in-" + prefix(digest) }
+
+func cacheToken(digest string) string { return "ca-" + prefix(digest) }
 
 func (s *Server) ConfigureBlobs(fn func(*BlobKnobs)) {
 	s.mu.Lock()

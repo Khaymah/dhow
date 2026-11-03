@@ -89,7 +89,7 @@ func (s *Service) CommitCache(ctx context.Context, lease *runnerv1.LeaseRef, key
 		if err := q.LockProjectCache(ctx, l.row.ProjectId.String()); err != nil {
 			return err
 		}
-		if err := touchBlob(ctx, q, d, size); err != nil {
+		if err := touchBlob(ctx, q, l.row.OrganizationId, d, size); err != nil {
 			return err
 		}
 		id, err := q.InsertCacheEntry(ctx, sqlc.InsertCacheEntryParams{
@@ -101,39 +101,46 @@ func (s *Service) CommitCache(ctx context.Context, lease *runnerv1.LeaseRef, key
 		if err != nil {
 			return err
 		}
-		stored = true
-		return s.evict(ctx, q, *l.row.ProjectId, id)
+		stored, err = s.evict(ctx, q, *l.row.ProjectId, id, where, l.defaultScope())
+		return err
 	})
 	return stored, err
 }
 
-func (s *Service) evict(ctx context.Context, q *sqlc.Queries, project, keep uuid.UUID) error {
+func (s *Service) evict(ctx context.Context, q *sqlc.Queries, project, added uuid.UUID, where, protected string) (bool, error) {
 	total, err := q.ProjectCacheBytes(ctx, project)
 	if err != nil {
-		return err
+		return false, err
 	}
+	includeProtected := protected == "" || where == protected
 	for total > s.cfg.CacheMaxBytes {
-		rows, err := q.OldestCacheEntries(ctx, sqlc.OldestCacheEntriesParams{ProjectID: project, MaxRows: evictPage})
+		rows, err := q.OldestCacheEntries(ctx, sqlc.OldestCacheEntriesParams{
+			ProjectID: project, IncludeProtected: includeProtected, ProtectedScope: protected, MaxRows: evictPage,
+		})
 		if err != nil {
-			return err
+			return false, err
 		}
 		var ids []uuid.UUID
 		for _, r := range rows {
 			if total <= s.cfg.CacheMaxBytes {
 				break
 			}
-			if r.Id == keep {
+			if r.Id == added {
 				continue
 			}
 			ids = append(ids, r.Id)
 			total -= r.SizeBytes
 		}
 		if len(ids) == 0 {
-			return nil
+			break
 		}
 		if _, err := q.EvictCacheEntries(ctx, ids); err != nil {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	if total <= s.cfg.CacheMaxBytes {
+		return true, nil
+	}
+	_, err = q.EvictCacheEntries(ctx, []uuid.UUID{added})
+	return false, err
 }
