@@ -1,6 +1,6 @@
 # خطة M5: الأسرار والبيئات (Secrets & Environments)
 
-**الحالة:** مسودة، مستنية إجابات Sabry على [الأسئلة المفتوحة](#أسئلة-مفتوحة-لـ-sabry). القرارات التقنية مفوَّضة ومكتوبة بالتوصية، وكل واحد منها بيبقى ADR في أول المرحلة بتاعته · **التاريخ:** 2026-11-03
+**الحالة:** مقبولة. Sabry اختار التوصية في الأسئلة الستة يوم 2026-11-03 ([قراراته](#قرارات-sabry-2026-11-03)). القرارات التقنية مفوَّضة ومكتوبة بالتوصية، وكل واحد منها بيبقى ADR في أول المرحلة بتاعته · **التاريخ:** 2026-11-03
 
 ## الهدف
 شرط خلاص M5 في `docs/roadmap.md` (الصف M5، بعد [ADR-0068](ADR/0068-first-production-release-scope.md)):
@@ -25,7 +25,7 @@
 ## قرارات Sabry اللي الخطة مبنية عليها (ملزمة)
 1. **قاعدة البيئة بتحدد الفروع والـ tags اللي بتنشر عليها**، على السيرفر، ومفيش commit يقدر يغيّرها. الـ job بيكتب `environment:` واحد. الـ job اللي الـ ref بتاعه مش مسموح بيخلص `skipped` بسبب واضح مش `failed`. المستودع بيفضل بـ deploy key واحد للـ checkout لكل الفروع، ومفاتيح السيرفرات اللي بننشر عليها أسرار جوه كل بيئة (Status، 2026-11-02).
 2. **تنفيذات الـ forks:** من غير أسرار ولا بيئات، أبدًا (ADR-0076).
-3. **الـ cache:** أول ما الأسرار تيجي، تنفيذات الـ forks ماترجّعش نطاقات موثوقة، أو ترجّع قايمة صريحة بس (Status، من مراجعة M4.11). M5 بيقرر وبينفّذ ([السؤال 4](#4-الـ-cache-لتنفيذات-الـ-forks)).
+3. **الـ cache:** أول ما الأسرار تيجي، تنفيذات الـ forks ماترجّعش نطاقات موثوقة، أو ترجّع قايمة صريحة بس (Status، من مراجعة M4.11). M5 بينفّذ [قرار Sabry 4](#قرارات-sabry-2026-11-03).
 4. **كله ببلاش** (ADR-0077): مفيش خدمة ولا جهاز مدفوع مطلوب. KMS أو HSM ممكن يبقى اختياري، عمره ما يبقى شرط.
 5. **expand/contract** (ADR-0077، الـ hook U1): كل migration في M5 ماشي بيها، وكمان تغيير صيغة القيم المتشفّرة نفسها.
 
@@ -37,18 +37,19 @@
 5. **بيانات دخول الـ registry الخاص:** للسيرفر وهو بيثبّت الـ tag بالـ digest (§12.5 بيقول M5)، وللـ runner وهو بيسحب الصورة.
 6. **البيئات:** النموذج، وقواعد الحماية (§9)، والموافقات بخطوة تانية، ومؤقت الانتظار، والتزامن لكل بيئة، وسجل النشر، والتخطّي الإداري المسجّل.
 7. **الـ forks والـ PRs والـ cache:** القاعدة الجديدة للـ cache، وتعليم الـ cache اللي اتكتب من job شاف أسرار.
-8. **مُصدِر OIDC للأحمال:** التصميم كامل هنا، والتنفيذ حسب [السؤال 3](#3-مُصدِر-oidc-للأحمال-إمتى).
+8. **مُصدِر OIDC للأحمال (تصميم بس):** التصميم كامل هنا في M5.8، والتنفيذ بعد أول نسخة ([قرار Sabry 3](#قرارات-sabry-2026-11-03))، فمش جزء من شرط خلاص M5.
 9. **الواجهة:** صفحة الأسرار (مابتعرضش قيمة أبدًا)، والبيئات، والموافقات، وصفحة التنفيذ وهي مستنية موافقة أو متخطّية.
 10. **الوثائق بالنسختين**، وصفوف M5 في جدول التهديدات، و`deploy/m5-demo/run.sh`.
 
 ## مش في M5
 - **Vault وKMS السحابة وHSM:** في Enterprise (ADR-0014، M8 بعد أول نسخة). M5 بيعمل الـ interface `KeyProvider` ومعاه provider الملف بس.
-- **أكتر من مراجع مطلوب، ونوافذ النشر، والتجميد المجدول:** في Business حسب جدول النسخ، فبعد أول نسخة لو Sabry وافق على التوصية في [السؤال 2](#2-نوافذ-النشر-والتجميد-وأكتر-من-مراجع). النموذج بيتعمل جاهز ليهم من غير ما يتنفّذوا.
+- **أكتر من مراجع مطلوب، ونوافذ النشر، والتجميد المجدول:** في Business مع M8 بعد أول نسخة، زي جدول النسخ ([قرار Sabry 2](#قرارات-sabry-2026-11-03)). Community فيها مراجع واحد وزرار «أوقف النشر» يدوي، والنموذج بيتعمل جاهز للباقي من غير ما يتنفّذ.
+- **مُصدِر OIDC للأحمال:** بعد أول نسخة ([قرار Sabry 3](#قرارات-sabry-2026-11-03)). M5.8 مصمّمة هنا ومتأجّلة، ومش من شرط خلاص M5.
 - **تدوير `DHOW_SECRET_KEY` نفسه:** بعد M5.2 مابقاش بيشفّر حاجة متخزّنة، بس لسه بيشتق مفاتيح التوقيع والـ HMAC (الـ runner plane وتوكنات API وCSRF وأكواد الطوارئ). تدويره بيعيد تسجيل الـ runners ويبطّل التوكنات، فبيتأجّل لبعد أول نسخة بإجراء موثّق.
 - **تدوير DEK بإعادة تشفير القيم:** تدوير الـ KEK بيعيد لف الـ DEKs بس (ADR-0014). بعد أي تسريب، الحل الحقيقي إن صاحب السر يغيّر قيمته، وده مكتوب في دليل الطوارئ.
 - **الإشعارات** (إيميل للمراجعين، وSlack، والموافقة من Slack): M7. في M5 الموافقة بتظهر في الواجهة وفي عدّاد «مستنياك».
 - **أهداف النشر نفسها** (`deploy-ssh` و`deploy-compose` والرجوع): M6. M5 بيدّي البيئة وأسرارها وسجل النشر اللي M6 هيبني عليه.
-- **توكنات API للأسرار والموافقات:** حسب [السؤال 6](#6-توكنات-api-للأسرار).
+- **كتابة الأسرار أو الموافقة بتوكن API:** مش في M5 ([قرار Sabry 6](#قرارات-sabry-2026-11-03)). الكتابة من جلسة بس، والتوكن بياخد `secret.read` (الأسماء والـ metadata، عمره ما بيقرا قيمة).
 - **سياسات OPA:** Enterprise.
 
 ## المعمارية
@@ -71,7 +72,7 @@
                                  │                                  re-check fork, environment, rule version
                                  ◄── SealedSecrets: HPKE to the leasing runner (ADR-0045), once per attempt
    runner: masker ◄─ values · env/file per step · registry authfile outside the sandbox · scan artifacts and cache
-   (optional M5.8) /run/dhow/bin/id-token ─► agent ─► runner ─► IdentityService.MintIdToken ─► JWT (RS256)
+   (M5.8, after the first release) /run/dhow/bin/id-token ─► agent ─► runner ─► IdentityService.MintIdToken ─► JWT (RS256)
  public:  /.well-known/openid-configuration   /.well-known/jwks.json
 ```
 
@@ -90,8 +91,8 @@
 - **الإصدار 1** (`Sealer` النهارده): `0x01 ‖ nonce ‖ ciphertext ‖ tag` بمفتاح مشتق من `DHOW_SECRET_KEY`. بيتقري لحد الـ contract في M5.9.
 - **القيود الموجودة كفاية:** TOTP 20 byte بيبقى 65 (القيد 29 لـ 128)، وإعدادات السيرفر (لحد 65536) ومزوّدي الدخول (لحد 4096) والمستودعات (8192 و1024) فيهم مكان. اختبار في M5.2 بيتأكد من أكبر قيمة ممكنة في كل عمود.
 
-### مكان الـ KEK (حسب [السؤال 1](#1-مكان-مفتاح-التغليف-kek))
-- **التوصية:** ملف سلسلة مفاتيح منفصل عن `DHOW_SECRET_KEY`:
+### مكان الـ KEK ([قرار Sabry 1](#قرارات-sabry-2026-11-03))
+- **القرار:** ملف سلسلة مفاتيح منفصل عن `DHOW_SECRET_KEY`، وKMS خارجي اختياري بعدين ورا نفس الـ interface:
   - **systemd:** `LoadCredential=dhow-keyring:/etc/dhow/credentials/dhow-keyring` في `dhow.service`، و`root:root 0600`.
   - **Compose:** `secrets:` في `compose.yaml` من `./secrets/dhow-keyring`، و`./init.sh` بيعمله جنب `.env`. مش متغيّر بيئة، لأن `docker inspect` وبيئة الـ process بيكشفوه.
   - **غير كده:** `DHOW_KEYRING_FILE`، بنفس قواعد `secretValue` الموجودة (مفيش صلاحية لمستخدمين تانيين، و64 KiB بالكتير، وملف عادي).
@@ -214,8 +215,8 @@
 | الفروع والـ tags المسموحة | `AllowedRefs` (`Kind` = `branch` أو `tag`، و`Pattern`) | فرع المشروع الافتراضي | glob بتاع `internal/pathglob` (`*` و`**` و`?`)، و50 pattern بالكتير. فاضية = مفيش حاجة تنشر. **مفيش تخطّي ليها** |
 | الـ PRs من نفس المستودع | `AllowPullRequests` | لأ | لبيئات المعاينة. الـ forks لأ أبدًا |
 | المراجعين | `Reviewers: {UserIds, TeamIds}` | مفيش | 20 بالكتير. المراجع لازم عضو ودوره Developer أو أعلى على المشروع |
-| عدد الموافقات | `RequiredApprovals` | 1 | أكتر من 1 في Business ([السؤال 2](#2-نوافذ-النشر-والتجميد-وأكتر-من-مراجع)). الـ CHECK = 1 دلوقتي، والتوسيع expand بعدين |
-| منع الموافقة على النفس | `PreventSelfReview` | آه | [السؤال 5](#5-الموافقة-الخطوة-التانية-والموافقة-على-النفس) |
+| عدد الموافقات | `RequiredApprovals` | 1 | أكتر من 1 في Business مع M8 ([قرار Sabry 2](#قرارات-sabry-2026-11-03)). الـ CHECK = 1 دلوقتي، والتوسيع expand بعدين |
+| منع الموافقة على النفس | `PreventSelfReview` | آه | [قرار Sabry 5](#قرارات-sabry-2026-11-03): Admin يقدر يقفله للبيئة دي بس (فريق شخص واحد)، بخطوة تانية، والتغيير في الـ audit |
 | مؤقت الانتظار | `WaitMinutes` | 0 | من 0 لـ 43200 (30 يوم)، بيبدأ لما الـ job يوصل البوابة |
 | مدة صلاحية الطلب | `ApprovalTimeoutHours` | 72 | من 1 لـ 720 |
 | الصور بالـ digest | `RequirePinnedImages` | لأ | الـ digest لازم يبقى **مكتوب في الملف**. التثبيت اللي السيرفر بيعمله للـ tag (§12.5) مايكفيش، لأن الـ tag وقت التنفيذ ممكن يبقى اتنقل لصورة حد تاني |
@@ -223,8 +224,8 @@
 | مستوى العزل | `RequiredIsolation` | `container` | في أول نسخة مفيش غير `container`، فالقاعدة بتتحقق بس |
 | التخطّي الإداري | `AllowAdminBypass` | لأ | للمراجعين والمؤقت بس (تحت) |
 | استبدال الطلبات القديمة | `SupersedePending` | آه | تحت |
-| الإيقاف | `Paused` و`PausedReason` | — | في Community بدل التجميد المجدول، حسب السؤال 2 |
-| نوافذ النشر والتجميد المجدول | — | — | Business، حسب السؤال 2 |
+| الإيقاف («أوقف النشر») | `Paused` و`PausedReason` | — | يدوي، في Community بدل التجميد المجدول (قرار Sabry 2) |
+| نوافذ النشر والتجميد المجدول | — | — | Business مع M8 (قرار Sabry 2) |
 
 ### البوابة: ترتيب الفحوص
 لما الـ `needs` كلها تخلص صح، `Pipelines` بينادي `Core/Deployments.Gate` جوه نفس الـ transaction (port زي ADR-0070) بالترتيب ده:
@@ -245,7 +246,7 @@
 ### الموافقات
 - **طلب واحد لكل (run، بيئة، جولة):** كل jobs التنفيذ اللي على البيئة دي (ومعاها نسخ الـ matrix) بتعدّي بموافقة واحدة. «أعد تشغيل الفاشل» بيبدأ جولة جديدة بطلب جديد.
 - **الطلب** مربوط بالـ run (يعني الـ sha والتعريف) وبـ `"RuleVersion"`.
-- **مين يوافق:** حد في `Reviewers` (مباشرة أو من فريق)، عضو، ودوره Developer أو أعلى على المشروع، وعنده خطوة تانية مسجّلة (حسب [السؤال 5](#5-الموافقة-الخطوة-التانية-والموافقة-على-النفس))، ومش «نفسه» لو `PreventSelfReview`. «نفسه» = اللي عمل التشغيل اليدوي (`"TriggeredByUserId"`)، أو المستخدم اللي حسابه على GitHub أو GitLab المربوط بداو (M2.4) هو نفس الـ actor بتاع الـ push. في Git العام الـ pusher نص من الـ webhook ومش مربوط بحد، والواجهة بتقول كده جنب الطلب.
+- **مين يوافق:** حد في `Reviewers` (مباشرة أو من فريق)، عضو، ودوره Developer أو أعلى على المشروع، وعنده خطوة تانية مسجّلة ([قرار Sabry 5](#قرارات-sabry-2026-11-03))، ومش «نفسه» لو `PreventSelfReview` شغّال (الافتراضي، وAdmin يقدر يقفله للبيئة دي بس). «نفسه» = اللي عمل التشغيل اليدوي (`"TriggeredByUserId"`)، أو المستخدم اللي حسابه على GitHub أو GitLab المربوط بداو (M2.4) هو نفس الـ actor بتاع الـ push. في Git العام الـ pusher نص من الـ webhook ومش مربوط بحد، والواجهة بتقول كده جنب الطلب.
 - **الموافقة:** `POST .../runs/{runId}/approvals/{approvalId}/approve` بـ `CurrentFactor` (TOTP أو كود طوارئ أو مفتاح مرور، زي تغييرات الهوية) و`Comment` اختياري (1 KiB). بتتسجّل بنوع الخطوة (مش القيمة).
 - **الرفض:** `.../reject` بنفس الشروط. الـ jobs اللي مستنية بتفشل `DEPLOYMENT_REJECTED`، واللي بعدها `skipped` بـ `NEEDS_FAILED`.
 - **الانتهاء:** الطلب اللي ماحدش رد عليه في `ApprovalTimeoutHours` بيخلص `expired`، والـ jobs بتفشل `APPROVAL_EXPIRED`.
@@ -254,7 +255,7 @@
 - **المراجع اتشال:** الموافقة بتتفحص تاني عند فتح البوابة: لو صاحبها ماعادش مراجع أو عضو، الطلب بيرجع `pending`.
 - **الإلغاء:** إلغاء الـ run بيلغي الطلبات.
 - **التخطّي الإداري:** `.../bypass` لـ Owner وAdmin بس، لو البيئة فيها `AllowAdminBypass`، بـ `Reason` (إجباري، 1 KiB) و`CurrentFactor`. بيعدّي المراجعين والمؤقت بس. قاعدة الـ ref والقواعد الثابتة والإيقاف والـ forks مافيهاش تخطّي. بيتسجّل `environment.bypassed` وبيبان على الـ run وعلى صف النشر.
-- **الخطوة التانية:** `deployment.approve` و`environment.bypass` من الإجراءات الحساسة (ADR-0054)، وفوقها `CurrentFactor` مع كل طلب، حسب [السؤال 5](#5-الموافقة-الخطوة-التانية-والموافقة-على-النفس).
+- **الخطوة التانية:** `deployment.approve` و`environment.bypass` من الإجراءات الحساسة (ADR-0054)، وفوقها `CurrentFactor` مع كل موافقة ورفض وتخطّي ([قرار Sabry 5](#قرارات-sabry-2026-11-03)).
 
 ### التزامن لكل بيئة
 - **run واحد في البيئة في المرة:** الـ run بيمسك البيئة من أول job بيتدرج عليها لحد ما مايبقاش فيه `RunJob` منه على البيئة دي مش منتهي (أو الـ run يخلص أو يتلغي). كده `deploy` و`migrate-db` في نفس الـ run مايتداخلش بينهم run تاني.
@@ -271,15 +272,15 @@
 - **الـ run في القايمة:** شارة «مستني موافقة» لو أي job فيه `"Gate" = 'approval'`، وعدّاد «موافقات مستنياك» في الرئيسية والقايمة.
 
 ## الـ forks والـ PRs والـ cache
-- **الـ forks:** الـ resolver بيرفض أي سر لـ run فيه `"IsFork"` حتى لو الفحص في `Pipelines` اتكسر (دفاع تاني)، ومفيش متغيّرات ولا registry ولا OIDC.
-- **الـ cache (حسب [السؤال 4](#4-الـ-cache-لتنفيذات-الـ-forks)، التوصية):**
+- **الـ forks:** الـ resolver بيرفض أي سر لـ run فيه `"IsFork"` حتى لو الفحص في `Pipelines` اتكسر (دفاع تاني)، ومفيش متغيّرات ولا registry ولا OIDC (لما M5.8 ييجي).
+- **الـ cache ([قرار Sabry 4](#قرارات-sabry-2026-11-03)):**
   - تنفيذات الـ forks مابترجّعش أي cache افتراضيًا.
   - Admin يقدر يفتح «الـ forks تقرا cache الفرع الافتراضي» من إعدادات المشروع (`"ForkCacheRestore"` = `none` أو `default_branch`)، بتحذير.
   - أي cache اتكتب من job وصله سر أو بيانات registry أو توكن OIDC بيتعلّم `"HadSecrets"`، وعمره ما بيرجع لـ fork حتى لو الإعداد مفتوح.
 - **الـ artifacts:** الـ forks `Untrusted` زي M4، والبوابة بترفض job على بيئة بيستخدم artifact `Untrusted` (`UNTRUSTED_ARTIFACT`)، دفاع تاني لأن الـ fork مايوصلش للبيئة أصلًا.
 
 ## مُصدِر OIDC للأحمال
-**إمتى:** حسب [السؤال 3](#3-مُصدِر-oidc-للأحمال-إمتى). التوصية بعد أول نسخة مباشرة، والتصميم هنا كامل عشان يتعمل في أي وقت بعد M5.6 (المرحلة M5.8).
+**إمتى:** بعد أول نسخة مباشرة ([قرار Sabry 3](#قرارات-sabry-2026-11-03)). التصميم هنا كامل عشان يتعمل في أي وقت بعد M5.6 (المرحلة M5.8)، ومش من شرط خلاص M5. أهداف أول نسخة SSH وCompose مش بتستخدمه، واللي محتاج سحابة لحد ساعتها يستخدم سر عادي.
 - **الـ endpoints** (بره `/api/v1`، بـ `policy.Public`، وrate limit، و`Cache-Control: max-age=300`): `GET /.well-known/openid-configuration` و`GET /.well-known/jwks.json`. والـ issuer = `DHOW_PUBLIC_URL`، ولازم `https` وhost عام، وإلا الميزة مقفولة برسالة في `doctor`. وقالب nginx بتاع الـ installer بيعدّي المسارين دول.
 - **الطلب:** الـ job بيعلن `id_token: {audiences: [...]}` (5 بالكتير)، وإلا مفيش توكن. والخطوة بتنادي `/run/dhow/bin/id-token --audience <aud>`، فالـ agent بيبعت للـ runner على قناة التحكم، والـ runner بينادي `IdentityService.MintIdToken(LeaseRef، audience، lifetime)` بالـ fencing، والتوكن بيتضاف للـ masker وبيتطبع على stdout الـ helper.
 - **السيرفر بيتأكد:** الـ lease حي والـ fencing الحالي، والـ audience في اللي اتعلن، والـ run مش fork، ولو فيه بيئة البوابة عدّت، و60 توكن بالكتير لكل attempt.
@@ -319,7 +320,7 @@
 | 18 | موافقة واحدة لكل (run، بيئة، جولة)، و72 ساعة، واستبدال الـ `pending` الأقدم على نفس الـ ref، ومربوطة بـ `"RuleVersion"` | المراجع بيوافق على نسخة الكود مش على كل job، والقاعدة المتغيّرة محتاجة موافقة جديدة | M5.6 |
 | 19 | run واحد لكل بيئة، ماسكها لحد ما jobs البيئة بتاعته تخلص | نشر ومايجريشن من نفس الـ run مايتداخلش بينهم حد | M5.6 |
 | 20 | «الصور بالـ digest» = في الملف، والإضافات ببادئة الاسم، والتخطّي للمراجعين والمؤقت بس | الـ tag بيتنقل، والتوقيع مع السجل بعد GA، والـ ref قرار Sabry مالوش تخطّي | M5.6 |
-| 21 | OIDC: RS256 من الـ standard library، و5 دقايق، وعند الطلب من خلال الـ runner، ومفاتيح كل 90 يوم | أوسع توافق، ومن غير مكتبة JWT، والتوكن مايتولدش قبل ما الخطوة تحتاجه | M5.8 |
+| 21 | OIDC (بعد أول نسخة): RS256 من الـ standard library، و5 دقايق، وعند الطلب من خلال الـ runner، ومفاتيح كل 90 يوم | أوسع توافق، ومن غير مكتبة JWT، والتوكن مايتولدش قبل ما الخطوة تحتاجه | M5.8 |
 
 ## الأمان
 | الخطر | التخفيف | فين بيتختبر |
@@ -346,8 +347,8 @@
 | runner من مؤسسة تانية بياخد الأسرار | الـ lease بالمؤسسة وHPKE لمفتاح الـ runner اللي ماسك الـ lease (M3) | اختبار العزل بين المؤسسات بيتوسّع للأسرار |
 | Maintainer بيطلّع سر البيئة بكود | أسرار البيئة بعد قاعدة الـ ref والمراجعة بس، والـ masker | خطر مقبول ومكتوب (§13.2) |
 | بيانات دخول registry بتروح لـ host تاني | للـ host نفسه وللـ realm اللي بيعدّي قواعد §12.5 بس، و`netguard` | realm على host تاني أو IP خاص: مابيتبعتلوش |
-| توكن OIDC اتسرق من الـ job | 5 دقايق، و`aud` محدد، والـ masker، و`sub` فيه البيئة | توكن بعد `exp` وبـ `aud` تاني: مرفوض في اختبار التحقق |
-| مفتاح توقيع OIDC اتسرّب | متشفّر بـ DEK، والتدوير كل 90 يوم، وتدوير فوري بأمر | `leaksweep` بيدوّر على المفتاح الخاص |
+| توكن OIDC اتسرق من الـ job (M5.8) | 5 دقايق، و`aud` محدد، والـ masker، و`sub` فيه البيئة | توكن بعد `exp` وبـ `aud` تاني: مرفوض في اختبار التحقق |
+| مفتاح توقيع OIDC اتسرّب (M5.8) | متشفّر بـ DEK، والتدوير كل 90 يوم، وتدوير فوري بأمر | `leaksweep` بيدوّر على المفتاح الخاص |
 
 **الأسرار للكتابة بس (اختبار):** نفس اختبار M4 بيتوسّع: كل DTO جديد مافيهوش قيمة سر ولا قيمة registry ولا مفتاح OIDC خاص ولا DEK، والـ access log مابيسجّلش bodies الـ routes دي.
 
@@ -367,7 +368,7 @@
 | `"SecretProjectAccess"` | Secrets | `"SecretId"` و`"ProjectId"`، unique |
 | `"Variables"` | Secrets | نفس نطاق `"Secrets"` و`"Name"` و`"Value"` (4 KiB) و`"UpdatedByUserId"` |
 | `"RegistryCredentials"` | Secrets | `"OrganizationId"` و`"ProjectId"` و`"Host"` (unique مع النطاق) و`"Username"` و`"PasswordSealed"` |
-| `"OidcSigningKeys"` (M5.8) | WorkloadIdentity | `"Kid"` (unique) و`"PublicJwk"` (jsonb) و`"PrivateSealed"` و`"State"` (`next`, `current`, `previous`, `retired`) و`"ActivatesAt"` و`"RetiresAt"` |
+| `"OidcSigningKeys"` (M5.8، بعد أول نسخة) | WorkloadIdentity | `"Kid"` (unique) و`"PublicJwk"` (jsonb) و`"PrivateSealed"` و`"State"` (`next`, `current`, `previous`, `retired`) و`"ActivatesAt"` و`"RetiresAt"` |
 
 - **أعمدة جديدة (expand):**
   - `"RunJobs"`: `"EnvironmentId"` و`"Gate"` (`TEXT` CHECK IN (`approval`, `timer`, `paused`, `environment_busy`)) و`"GateOpensAt"` و`"FailureDetail"` (jsonb `{}`، 1 KiB).
@@ -375,7 +376,7 @@
   - `"Projects"`: `"ForkCacheRestore"` (`TEXT NOT NULL DEFAULT 'none'`).
   - `"ServerInstances"` (من U2): `"KekVersions"` (`integer[] NOT NULL DEFAULT '{}'`).
 - **أسباب فشل جديدة** على `"RunJobs"."FailureReason"` (64 حرف بالكتير): `ENVIRONMENT_NOT_FOUND` و`ENVIRONMENT_REF_NOT_ALLOWED` و`ENVIRONMENT_REQUIRES_PINNED_IMAGES` و`ENVIRONMENT_PLUGIN_NOT_ALLOWED` و`ENVIRONMENT_ISOLATION_REQUIRED` و`ENVIRONMENT_RULE_CHANGED` و`SECRET_NOT_FOUND` و`SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS` و`SECRETS_TOO_LARGE` و`DEPLOYMENT_REJECTED` و`APPROVAL_EXPIRED` و`SUPERSEDED` و`UNTRUSTED_ARTIFACT` و`ARTIFACT_CONTAINS_SECRET`. الـ binary القديم بيعرضهم نص زي ما هم (الحقل `TEXT`).
-- **`"ApiTokens"`:** الـ scopes الجديدة حسب [السؤال 6](#6-توكنات-api-للأسرار) (التوصية: `secret.read` بس).
+- **`"ApiTokens"`:** migration بيوسّع الـ CHECK على `"Scopes"` بـ `secret.read` بس ([قرار Sabry 6](#قرارات-sabry-2026-11-03)): الأسماء والـ metadata، عمره ما بيقرا قيمة. ومفيش scope للكتابة ولا للموافقة في M5.
 - **الـ FK بين الموديولات:** مفيش (زي M4)، والتحقق في الـ service. والـ FK المركّب على `"Projects"` و`"PipelineRuns"` زي `"Repositories"`.
 
 ## الـ API
@@ -408,7 +409,7 @@
 | `GET /system/keys` | `instance.settings.manage` | حالة السلسلة للقراية بس |
 
 - **الـ `RunJob` في تفاصيل الـ run** بيزيد عليه `Environment` و`Gate` و`GateOpensAt` و`ApprovalId` و`FailureDetail`.
-- **الـ OIDC** (M5.8، بره `/api/v1`): `GET /.well-known/openid-configuration` و`GET /.well-known/jwks.json` بـ `policy.Public`.
+- **الـ OIDC** (M5.8 بعد أول نسخة، بره `/api/v1`): `GET /.well-known/openid-configuration` و`GET /.well-known/jwks.json` بـ `policy.Public`.
 - **الأخطاء الجديدة (`UPPER_SNAKE`، مترجمة من `Accept-Language`):** `SECRET_TOO_SHORT` و`SECRET_TOO_LARGE` و`SECRET_NAME_RESERVED` و`SECRET_LIMIT_REACHED` و`ENVIRONMENT_EXISTS` و`ENVIRONMENT_VERSION_CONFLICT` و`REVIEWER_NOT_ELIGIBLE` و`REVIEWER_NEEDS_SECOND_FACTOR` و`SELF_REVIEW_NOT_ALLOWED` و`APPROVAL_NOT_PENDING` و`BYPASS_NOT_ALLOWED` و`KEK_NOT_EVERYWHERE`.
 
 **الأدوار المقترحة** (على المشروع من `"RoleBindings"` لو موجودة، وغير كده دور المؤسسة):
@@ -423,6 +424,7 @@
 | `deployment.approve` (ولازم يبقى مراجع في البيئة) | ✅ | ✅ | ✅ | ✅ | — |
 | `environment.bypass` (لو البيئة سامحة) | ✅ | ✅ | — | — | — |
 
+- **التوكنات:** `secret.read` بس. أي route بيكتب سر أو متغيّر أو بيئة أو بيوافق بيرفض التوكن (قرار Sabry 6)، وصفوف الـ route-table بتتأكد.
 - **حساسة (ADR-0054):** `secret.manage` و`org.secret.manage` و`environment.manage` و`deployment.approve` و`environment.bypass`.
 - **الإيقاف والاستكمال مش متساويين عن قصد:** وقف النشر وقت مشكلة Maintainer يقدر عليه، والرجوع Admin بخطوة تانية.
 - **كل route** ليه صف في اختبار الـ route-table لكل دور، ومعاه binding على المشروع بيرفع أو بيقلّل الدور.
@@ -430,10 +432,10 @@
 ### الـ proto (`packages/proto/dhow/runner/v1`، إضافات بس، و`buf breaking` أخضر)
 ```
 JobSpec      += registry_auth[] RegistryAuth { host, secret_name }   (M5.5)
-             += id_token IdTokenGrant { audiences[] }                (M5.8)
+             += id_token IdTokenGrant { audiences[] }                (M5.8, after the first release)
 AttemptFailureReason += ARTIFACT_CONTAINS_SECRET
 
-IdentityService.MintIdToken(LeaseRef, audience, lifetime_seconds) → token, expires_at   (M5.8)
+IdentityService.MintIdToken(LeaseRef, audience, lifetime_seconds) → token, expires_at   (M5.8, deferred)
 
 features: registry_auth (M5.5), id_token (M5.8)
 agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token, like the mask helper)
@@ -444,7 +446,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 ### الإعدادات الجديدة
 - **السيرفر** (في `docs/install/configuration.md` بالنسختين، ومش في «إعدادات السيرفر» لأنها مفاتيح):
   - `DHOW_KEYRING_FILE` أو الـ credential `dhow-keyring`: إجباري، والإقلاع بيقف من غيره.
-  - `DHOW_OIDC_ISSUER` (M5.8): `on` أو `off`، والافتراضي `off` لحد ما الأدمن يفتحه.
+  - `DHOW_OIDC_ISSUER` (M5.8، بعد أول نسخة): `on` أو `off`، والافتراضي `off` لحد ما الأدمن يفتحه.
 - **الثوابت** (مش env): حدود الأسرار والمتغيّرات، و`ApprovalTimeoutHours` على البيئة، وإيقاع إعادة اللف.
 
 ## الوثائق (بالنسختين، و`make docs-check`)
@@ -455,10 +457,10 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 | `docs/guides/secrets.md` (جديد) | M5.4 | النطاقات والأولوية والـ write-only والإصدارات والمتغيّرات والـ registry |
 | `docs/guides/environments.md` (جديد) | M5.6 | القواعد والموافقات والتزامن والسجل والتخطّي وشكل الـ jobs |
 | `docs/pipeline-spec.md` | M5.5 وM5.6 | `files:` و`vars` والـ registry (§12.5)، وشيل سطر M5 من §8، و§9 كامل، و§12.4 والـ cache |
-| `docs/architecture.md` | M5.1 | §6 بالطبقات، وتصحيح سطر «إلا لو أدمن وافق» للـ forks (بيعارض ADR-0076)، و§7 حسب السؤال 3 |
+| `docs/architecture.md` | M5.1 | §6 بالطبقات، وتصحيح سطر «إلا لو أدمن وافق» للـ forks (بيعارض ADR-0076)، و§7 بيقول إن المُصدِر بعد أول نسخة (قرار Sabry 3) |
 | `docs/security-model.md` | M5.9 | §8 بالتفاصيل، و§13 مراجعة تهديدات M5 (الجدول والمخاطر المقبولة)، وإضافات لقايمة المراجعة الخارجية |
-| `docs/guides/oidc-workloads.md` (جديد) | M5.8 | AWS وGCP وAzure وOpenBao/Vault |
-| `docs/roadmap.md` | M5.9 | M5 خلص |
+| `docs/guides/oidc-workloads.md` (جديد) | M5.8 (بعد أول نسخة) | AWS وGCP وAzure وOpenBao/Vault |
+| `docs/roadmap.md` | M5.9 | M5 خلص. (OIDC اتنقل لـ «بعد أول نسخة» والتجميد لـ M8 في الخطة دي نفسها) |
 
 ## Edge cases
 - **السر اتمسح أو اتغيّر اسمه وهو مستني موافقة:** `SECRET_NOT_FOUND` في `Start`، والـ attempt بيفشل من غير ما أي سر يتفك.
@@ -488,14 +490,14 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 - **إعادة اللف اتقطعت:** بتكمّل من مكانها، والقراية شغّالة طول الوقت.
 - **استرجاع نسخة قديمة بعد شيل إصدار قديم من الملف:** السلسلة اللي جوه النسخة بترجع معاها، ولو اتاخدت القاعدة بس يبقى الإقلاع بيقف بـ `KEYRING_MISSING_VERSION`.
 - **القاعدة اترجعت من غير السلسلة:** الأسرار ضاعت. الإقلاع بيقف، و`keys init --discard-unreadable` (بتأكيد صريح) بيعلّم كل القيم ممسوحة عشان السيرفر يقوم والناس تدخّل الأسرار تاني، وTOTP بيتطلب يتسجّل تاني. ده مكتوب في دليل الطوارئ.
-- **`DHOW_PUBLIC_URL` اتغيّر والـ OIDC شغّال:** الـ issuer اتغيّر، وكل الثقة في السحابة هتقع. `doctor` والواجهة بيحذّروا قبل الحفظ، والقديم مش بيتنشر.
-- **فرق الساعة في OIDC:** `nbf` قبلها بـ 30 ثانية، و`doctor` بيحذّر من فرق أكبر من 60 ثانية.
+- **(M5.8) `DHOW_PUBLIC_URL` اتغيّر والـ OIDC شغّال:** الـ issuer اتغيّر، وكل الثقة في السحابة هتقع. `doctor` والواجهة بيحذّروا قبل الحفظ، والقديم مش بيتنشر.
+- **(M5.8) فرق الساعة في OIDC:** `nbf` قبلها بـ 30 ثانية، و`doctor` بيحذّر من فرق أكبر من 60 ثانية.
 
 ## تقسيم الـ PRs
 كل PR بيعدّي `make check` وCI أخضر، وفيه اختبارات سلبية لكل مسار أمني، وبيحدّث `Plan/Progress/` في يومه، وبيكتب الـ ADR بتاع قراراته في أوله، وعليه مراجعة أمنية مستقلة قبل الـ merge. والأوامر بتفترض نفس `DHOW_TEST_DATABASE_URL` بتاع M3 وM4.
 
 ### M5.1: سلسلة المفاتيح والتشفير المغلّف (`Core/Keys`)
-- **الحجم:** M. **الاعتماد:** U2 (`"ServerInstances"` و`"SchemaFloor"`) وإجابة [السؤال 1](#1-مكان-مفتاح-التغليف-kek).
+- **الحجم:** M. **الاعتماد:** U2 (`"ServerInstances"` و`"SchemaFloor"`) 
 - **المحتوى:**
   - `apps/server/internal/Core/Keys` (`package keys`): قراية السلسلة وفحصها، و`KeyProvider` بـ `file` و`fake`، و`Envelope.Seal` و`Open` بالصاحب والغرض والـ context، والـ DEK lazy (`INSERT ... ON CONFLICT DO NOTHING` وبعده `SELECT`)، و`Destroy(owner)`.
   - الـ migrations: `"KeyEncryptionKeys"` و`"DataKeys"` و`"ServerInstances"."KekVersions"`.
@@ -505,7 +507,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
   - `deploy/systemd/dhow.service` (`LoadCredential=dhow-keyring:...`)، والـ installer بيعمل الملف، و`deploy/compose/init.sh` و`compose.yaml` (`secrets:`)، وحزمة التطوير (`deploy/dev`).
   - تعديل U5 في `Upgrades-and-Help.md`: `./secrets/` في نسخة Compose، والاسترجاع بيقارن الـ check values.
   - الوثائق: `docs/install/keys.md` والإعدادات، و`architecture.md` §6.
-  - ADR للقرارات 1 لـ 5، وإجابة السؤال 1.
+  - ADR للقرارات 1 لـ 5، وقرار Sabry 1 (الملف، وKMS بعدين ورا نفس الـ interface).
 - **قبول:**
   - **الشكل:** القيمة المختومة مافيهاش النص، ونفس القيمة مرتين بتطلع مختلفة، وقيمة صف بتتفتح لنفس الصف بس، وقيمة صاحب مابتتفتحش لصاحب تاني حتى بنفس الـ context.
   - **الإقلاع:** ملف ناقص إصدار في القاعدة، أو مفتاح متبدّل، أو سطر بايظ، أو صلاحيات مفتوحة: السيرفر بيقف برسالة فيها الإصدار، وexit code ثابت.
@@ -572,14 +574,14 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 ### M5.5: التوصيل للـ runner، والـ forks، والـ cache
 - **الحجم:** L. **الاعتماد:** M5.4.
 - **المحتوى:**
-  - **`internal/pipelinespec`:** `files:` في الخطوة والـ job، و`id_token:` (بيتقبل ويتأجّل لـ M5.8 لو اتأجّل)، وشيل الـ warnings `SECRETS_UNAVAILABLE` و`ENVIRONMENTS_UNAVAILABLE`، و`vars` في السياق، و`packages/spec/dhow.schema.json` واختبار التطابق.
+  - **`internal/pipelinespec`:** `files:` في الخطوة والـ job، و`id_token:` بيترفض بـ `ID_TOKEN_NOT_SUPPORTED_YET` لحد M5.8 (زي `TRIGGER_NOT_SUPPORTED_YET`)، وشيل الـ warnings `SECRETS_UNAVAILABLE` و`ENVIRONMENTS_UNAVAILABLE`، و`vars` في السياق، و`packages/spec/dhow.schema.json` واختبار التطابق.
   - **`Pipelines`:** `Core/SecretStore.Check` قبل الإدراج، و`"FailureDetail"`، والمتغيّرات، والـ PR والعلامة.
   - **`App`:** الـ resolver الحقيقي بدل `jobs.NoSecrets` (جنب `checkoutSecrets`)، وفحص `Start` كله، و`job.secrets_delivered`. و`SecretRequest` بيزيد عليه `OriginKind` و`OriginID` (العقد بتاع ADR-0045، والتغيير بيعدّي على الاتنين).
   - **الـ runner:** `registry_auth` والـ authfile، وفحص الـ artifacts والـ cache، والـ feature `registry_auth`.
   - **الـ cache:** `"Projects"."ForkCacheRestore"` و`"CacheEntries"."HadSecrets"`، و`CacheService.Lookup` بيطبّق القاعدة.
   - **فحص التسريب:** E2E بقيمة مميزة في كل نطاق، وjob بيطبعها بكل الصيغ، ويكتبها في output وartifact وcache وملف.
   - `docs/pipeline-spec.md` بالنسختين.
-  - ADR للقرارات 14 لـ 16، وإجابة السؤال 4.
+  - ADR للقرارات 14 لـ 16، وقرار Sabry 4.
 - **قبول:**
   - **التوصيل:** سر المشروع بيوصل كـ env وكملف للخطوة اللي طلبته بس، والإضافة بتاخد سر `with:` بتاعها بس (ADR-0075 زي ما هو).
   - **`Start`:** run اتعلّم fork بعد الإدراج (في الاختبار)، أو `RunJob` مش `active`: مفيش قيمة اتفكّت، والـ resolver مانداش `Open` خالص (عدّاد في الـ fake).
@@ -603,7 +605,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
   - `GET /organizations/{id}/deployment-approvals` والعدّاد في `GET /organizations/{id}/overview` (ADR-0061، جزء بصلاحيته).
   - الـ audit: `deployment.approval_requested` و`deployment.approved` و`deployment.rejected` و`deployment.approval_expired` و`environment.bypassed` و`deployment.started` و`deployment.finished`.
   - `docs/guides/environments.md` و`pipeline-spec.md` §9 بالنسختين.
-  - ADR للقرارات 17 لـ 20، وإجابتي السؤالين 2 و5.
+  - ADR للقرارات 17 لـ 20، وقراري Sabry 2 و5 (الإيقاف اليدوي، وإعداد `PreventSelfReview` اللي Admin بس يقفله، والقبول بيختبر الاتنين).
 - **قبول:**
   - **قرار Sabry:** push على `feature/x` لبيئة `main` بس: `skipped` بـ `ENVIRONMENT_REF_NOT_ALLOWED`، والـ run مابيفشلش بسببه، ومفيش سر اتفك.
   - **الموافقة:** push على `main`: `"Gate" = 'approval'`. اللي شغّل بيوافق: `SELF_REVIEW_NOT_ALLOWED`. مراجع من غير خطوة تانية: `REVIEWER_NEEDS_SECOND_FACTOR`. مراجع بالخطوة: الـ job بيتدرج بأسرار البيئة، وصف النشر `succeeded`.
@@ -628,7 +630,8 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
   - `App/Requests.test.tsx`: مفيش طلب متكرر في الصفحات الجديدة.
 - **التحقق:** `pnpm -C apps/web lint && pnpm -C apps/web typecheck && pnpm -C apps/web test && pnpm -C apps/web build && pnpm -C apps/web size`، و`make web` و`make check`.
 
-### M5.8: مُصدِر OIDC للأحمال (حسب [السؤال 3](#3-مُصدِر-oidc-للأحمال-إمتى))
+### M5.8: مُصدِر OIDC للأحمال (متأجّلة لبعد أول نسخة)
+- **الحالة:** مصمّمة ومتأجّلة ([قرار Sabry 3](#قرارات-sabry-2026-11-03)). مش من شرط خلاص M5، ومش شرط لـ M5.9، وبتتعمل بعد أول نسخة production مباشرة. وقتها بتعدّي مراجعة أمنية لوحدها، وبتضيف صفوفها لجدول التهديدات وفحص التسريب.
 - **الحجم:** M. **الاعتماد:** M5.6 (claims البيئة)، والـ runner بعد M5.5.
 - **المحتوى:**
   - **spike أول المرحلة (نص يوم):** حجم مفتاح RS256 اللي AWS وGCP وAzure بيقبلوه من الوثائق الرسمية، والنتيجة في الـ ADR. والاختبار الحقيقي في الـ CI على OpenBao في حاوية (ببلاش)، والسحابة يدوي واختياري.
@@ -648,13 +651,13 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 - **الحجم:** M. **الاعتماد:** كل اللي فات.
 - **المحتوى:**
   - **الـ contract لصيغة `0x01`** لو لسه مفيش tag (`-- dhow:floor 0.0.0`)، أو في أول minor بعد release فيه M5.2 كامل.
-  - **fuzz targets جديدة** في `FUZZ_TARGETS` و`fuzz-nightly.yml`: `FuzzKeyring` و`FuzzOpen` و`FuzzAllowedRefs` و`FuzzSecretName` و`FuzzIdTokenRequest`.
+  - **fuzz targets جديدة** في `FUZZ_TARGETS` و`fuzz-nightly.yml`: `FuzzKeyring` و`FuzzOpen` و`FuzzAllowedRefs` و`FuzzSecretName` (و`FuzzIdTokenRequest` بييجي مع M5.8).
   - **`deploy/m5-demo/run.sh`** (فوق M4 demo): بيئة `production` بـ `main` بس ومراجع تاني بـ TOTP، وأسرار في التلات نطاقات، وpush على فرع تاني (متخطّي)، وpush على `main` (مستني، والموافقة على النفس مرفوضة، والمراجع بيوافق، والنشر بالسر)، وتدوير KEK في النص (`generate` وإعادة تشغيل و`activate` وإعادة اللف) وتنفيذ تاني، وفحص التسريب.
-  - **فحص التسريب** بيدوّر كمان على: قيم الأسرار بكل نطاق، ومفاتيح السلسلة، والـ DEKs بعد الفك، وكلمة سر الـ registry، ومفتاح OIDC الخاص، وأي توكن بشكل JWT بالـ `kid` بتاعنا.
-  - **مراجعة التهديدات:** `docs/security-model.md` §13 بالنسختين (الصفوف اللي فوق بالاختبار بالمسار، والمخاطر المقبولة: التطليع بتحويل، والـ pusher في Git العام، والملفات المضغوطة جوه الـ artifacts)، وإضافات لقايمة المراجعة الخارجية.
+  - **فحص التسريب** بيدوّر كمان على: قيم الأسرار بكل نطاق، ومفاتيح السلسلة، والـ DEKs بعد الفك، وكلمة سر الـ registry. ومفتاح OIDC الخاص والتوكنات بشكل JWT بيتضافوا مع M5.8.
+  - **مراجعة التهديدات:** `docs/security-model.md` §13 بالنسختين (الصفوف اللي فوق بالاختبار بالمسار، والمخاطر المقبولة: التسريب بتحويل القيمة، والـ pusher في Git العام، والملفات المضغوطة جوه الـ artifacts)، وإضافات لقايمة المراجعة الخارجية.
   - **مراجعة أمنية مستقلة** وإصلاح الـ Critical والـ High.
   - `docs/roadmap.md` بالنسختين: M5 خلص.
-- **قبول:**
+- **قبول (شرط خلاص M5، من غير OIDC):**
   - `deploy/m5-demo/run.sh` عدّى على `ubuntu-26.04` في `demo.yml`، وعلى VM نضيفة بـ Debian 13 وUbuntu 26.04.
   - فحص التسريب لقى الحالات المزروعة ومالقاش أي حاجة غيرها.
   - مفيش finding مفتوح Critical أو High.
@@ -665,7 +668,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 U2 ──► M5.1 ─┬─► M5.2 (+U4)
              │
 M4.8 ─► M5.3 ┴─► M5.4 ─┬─► M5.5 ─► M5.6 ─┬─► M5.7 (ب)
-                       └─► M5.7 (أ)      └─► M5.8 (حسب السؤال 3)
+                       └─► M5.7 (أ)      └─► M5.8 (بعد أول نسخة)
                                                    M5.9 في الآخر
 ```
 - M5.1 وM5.3 بيبدأوا مع بعض.
@@ -695,9 +698,9 @@ M4.8 ─► M5.3 ┴─► M5.4 ─┬─► M5.5 ─► M5.6 ─┬─► M5.7 
 | `make upgrade-test` (`0x01` وbinary M4 على قاعدة M5) | ✅ لو الـ PR بيلمس `Database/Migrations` أو `apps/server` | ✅ | ✅ |
 | Playwright (الأسرار والبيئات والموافقة) على سيرفر حقيقي وForgejo | ✅ لو الـ PR بيلمس `apps/web` | — | ✅ |
 | `deploy/m5-demo/run.sh` بفحص التسريب | ✅ لو الـ PR بيلمس الكود | ✅ ليلي في `demo.yml` | ✅ |
-| OIDC مع OpenBao في حاوية بالـ digest | ✅ لو الـ PR بيلمس OIDC | ✅ | ✅ |
-| OIDC مع AWS أو GCP أو Azure | — | — | يدوي واختياري (مش شرط، قرار Sabry «ببلاش») |
-| fuzz طويل (السلسلة والصيغة والـ refs والأسماء وطلب التوكن) | — | ✅ ليلي (30 دقيقة لكل target) | — |
+| OIDC مع OpenBao في حاوية بالـ digest (من M5.8، بعد أول نسخة) | ✅ لو الـ PR بيلمس OIDC | ✅ | ✅ |
+| OIDC مع AWS أو GCP أو Azure (M5.8) | — | — | يدوي واختياري (مش شرط، قرار Sabry «ببلاش») |
+| fuzz طويل (السلسلة والصيغة والـ refs والأسماء، وطلب التوكن مع M5.8) | — | ✅ ليلي (30 دقيقة لكل target) | — |
 | الفوضى: قتل السيرفر وقت إعادة اللف ووقت فتح البوابة | — | ✅ ليلي وعلى label `chaos` | ✅ |
 
 ## المخاطر
@@ -705,11 +708,11 @@ M4.8 ─► M5.3 ┴─► M5.4 ─┬─► M5.5 ─► M5.6 ─┬─► M5.7 
 |---|---|
 | ضياع ملف السلسلة = ضياع كل الأسرار | الـ installer و`init.sh` بيعملوه ويقولوا «صدّره»، و`keys export` بـ `age`، والنسخة الاحتياطية فيها السلسلة، و`doctor` بيحذّر لو مفيش تصدير، ودليل طوارئ للاسترجاع من غيرها |
 | تغيير صيغة القيم بيكسر الرجوع | قراية الصيغتين قبل الكتابة، وU3 بيختبر، والـ hook بيمنع `NewSealer` جديد |
-| احتكاك الموافقات للفرق الصغيرة (شخص واحد) | المراجعين اختيارية، وقاعدة الـ ref لوحدها بتحمي، والتخطّي اختيار، و[السؤال 5](#5-الموافقة-الخطوة-التانية-والموافقة-على-النفس) |
+| احتكاك الموافقات للفرق الصغيرة (شخص واحد) | المراجعين اختيارية، وقاعدة الـ ref لوحدها بتحمي، وAdmin يقدر يقفل منع الموافقة على النفس للبيئة دي بس (قرار Sabry 5)، والتخطّي اختيار |
 | الـ masker مابيمسكش كل تحويل | الحماية الحقيقية قاعدة الـ ref والمراجعة، وفحص الـ artifacts، ومكتوب كخطر مقبول |
 | فحص الـ artifacts الكبيرة بياخد CPU | Aho-Corasick على الـ stream مرة واحدة، و`make bench` بـ artifact 1 GiB قبل الدمج، والحد في الوثائق |
-| النطاق بيكبر (المتغيّرات والـ registry وOIDC) | كل واحد في مرحلة مستقلة، وOIDC حسب السؤال 3 |
-| الحد بين Community وBusiness في قواعد الحماية | [السؤال 2](#2-نوافذ-النشر-والتجميد-وأكتر-من-مراجع)، والنموذج جاهز للتوسيع بـ expand |
+| النطاق بيكبر (المتغيّرات والـ registry وOIDC) | كل واحد في مرحلة مستقلة، وOIDC اتأجّل لبعد أول نسخة (قرار Sabry 3) |
+| الحد بين Community وBusiness في قواعد الحماية | قرار Sabry 2: الجدول زي ما هو، والنموذج جاهز للتوسيع بـ expand في M8 |
 | «نفسه» مش معروف في Git العام | مكتوب جنب الطلب في الواجهة، والفرق بتستخدم التشغيل اليدوي أو مراجع تاني |
 | أكتر من instance والتفعيل | محتاج heartbeat U2، و`KEK_NOT_EVERYWHERE` قبل أي تغيير |
 | أرقام الـ migrations بتتخبط بين المراحل والـ U | الرقم وقت الـ merge، و`Compat_test.go` |
@@ -721,9 +724,9 @@ M4.8 ─► M5.3 ┴─► M5.4 ─┬─► M5.5 ─► M5.6 ─┬─► M5.7 
 | الاعتمادية | النسخة | تاريخها | ليه |
 |---|---|---|---|
 | Go standard library (`crypto/aes` و`crypto/cipher` و`crypto/hkdf` و`crypto/hpke` و`crypto/rsa` و`crypto/sha256`) | Go 1.27.3 (`go.mod`) | — | الختم والـ HPKE وتوقيع RS256، من غير مكتبات |
-| `filippo.io/age` | v1.3.2 | 2026-08-29 | `keys export` بمفتاح عام. نفس نسخة U5 بالظبط، وبتتضاف هنا لو U5 لسه |
+| `filippo.io/age` | v1.3.2 | 2026-08-29 | `keys export` بمفتاح عام لملف السلسلة (قرار Sabry 1). نفس نسخة U5 بالظبط، وبتتضاف هنا لو U5 لسه |
 | `go.yaml.in/yaml/v3` و`github.com/google/cel-go` | الموجودين | — | `files:` و`vars` في الـ spec |
-| صورة OpenBao (CI) | بالـ digest وقت التنفيذ | — | اختبار OIDC الحقيقي، open source (MPL) وببلاش، بدل Vault (BUSL) |
+| صورة OpenBao (CI، مع M5.8 بعد أول نسخة) | بالـ digest وقت التنفيذ | — | اختبار OIDC الحقيقي، open source (MPL) وببلاش، بدل Vault (BUSL) |
 | صورة Forgejo (CI) | الموجودة من M4 | — | الـ demo وPlaywright |
 
 **مش هنضيف:**
@@ -732,46 +735,14 @@ M4.8 ─► M5.3 ┴─► M5.4 ─┬─► M5.5 ─► M5.6 ─┬─► M5.7 
 - مكتبة glob: `internal/pathglob` بتاع M4.
 - مكتبة Aho-Corasick: الـ masker بتاعنا من M3.
 
-## أسئلة مفتوحة لـ Sabry
-
-### 1. مكان مفتاح التغليف (KEK)
-- **أ. مشتق من `DHOW_SECRET_KEY`** (HKDF بـ label `dhow/kek/v1`): مفيش ملف جديد ولا خطوة تنصيب. بس التدوير الحقيقي مستحيل من غير تغيير `DHOW_SECRET_KEY`، وده بيعيد تسجيل كل الـ runners ويبطّل التوكنات. يعني «التدوير من غير توقف» اللي في الـ roadmap مش هيتحقق.
-- **ب. ملف سلسلة منفصل** (`dhow-keyring` بإصدارات، systemd credential أو Compose secret): تدوير حقيقي من غير توقف، ومنفصل عن متغيّر بيئة ممكن يبان في `docker inspect`، ونفس الـ interface بياخد KMS في Enterprise. بس فيه ملف تاني لازم يتعمله نسخة، ولو ضاع الأسرار بتضيع.
-- **ج. هجين:** الإصدار 1 مشتق من `DHOW_SECRET_KEY` والإصدارات بعده من الملف: صفر إعداد في الأول، بس الـ KEK الأول مربوط بالمفتاح السري لحد أول تدوير، وطريقين في الكود.
-- **التوصية:** (ب). مفيش release لسه، فمفيش ترقية هتتعب، والـ installer و`init.sh` بيعملوا الملف لوحدهم.
-
-### 2. نوافذ النشر والتجميد وأكتر من مراجع
-`docs/editions-and-licensing.md` §3 بيحط «أكتر من مراجع، ونوافذ النشر، والتجميد» في Business، و«البيئات وقواعد الحماية (فروع، ومراجع واحد)» في Community. وM8 بعد أول نسخة.
-- **أ. نمشي بالجدول:** Community في M5 فيها الفروع والمراجع الواحد (من قايمة) والمؤقت والصور والعزل والتخطّي، **ومعاها «أوقف النشر» يدوي** (زرار وسبب) لأن وقف النشر وقت مشكلة أمان أساسي، والأمان الأساسي عمره ما بيتقفل ورا فلوس (§1 في نفس الوثيقة). والنوافذ والتجميد المجدول وأكتر من مراجع في `ee/` مع M8، والنموذج جاهز ليهم.
-- **ب. كله في Community دلوقتي** بـ ADR بيعدّل الجدول: أكتر قيمة للمستخدم، بس بنشيل من Business أهم سببين للشراء، وبنكبّر M5.
-- **ج. نمشي بالجدول من غير الإيقاف اليدوي:** أبسط، بس مفيش طريقة توقف النشر وقت حادثة غير إنك تعدّل القاعدة.
-- **التوصية:** (أ).
-
-### 3. مُصدِر OIDC للأحمال: إمتى؟
-ADR-0068 حطّه في M5، وADR-0014 بيقول إنه ببلاش. بس أهداف أول نسخة SSH/VPS وCompose، والاتنين مش بيستخدموه. فايدته للسحابة (رفع صور لـ ECR أو GAR، وS3، وVault)، وده بعد أول نسخة مع Kubernetes وStatic/CDN.
-- **أ. في M5 زي ADR-0068:** جاهز من أول يوم، بس endpoint عام ومفاتيح توقيع زيادة في مراجعة M9، وحجم M على مرحلة مش شرط خلاص.
-- **ب. بعد أول نسخة مباشرة:** التصميم هنا كامل (M5.8) ويتعمل في أي وقت من غير ما يلمس الباقي. M5 يخلص أسرع، وسطح أقل في M9. واللي محتاج سحابة يستخدم سر عادي مؤقتًا.
-- **ج. في M5 بس مقفول افتراضيًا:** الكود موجود ومحتاج مراجعة برضه، من غير ما حد يستخدمه.
-- **التوصية:** (ب)، وصف جديد في «بعد أول نسخة» في `docs/roadmap.md` بيشاور على M5.8، وADR صغير بيعدّل ADR-0068 في النقطة دي بس.
-
-### 4. الـ cache لتنفيذات الـ forks
-النهارده الـ fork بيقرا cache الفرع الافتراضي. أول ما الأسرار تيجي، الـ cache ده ممكن يبقى فيه حاجة من job شاف سر (ملف `.npmrc` بتوكن مثلًا).
-- **أ. الـ forks مابترجّعش أي cache خالص:** أأمن وأبسط، بس الـ PRs من بره أبطأ.
-- **ب. مابترجّعش افتراضيًا، وAdmin يفتح «الفرع الافتراضي بس» للمشروع، والـ cache اللي اتكتب من job وصله سر عمره ما بيرجع لـ fork:** نفس أمان (أ) للحاجات اللي ممكن يبقى فيها سر، وسرعة للمشاريع المفتوحة اللي عايزاها.
-- **ج. نسيبه زي ما هو:** أسرع، بس أي سر وقع في cache يوصل لأي حد يفتح PR.
-- **التوصية:** (ب).
-
-### 5. الموافقة: الخطوة التانية والموافقة على النفس
-- **أ. خطوة تانية مع كل موافقة** (`CurrentFactor`)، والمراجع لازم عنده خطوة تانية، و«منع الموافقة على النفس» شغّال افتراضيًا: موافقة على production لازم تبقى من شخص حقيقي تاني وفي اللحظة دي. بس فيه خطوة زيادة مع كل نشر، والفريق اللي فيه شخص واحد مايحطش مراجعين (قاعدة الفرع والمؤقت بيحموا) أو يفتح التخطّي.
-- **ب. الجلسة بس** (والإجراء حساس بقاعدة المؤسسة زي `run.approve` النهارده): أسرع، بس جلسة مسروقة تقدر توافق على نشر.
-- **ج. زي (أ) بس منع الموافقة على النفس مقفول افتراضيًا:** أسهل للفرق الصغيرة، بس الافتراضي ماحماش من إن حد يوافق على كوده.
-- **التوصية:** (أ).
-
-### 6. توكنات API للأسرار
-- **أ. الجلسة بس في M5:** مفيش توكن يقدر يكتب سر أو يوافق. أأمن، بس مفيش أتمتة (Terraform أو سكربت تدوير).
-- **ب. scope `secret.write` للكتابة بس على أسرار المشروع:** أتمتة التدوير، والتوكن مايقدرش يقرا. بس توكن مسروق يقدر يبدّل سر بقيمة المهاجم (عنوان قاعدة بيانات مثلًا).
-- **ج. كل حاجة بالتوكنات ومعاها الموافقة:** أتمتة كاملة، بس الموافقة بتفقد معناها.
-- **التوصية:** (أ) في M5، ومعاها `secret.read` (الأسماء بس) للتوكنات. و(ب) بعدها بـ ADR لو حد طلبه.
+## قرارات Sabry (2026-11-03)
+Sabry اختار التوصية في الأسئلة الستة، والخطة كلها اتعدّلت عليها:
+1. **مكان مفتاح التغليف (KEK):** ملف سلسلة مفاتيح منفصل (`dhow-keyring` بإصدارات، systemd credential أو Compose secret أو `DHOW_KEYRING_FILE`)، مش مشتق من `DHOW_SECRET_KEY`. وKMS خارجي (Vault Transit وKMS السحابة وHSM) اختياري بعدين ورا نفس الـ interface `KeyProvider` في `ee/` مع M8، وعمره ما بيبقى شرط. السبب: تدوير حقيقي من غير توقف، ومنفصل عن متغيّر بيئة ممكن يبان، ومفيش release لسه فمفيش ترقية هتتعب.
+2. **نوافذ النشر والتجميد وأكتر من مراجع:** زي جدول النسخ في `docs/editions-and-licensing.md` §3. النوافذ والتجميد المجدول وأكتر من مراجع في Business مع M8 بعد أول نسخة. Community في M5 فيها مراجع واحد (من قايمة مراجعين)، وزرار «أوقف النشر» يدوي بسبب، لأن وقف النشر وقت حادثة أمان أساسي. والنموذج جاهز للباقي بـ expand.
+3. **مُصدِر OIDC للأحمال:** بعد أول نسخة مباشرة. M5.8 بتفضل مصمّمة هنا ومتأجّلة، ومش من شرط خلاص M5. و`docs/roadmap.md` (بالنسختين) نقله لـ «بعد أول نسخة». وفي أول M5.8 فيه ADR صغير بيعدّل ADR-0068 في النقطة دي بس.
+4. **الـ cache لتنفيذات الـ forks:** افتراضيًا الـ fork مابيرجّعش أي cache خالص. Admin يقدر يفتح cache الفرع الافتراضي للمشروع (`"ForkCacheRestore"` = `default_branch`) بتحذير. والـ cache اللي اتكتب من job وصله سر أو بيانات registry (أو توكن OIDC بعدين) عمره ما بيوصل لـ fork حتى لو الإعداد مفتوح.
+5. **الموافقة:** كل موافقة (ورفض وتخطّي) محتاجة الخطوة التانية (`CurrentFactor`)، والمراجع لازم عنده خطوة تانية مسجّلة. ومنع الموافقة على النفس شغّال افتراضيًا، وAdmin يقدر يقفله لبيئة معيّنة بس (للفرق اللي فيها شخص واحد)، بخطوة تانية، والتغيير بيتسجّل في الـ audit وبيبان في صفحة البيئة.
+6. **توكنات API:** في M5 كتابة الأسرار والمتغيّرات والبيئات والموافقة من جلسة بس. التوكنات بتاخد `secret.read` بس: الأسماء والـ metadata، عمرها ما بتقرا قيمة. والكتابة بتوكن (`secret.write`) بعدين بـ ADR لو حد طلبها.
 
 ## قرارات تانية اتاخدت بالتوصية (Sabry يقدر يرجع فيها)
 1. **الأدوار:** الجدول اللي فوق. Maintainer بيدير أسرار المشروع ومتغيّراته، وAdmin بس بيدير البيئات وأسرارها وأسرار المؤسسة.
