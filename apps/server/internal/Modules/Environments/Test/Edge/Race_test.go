@@ -49,7 +49,9 @@ func statuses(t *testing.T, n int, do func(i int) apptest.Response) map[string]i
 
 func TestRaceOnlyOneEditWinsTheSameVersion(t *testing.T) {
 	env, owner, path, password := setup(t)
-	res := owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{"Name": "production"}})
+	res := owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{
+		"Name": "production", "CurrentFactor": apptest.PasswordFactor(password),
+	}})
 	require.Equal(t, http.StatusCreated, res.Status, string(res.Raw))
 	var start versioned
 	res.Decode(t, &start)
@@ -71,17 +73,23 @@ func TestRaceOnlyOneEditWinsTheSameVersion(t *testing.T) {
 }
 
 func TestRaceOnlyOneCreateWinsTheSameName(t *testing.T) {
-	env, owner, path, _ := setup(t)
+	env, owner, path, password := setup(t)
 	got := statuses(t, parallel, func(int) apptest.Response {
-		return owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{"Name": "production"}})
+		return owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{
+			"Name": "production", "CurrentFactor": apptest.PasswordFactor(password),
+		}})
 	})
-	assert.Equal(t, map[string]int{"Created": 1, "ENVIRONMENT_EXISTS": parallel - 1}, got)
+	assert.Equal(t, 1, got["Created"], "%v", got)
+	assert.Equal(t, parallel-1, got["ENVIRONMENT_EXISTS"]+got["INVALID_CURRENT_FACTOR"],
+		"the others lose on the name, or on the throttle of factor attempts: %v", got)
 	assert.Equal(t, 1, env.AuditCount("environment.created"))
 }
 
 func TestRaceOnePauseOneAuditEvent(t *testing.T) {
-	env, owner, path, _ := setup(t)
-	res := owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{"Name": "production"}})
+	env, owner, path, password := setup(t)
+	res := owner.Do(apptest.Request{Method: http.MethodPost, Path: path, Body: map[string]any{
+		"Name": "production", "CurrentFactor": apptest.PasswordFactor(password),
+	}})
 	require.Equal(t, http.StatusCreated, res.Status, string(res.Raw))
 	got := statuses(t, parallel, func(int) apptest.Response {
 		return owner.Do(apptest.Request{Method: http.MethodPost, Path: path + "/production/pause", Body: map[string]any{"Reason": "Incident"}})

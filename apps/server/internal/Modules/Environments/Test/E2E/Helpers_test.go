@@ -30,9 +30,13 @@ type environmentView struct {
 	Paused                                           bool
 	PausedAt, PausedByUserId, PausedReason           *string
 	Rules                                            struct {
-		AllowedRefs          []refView
-		AllowPullRequests    bool
-		Reviewers            struct{ UserIds, TeamIds []string }
+		AllowedRefs       []refView
+		AllowPullRequests bool
+		Reviewers         struct {
+			UserIds, TeamIds     []string
+			UserCount, TeamCount int
+			IdsShown             bool
+		}
 		RequiredApprovals    int
 		AllowSelfApproval    bool
 		WaitMinutes          int
@@ -65,6 +69,16 @@ func (w world) path(project uuid.UUID, rest string) string {
 }
 
 func (w world) create(c *apptest.Client, body map[string]any) apptest.Response {
+	if _, ok := body["CurrentFactor"]; !ok {
+		body["CurrentFactor"] = memberFactor()
+		if c == w.owner {
+			body["CurrentFactor"] = w.ownerFactor()
+		}
+	}
+	return w.createRaw(c, body)
+}
+
+func (w world) createRaw(c *apptest.Client, body map[string]any) apptest.Response {
 	return c.Do(apptest.Request{Method: http.MethodPost, Path: w.path(w.project, ""), Body: body})
 }
 

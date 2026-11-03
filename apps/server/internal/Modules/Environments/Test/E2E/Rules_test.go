@@ -185,8 +185,9 @@ func TestEveryChangeIsAudited(t *testing.T) {
 	updated := auditOf(t, w, "environment.updated")
 	require.Len(t, updated, 1)
 	assert.Equal(t, "AllowSelfApproval,WaitMinutes", updated[0].Data["Fields"])
-	assert.JSONEq(t, `{"WaitMinutes":0,"AllowSelfApproval":false}`, updated[0].Data["From"])
-	assert.JSONEq(t, `{"WaitMinutes":5,"AllowSelfApproval":true}`, updated[0].Data["To"])
+	assert.Equal(t, "0 -> 5", updated[0].Data["WaitMinutes"])
+	assert.Equal(t, "false -> true", updated[0].Data["AllowSelfApproval"])
+	assert.NotContains(t, updated[0].Data, "AllowAdminBypass", "only the changed rules")
 	assert.Equal(t, "2", updated[0].Data["Version"])
 
 	_, maintainer := w.member(t, "maintainer")
