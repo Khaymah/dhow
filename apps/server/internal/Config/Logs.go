@@ -37,6 +37,7 @@ const (
 	LogMaxBytesMax       = settingspec.JobLogMaxBytesMax
 	LogRetentionDefault  = settingspec.LogRetentionDefault
 	LogRetentionMax      = settingspec.LogRetentionMax
+	OrgLogRetentionMin   = 7
 	SSEMaxStreamsDefault = 2000
 	SSEMaxStreamsMax     = 100_000
 	LogReadConnsDefault  = 4

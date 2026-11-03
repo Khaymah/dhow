@@ -709,7 +709,7 @@ export interface paths {
         get?: never;
         /**
          * Keep this organization's job logs for fewer days
-         * @description Needs `org.update`. `LogRetentionDays` from 1 to 3650 keeps the job logs of this organization for that many days at most; `null` follows the server setting. The server setting still wins when it is shorter. Older logs stop showing at once, and their content is erased within the hour.
+         * @description Needs `org.security` (owners only), a current factor of the caller, and a second factor on the caller's own account (`SECOND_FACTOR_REQUIRED` otherwise). `LogRetentionDays` from 7 to 3650 keeps the job logs of this organization for that many days at most; `null` follows the server setting. The server setting still wins when it is shorter. Older logs stop showing at once, and their content is erased within the hour. The change and its audit entry are written together.
          */
         put: operations["updateLogRetention"];
         post?: never;
@@ -2345,6 +2345,7 @@ export interface components {
         };
         UpdateLogRetentionRequest: {
             LogRetentionDays: number | null;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
         };
         /**
          * @description Who must use two-step verification in the organization.

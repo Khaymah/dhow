@@ -1,6 +1,10 @@
 package eventbus
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
+)
 
 const (
 	SystemInstanceSetupCompleted = "system.instance.setupCompleted"
@@ -164,4 +168,5 @@ type Audited struct {
 	TargetID        string
 	IP              string
 	Data            map[string]string
+	Tx              *sqlc.Queries
 }

@@ -15,6 +15,7 @@ import (
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
+	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity/Models"
 )
 
@@ -35,39 +36,61 @@ func (s *Service) GetOrganization(ctx context.Context, id uuid.UUID) (models.Org
 	return org, nil
 }
 
-func (s *Service) UpdateLogRetention(ctx context.Context, id uuid.UUID, days *int) (models.Organization, error) {
-	p, ok := auth.PrincipalFrom(ctx)
-	if !ok {
-		return models.Organization{}, apperrors.Unauthenticated()
+func (s *Service) UpdateLogRetention(ctx context.Context, id uuid.UUID, days *int, factor auth.Factor) (models.Organization, error) {
+	p, _, err := actorIn(ctx, id)
+	if err != nil {
+		return models.Organization{}, err
 	}
 	var value pgtype.Int4
 	if days != nil {
-		if *days < 1 || *days > config.LogRetentionMax {
+		if *days < config.OrgLogRetentionMin || *days > config.LogRetentionMax {
 			return models.Organization{}, apperrors.ValidationFailed(invalid("LogRetentionDays"))
 		}
-		value = pgtype.Int4{Int32: int32(*days), Valid: true}
+		value = pgtype.Int4{Int32: int32(*days), Valid: true} //nolint:gosec // Checked against LogRetentionMax just above.
 	}
-	row, err := s.queries().SetOrganizationLogRetention(ctx, sqlc.SetOrganizationLogRetentionParams{ID: id, Days: value, Now: s.now()})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return models.Organization{}, apperrors.NotFound()
-	}
+	state, err := s.queries().GetUserMfaState(ctx, p.UserID)
 	if err != nil {
+		return models.Organization{}, err
+	}
+	if !state.HasTotp && !state.HasPasskey {
+		return models.Organization{}, apperrors.SecondFactorRequired()
+	}
+	if err := s.factors.ConfirmFactor(ctx, p, factor); err != nil {
 		return models.Organization{}, err
 	}
 	shown := "server"
 	if value.Valid {
 		shown = strconv.Itoa(int(value.Int32))
 	}
-	actor := p.UserID
-	err = s.bus.Publish(ctx, eventbus.Event{Name: eventbus.IdentityOrganizationUpdated, Payload: eventbus.Audited{
-		OrganizationIDs: []uuid.UUID{id}, ActorUserID: &actor, TargetType: "organization", TargetID: id.String(),
-		IP: auth.RequestMetaFrom(ctx).IPString(), Data: map[string]string{"LogRetentionDays": shown},
-	}})
+	var org models.Organization
+	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
+		if _, err := q.LockOrganization(ctx, id); errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound()
+		} else if err != nil {
+			return err
+		}
+		self, err := loadMember(ctx, q, id, p.UserID)
+		if err != nil {
+			return err
+		}
+		if self.Direct != policy.RoleOwner {
+			return apperrors.Forbidden()
+		}
+		row, err := q.SetOrganizationLogRetention(ctx, sqlc.SetOrganizationLogRetentionParams{ID: id, Days: value, Now: s.now()})
+		if err != nil {
+			return err
+		}
+		org = organizationOf(row.Id, row.Name, row.Slug, row.CreatedAt, row.RequireSecondFactor, row.RequireSecondFactorSince)
+		org.LogRetentionDays = daysOf(row.LogRetentionDays)
+		actor := p.UserID
+		return s.bus.Publish(ctx, eventbus.Event{Name: eventbus.IdentityOrganizationUpdated, Payload: eventbus.Audited{
+			OrganizationIDs: []uuid.UUID{id}, ActorUserID: &actor, TargetType: "organization", TargetID: id.String(),
+			IP: auth.RequestMetaFrom(ctx).IPString(), Data: map[string]string{"LogRetentionDays": shown}, Tx: q,
+		}})
+	})
 	if err != nil {
 		return models.Organization{}, err
 	}
-	org := organizationOf(row.Id, row.Name, row.Slug, row.CreatedAt, row.RequireSecondFactor, row.RequireSecondFactorSince)
-	org.LogRetentionDays = daysOf(row.LogRetentionDays)
 	return org, nil
 }
 

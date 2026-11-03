@@ -721,7 +721,9 @@ type TransferOwnershipRequest struct {
 
 // UpdateLogRetentionRequest defines model for UpdateLogRetentionRequest.
 type UpdateLogRetentionRequest struct {
-	LogRetentionDays *int `json:"LogRetentionDays"`
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor    CurrentFactor `json:"CurrentFactor"`
+	LogRetentionDays *int          `json:"LogRetentionDays"`
 }
 
 // UpdateOrganizationRequest defines model for UpdateOrganizationRequest.

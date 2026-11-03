@@ -74,7 +74,7 @@ func (c *Controller) UpdateLogRetention(ctx context.Context, req gen.UpdateLogRe
 	if req.Body == nil {
 		return nil, apperrors.BadRequest()
 	}
-	org, err := c.service.UpdateLogRetention(ctx, req.Id, req.Body.LogRetentionDays)
+	org, err := c.service.UpdateLogRetention(ctx, req.Id, req.Body.LogRetentionDays, factorOf(req.Body.CurrentFactor))
 	if err != nil {
 		return nil, err
 	}

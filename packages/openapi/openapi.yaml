@@ -1044,9 +1044,11 @@ paths:
       tags: [identity]
       summary: Keep this organization's job logs for fewer days
       description: >-
-        Needs `org.update`. `LogRetentionDays` from 1 to 3650 keeps the job logs of this organization for that many
-        days at most; `null` follows the server setting. The server setting still wins when it is shorter. Older logs
-        stop showing at once, and their content is erased within the hour.
+        Needs `org.security` (owners only), a current factor of the caller, and a second factor on the caller's own
+        account (`SECOND_FACTOR_REQUIRED` otherwise). `LogRetentionDays` from 7 to 3650 keeps the job logs of this
+        organization for that many days at most; `null` follows the server setting. The server setting still wins when
+        it is shorter. Older logs stop showing at once, and their content is erased within the hour. The change and its
+        audit entry are written together.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -4004,19 +4006,21 @@ components:
           description: When the rule last reached more roles. Absent while the rule is `off`.
         LogRetentionDays:
           type: integer
-          minimum: 1
+          minimum: 7
           maximum: 3650
           description: Days this organization keeps its job logs. Absent when it follows the server setting.
     UpdateLogRetentionRequest:
       type: object
       additionalProperties: false
-      required: [LogRetentionDays]
+      required: [LogRetentionDays, CurrentFactor]
       properties:
         LogRetentionDays:
           type: integer
           nullable: true
-          minimum: 1
+          minimum: 7
           maximum: 3650
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
     SecondFactorRule:
       type: string
       enum: [off, admins, everyone]

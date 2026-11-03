@@ -58,7 +58,7 @@ func Policies() []policy.Rule {
 		browser(http.MethodPost, orgPath+"/leave", policy.OrgLeave),
 		browser(http.MethodPost, orgPath+"/transfer-ownership", policy.OrgTransfer),
 		browser(http.MethodPut, orgPath+"/second-factor-rule", policy.OrgSecurity),
-		browser(http.MethodPut, orgPath+"/log-retention", policy.OrgUpdate),
+		browser(http.MethodPut, orgPath+"/log-retention", policy.OrgSecurity),
 		org(http.MethodGet, orgPath+"/members", policy.MemberRead),
 		org(http.MethodPatch, memberPath, policy.MemberManage),
 		org(http.MethodDelete, memberPath, policy.MemberManage),

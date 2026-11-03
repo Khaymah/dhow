@@ -127,7 +127,7 @@ func organizationBody(env *apptest.Env, fx fixture, rule policy.Rule) any {
 	case "POST /organizations/{id}/projects/{projectId}/runs":
 		return map[string]string{"Ref": "main"}
 	case "PUT /organizations/{id}/log-retention":
-		return map[string]any{"LogRetentionDays": 7}
+		return map[string]any{"LogRetentionDays": 1, "CurrentFactor": wrong}
 	case "POST /organizations/{id}/invitations":
 		return map[string]string{"Email": randomEmail(env.T), "Role": string(policy.RoleViewer)}
 	case "POST /invitations/preview", "POST /me/invitations/accept":
