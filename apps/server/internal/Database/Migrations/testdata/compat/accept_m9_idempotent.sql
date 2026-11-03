@@ -1,0 +1,10 @@
+-- +goose NO TRANSACTION
+-- dhow:phase expand
+-- +goose Up
+ALTER TABLE "Jobs" VALIDATE CONSTRAINT "CK_Jobs_Attempts";
+ALTER TABLE "Jobs" ADD COLUMN IF NOT EXISTS "Note" TEXT;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_Jobs_Note" ON "Jobs" ("Note");
+DROP INDEX CONCURRENTLY IF EXISTS "IX_Jobs_Old";
+
+-- +goose Down
+ALTER TABLE "Jobs" DROP COLUMN IF EXISTS "Note";

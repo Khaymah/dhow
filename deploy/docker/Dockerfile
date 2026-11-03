@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM node:26-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe AS web
+FROM --platform=$BUILDPLATFORM node:26-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9 AS web
 
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN npm install --global corepack@0.36.0 && corepack enable && corepack prepare pnpm@10.28.0 --activate
@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 COPY apps/web ./
 RUN pnpm build
 
-FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS build
 
 ARG VERSION=dev
 ARG COMMIT=unknown
