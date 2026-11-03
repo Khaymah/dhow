@@ -46,7 +46,7 @@ func (s *Service) UpdateLogRetention(ctx context.Context, id uuid.UUID, days *in
 		if *days < config.OrgLogRetentionMin || *days > config.LogRetentionMax {
 			return models.Organization{}, apperrors.ValidationFailed(invalid("LogRetentionDays"))
 		}
-		value = pgtype.Int4{Int32: int32(*days), Valid: true} //nolint:gosec // Checked against LogRetentionMax just above.
+		value = pgtype.Int4{Int32: int32(*days), Valid: true}
 	}
 	state, err := s.queries().GetUserMfaState(ctx, p.UserID)
 	if err != nil {
