@@ -15,11 +15,15 @@ type Beginner interface {
 }
 
 func Run(ctx context.Context, db Beginner, fn func(q *sqlc.Queries) error) error {
+	return RunTx(ctx, db, func(tx pgx.Tx) error { return fn(sqlc.New(tx)) })
+}
+
+func RunTx(ctx context.Context, db Beginner, fn func(tx pgx.Tx) error) error {
 	tx, err := db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	if err := fn(sqlc.New(tx)); err != nil {
+	if err := fn(tx); err != nil {
 		if rbErr := rollback(ctx, tx); rbErr != nil {
 			return errors.Join(err, rbErr)
 		}

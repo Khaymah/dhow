@@ -13,6 +13,10 @@ const (
 	envKeyringValue   = "DHOW_KEYRING"
 	KeyRewrapEvery    = 30 * time.Second
 	KekActiveMaxAge   = 365 * 24 * time.Hour
+	BackfillEvery     = 30 * time.Second
+	BackfillPause     = 100 * time.Millisecond
+	BackfillBatch     = 1000
+	KeyRekeyGrace     = 10 * time.Second
 )
 
 type Keyring struct {
