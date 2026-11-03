@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	app "github.com/Khaymah/dhow/apps/server/internal/App"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 )
 
@@ -50,4 +51,15 @@ func TestExitCodeOfASchemaTooNew(t *testing.T) {
 	assert.Equal(t, 78, exitCode(tooNew))
 	assert.Equal(t, 78, exitCode(fmt.Errorf("start: %w", tooNew)))
 	assert.Equal(t, 1, exitCode(errors.New("anything else")))
+}
+
+func TestRunDispatchesMigrate(t *testing.T) {
+	require.ErrorIs(t, run(context.Background(), []string{"migrate"}), app.ErrMigrateUsage)
+	require.ErrorIs(t, run(context.Background(), []string{"migrate", "up"}), app.ErrMigrateUsage)
+	t.Setenv("DHOW_DATABASE_URL", "")
+	t.Setenv("DHOW_DATABASE_URL_FILE", "")
+	t.Setenv("CREDENTIALS_DIRECTORY", "")
+	err := run(context.Background(), []string{"migrate", "status"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "DHOW_DATABASE_URL")
 }
