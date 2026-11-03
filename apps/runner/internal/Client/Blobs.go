@@ -101,7 +101,7 @@ func (c *Client) doBlob(ctx context.Context, build func() (*http.Request, error)
 	}
 }
 
-func (c *Client) PutBlob(ctx context.Context, ref *runnerv1.LeaseRef, kind, digest string, size int64, open func() (io.ReadCloser, error)) error {
+func (c *Client) PutBlob(ctx context.Context, ref *runnerv1.LeaseRef, kind, name, digest string, size int64, open func() (io.ReadCloser, error)) error {
 	res, err := c.doBlob(ctx, func() (*http.Request, error) {
 		body, err := open()
 		if err != nil {
@@ -113,6 +113,9 @@ func (c *Client) PutBlob(ctx context.Context, ref *runnerv1.LeaseRef, kind, dige
 			return nil, err
 		}
 		req.Header.Set("Dhow-Blob-Kind", kind)
+		if name != "" {
+			req.Header.Set("Dhow-Blob-Name", name)
+		}
 		return req, nil
 	})
 	if err != nil {

@@ -255,3 +255,19 @@ func TestAReadOnlyCacheIsNeverSaved(t *testing.T) {
 		assert.NotEqual(t, sandbox.PackCommand, e.Argv[1], "a read-only cache is never packed")
 	}
 }
+
+func TestAMalformedDigestFromTheServerIsNeverUsed(t *testing.T) {
+	srv := runnertest.NewServer(t)
+	r := checkoutRunner(t, srv)
+	spec := transferSpec()
+	spec.Cache = &runnerv1.Cache{KeyExpression: "deps", Paths: []string{".npm"}, MaxBytes: 1 << 20, ReadOnly: true}
+	srv.SeedCache("deps", "../../short")
+	srv.Enqueue(spec, nil)
+	running := r.Start(fake.Recording{Steps: []fake.Step{{}}}, runnertest.StartOptions{Workspace: t.TempDir()})
+	out := running.Next(t, finishWithin)
+	assert.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, out.Result, "a bad cache answer is only a warning: %s", out.Reason)
+	for _, e := range transferExecs(running.Driver.Events()) {
+		assert.NotEqual(t, sandbox.UnpackCommand, e.Argv[1], "nothing is unpacked from a malformed digest")
+	}
+	assert.Zero(t, srv.Calls("GET /blobs/"), "nothing is downloaded either")
+}

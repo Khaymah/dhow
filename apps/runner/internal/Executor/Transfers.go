@@ -20,15 +20,19 @@ import (
 	config "github.com/Khaymah/dhow/apps/runner/internal/Config"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
 	"github.com/Khaymah/dhow/internal/cachekey"
+	"github.com/Khaymah/dhow/internal/jobspec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
-const hashOutputMax = 256
+const (
+	hashOutputMax = 256
+	shortDigest   = 12
+)
 
 var errDigest = errors.New("the downloaded bytes do not match the digest")
 
 type transferAPI interface {
-	PutBlob(ctx context.Context, ref *runnerv1.LeaseRef, kind, digest string, size int64, open func() (io.ReadCloser, error)) error
+	PutBlob(ctx context.Context, ref *runnerv1.LeaseRef, kind, name, digest string, size int64, open func() (io.ReadCloser, error)) error
 	GetBlob(ctx context.Context, ref *runnerv1.LeaseRef, digest, token string) (client.Blob, error)
 	CommitArtifact(ctx context.Context, ref *runnerv1.LeaseRef, name, digest string, size int64) error
 	LookupCache(ctx context.Context, ref *runnerv1.LeaseRef, key string) (*runnerv1.CacheServiceLookupResponse, error)
@@ -124,7 +128,17 @@ func (a *attempt) leaseError(err error, reason runnerv1.FailureReason, what stri
 	return failed(reason, 0)
 }
 
+func short(digest string) string {
+	if len(digest) < shortDigest {
+		return digest
+	}
+	return digest[:shortDigest]
+}
+
 func (a *attempt) download(ctx context.Context, api transferAPI, digest, token string, size int64) (string, error) {
+	if !jobspec.ValidDigest(digest) {
+		return "", permanent(errDigest)
+	}
 	path := filepath.Join(a.dir, "download-"+digest+".tgz")
 	err := a.retry(ctx, func(rctx context.Context) error {
 		blob, err := api.GetBlob(rctx, a.ref, digest, token)
@@ -185,7 +199,11 @@ func (a *attempt) restoreTransfers(ctx, jobCtx context.Context) (result, bool) {
 		return failed(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, 0), false
 	}
 	for _, in := range a.grant.GetSpec().GetInputs() {
-		a.pipe.Systemf(nil, "dhow: artifact %s: download and unpack (%s)", in.GetName(), in.GetDigest()[:12])
+		if !jobspec.ValidDigest(in.GetDigest()) {
+			a.pipe.Systemf(nil, "dhow: ARTIFACT_DOWNLOAD_FAILED: the server sent a malformed digest for %s", in.GetName())
+			return failed(runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_DOWNLOAD_FAILED, 0), false
+		}
+		a.pipe.Systemf(nil, "dhow: artifact %s: download and unpack (%s)", in.GetName(), short(in.GetDigest()))
 		path, err := a.download(ctx, api, in.GetDigest(), in.GetDownloadToken(), in.GetSizeBytes())
 		if err != nil {
 			return a.leaseError(err, runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_DOWNLOAD_FAILED, "the artifact "+in.GetName()+" could not be downloaded"), false
@@ -275,8 +293,12 @@ func (a *attempt) restoreCache(ctx, jobCtx context.Context, api transferAPI) (re
 		a.pipe.Systemf(nil, "dhow: cache: no entry for this key yet")
 		return result{}, true
 	}
+	if !jobspec.ValidDigest(hit.GetDigest()) {
+		a.pipe.Systemf(nil, "dhow: warning: the server sent a malformed cache digest, so the job runs without the cache")
+		return result{}, true
+	}
 	a.cacheHit = true
-	a.pipe.Systemf(nil, "dhow: cache: restoring %s", hit.GetDigest()[:12])
+	a.pipe.Systemf(nil, "dhow: cache: restoring %s", short(hit.GetDigest()))
 	path, err := a.download(ctx, api, hit.GetDigest(), hit.GetDownloadToken(), hit.GetSizeBytes())
 	if err != nil {
 		if client.IsLeaseLost(err) || errors.Is(err, ErrSelfFenced) {
@@ -326,9 +348,9 @@ func (a *attempt) pack(ctx, jobCtx context.Context, name string, paths []string,
 	return packed{path: path, digest: hex.EncodeToString(w.h.Sum(nil)), size: w.n}, code, result{}, true
 }
 
-func (a *attempt) upload(ctx context.Context, api transferAPI, kind string, p packed) error {
+func (a *attempt) upload(ctx context.Context, api transferAPI, kind, name string, p packed) error {
 	return a.retry(ctx, func(rctx context.Context) error {
-		return api.PutBlob(rctx, a.ref, kind, p.digest, p.size, func() (io.ReadCloser, error) {
+		return api.PutBlob(rctx, a.ref, kind, name, p.digest, p.size, func() (io.ReadCloser, error) {
 			f, err := os.Open(p.path)
 			if err != nil {
 				return nil, permanent(err)
@@ -377,7 +399,7 @@ func (a *attempt) saveArtifact(ctx, jobCtx context.Context, api transferAPI, art
 		return failed(reason, code), false
 	}
 	defer func() { _ = os.Remove(p.path) }()
-	if err := a.upload(ctx, api, client.BlobKindArtifact, p); err != nil {
+	if err := a.upload(ctx, api, client.BlobKindArtifact, art.GetName(), p); err != nil {
 		reason := runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_UPLOAD_FAILED
 		if client.Code(err) == connect.CodeOutOfRange {
 			reason = runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_TOO_LARGE
@@ -390,7 +412,7 @@ func (a *attempt) saveArtifact(ctx, jobCtx context.Context, api transferAPI, art
 	if err != nil {
 		return a.leaseError(err, runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_UPLOAD_FAILED, "the artifact "+art.GetName()+" could not be recorded"), false
 	}
-	a.pipe.Systemf(nil, "dhow: artifact %s: %d bytes, sha256 %s", art.GetName(), p.size, p.digest)
+	a.pipe.Systemf(nil, "dhow: artifact %s: %d bytes, sha256 %s", art.GetName(), p.size, short(p.digest))
 	return result{}, true
 }
 
@@ -419,7 +441,7 @@ func (a *attempt) saveCache(ctx, jobCtx context.Context, api transferAPI) (resul
 		return result{}, true
 	}
 	defer func() { _ = os.Remove(p.path) }()
-	err := a.upload(ctx, api, client.BlobKindCache, p)
+	err := a.upload(ctx, api, client.BlobKindCache, "", p)
 	var stored bool
 	if err == nil {
 		err = a.retry(ctx, func(rctx context.Context) error {
