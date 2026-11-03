@@ -6,7 +6,11 @@ import (
 	"strings"
 )
 
-const ExitKeyring = 79
+const (
+	ExitKeyring       = 79
+	exitOther         = 1
+	keyringCodePrefix = "KEYRING_"
+)
 
 const (
 	CodeKeyringMissing        = "KEYRING_MISSING"
@@ -56,7 +60,12 @@ func (e *Error) Error() string {
 	return b.String()
 }
 
-func (e *Error) ExitCode() int { return ExitKeyring }
+func (e *Error) ExitCode() int {
+	if strings.HasPrefix(e.Code, keyringCodePrefix) {
+		return ExitKeyring
+	}
+	return exitOther
+}
 
 func newError(code string, version int32, detail string) *Error {
 	return &Error{Code: code, Version: version, Detail: detail}

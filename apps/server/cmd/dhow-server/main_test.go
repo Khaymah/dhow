@@ -66,6 +66,7 @@ func TestExitCodeOfAKeyringThatDoesNotFit(t *testing.T) {
 	assert.Equal(t, keys.ExitKeyring, exitCode(missing))
 	assert.Equal(t, 79, exitCode(fmt.Errorf("start: %w", missing)))
 	assert.Equal(t, 1, exitCode(&keys.NotEverywhereError{Version: 2}), "a refused activation is not a boot failure")
+	assert.Equal(t, 1, exitCode(&keys.Error{Code: keys.CodeKekNotFound, Version: 7}))
 }
 
 func TestRunDispatchesKeys(t *testing.T) {
