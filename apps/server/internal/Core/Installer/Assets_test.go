@@ -2,11 +2,14 @@ package installer
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 )
 
 const repoRoot = "../../../../../"
@@ -28,6 +31,7 @@ func TestUnitUsesTheInstallerPaths(t *testing.T) {
 		"User=" + ServiceUser, "ExecStart=" + BinaryPath, "EnvironmentFile=" + EnvFilePath,
 		"LoadCredential=dhow-secret-key:" + SecretKeyPath, "LoadCredential=dhow-database-url:" + DatabaseURLPath,
 		"CapabilityBoundingSet=\n", "NoNewPrivileges=yes", "ProtectSystem=strict", "UMask=0077",
+		"RestartPreventExitStatus=" + strconv.Itoa(migrations.ExitSchemaTooNew) + "\n",
 	} {
 		assert.Contains(t, unit, want)
 	}

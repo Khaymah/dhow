@@ -2,10 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 )
 
 func TestRunRejectsUnknownCommands(t *testing.T) {
@@ -39,4 +43,11 @@ func TestRunDispatchesInstallerCommands(t *testing.T) {
 	err := run(context.Background(), []string{"install", "--bogus"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "flag provided but not defined")
+}
+
+func TestExitCodeOfASchemaTooNew(t *testing.T) {
+	tooNew := &migrations.IncompatibleError{Status: migrations.Evaluate(60, 50, "2.0.0", migrations.Binary{Version: "1.0.0"})}
+	assert.Equal(t, 78, exitCode(tooNew))
+	assert.Equal(t, 78, exitCode(fmt.Errorf("start: %w", tooNew)))
+	assert.Equal(t, 1, exitCode(errors.New("anything else")))
 }

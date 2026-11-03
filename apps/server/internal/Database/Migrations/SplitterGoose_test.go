@@ -23,7 +23,8 @@ var rePgDumpMajor = regexp.MustCompile(`\(PostgreSQL\) (\d+)`)
 func pgDump(t *testing.T, ctx context.Context, server int) []string {
 	t.Helper()
 	argv := strings.Fields(config.TestPgDump())
-	out, err := exec.CommandContext(ctx, argv[0], append(argv[1:], "--version")...).Output() //nolint:gosec // The test's own pg_dump command, from DHOW_TEST_PG_DUMP.
+	version := append(append([]string{}, argv[1:]...), "--version")
+	out, err := exec.CommandContext(ctx, argv[0], version...).Output()
 	major := 0
 	if m := rePgDumpMajor.FindSubmatch(out); err == nil && m != nil {
 		major, _ = strconv.Atoi(string(m[1]))
@@ -48,9 +49,9 @@ func schemaOf(t *testing.T, ctx context.Context, pool *pgxpool.Pool) string {
 
 func dumpSchema(t *testing.T, ctx context.Context, argv []string, schema string) string {
 	t.Helper()
-	args := append(argv[1:], "--schema-only", "--no-owner", "--no-privileges", "--schema="+schema,
+	args := append(append([]string{}, argv[1:]...), "--schema-only", "--no-owner", "--no-privileges", "--schema="+schema,
 		"--exclude-table="+schema+".goose_db_version", config.TestDatabaseURL())
-	out, err := exec.CommandContext(ctx, argv[0], args...).CombinedOutput() //nolint:gosec // The test's own pg_dump command and database.
+	out, err := exec.CommandContext(ctx, argv[0], args...).CombinedOutput()
 	require.NoError(t, err, string(out))
 	var keep []string
 	for _, line := range strings.Split(strings.ReplaceAll(string(out), schema, "SCHEMA"), "\n") {

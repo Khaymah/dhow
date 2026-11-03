@@ -27,6 +27,7 @@ import (
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	mailer "github.com/Khaymah/dhow/apps/server/internal/Core/Mail"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	dbtest "github.com/Khaymah/dhow/apps/server/internal/Database/Testing"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
 	"github.com/Khaymah/dhow/internal/buildinfo"
@@ -105,7 +106,9 @@ func (f *FakeBreach) IsBreached(_ context.Context, password string) (bool, error
 
 type fakeMigrations struct{}
 
-func (fakeMigrations) Current(context.Context) (bool, error) { return true, nil }
+func (fakeMigrations) State(context.Context) (migrations.SchemaState, error) {
+	return migrations.SchemaCurrent, nil
+}
 
 type Env struct {
 	T       *testing.T

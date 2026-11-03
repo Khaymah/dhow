@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	system "github.com/Khaymah/dhow/apps/server/internal/Modules/System"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/System/Models"
@@ -53,6 +54,20 @@ func TestReadiness(t *testing.T) {
 			"pending migrations",
 			support.FakeDB{},
 			support.FakeMigrations{Pending: true},
+			models.HealthUnavailable,
+			map[models.HealthCheckName]bool{models.CheckDatabase: true, models.CheckMigrations: false},
+		},
+		{
+			"a newer schema whose floor allows this binary",
+			support.FakeDB{},
+			support.FakeMigrations{Schema: migrations.SchemaAhead},
+			models.HealthOK,
+			map[models.HealthCheckName]bool{models.CheckDatabase: true, models.CheckMigrations: true},
+		},
+		{
+			"a newer schema whose floor is above this binary",
+			support.FakeDB{},
+			support.FakeMigrations{Schema: migrations.SchemaIncompatible},
 			models.HealthUnavailable,
 			map[models.HealthCheckName]bool{models.CheckDatabase: true, models.CheckMigrations: false},
 		},

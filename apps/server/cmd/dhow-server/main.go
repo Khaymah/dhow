@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -15,11 +16,21 @@ import (
 
 const commandHealthcheck = "healthcheck"
 
+type exitCoder interface{ ExitCode() int }
+
 func main() {
 	if err := run(context.Background(), os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "dhow-server:", err)
-		os.Exit(1)
+		os.Exit(exitCode(err))
 	}
+}
+
+func exitCode(err error) int {
+	var coded exitCoder
+	if errors.As(err, &coded) {
+		return coded.ExitCode()
+	}
+	return 1
 }
 
 func run(ctx context.Context, args []string) error {

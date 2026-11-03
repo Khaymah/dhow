@@ -3,10 +3,12 @@ package system
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/System/Models"
 	"github.com/Khaymah/dhow/internal/buildinfo"
@@ -14,14 +16,14 @@ import (
 
 const readinessTimeout = 2 * time.Second
 
-var errNotMigrated = errors.New("schema is not at the latest migration")
+var errSchemaNotReady = errors.New("the database schema does not fit this binary")
 
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
 type MigrationStatus interface {
-	Current(ctx context.Context) (bool, error)
+	State(ctx context.Context) (migrations.SchemaState, error)
 }
 
 type InstanceQuerier interface {
@@ -50,7 +52,7 @@ func (s *HealthService) Liveness() models.HealthStatus {
 
 func (s *HealthService) Readiness(ctx context.Context) models.HealthStatus {
 	dbOK := s.check(ctx, models.CheckDatabase, s.db.Ping)
-	migOK := dbOK && s.check(ctx, models.CheckMigrations, s.migrationsCurrent)
+	migOK := dbOK && s.check(ctx, models.CheckMigrations, s.schemaReady)
 	status := models.HealthStatus{
 		Status: models.HealthOK,
 		Checks: []models.HealthCheck{
@@ -71,13 +73,13 @@ func (s *HealthService) Readiness(ctx context.Context) models.HealthStatus {
 	return status
 }
 
-func (s *HealthService) migrationsCurrent(ctx context.Context) error {
-	ok, err := s.migrations.Current(ctx)
+func (s *HealthService) schemaReady(ctx context.Context) error {
+	state, err := s.migrations.State(ctx)
 	if err != nil {
 		return err
 	}
-	if !ok {
-		return errNotMigrated
+	if !state.Ready() {
+		return fmt.Errorf("%w: %s", errSchemaNotReady, state)
 	}
 	return nil
 }

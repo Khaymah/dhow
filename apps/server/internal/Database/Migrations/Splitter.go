@@ -171,11 +171,12 @@ func ParseUp(text string) (ParsedFile, error) {
 	if err := scanner.Err(); err != nil {
 		return ParsedFile{}, splitErr("read: %v", err)
 	}
-	switch {
-	case s.state == splitStart:
+	switch s.state {
+	case splitStart:
 		return ParsedFile{}, splitErr("missing -- +goose Up")
-	case s.state == splitBlock:
+	case splitBlock:
 		return ParsedFile{}, splitErr("missing -- +goose StatementEnd")
+	case splitUp:
 	}
 	if rest := strings.TrimSpace(s.buf.String()); rest != "" {
 		return ParsedFile{}, splitErr("unfinished statement %q (missing semicolon?)", rest)
