@@ -57,6 +57,15 @@ delegate() {
   say "the runner gets its own cgroup with the ${controllers[*]} controllers, as systemd Delegate=yes gives it"
 }
 
+fresh_runtime() {
+  local uid
+  uid=$(id -u "$user")
+  setpriv --reuid="$user" --regid="$user" --init-groups --inh-caps=-all --bounding-set=-all \
+    rm -rf --one-file-system -- "$state/run" "/tmp/storage-run-$uid" "/tmp/podman-run-$uid" "/tmp/containers-user-$uid" "/dev/shm/libpod_rootless_lock_$uid" ||
+    die "could not clear the rootless Podman state that the last run of this container left behind"
+  say "cleared the rootless Podman state that the last run of this container left behind (pause process, runtime and libpod tmp directories, locks); the identity and the images stay"
+}
+
 forward() {
   while true; do
     setpriv --reuid=nobody --regid=nogroup --clear-groups --inh-caps=-all \
@@ -194,6 +203,7 @@ trap shutdown TERM INT
 
 if [[ $mode == podman ]]; then
   delegate
+  fresh_runtime
 else
   printf '{"Steps":[{"Output":[{"Data":"hello from the fake driver\\n"}]}]}\n' >"$recording"
   chmod 0644 "$recording"

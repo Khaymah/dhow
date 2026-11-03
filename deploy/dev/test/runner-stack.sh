@@ -128,6 +128,34 @@ started_once() {
     [[ $(grep -cF '"msg":"the runner is ready"' <<<"$log") == 1 ]]
 }
 
+back_after() {
+  local since=$1 log
+  for _ in $(seq 180); do
+    log=$(docker compose logs --no-color --since "$since" "$service" 2>/dev/null) || true
+    if grep -F -- '"msg":"the runner is ready"' <<<"$log" | grep -qF -- "\"runner_id\":\"$runner_id\""; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+job_in_podman() {
+  local status
+  status=$(api "$work/busy-job" POST "/api/v1/organizations/$org_id/jobs" \
+    "$(printf '{"Name":"%s","Spec":{"Image":"%s","Steps":[{"Name":"busy","Run":"sleep 30"}]}}' "$1" "$image")" "${session[@]}")
+  [[ $status == 201 ]] || return 1
+  for _ in $(seq 120); do
+    docker compose exec -T runner pgrep -x conmon >/dev/null && return 0
+    sleep 1
+  done
+  return 1
+}
+
+no_stale_podman() {
+  ! docker compose logs --no-color "$service" 2>/dev/null | grep -qiE -- 'invalid internal status|system migrate'
+}
+
 delegated() {
   local pid=
   for _ in $(seq 60); do
@@ -186,6 +214,22 @@ must "the runner signs in" ready
 expect "the runner runs as dhow-runner in its delegated cgroup" delegated
 expect "a job runs to success in rootless Podman" job_succeeds "dev stack podman"
 expect "the runner started once after registering, with no restart" started_once
+
+printf 'The Podman runner after its container stops in the middle of a job\n'
+must "a job is running in Podman before the restart" job_in_podman "dev stack podman restarted"
+since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+docker compose restart runner
+must "the runner comes back after docker compose restart" back_after "$since"
+must "the runner is online after the restart" online
+expect "a job runs to success after the restart" job_succeeds "dev stack podman after restart"
+must "a job is running in Podman before the kill" job_in_podman "dev stack podman killed"
+since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+docker compose kill runner
+docker compose up --detach runner
+must "the runner comes back after docker compose kill and up" back_after "$since"
+must "the runner is online after kill and up" online
+expect "a job runs to success after kill and up" job_succeeds "dev stack podman after kill"
+expect "Podman never asked for podman system migrate" no_stale_podman
 
 printf 'The fake runner\n'
 evidence runner
