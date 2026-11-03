@@ -41,6 +41,19 @@ work=$(mktemp -d)
 failures=0
 scenario_failures=()
 
+make_keyring() {
+  local file=$1
+  mkdir -p "$(dirname -- "$file")"
+  chmod 700 "$(dirname -- "$file")"
+  printf 'kek 1 %s\n' "$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')" >"$file"
+  chmod 600 "$file"
+  if [[ $(id -u) -eq 0 ]]; then
+    chown 65532:65532 "$file"
+  else
+    sudo chown 65532:65532 "$file"
+  fi
+}
+
 traefik_compose() {
   docker compose --progress quiet --project-name "$traefik_project" --project-directory "$work/traefik" \
     -f "$root/deploy/compose/compose.yaml" -f "$here/traefik/compose.traefik.yaml" \
@@ -145,8 +158,10 @@ start_postgres() {
 
 start_dhow() {
   local netns=$1 trusted=$2
+  [[ -f $work/keyring/dhow-keyring ]] || make_keyring "$work/keyring/dhow-keyring"
   docker run -d --name "$prefix-dhow" --label "$label" --network "container:$netns" \
     --read-only --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:size=16m \
+    -v "$work/keyring/dhow-keyring:/run/secrets/dhow-keyring:ro" -e DHOW_KEYRING_FILE=/run/secrets/dhow-keyring \
     -e DHOW_DATABASE_URL="postgres://dhow:$pg_password@postgres:5432/dhow?sslmode=require" \
     -e DHOW_SECRET_KEY="$(openssl rand -hex 32)" \
     -e DHOW_PUBLIC_URL="$public_url" \
@@ -360,6 +375,7 @@ run_traefik() {
     return
   fi
   mkdir -p "$work/traefik"
+  make_keyring "$work/traefik/secrets/dhow-keyring"
   pebble_id=$(docker create "$pebble_image")
   docker cp "$pebble_id:/test/certs/pebble.minica.pem" "$work/traefik/pebble.minica.pem" >/dev/null
   docker rm "$pebble_id" >/dev/null

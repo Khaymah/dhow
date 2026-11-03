@@ -63,6 +63,7 @@ func (d Doctor) permissions() Finding {
 		{CredentialsDir, modeRootDir.Perm},
 		{SecretKeyPath, modeRootPrivate.Perm},
 		{DatabaseURLPath, modeRootPrivate.Perm},
+		{KeyringPath, modeRootPrivate.Perm},
 		{EnvFilePath, modeRootPrivate.Perm},
 		{AnswersPath, modeRootPrivate.Perm},
 		{UnitPath, modeRootPublic.Perm},

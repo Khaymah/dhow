@@ -11,6 +11,7 @@ import (
 	app "github.com/Khaymah/dhow/apps/server/internal/App"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	installer "github.com/Khaymah/dhow/apps/server/internal/Core/Installer"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	"github.com/Khaymah/dhow/internal/buildinfo"
 )
@@ -29,6 +30,10 @@ func exitCode(err error) int {
 	if errors.As(err, &incompatible) {
 		return incompatible.ExitCode()
 	}
+	var keyring *keys.Error
+	if errors.As(err, &keyring) {
+		return keyring.ExitCode()
+	}
 	return 1
 }
 
@@ -40,11 +45,13 @@ func run(ctx context.Context, args []string) error {
 		return app.RunHealthcheck(ctx)
 	case args[0] == app.CommandMigrate:
 		return runMigrate(ctx, args[1:])
+	case args[0] == app.CommandKeys:
+		return runKeys(ctx, args[1:])
 	case installer.IsCommand(args[0]):
 		return runInstaller(ctx, args)
 	default:
-		return fmt.Errorf("unknown command %q; run without arguments to start the server, or use %q, %q, %q, %q or %q",
-			args[0], commandHealthcheck, app.CommandMigrate, installer.CommandInstall, installer.CommandDoctor, installer.CommandUninstall)
+		return fmt.Errorf("unknown command %q; run without arguments to start the server, or use %q, %q, %q, %q, %q or %q",
+			args[0], commandHealthcheck, app.CommandMigrate, app.CommandKeys, installer.CommandInstall, installer.CommandDoctor, installer.CommandUninstall)
 	}
 }
 
@@ -52,6 +59,12 @@ func runMigrate(ctx context.Context, args []string) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return app.RunMigrate(ctx, args, os.Stdout)
+}
+
+func runKeys(ctx context.Context, args []string) error {
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return app.RunKeys(ctx, args, os.Stdout)
 }
 
 func runInstaller(ctx context.Context, args []string) error {

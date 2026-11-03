@@ -33,7 +33,7 @@ export interface paths {
         };
         /**
          * Readiness probe
-         * @description Returns 200 when the database is reachable and fully migrated, today's job log partition exists, and the last reload of the instance settings succeeded, otherwise 503. A failed settings reload is retried with a bounded backoff, and the `settings` check recovers on the next successful reload.
+         * @description Returns 200 when the database is reachable and fully migrated, today's job log partition exists, the last reload of the instance settings succeeded, and the keyring this server loaded still holds every KEK version the database needs with matching check values, otherwise 503. A failed settings reload is retried with a bounded backoff, and the `settings` check recovers on the next successful reload.
          */
         get: operations["getReadiness"];
         put?: never;
@@ -56,6 +56,26 @@ export interface paths {
          * @description Public information the UI needs before sign-in.
          */
         get: operations["getMeta"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * State of the keyring, never a key
+         * @description Needs `instance.settings.manage` (the instance owner only, never an API token). Lists every key encryption key (KEK) version the database knows, its state (`pending`, `active`, `retiring` or `retired`), how many data keys it still wraps, and whether the keyring file of the server that answers holds it. No key, check value or wrapped data key ever comes back. Rotation happens with `dhow-server keys`, because it needs the keyring file.
+         */
+        get: operations["getKeyringStatus"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2419,8 +2439,54 @@ export interface components {
         };
         HealthCheck: {
             /** @enum {string} */
-            Name: "database" | "migrations" | "log_partitions" | "settings";
+            Name: "database" | "migrations" | "log_partitions" | "settings" | "keyring";
             Ok: boolean;
+        };
+        KeyringStatusResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["KeyringStatus"];
+        };
+        KeyringStatus: {
+            /**
+             * @description Where the KEKs of this server come from. `file` in Community.
+             * @example file
+             */
+            Provider: string;
+            /**
+             * Format: int32
+             * @description The KEK version new data keys are wrapped with. 0 before the first start.
+             */
+            ActiveVersion: number;
+            Versions: components["schemas"]["KekVersionStatus"][];
+            /**
+             * Format: int64
+             * @description Data keys still wrapped with a version other than the active one. 0 when re-wrapping is done.
+             */
+            ToRewrap: number;
+            /** @description The versions in the keyring file of the server that answered. */
+            LoadedVersions: number[];
+            /** Format: date-time */
+            LastRotatedAt?: string;
+            /**
+             * Format: date-time
+             * @description The last `dhow-server keys export`. Absent when the keyring was never exported.
+             */
+            LastExportedAt?: string;
+        };
+        KekVersionStatus: {
+            /** Format: int32 */
+            Version: number;
+            /** @enum {string} */
+            State: "pending" | "active" | "retiring" | "retired";
+            /** Format: int64 */
+            DataKeys: number;
+            /** @description True when the keyring file of the server that answered holds this version. */
+            Loaded: boolean;
+            /** Format: date-time */
+            ActivatedAt?: string;
+            /** Format: date-time */
+            RetiredAt?: string;
+            /** Format: date-time */
+            LastExportedAt?: string;
         };
         Meta: {
             /** @example v0.1.0 */
@@ -3978,6 +4044,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetaResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getKeyringStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The keyring state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyringStatusResponse"];
                 };
             };
             default: components["responses"]["Error"];

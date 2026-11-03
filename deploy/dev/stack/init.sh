@@ -3,6 +3,14 @@ set -euo pipefail
 umask 077
 
 file=/src/.env.dev
+keyring=/src/.dhow-dev-keyring
+if [[ ! -e $keyring ]]; then
+  tmp=$(mktemp /src/.dhow-dev-keyring.XXXXXX)
+  printf 'kek 1 %s\n' "$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')" >"$tmp"
+  chown "$(stat -c %u:%g /src)" "$tmp"
+  mv "$tmp" "$keyring"
+  printf 'init: wrote .dhow-dev-keyring with a new development key\n'
+fi
 if [[ -e $file ]]; then
   printf 'init: keeping the existing .env.dev\n'
   exit 0

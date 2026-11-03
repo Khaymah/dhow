@@ -1,9 +1,9 @@
 -- name: RegisterServerInstance :one
-INSERT INTO "ServerInstances" ("InstanceKey", "Hostname", "Version", "Commit", "SchemaVersion")
-VALUES (@instance_key, @hostname, @version, @commit, @schema_version)
+INSERT INTO "ServerInstances" ("InstanceKey", "Hostname", "Version", "Commit", "SchemaVersion", "KekVersions")
+VALUES (@instance_key, @hostname, @version, @commit, @schema_version, @kek_versions::integer[])
 ON CONFLICT ("InstanceKey") DO UPDATE
 SET "Hostname" = EXCLUDED."Hostname", "Version" = EXCLUDED."Version", "Commit" = EXCLUDED."Commit",
-    "SchemaVersion" = EXCLUDED."SchemaVersion", "IsDeleted" = false, "StartedAt" = now(), "LastSeenAt" = now(),
+    "SchemaVersion" = EXCLUDED."SchemaVersion", "KekVersions" = EXCLUDED."KekVersions", "IsDeleted" = false, "StartedAt" = now(), "LastSeenAt" = now(),
     "UpdatedAt" = now()
 RETURNING "Id";
 

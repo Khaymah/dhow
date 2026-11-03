@@ -23,6 +23,7 @@ sql:
       - internal/Database/Retention/Queries
       - internal/Database/Migrations/Queries
       - internal/Core/ServerInstances/Queries
+      - internal/Core/Keys/Queries
     gen:
       go:
         package: sqlc

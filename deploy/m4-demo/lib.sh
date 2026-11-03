@@ -108,6 +108,8 @@ prepare_work() {
   work=$DHOW_DEMO_WORK
   install -d -m 0700 "$work/server" "$work/certs" "$work/sweep"
   od -An -tx1 -N32 /dev/urandom | tr -d ' \n' >"$work/server/secret-key"
+  printf 'kek 1 %s\n' "$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')" >"$work/server/keyring"
+  chmod 600 "$work/server/keyring"
 }
 
 teardown() {

@@ -219,6 +219,7 @@ func NewWithOptions(t *testing.T, o Options) *Env {
 	if o.Secrets != nil {
 		infra.Secrets = o.Secrets
 	}
+	infra.Keys = NewKeys(t, pool, log)
 	wired, err := app.Build(t.Context(), infra)
 	require.NoError(t, err)
 	t.Cleanup(wired.Close)

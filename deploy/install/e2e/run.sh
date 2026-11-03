@@ -45,6 +45,7 @@ expect() {
 absent() { ! in_box test -e "$1"; }
 lacks() { ! grep -qF -- "$1" "$2"; }
 journal_lacks() { ! in_box journalctl --no-pager | grep -qF -- "$1"; }
+journal_has_keyring() { in_box journalctl -u dhow -o cat --no-pager | grep -q '"msg":"keyring loaded"'; }
 journal_has_setup_link() { in_box journalctl -u dhow -o cat --no-pager | grep -q '"setup_url":"https://dhow.e2e.test/setup#'; }
 every_step_skipped() { ! grep -E '^\[[0-9]+/[0-9]+\] [^:]*$' "$1"; }
 pgdg_installed() { in_box test -x /usr/lib/postgresql/18/bin/postgres || in_box test -x /usr/pgsql-18/bin/postgres; }
@@ -52,7 +53,7 @@ nologin() { in_box getent passwd dhow | grep -q ':/usr/sbin/nologin$'; }
 only_mptcp_advisory() {
   grep -qx 'Everything looks good.' "$1" && return 0
   grep -qx 'Nothing blocks Dhow, but read the warnings above.' "$1" || return 1
-  ! grep -E '^  (WARN|FAIL) ' "$1" | grep -v 'MPTCP, CVE-2026-98432'
+  ! grep -E '^  (WARN|FAIL) ' "$1" | grep -v -e 'MPTCP, CVE-2026-98432' -e 'The keyring was never exported'
 }
 doctor_clean() {
   in_box /root/dhow-server doctor >"$work/doctor.log"
@@ -85,7 +86,7 @@ expect "dhow is enabled" in_box systemctl is-enabled --quiet dhow
 expect "/api/v1/health/ready answers 200" in_box env DHOW_LISTEN_ADDR=127.0.0.1:8080 /usr/local/bin/dhow-server healthcheck
 expect "the journal holds the setup link" journal_has_setup_link
 expect "PostgreSQL 18 came from PGDG" pgdg_installed
-for f in /etc/dhow/credentials/dhow-secret-key /etc/dhow/credentials/dhow-database-url /etc/dhow/dhow.env /etc/dhow/answers.yaml; do
+for f in /etc/dhow/credentials/dhow-secret-key /etc/dhow/credentials/dhow-database-url /etc/dhow/credentials/dhow-keyring /etc/dhow/dhow.env /etc/dhow/answers.yaml; do
   expect "$f is 600 root:root" mode_is "$f" "600 root:root"
 done
 expect "/etc/dhow is 700 root:root" mode_is /etc/dhow "700 root:root"
@@ -93,12 +94,18 @@ expect "the service user has no login shell" nologin
 key=$(in_box cat /etc/dhow/credentials/dhow-secret-key)
 expect "the secret key never reached the output" lacks "$key" "$work/install.log"
 expect "the secret key never reached the journal" journal_lacks "$key"
+kek=$(in_box cat /etc/dhow/credentials/dhow-keyring)
+kek=${kek##* }
+expect "the keyring never reached the output" lacks "$kek" "$work/install.log"
+expect "the keyring never reached the journal" journal_lacks "$kek"
+expect "the server registered the keyring" journal_has_keyring
 in_box systemd-analyze security dhow.service --no-pager | tail -1 | tee "$work/security.txt"
 expect "systemd-analyze rates the unit OK or better" grep -Eq 'OK|SAFE|PERFECT' "$work/security.txt"
 
 printf 'Running the installer again\n'
 in_box /root/dhow-server install --answers /root/answers.yaml --yes >"$work/rerun.log"
 expect "a re-run keeps the secret key" test "$(in_box cat /etc/dhow/credentials/dhow-secret-key)" = "$key"
+expect "a re-run keeps the keyring" in_box grep -qF -- "$kek" /etc/dhow/credentials/dhow-keyring
 expect "a re-run skips every step" every_step_skipped "$work/rerun.log"
 
 printf 'Doctor\n'
@@ -112,6 +119,7 @@ expect "the binary is gone" absent /usr/local/bin/dhow-server
 expect "the config is gone" absent /etc/dhow/dhow.env
 expect "the answers are kept for a later purge" in_box test -s /etc/dhow/answers.yaml
 expect "the secrets are kept" in_box test -s /etc/dhow/credentials/dhow-secret-key
+expect "the keyring is kept" in_box test -s /etc/dhow/credentials/dhow-keyring
 printf 'delete dhow data\n' | in_box_stdin /root/dhow-server uninstall --purge >"$work/purge.log"
 expect "purge removes /etc/dhow" absent /etc/dhow
 expect "purge removes the dhow user" user_gone

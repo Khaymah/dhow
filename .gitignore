@@ -17,6 +17,9 @@ node_modules/
 *.pem
 *.key
 dhow.local.yaml
+.dhow-dev-keyring
+.dhow-dev-keyring.*
+deploy/compose/secrets/
 
 # Editors and OS
 .idea/

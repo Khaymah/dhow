@@ -25,6 +25,10 @@ func SecretFileStep(sys System, title, path string, generate func() ([]byte, err
 	return engine.SecretFileStep(sys, title, path, modeRootPrivate, generate)
 }
 
+func ContainerSecretFileStep(sys System, title, path string, generate func() ([]byte, error)) Step {
+	return engine.SecretFileStep(sys, title, path, modeContainer, generate)
+}
+
 func DirStep(sys System, title, path string, mode FileMode) Step {
 	return engine.DirStep(sys, title, path, mode)
 }

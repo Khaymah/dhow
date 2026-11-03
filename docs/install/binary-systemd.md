@@ -72,10 +72,11 @@ install -d -o root -g root -m 0700 /etc/dhow /etc/dhow/credentials
 umask 077
 openssl rand -hex 32 > /etc/dhow/credentials/dhow-secret-key
 printf '%s\n' "$db_url" > /etc/dhow/credentials/dhow-database-url
+/usr/local/bin/dhow-server keys init --file /etc/dhow/credentials/dhow-keyring
 unset password db_url
 ```
 
-احفظ نسخة من `/etc/dhow/credentials/dhow-secret-key` مع قاعدة البيانات، لأن نسخة قاعدة البيانات لا تُفك بدونه. راجع [الأسرار في ملفات](configuration.md#الأسرار-في-ملفات) لتعرف كيف يقرأ داو هذه الملفات وما الذي يرفضه.
+احفظ نسخة من `/etc/dhow/credentials/dhow-secret-key` و`/etc/dhow/credentials/dhow-keyring` مع قاعدة البيانات، لأن نسخة قاعدة البيانات لا تُفك بدونهما. الملف الثاني [سلسلة المفاتيح](keys.md)، والخدمة تقرؤه بـ `LoadCredential=dhow-keyring:...`. راجع [الأسرار في ملفات](configuration.md#الأسرار-في-ملفات) لتعرف كيف يقرأ داو هذه الملفات وما الذي يرفضه.
 
 ## 5. كتابة الإعدادات
 
@@ -147,7 +148,7 @@ tar -C /etc -czf /root/dhow-etc-$(date +%F).tar.gz dhow
 chmod 600 /root/dhow-*
 ```
 
-انسخ الملفين إلى مكان غير هذا الجهاز. للاسترجاع: أوقف داو، واسترجع قاعدة البيانات بـ `pg_restore --clean --if-exists --no-owner -d dhow` كمستخدم superuser، وأعد `/etc/dhow` بالمفتاح السري نفسه، ثم شغّل داو مرة أخرى.
+انسخ الملفين إلى مكان غير هذا الجهاز. نسخة `/etc/dhow` فيها سلسلة المفاتيح. للاسترجاع: أوقف داو، واسترجع قاعدة البيانات بـ `pg_restore --clean --if-exists --no-owner -d dhow` كمستخدم superuser، وأعد `/etc/dhow` بالمفتاح السري نفسه وسلسلة المفاتيح نفسها، ثم شغّل داو مرة أخرى. عند البدء يقارن داو قيم الفحص في القاعدة بالسلسلة، ويتوقف إذا لم تتطابق.
 
 ## إزالة التثبيت
 

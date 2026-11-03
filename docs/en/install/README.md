@@ -17,7 +17,7 @@ Dhow is one server process with the web app built in, and a PostgreSQL 18 databa
 
 Jobs run on separate runner hosts: see [Dhow runners](../runner/README.md) to install and register one. The same bootstrap script installs either component: `get.sh` installs the server (`--component server`, the default), and `get.sh --component runner` installs the runner binary and its systemd unit from the same signed release, after which `sudo dhow-runner install` sets up, registers and starts the runner ([Install a runner](../runner/install.md)).
 
-If you are not sure, use Docker Compose. Every method runs the same server with the same [configuration](configuration.md), so you can move between them by restoring a database backup and keeping the same `DHOW_SECRET_KEY`.
+If you are not sure, use Docker Compose. Every method runs the same server with the same [configuration](configuration.md), so you can move between them by restoring a database backup and keeping the same `DHOW_SECRET_KEY` and the same [keyring](keys.md).
 
 ## Requirements for every method
 
@@ -44,6 +44,7 @@ Go through this list before other people use the instance.
 
 - [ ] `DHOW_SECRET_KEY` was generated randomly, for example by `init.sh` or `openssl rand -hex 32`, and never reused from another instance.
 - [ ] `DHOW_SECRET_KEY` is backed up together with the database backups, somewhere other than the host. A database backup cannot be decrypted without it.
+- [ ] The [keyring](keys.md) is exported to an age public key (`dhow-server keys export`), and the copy is kept somewhere other than the host.
 - [ ] The artifacts folder (`DHOW_BLOB_DIR`, the `blobs` volume with Docker Compose) is backed up with the database. Without it, runs keep their history but their artifacts and cache are gone.
 - [ ] A restore was tried once, as in [Back up and restore](compose.md#back-up-and-restore).
 - [ ] The file that holds the secrets, such as `.env`, has mode `600`. Only administrators can use the Docker socket, because it reveals every container's environment.

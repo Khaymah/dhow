@@ -65,6 +65,7 @@ type System interface {
 	WriteFile(path string, data []byte, mode FileMode) error
 	Chmod(path string, mode FileMode) error
 	Stat(path string) (FileInfo, error)
+	Lstat(path string) (FileInfo, error)
 	Remove(path string) error
 	RemoveAll(path string) error
 	MkdirAll(path string, mode FileMode) error

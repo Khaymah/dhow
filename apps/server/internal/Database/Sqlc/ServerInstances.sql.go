@@ -60,11 +60,11 @@ func (q *Queries) ListLiveServerInstances(ctx context.Context, staleAfterSeconds
 }
 
 const registerServerInstance = `-- name: RegisterServerInstance :one
-INSERT INTO "ServerInstances" ("InstanceKey", "Hostname", "Version", "Commit", "SchemaVersion")
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO "ServerInstances" ("InstanceKey", "Hostname", "Version", "Commit", "SchemaVersion", "KekVersions")
+VALUES ($1, $2, $3, $4, $5, $6::integer[])
 ON CONFLICT ("InstanceKey") DO UPDATE
 SET "Hostname" = EXCLUDED."Hostname", "Version" = EXCLUDED."Version", "Commit" = EXCLUDED."Commit",
-    "SchemaVersion" = EXCLUDED."SchemaVersion", "IsDeleted" = false, "StartedAt" = now(), "LastSeenAt" = now(),
+    "SchemaVersion" = EXCLUDED."SchemaVersion", "KekVersions" = EXCLUDED."KekVersions", "IsDeleted" = false, "StartedAt" = now(), "LastSeenAt" = now(),
     "UpdatedAt" = now()
 RETURNING "Id"
 `
@@ -75,6 +75,7 @@ type RegisterServerInstanceParams struct {
 	Version       string
 	Commit        string
 	SchemaVersion int64
+	KekVersions   []int32
 }
 
 func (q *Queries) RegisterServerInstance(ctx context.Context, arg RegisterServerInstanceParams) (uuid.UUID, error) {
@@ -84,6 +85,7 @@ func (q *Queries) RegisterServerInstance(ctx context.Context, arg RegisterServer
 		arg.Version,
 		arg.Commit,
 		arg.SchemaVersion,
+		arg.KekVersions,
 	)
 	var Id uuid.UUID
 	err := row.Scan(&Id)

@@ -25,6 +25,7 @@ type Identity struct {
 	Version       string
 	Commit        string
 	SchemaVersion int64
+	KekVersions   []int32
 }
 
 type Heartbeat struct {
@@ -50,6 +51,7 @@ func (h *Heartbeat) ID() uuid.UUID {
 func (h *Heartbeat) Register(ctx context.Context) error {
 	id, err := h.q.RegisterServerInstance(ctx, sqlc.RegisterServerInstanceParams{
 		InstanceKey: h.ident.Key, Hostname: h.ident.Hostname, Version: h.ident.Version, Commit: h.ident.Commit, SchemaVersion: h.ident.SchemaVersion,
+		KekVersions: kekVersions(h.ident.KekVersions),
 	})
 	if err != nil {
 		return fmt.Errorf("register this server instance: %w", err)
@@ -96,4 +98,11 @@ func (h *Heartbeat) Loop(ctx context.Context, every time.Duration) {
 			}
 		}
 	}
+}
+
+func kekVersions(v []int32) []int32 {
+	if v == nil {
+		return []int32{}
+	}
+	return v
 }

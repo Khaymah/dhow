@@ -66,8 +66,9 @@ as_runner() {
 printf 'Starting dhow-server with a TLS runner listener\n'
 openssl req -x509 -newkey ed25519 -nodes -days 1 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1 \
   -keyout "$work/runner.key" -out "$work/ca.pem" 2>/dev/null
+"$server_bin" keys init --file "$work/dhow-keyring" >/dev/null
 DHOW_DEV=true DHOW_PUBLIC_URL="$public_url" DHOW_LISTEN_ADDR="127.0.0.1:$port" DHOW_DATABASE_URL="$database_url" \
-  DHOW_SECRET_KEY="$(openssl rand -hex 32)" DHOW_RUNNER_LISTEN_ADDR="127.0.0.1:$runner_port" \
+  DHOW_SECRET_KEY="$(openssl rand -hex 32)" DHOW_KEYRING_FILE="$work/dhow-keyring" DHOW_RUNNER_LISTEN_ADDR="127.0.0.1:$runner_port" \
   DHOW_RUNNER_TLS_CERT_FILE="$work/ca.pem" DHOW_RUNNER_TLS_KEY_FILE="$work/runner.key" \
   "$server_bin" >"$work/server.log" 2>&1 &
 server_pid=$!

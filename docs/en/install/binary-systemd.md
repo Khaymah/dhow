@@ -72,10 +72,11 @@ install -d -o root -g root -m 0700 /etc/dhow /etc/dhow/credentials
 umask 077
 openssl rand -hex 32 > /etc/dhow/credentials/dhow-secret-key
 printf '%s\n' "$db_url" > /etc/dhow/credentials/dhow-database-url
+/usr/local/bin/dhow-server keys init --file /etc/dhow/credentials/dhow-keyring
 unset password db_url
 ```
 
-Back up `/etc/dhow/credentials/dhow-secret-key` together with the database: a database backup cannot be decrypted without it. See [Secrets in files](configuration.md#secrets-in-files) for how Dhow reads these files and what it refuses.
+Back up `/etc/dhow/credentials/dhow-secret-key` and `/etc/dhow/credentials/dhow-keyring` together with the database: a database backup cannot be decrypted without them. The second file is the [keyring](keys.md), and the service reads it with `LoadCredential=dhow-keyring:...`. See [Secrets in files](configuration.md#secrets-in-files) for how Dhow reads these files and what it refuses.
 
 ## 5. Write the configuration
 
@@ -147,7 +148,7 @@ tar -C /etc -czf /root/dhow-etc-$(date +%F).tar.gz dhow
 chmod 600 /root/dhow-*
 ```
 
-Copy both files somewhere other than this host. To restore, stop Dhow, restore the database with `pg_restore --clean --if-exists --no-owner -d dhow` as a superuser, put `/etc/dhow` back with the same secret key, and start Dhow again.
+Copy both files somewhere other than this host. The copy of `/etc/dhow` holds the keyring. To restore, stop Dhow, restore the database with `pg_restore --clean --if-exists --no-owner -d dhow` as a superuser, put `/etc/dhow` back with the same secret key and the same keyring, and start Dhow again. At start, Dhow compares the check values in the database with the keyring and stops when they do not match.
 
 ## Uninstall
 

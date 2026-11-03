@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	"github.com/Khaymah/dhow/internal/buildinfo"
 )
@@ -30,6 +31,11 @@ func Run(ctx context.Context) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	provider, err := OpenKeyring(cfg.Keyring)
+	if err != nil {
+		return holdKeyring(ctx, err, cfg, log)
+	}
+
 	pool, err := config.OpenDatabase(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
@@ -45,16 +51,19 @@ func Run(ctx context.Context) error {
 			log.Warn("close migrator", "error", err)
 		}
 	}()
+	if err := keys.NewManager(pool, provider, log).Preflight(ctx); err != nil {
+		return holdKeyring(ctx, err, cfg, log)
+	}
 	if err := PrepareSchema(ctx, migrator, log); err != nil {
 		return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
 	}
-	stopHeartbeat, err := StartHeartbeat(ctx, pool, ServerIdentity(build, migrator.Latest(), cfg.InstanceID, os.Hostname, log), log)
+	keyManager, stopInstance, err := StartInstance(ctx, pool, provider, ServerIdentity(build, migrator.Latest(), cfg.InstanceID, os.Hostname, log), log)
 	if err != nil {
-		return err
+		return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
 	}
-	defer stopHeartbeat()
+	defer stopInstance()
 
-	wired, err := Build(ctx, Infra{Config: cfg, Log: log, Pool: pool, Migrations: migrator, Build: build})
+	wired, err := Build(ctx, Infra{Config: cfg, Log: log, Pool: pool, Migrations: migrator, Build: build, Keys: keyManager})
 	if err != nil {
 		return err
 	}
@@ -158,4 +167,11 @@ func NewHTTPServer(cfg config.Config, handler http.Handler, log *slog.Logger) *h
 		MaxHeaderBytes:    config.MaxHeaderBytes,
 		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
 	}
+}
+
+func holdKeyring(ctx context.Context, err error, cfg config.Config, log *slog.Logger) error {
+	if cfg.OnIncompatible != config.OnIncompatibleWait {
+		log.Error("the keyring does not fit; stopping", "code", keys.CodeOf(err), "error", err.Error())
+	}
+	return HoldIncompatible(ctx, err, cfg.OnIncompatible, log)
 }

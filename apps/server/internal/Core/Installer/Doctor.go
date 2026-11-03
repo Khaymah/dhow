@@ -117,7 +117,9 @@ func (d Doctor) nativeChecks(ctx context.Context) []Finding {
 	if out[0].Severity == SeverityFail {
 		return out
 	}
-	out = append(out, d.unitDrift(), d.permissions(), d.secrets(), d.service(ctx))
+	out = append(out, d.unitDrift(), d.permissions(), d.secrets())
+	out = append(out, d.keyring(ctx)...)
+	out = append(out, d.service(ctx))
 	return append(out, d.health(ctx)...)
 }
 
@@ -129,6 +131,7 @@ func (d Doctor) composeChecks(ctx context.Context) []Finding {
 	out = append(out, ok(d.M.T(KeyCheckInstalled)), d.permissionsOf([]permCheck{
 		{ConfigDir, modeRootDir.Perm}, {ComposeDir, modeRootDir.Perm}, {ComposeEnvPath, modeRootPrivate.Perm},
 	}))
+	out = append(out, d.keyring(ctx)...)
 	res, err := d.Sys.Run(ctx, composeCmd("ps", "--status", "running", "--services"))
 	running := err == nil && bytes.Contains(res.Stdout, []byte("dhow")) && bytes.Contains(res.Stdout, []byte("postgres"))
 	if running {

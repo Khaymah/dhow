@@ -108,8 +108,9 @@ paths:
       tags: [system]
       summary: Readiness probe
       description: >-
-        Returns 200 when the database is reachable and fully migrated, today's job log partition exists, and the
-        last reload of the instance settings succeeded, otherwise 503. A failed settings reload is retried with a
+        Returns 200 when the database is reachable and fully migrated, today's job log partition exists, the
+        last reload of the instance settings succeeded, and the keyring this server loaded still holds every KEK
+        version the database needs with matching check values, otherwise 503. A failed settings reload is retried with a
         bounded backoff, and the `settings` check recovers on the next successful reload.
       security: []
       responses:
@@ -143,6 +144,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MetaResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /system/keys:
+    get:
+      operationId: getKeyringStatus
+      tags: [system]
+      summary: State of the keyring, never a key
+      description: >-
+        Needs `instance.settings.manage` (the instance owner only, never an API token). Lists every key encryption
+        key (KEK) version the database knows, its state (`pending`, `active`, `retiring` or `retired`), how many data
+        keys it still wraps, and whether the keyring file of the server that answers holds it. No key, check value or
+        wrapped data key ever comes back. Rotation happens with `dhow-server keys`, because it needs the keyring file.
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: The keyring state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeyringStatusResponse"
         default:
           $ref: "#/components/responses/Error"
   /setup:
@@ -4167,9 +4189,76 @@ components:
       properties:
         Name:
           type: string
-          enum: [database, migrations, log_partitions, settings]
+          enum: [database, migrations, log_partitions, settings, keyring]
         Ok:
           type: boolean
+    KeyringStatusResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/KeyringStatus"
+    KeyringStatus:
+      type: object
+      additionalProperties: false
+      required: [Provider, ActiveVersion, Versions, ToRewrap, LoadedVersions]
+      properties:
+        Provider:
+          type: string
+          description: Where the KEKs of this server come from. `file` in Community.
+          example: file
+        ActiveVersion:
+          type: integer
+          format: int32
+          description: The KEK version new data keys are wrapped with. 0 before the first start.
+        Versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/KekVersionStatus"
+        ToRewrap:
+          type: integer
+          format: int64
+          description: Data keys still wrapped with a version other than the active one. 0 when re-wrapping is done.
+        LoadedVersions:
+          type: array
+          description: The versions in the keyring file of the server that answered.
+          items:
+            type: integer
+            format: int32
+        LastRotatedAt:
+          type: string
+          format: date-time
+        LastExportedAt:
+          type: string
+          format: date-time
+          description: The last `dhow-server keys export`. Absent when the keyring was never exported.
+    KekVersionStatus:
+      type: object
+      additionalProperties: false
+      required: [Version, State, DataKeys, Loaded]
+      properties:
+        Version:
+          type: integer
+          format: int32
+        State:
+          type: string
+          enum: [pending, active, retiring, retired]
+        DataKeys:
+          type: integer
+          format: int64
+        Loaded:
+          type: boolean
+          description: True when the keyring file of the server that answered holds this version.
+        ActivatedAt:
+          type: string
+          format: date-time
+        RetiredAt:
+          type: string
+          format: date-time
+        LastExportedAt:
+          type: string
+          format: date-time
     Meta:
       type: object
       additionalProperties: false

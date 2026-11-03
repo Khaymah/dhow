@@ -75,6 +75,7 @@ services:
     environment:
       DHOW_DATABASE_URL: postgres://dhow:${POSTGRES_PASSWORD:?run ./init.sh to create .env}@postgres:5432/dhow?sslmode=require
       DHOW_SECRET_KEY: ${DHOW_SECRET_KEY:?run ./init.sh to create .env}
+      DHOW_KEYRING_FILE: /run/secrets/dhow-keyring
       DHOW_PUBLIC_URL: ${DHOW_PUBLIC_URL:?run ./init.sh to create .env}
       DHOW_TRUSTED_PROXIES: ${DHOW_TRUSTED_PROXIES:-}
       DHOW_LOG_LEVEL: ${DHOW_LOG_LEVEL:-info}
@@ -89,6 +90,8 @@ services:
       DHOW_SMTP_USERNAME: ${DHOW_SMTP_USERNAME:-}
       DHOW_SMTP_PASSWORD: ${DHOW_SMTP_PASSWORD:-}
       DHOW_SMTP_FROM: ${DHOW_SMTP_FROM:-}
+    secrets:
+      - dhow-keyring
     ports:
       - "${DHOW_PUBLISH:-127.0.0.1:8080}:8080"
     tmpfs:
@@ -102,6 +105,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+secrets:
+  dhow-keyring:
+    file: ./secrets/dhow-keyring
 
 networks:
   data:

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -16,6 +17,7 @@ import (
 // Defines values for HealthCheckName.
 const (
 	Database      HealthCheckName = "database"
+	Keyring       HealthCheckName = "keyring"
 	LogPartitions HealthCheckName = "log_partitions"
 	Migrations    HealthCheckName = "migrations"
 	Settings      HealthCheckName = "settings"
@@ -25,6 +27,8 @@ const (
 func (e HealthCheckName) Valid() bool {
 	switch e {
 	case Database:
+		return true
+	case Keyring:
 		return true
 	case LogPartitions:
 		return true
@@ -49,6 +53,30 @@ func (e HealthStatusStatus) Valid() bool {
 	case Ok:
 		return true
 	case Unavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for KekVersionStatusState.
+const (
+	Active   KekVersionStatusState = "active"
+	Pending  KekVersionStatusState = "pending"
+	Retired  KekVersionStatusState = "retired"
+	Retiring KekVersionStatusState = "retiring"
+)
+
+// Valid indicates whether the value is a known member of the KekVersionStatusState enum.
+func (e KekVersionStatusState) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Pending:
+		return true
+	case Retired:
+		return true
+	case Retiring:
 		return true
 	default:
 		return false
@@ -130,6 +158,57 @@ type HealthStatus struct {
 // HealthStatusStatus defines model for HealthStatus.Status.
 type HealthStatusStatus string
 
+// KekVersionStatus defines model for KekVersionStatus.
+type KekVersionStatus struct {
+	ActivatedAt    *time.Time `json:"ActivatedAt,omitempty"`
+	DataKeys       int64      `json:"DataKeys"`
+	LastExportedAt *time.Time `json:"LastExportedAt,omitempty"`
+
+	// Loaded True when the keyring file of the server that answered holds this version.
+	Loaded    bool                  `json:"Loaded"`
+	RetiredAt *time.Time            `json:"RetiredAt,omitempty"`
+	State     KekVersionStatusState `json:"State"`
+	Version   int32                 `json:"Version"`
+}
+
+// KekVersionStatusState defines model for KekVersionStatus.State.
+type KekVersionStatusState string
+
+// KeyringStatus defines model for KeyringStatus.
+type KeyringStatus struct {
+	// ActiveVersion The KEK version new data keys are wrapped with. 0 before the first start.
+	ActiveVersion int32 `json:"ActiveVersion"`
+
+	// LastExportedAt The last `dhow-server keys export`. Absent when the keyring was never exported.
+	LastExportedAt *time.Time `json:"LastExportedAt,omitempty"`
+	LastRotatedAt  *time.Time `json:"LastRotatedAt,omitempty"`
+
+	// LoadedVersions The versions in the keyring file of the server that answered.
+	LoadedVersions []int32 `json:"LoadedVersions"`
+
+	// Provider Where the KEKs of this server come from. `file` in Community.
+	//
+	// Example: file
+	Provider string `json:"Provider"`
+
+	// ToRewrap Data keys still wrapped with a version other than the active one. 0 when re-wrapping is done.
+	ToRewrap int64              `json:"ToRewrap"`
+	Versions []KekVersionStatus `json:"Versions"`
+}
+
+// KeyringStatusResponse defines model for KeyringStatusResponse.
+type KeyringStatusResponse struct {
+	Data  *KeyringStatus `json:"Data,omitempty"`
+	Error *ErrorDetail   `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
 // Meta defines model for Meta.
 type Meta struct {
 	// Commit Example: 2e39188
@@ -176,6 +255,9 @@ type ServerInterface interface {
 	// GetMeta Instance metadata
 	// (GET /meta)
 	GetMeta(w http.ResponseWriter, r *http.Request)
+	// GetKeyringStatus State of the keyring, never a key
+	// (GET /system/keys)
+	GetKeyringStatus(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -197,6 +279,12 @@ func (_ Unimplemented) GetReadiness(w http.ResponseWriter, r *http.Request) {
 // GetMeta Instance metadata
 // (GET /meta)
 func (_ Unimplemented) GetMeta(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetKeyringStatus State of the keyring, never a key
+// (GET /system/keys)
+func (_ Unimplemented) GetKeyringStatus(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -242,6 +330,20 @@ func (siw *ServerInterfaceWrapper) GetMeta(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMeta(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetKeyringStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetKeyringStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetKeyringStatus(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -372,6 +474,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/meta", wrapper.GetMeta)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/system/keys", wrapper.GetKeyringStatus)
 	})
 
 	return r
@@ -507,6 +612,44 @@ func (response GetMetadefaultJSONResponse) VisitGetMetaResponse(w http.ResponseW
 	return err
 }
 
+type GetKeyringStatusRequestObject struct {
+}
+
+type GetKeyringStatusResponseObject interface {
+	VisitGetKeyringStatusResponse(w http.ResponseWriter) error
+}
+
+type GetKeyringStatus200JSONResponse KeyringStatusResponse
+
+func (response GetKeyringStatus200JSONResponse) VisitGetKeyringStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetKeyringStatusdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response GetKeyringStatusdefaultJSONResponse) VisitGetKeyringStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// GetLiveness Liveness probe
@@ -518,6 +661,9 @@ type StrictServerInterface interface {
 	// GetMeta Instance metadata
 	// (GET /meta)
 	GetMeta(ctx context.Context, request GetMetaRequestObject) (GetMetaResponseObject, error)
+	// GetKeyringStatus State of the keyring, never a key
+	// (GET /system/keys)
+	GetKeyringStatus(ctx context.Context, request GetKeyringStatusRequestObject) (GetKeyringStatusResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -624,6 +770,30 @@ func (sh *strictHandler) GetMeta(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMetaResponseObject); ok {
 		if err := validResponse.VisitGetMetaResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetKeyringStatus operation middleware
+func (sh *strictHandler) GetKeyringStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetKeyringStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetKeyringStatus(ctx, request.(GetKeyringStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetKeyringStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetKeyringStatusResponseObject); ok {
+		if err := validResponse.VisitGetKeyringStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

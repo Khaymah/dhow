@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	serverinstances "github.com/Khaymah/dhow/apps/server/internal/Core/ServerInstances"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
@@ -35,13 +36,22 @@ func PrepareSchema(ctx context.Context, m *migrations.Migrator, log *slog.Logger
 }
 
 func HoldIncompatible(ctx context.Context, err error, mode string, log *slog.Logger) error {
-	var incompatible *migrations.IncompatibleError
-	if mode != config.OnIncompatibleWait || !errors.As(err, &incompatible) {
+	if mode != config.OnIncompatibleWait {
 		return err
 	}
-	log.Error("the database schema is too new for this binary; waiting for a stop signal instead of exiting, "+
-		"so the container does not restart in a loop", "code", migrations.CodeSchemaTooNew, "error", err.Error(),
-		config.EnvOnIncompatible, mode)
+	var incompatible *migrations.IncompatibleError
+	var keyring *keys.Error
+	switch {
+	case errors.As(err, &incompatible):
+		log.Error("the database schema is too new for this binary; waiting for a stop signal instead of exiting, "+
+			"so the container does not restart in a loop", "code", migrations.CodeSchemaTooNew, "error", err.Error(),
+			config.EnvOnIncompatible, mode)
+	case errors.As(err, &keyring) && keyring.ExitCode() == keys.ExitKeyring:
+		log.Error("the keyring does not fit this database; waiting for a stop signal instead of exiting, "+
+			"so the container does not restart in a loop", "code", keyring.Code, "error", err.Error(), config.EnvOnIncompatible, mode)
+	default:
+		return err
+	}
 	<-ctx.Done()
 	return nil
 }

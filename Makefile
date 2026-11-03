@@ -157,9 +157,13 @@ DEV_DB_URL      := postgres://dhow:$(DEV_DB_PASSWORD)@127.0.0.1:$(DEV_DB_PORT)
 dev-setup: ## Install what development needs, ask for your settings and generate secrets (SETUP_ARGS="--help" for options)
 	bash deploy/dev/setup.sh $(SETUP_ARGS)
 
+DEV_KEYRING     := $(abspath .dhow-dev-keyring)
+
 .PHONY: dev-env
-dev-env: ## Write .env.dev once: DHOW_DEV, a fresh secret key and the local database URLs
-	@if [ -f $(DEV_ENV) ]; then echo "$(DEV_ENV) already exists; delete it to make a new one"; exit 0; fi; \
+dev-env: ## Write .env.dev once: DHOW_DEV, a fresh secret key, a development keyring and the local database URLs
+	@umask 077; if [ ! -f $(DEV_KEYRING) ]; then printf 'kek 1 %s\n' "$$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')" > $(DEV_KEYRING); echo "wrote $(DEV_KEYRING)"; fi
+	@if [ -f $(DEV_ENV) ]; then grep -q '^DHOW_KEYRING_FILE=' $(DEV_ENV) || { echo "DHOW_KEYRING_FILE=$(DEV_KEYRING)" >> $(DEV_ENV); echo "added DHOW_KEYRING_FILE to $(DEV_ENV)"; }; \
+		echo "$(DEV_ENV) already exists; delete it to make a new one"; exit 0; fi; \
 	umask 077; { \
 		echo "DHOW_DEV=true"; \
 		echo "DHOW_PUBLIC_URL=http://localhost:8080"; \
@@ -167,6 +171,7 @@ dev-env: ## Write .env.dev once: DHOW_DEV, a fresh secret key and the local data
 		echo "DHOW_TEST_DATABASE_URL=$(DEV_DB_URL)/dhow_test?sslmode=disable"; \
 		echo "DHOW_TEST_PG_DUMP=\"$(DEV_DB_ENGINE) run --rm --network host docker.io/library/postgres:18 pg_dump\""; \
 		echo "DHOW_SECRET_KEY=$$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"; \
+		echo "DHOW_KEYRING_FILE=$(DEV_KEYRING)"; \
 	} > $(DEV_ENV); echo "wrote $(DEV_ENV)"
 
 .PHONY: dev-db
@@ -239,7 +244,8 @@ FUZZ_TARGETS := \
 	Core/Auth:FuzzTotp Core/Auth:FuzzRecoveryCode Core/Auth:FuzzEmailAndName Core/Auth:FuzzPasswordLength \
 	Core/Auth:FuzzWebAuthnResponses Core/I18n:FuzzParseAcceptLanguage Core/Middleware:FuzzClientIP Core/RateLimit:FuzzNetwork \
 	Core/Oidc:FuzzEmailVerifiedClaim Core/Oidc:FuzzAcceptedEmail Modules/Sources/Test/Edge:FuzzWebhook \
-	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName) \
+	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName \
+	Core/Keys:FuzzKeyring Core/Keys:FuzzOpen) \
 	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare \
 	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
 	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern

@@ -80,6 +80,9 @@ export const AUDIT_ACTIONS: Readonly<Record<string, IAuditAction>> = {
   'environment.resumed': { Icon: 'play', Bad: false },
   'system.instance.setupCompleted': { Icon: 'shield', Bad: false },
   'system.settings.changed': { Icon: 'settings', Bad: false },
+  'system.keys.activated': { Icon: 'key', Bad: false },
+  'system.keys.exported': { Icon: 'key', Bad: false },
+  'system.keys.discarded': { Icon: 'alert', Bad: true },
 };
 
 const GROUPS = ['auth', 'identity', 'runner', 'job', 'project', 'system'] as const;

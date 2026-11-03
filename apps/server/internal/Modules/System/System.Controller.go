@@ -18,6 +18,7 @@ const (
 type Controller struct {
 	health *HealthService
 	meta   *MetaService
+	keys   KeyringReader
 }
 
 var _ gen.StrictServerInterface = (*Controller)(nil)

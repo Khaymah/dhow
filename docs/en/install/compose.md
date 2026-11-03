@@ -31,6 +31,8 @@ To avoid cloning the repository, download `compose.yaml` and `init.sh` from the 
 
 The file has mode `0600`, and `init.sh` refuses to overwrite an existing `.env`. Back up `DHOW_SECRET_KEY` somewhere safe: without it, stored secrets cannot be decrypted, and a new key cannot read old data.
 
+`init.sh` also writes the [keyring](keys.md) to `./secrets/dhow-keyring` with mode `0600` and gives it to the container user `65532`, so its `chown` needs root or `sudo` once. The keyring is not an environment variable: `compose.yaml` mounts it into the container as a secret at `/run/secrets/dhow-keyring`, so `docker inspect` never shows it. With rootless Docker, set `DHOW_CONTAINER_UID` to the user id that `65532` maps to in `/etc/subuid`. Export the keyring after the first start and keep the copy off the host, as in [Backups and export](keys.md#backups-and-export).
+
 `docker compose up -d` waits for PostgreSQL to be healthy, applies the database migrations, and starts Dhow. Check it:
 
 ```sh
@@ -106,11 +108,12 @@ Database migrations run automatically when Dhow starts, under a lock, so only on
 
 ## Back up and restore
 
-Back up the database and `.env`. The database dump is useless without `DHOW_SECRET_KEY`.
+Back up the database, `.env` and the `./secrets/` directory. The database dump is useless without `DHOW_SECRET_KEY` and the keyring.
 
 ```sh
 docker compose exec -T postgres pg_dump -U dhow -d dhow --format=custom > dhow-$(date +%F).dump
 cp .env dhow-env-$(date +%F).backup
+sudo tar -czf dhow-secrets-$(date +%F).tar.gz secrets
 chmod 600 dhow-env-*.backup
 ```
 
@@ -123,7 +126,7 @@ docker compose exec -T postgres pg_restore -U dhow -d dhow --no-owner < dhow-202
 docker compose start dhow
 ```
 
-To restore on a new host, run `./init.sh`, replace the generated `DHOW_SECRET_KEY` in `.env` with the one from your backup, start only PostgreSQL with `docker compose up -d postgres`, run the `pg_restore` command, and then run `docker compose up -d`.
+To restore on a new host, run `./init.sh`, replace the generated `DHOW_SECRET_KEY` in `.env` with the one from your backup, and replace `./secrets/dhow-keyring` with the keyring from the backup (owner `65532`, mode `0600`). Then start only PostgreSQL with `docker compose up -d postgres`, run the `pg_restore` command, and run `docker compose up -d`. When the keyring does not fit the restored database, Dhow stops with a message that names the version, and never runs on broken data.
 
 ## Verify an image
 

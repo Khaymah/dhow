@@ -60,6 +60,7 @@ A host needs at least 1 CPU core, 2 GiB of memory and 5 GiB of free disk (2 core
 | [UI principles](docs/en/ui-principles.md) | Arabic-first design, navigation model, performance budgets |
 | [Editions & licensing](docs/en/editions-and-licensing.md) | Open-core model, feature matrix, license enforcement |
 | [Install](docs/en/install/README.md) | Choosing a method, Docker Compose, reverse proxies, local runs, configuration, troubleshooting |
+| [Keyring](docs/en/install/keys.md) | The key encryption keys that protect every stored secret, where they live, rotation without downtime, export and the emergency guide |
 | [Hardware requirements](docs/en/requirements.md) | Measured CPU, memory and disk for the server, PostgreSQL and runners |
 | [Development](docs/en/development.md) | Running Dhow from source on Linux, macOS or Windows, with or without Docker, and the tests |
 | [Sign in with OIDC](docs/en/guides/oidc.md) | Google, Keycloak, GitHub and any OIDC provider, account linking, allowed domains |

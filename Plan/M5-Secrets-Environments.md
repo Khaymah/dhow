@@ -85,11 +85,11 @@
 - **ليه DEK لكل صاحب مش لكل سر ومش لكل مؤسسة:** لكل سر معناه DEK لكل صف وصف `DataKeys` لكل قيمة من غير مكسب حقيقي (الاتنين بيتفكّوا في نفس الـ process بنفس الـ KEK). ولكل مؤسسة معناه إن مسح بيئة مايقدرش يمسح مفتاحها. لكل صاحب بيدّي مسح بالتشفير (crypto-shredding): لما البيئة أو المشروع يتمسح، الـ DEK بتاعه بيتصفّر ومفيش قيمة تتفك تاني. وده نفس كلام `docs/architecture.md` §6.
 
 ### الصيغة
-- **الإصدار 2:** `0x02 ‖ DataKeyId (16 byte) ‖ nonce (12) ‖ ciphertext ‖ tag (16)`، يعني 45 byte زيادة على القيمة.
+- **الإصدار 2:** `0x02 ‖ DataKeyId (16 byte) ‖ nonce (12) ‖ ciphertext ‖ tag (16)`، يعني 45 byte زيادة على القيمة. **اتعدّل في M5.1 بعد المراجعة الأمنية ([ADR-0081](ADR/0081-keyring-and-envelope-encryption.md)):** الصيغة بقت `0x03 ‖ DataKeyId ‖ salt (32) ‖ nonce ‖ ciphertext ‖ tag` بمفتاح فرعي HKDF-SHA256(DEK، salt، `dhow/value/v2` ‖ label) لكل قيمة، يعني 77 byte زيادة، والـ context الفاضي مرفوض.
 - **الـ AAD:** `0x02 ‖ DataKeyId ‖ label الغرض ‖ context الصف`. الـ label والـ context نفس اللي بيتستخدموا النهارده (`dhow/git-deploy-key/v1` و`deploy-key:<RepositoryId>` مثلًا)، فقيمة اتنقلت لصف تاني أو لعمود تاني مابتتفكّش.
 - **فحص الصاحب:** `Open` بياخد الصاحب المتوقع، ولو صف `DataKeys` بتاع الـ `DataKeyId` صاحبه مختلف بيرجّع `ErrSealed`. فنسخ قيمة من مؤسسة لمؤسسة مابيعدّيش حتى لو الـ context اتزوّر.
 - **الإصدار 1** (`Sealer` النهارده): `0x01 ‖ nonce ‖ ciphertext ‖ tag` بمفتاح مشتق من `DHOW_SECRET_KEY`. بيتقري لحد الـ contract في M5.9.
-- **القيود الموجودة كفاية:** TOTP 20 byte بيبقى 65 (القيد 29 لـ 128)، وإعدادات السيرفر (لحد 65536) ومزوّدي الدخول (لحد 4096) والمستودعات (8192 و1024) فيهم مكان. اختبار في M5.2 بيتأكد من أكبر قيمة ممكنة في كل عمود.
+- **القيود الموجودة كفاية:** TOTP 20 byte بيبقى 97 مع صيغة `0x03` (القيد 29 لـ 128)، وإعدادات السيرفر (لحد 65536) ومزوّدي الدخول (لحد 4096) والمستودعات (8192 و1024) فيهم مكان. اختبار في M5.2 بيتأكد من أكبر قيمة ممكنة في كل عمود.
 
 ### مكان الـ KEK ([قرار Sabry 1](#قرارات-sabry-2026-11-03))
 - **القرار:** ملف سلسلة مفاتيح منفصل عن `DHOW_SECRET_KEY`، وKMS خارجي اختياري بعدين ورا نفس الـ interface:
@@ -497,6 +497,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 كل PR بيعدّي `make check` وCI أخضر، وفيه اختبارات سلبية لكل مسار أمني، وبيحدّث `Plan/Progress/` في يومه، وبيكتب الـ ADR بتاع قراراته في أوله، وعليه مراجعة أمنية مستقلة قبل الـ merge. والأوامر بتفترض نفس `DHOW_TEST_DATABASE_URL` بتاع M3 وM4.
 
 ### M5.1: سلسلة المفاتيح والتشفير المغلّف (`Core/Keys`)
+- **الحالة:** على `feat/keyring-m51`، والقرارات في [ADR-0081](ADR/0081-keyring-and-envelope-encryption.md).
 - **الحجم:** M. **الاعتماد:** U2 (`"ServerInstances"` و`"SchemaFloor"`) 
 - **المحتوى:**
   - `apps/server/internal/Core/Keys` (`package keys`): قراية السلسلة وفحصها، و`KeyProvider` بـ `file` و`fake`، و`Envelope.Seal` و`Open` بالصاحب والغرض والـ context، والـ DEK lazy (`INSERT ... ON CONFLICT DO NOTHING` وبعده `SELECT`)، و`Destroy(owner)`.
@@ -521,6 +522,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
   - `make gen && git diff --exit-code` و`make hooks-test` و`make docs-check` و`make check`.
 
 ### M5.2: نقل مستخدمي `Sealer` للتشفير المغلّف
+- **ملزم (من المراجعة الأمنية لـ M5.1):** M5.2 لازم يضيف `dhow-server keys rekey`: DEK جديد لكل صاحب، وإعادة ختم كل قيمة من خلال «أماكن قيم» مسجّلة (كل عمود متشفّر بيسجّل الصاحب والـ label والـ context بتوعه)، وبعدها مسح الـ DEK القديم. لأن تدوير الـ KEK مابيحميش من سلسلة اتسرّبت مع نسخة قاعدة قديمة، و`Destroy` مابيمنعش نسخة أقدم. M5 مابيخلصش من غيره. وفيه اختبار: سلسلة قديمة ونسخة قاعدة من قبل الـ rekey مابيفتحوش أي قيمة حالية.
 - **الحجم:** M. **الاعتماد:** M5.1، وU4 (`Core/Backfill`) اللي بيتعمل هنا لو لسه.
 - **المحتوى:**
   - قراية `0x01` و`0x02` في كل الأماكن اللي في [الجدول](#نقل-مستخدمي-sealer-m52)، والكتابة `0x02`، والـ backfills (واحد لكل عمود) بنفس الـ context.

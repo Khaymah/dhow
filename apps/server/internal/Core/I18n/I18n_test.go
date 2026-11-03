@@ -32,7 +32,7 @@ func TestCatalogsCoverTheSameKeys(t *testing.T) {
 	keys := []string{
 		"errors.internal", "errors.notFound", "errors.methodNotAllowed", "errors.badRequest",
 		"errors.validationFailed", "errors.payloadTooLarge", "errors.serviceUnavailable",
-		"system.health.live", "system.health.ready", "system.meta.loaded",
+		"system.health.live", "system.health.ready", "system.meta.loaded", "system.keys.loaded",
 		"errors.unauthenticated", "errors.forbidden", "errors.csrfFailed", "errors.invalidCredentials",
 		"errors.invalidCurrentPassword", "errors.passwordBreached", "errors.setupCompleted", "errors.setupTokenInvalid",
 		"errors.conflict", "errors.passwordLength", "errors.passwordUnchanged", "errors.slugTaken", "errors.emailTaken",

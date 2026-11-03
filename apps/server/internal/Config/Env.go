@@ -54,6 +54,8 @@ type Config struct {
 
 	OnIncompatible string
 	InstanceID     string
+
+	Keyring Keyring
 }
 
 func LoadFromEnv() (Config, error) { return Load(os.Getenv) }
@@ -120,6 +122,9 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if cfg.InstanceID, err = parseInstanceID(getenv(EnvInstanceID)); err != nil {
 		errs = append(errs, fmt.Errorf("%s: %w", EnvInstanceID, err))
+	}
+	if cfg.Keyring, err = LoadKeyring(getenv); err != nil {
+		errs = append(errs, err)
 	}
 
 	if len(errs) > 0 {

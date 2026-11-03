@@ -27,6 +27,7 @@ type Querier interface {
 	ClaimPendingRun(ctx context.Context, arg ClaimPendingRunParams) (PipelineRun, error)
 	ClaimQueuedJob(ctx context.Context, arg ClaimQueuedJobParams) (Job, error)
 	ClaimUpload(ctx context.Context, arg ClaimUploadParams) (uuid.UUID, error)
+	ClearDataKeyUnreadable(ctx context.Context) (int64, error)
 	ClearMfaReset(ctx context.Context, arg ClearMfaResetParams) error
 	CompleteInstanceSetup(ctx context.Context, completedAt time.Time) error
 	ConfirmTotpFactor(ctx context.Context, arg ConfirmTotpFactorParams) error
@@ -34,6 +35,8 @@ type Querier interface {
 	ConsumeRegistrationToken(ctx context.Context, arg ConsumeRegistrationTokenParams) (ConsumeRegistrationTokenRow, error)
 	CountActiveUserTokens(ctx context.Context, arg CountActiveUserTokensParams) (int64, error)
 	CountAuditEvents(ctx context.Context, arg CountAuditEventsParams) (int64, error)
+	CountDataKeysByVersion(ctx context.Context) ([]CountDataKeysByVersionRow, error)
+	CountDataKeysOnVersions(ctx context.Context, versions []int32) (int64, error)
 	CountEnvironments(ctx context.Context, arg CountEnvironmentsParams) (int64, error)
 	CountIdentitiesByProvider(ctx context.Context) ([]CountIdentitiesByProviderRow, error)
 	CountJobs(ctx context.Context, arg CountJobsParams) (int64, error)
@@ -57,6 +60,9 @@ type Querier interface {
 	CurrentProviderIssuer(ctx context.Context, provider string) (string, error)
 	DeleteTeam(ctx context.Context, arg DeleteTeamParams) (int64, error)
 	DeleteTeamBinding(ctx context.Context, arg DeleteTeamBindingParams) (int64, error)
+	DemoteActiveKeyEncryptionKey(ctx context.Context) (int64, error)
+	DestroyDataKeysOfOwner(ctx context.Context, arg DestroyDataKeysOfOwnerParams) (int64, error)
+	DestroyDataKeysOnVersions(ctx context.Context, versions []int32) (int64, error)
 	DisableRunnerAsClone(ctx context.Context, arg DisableRunnerAsCloneParams) (int64, error)
 	DiscardPendingTotp(ctx context.Context, arg DiscardPendingTotpParams) error
 	DiscoveryLog(ctx context.Context, jobID uuid.UUID) ([][]byte, error)
@@ -87,6 +93,8 @@ type Querier interface {
 	FinishRun(ctx context.Context, arg FinishRunParams) error
 	FinishRunJob(ctx context.Context, arg FinishRunJobParams) (int64, error)
 	FinishUpload(ctx context.Context, arg FinishUploadParams) error
+	GetActiveDataKeyForOwner(ctx context.Context, arg GetActiveDataKeyForOwnerParams) (GetActiveDataKeyForOwnerRow, error)
+	GetActiveKeyEncryptionKey(ctx context.Context) (int32, error)
 	GetActiveRunnerSession(ctx context.Context, runnerID uuid.UUID) (GetActiveRunnerSessionRow, error)
 	GetAlertRecipient(ctx context.Context, id uuid.UUID) (GetAlertRecipientRow, error)
 	GetArtifact(ctx context.Context, arg GetArtifactParams) (Artifact, error)
@@ -94,6 +102,7 @@ type Querier interface {
 	GetAuditEvent(ctx context.Context, arg GetAuditEventParams) (GetAuditEventRow, error)
 	GetCheckoutRepository(ctx context.Context, arg GetCheckoutRepositoryParams) (GetCheckoutRepositoryRow, error)
 	GetConfirmedTotp(ctx context.Context, userID uuid.UUID) (GetConfirmedTotpRow, error)
+	GetDataKey(ctx context.Context, id uuid.UUID) (GetDataKeyRow, error)
 	GetEnvironment(ctx context.Context, arg GetEnvironmentParams) (Environment, error)
 	GetEnvironmentProject(ctx context.Context, arg GetEnvironmentProjectParams) (GetEnvironmentProjectRow, error)
 	GetInstance(ctx context.Context) (Instance, error)
@@ -144,12 +153,14 @@ type Querier interface {
 	InsertAuditEvent(ctx context.Context, arg InsertAuditEventParams) error
 	InsertAuthChallenge(ctx context.Context, arg InsertAuthChallengeParams) (uuid.UUID, error)
 	InsertCacheEntry(ctx context.Context, arg InsertCacheEntryParams) (uuid.UUID, error)
+	InsertDataKey(ctx context.Context, arg InsertDataKeyParams) (int64, error)
 	InsertEnvironment(ctx context.Context, arg InsertEnvironmentParams) (Environment, error)
 	InsertEnvironmentReviewer(ctx context.Context, arg InsertEnvironmentReviewerParams) error
 	InsertIdentity(ctx context.Context, arg InsertIdentityParams) (InsertIdentityRow, error)
 	InsertInstanceSetting(ctx context.Context, arg InsertInstanceSettingParams) (int64, error)
 	InsertInvitation(ctx context.Context, arg InsertInvitationParams) (uuid.UUID, error)
 	InsertJob(ctx context.Context, arg InsertJobParams) (Job, error)
+	InsertKeyEncryptionKey(ctx context.Context, arg InsertKeyEncryptionKeyParams) error
 	InsertLease(ctx context.Context, arg InsertLeaseParams) (Lease, error)
 	InsertLogChunks(ctx context.Context, arg InsertLogChunksParams) (int64, error)
 	InsertMembership(ctx context.Context, arg InsertMembershipParams) error
@@ -187,6 +198,7 @@ type Querier interface {
 	ListActiveUserSessions(ctx context.Context, arg ListActiveUserSessionsParams) ([]ListActiveUserSessionsRow, error)
 	ListApiTokens(ctx context.Context, arg ListApiTokensParams) ([]ListApiTokensRow, error)
 	ListAuditEvents(ctx context.Context, arg ListAuditEventsParams) ([]ListAuditEventsRow, error)
+	ListDataKeysToRewrap(ctx context.Context, arg ListDataKeysToRewrapParams) ([]ListDataKeysToRewrapRow, error)
 	ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobsParams) ([]ListDriftedRunJobsRow, error)
 	ListEnvironmentReviewers(ctx context.Context, arg ListEnvironmentReviewersParams) ([]ListEnvironmentReviewersRow, error)
 	ListEnvironments(ctx context.Context, arg ListEnvironmentsParams) ([]Environment, error)
@@ -195,6 +207,8 @@ type Querier interface {
 	ListJobAttempts(ctx context.Context, arg ListJobAttemptsParams) ([]JobAttempt, error)
 	ListJobSteps(ctx context.Context, arg ListJobStepsParams) ([]AttemptStep, error)
 	ListJobs(ctx context.Context, arg ListJobsParams) ([]ListJobsRow, error)
+	ListKeyEncryptionKeys(ctx context.Context) ([]ListKeyEncryptionKeysRow, error)
+	ListLiveServerInstanceKeks(ctx context.Context, staleAfterSeconds float64) ([]ListLiveServerInstanceKeksRow, error)
 	ListLiveServerInstances(ctx context.Context, staleAfterSeconds float64) ([]ListLiveServerInstancesRow, error)
 	ListLogChunks(ctx context.Context, arg ListLogChunksParams) ([]ListLogChunksRow, error)
 	ListMemberRoles(ctx context.Context, arg ListMemberRolesParams) ([]ListMemberRolesRow, error)
@@ -235,6 +249,7 @@ type Querier interface {
 	LockInstanceSetting(ctx context.Context, groupName string) (LockInstanceSettingRow, error)
 	LockJob(ctx context.Context, arg LockJobParams) (Job, error)
 	LockJobByID(ctx context.Context, id uuid.UUID) (Job, error)
+	LockKeyring(ctx context.Context) error
 	LockLeaseForCompletion(ctx context.Context, arg LockLeaseForCompletionParams) (LockLeaseForCompletionRow, error)
 	LockMfaChallenge(ctx context.Context, arg LockMfaChallengeParams) (LockMfaChallengeRow, error)
 	LockOidcProviderList(ctx context.Context, lockKey int64) error
@@ -266,10 +281,12 @@ type Querier interface {
 	LogPartitionReady(ctx context.Context) (bool, error)
 	MarkCommitStatusFailed(ctx context.Context, arg MarkCommitStatusFailedParams) error
 	MarkCommitStatusSent(ctx context.Context, arg MarkCommitStatusSentParams) error
+	MarkDataKeyUnreadable(ctx context.Context, id uuid.UUID) (int64, error)
 	MarkInstanceOwner(ctx context.Context, arg MarkInstanceOwnerParams) error
 	MarkInvitationAccepted(ctx context.Context, arg MarkInvitationAcceptedParams) (int64, error)
 	MarkJobLeased(ctx context.Context, id uuid.UUID) (int32, error)
 	MarkJobRunning(ctx context.Context, arg MarkJobRunningParams) (Job, error)
+	MarkKeyringExported(ctx context.Context, versions []int32) (int64, error)
 	MarkLateResultLogged(ctx context.Context, arg MarkLateResultLoggedParams) error
 	MarkMfaReset(ctx context.Context, arg MarkMfaResetParams) error
 	MarkMutationStarted(ctx context.Context, id uuid.UUID) error
@@ -296,6 +313,7 @@ type Querier interface {
 	PickUnstartedLease(ctx context.Context, startSeconds float64) (uuid.UUID, error)
 	ProjectCacheBytes(ctx context.Context, projectID uuid.UUID) (int64, error)
 	ProjectUntrustedArtifactBytes(ctx context.Context, projectID uuid.UUID) (int64, error)
+	PromoteKeyEncryptionKey(ctx context.Context, version int32) (int64, error)
 	ProviderIdentityIssuers(ctx context.Context, arg ProviderIdentityIssuersParams) (ProviderIdentityIssuersRow, error)
 	PurgeAuthChallenges(ctx context.Context, arg PurgeAuthChallengesParams) (int64, error)
 	PurgeInvitations(ctx context.Context, arg PurgeInvitationsParams) (int64, error)
@@ -326,6 +344,7 @@ type Querier interface {
 	RemoveUserIdentity(ctx context.Context, arg RemoveUserIdentityParams) (string, error)
 	RenamePasskey(ctx context.Context, arg RenamePasskeyParams) (RenamePasskeyRow, error)
 	ReopenRun(ctx context.Context, id uuid.UUID) error
+	ReplaceKeyEncryptionKeyCheck(ctx context.Context, arg ReplaceKeyEncryptionKeyCheckParams) (int64, error)
 	RequestJobCancel(ctx context.Context, arg RequestJobCancelParams) (Job, error)
 	RequestRunCancel(ctx context.Context, arg RequestRunCancelParams) error
 	RequeueJob(ctx context.Context, arg RequeueJobParams) (Job, error)
@@ -339,7 +358,9 @@ type Querier interface {
 	RetireArtifact(ctx context.Context, arg RetireArtifactParams) error
 	RetireBlobOwners(ctx context.Context, digests [][]byte) error
 	RetireConfirmedTotp(ctx context.Context, arg RetireConfirmedTotpParams) (int64, error)
+	RetireDrainedKeyEncryptionKeys(ctx context.Context) ([]int32, error)
 	RetireExpiredInvitations(ctx context.Context, arg RetireExpiredInvitationsParams) error
+	RetireKeyEncryptionKey(ctx context.Context, version int32) (int64, error)
 	RetireRecoveryCodes(ctx context.Context, arg RetireRecoveryCodesParams) (int64, error)
 	RetireServerInstance(ctx context.Context, id uuid.UUID) error
 	RetireStaleServerInstances(ctx context.Context, staleAfterSeconds float64) (int64, error)
@@ -360,6 +381,7 @@ type Querier interface {
 	RevokeUserApiTokens(ctx context.Context, arg RevokeUserApiTokensParams) (int64, error)
 	RevokeUserSession(ctx context.Context, arg RevokeUserSessionParams) (int64, error)
 	RevokeUserSessionsExcept(ctx context.Context, arg RevokeUserSessionsExceptParams) (int64, error)
+	RewrapDataKey(ctx context.Context, arg RewrapDataKeyParams) (int64, error)
 	RotateRunnerKeys(ctx context.Context, arg RotateRunnerKeysParams) (int32, error)
 	RunCreatorIsMember(ctx context.Context, arg RunCreatorIsMemberParams) (bool, error)
 	RunVisible(ctx context.Context, arg RunVisibleParams) (bool, error)
@@ -396,6 +418,7 @@ type Querier interface {
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
 	TrustedShaOnRef(ctx context.Context, arg TrustedShaOnRefParams) (bool, error)
 	TryBlobSweepLock(ctx context.Context, lockKey int64) (bool, error)
+	TryLockKeyRewrap(ctx context.Context) (bool, error)
 	TryLockLogPartitions(ctx context.Context) (bool, error)
 	TryLockWebhookPartitions(ctx context.Context) (bool, error)
 	TryRetentionLock(ctx context.Context, lockKey int64) (bool, error)
