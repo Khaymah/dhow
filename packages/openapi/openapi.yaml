@@ -2365,8 +2365,8 @@ paths:
       tags: [environments]
       summary: Create an environment
       description: >-
-        Needs `environment.manage` on the project (Admin and Owner, or an Admin binding on this project). A pipeline
-        file never creates an environment: a job that names a missing one fails with `ENVIRONMENT_NOT_FOUND`. The name
+        Needs `environment.manage` on the project (Admin and Owner, or an Admin binding on this project) and a fresh
+        `CurrentFactor`. A pipeline file never creates an environment: a job that names a missing one fails with `ENVIRONMENT_NOT_FOUND`. The name
         is unique among the project's environments (409 `ENVIRONMENT_EXISTS`) and never changes. Rules left out take
         their defaults, and `AllowedRefs` defaults to the default branch of the linked repository (`main` without one).
         A reviewer who is not a member, or whose role on the project is below Developer, or a team of another
@@ -6338,8 +6338,10 @@ components:
           minLength: 1
           maxLength: 256
           description: >-
-            A glob on the branch or tag name: `*` and `?` within one part between slashes, `**` alone for any number
-            of parts. Without `..`, `//`, a leading or trailing slash, spaces, `~`, `^`, `:`, brackets or braces.
+            A glob on the short branch or tag name (`Kind` says which): `*` and `?` within one part between slashes,
+            `**` alone for any number of parts, none included, so `release/**` also matches `release`. Without `..`,
+            `//`, a leading or trailing slash, spaces, invisible characters, `~`, `^`, `:`, brackets or braces, and
+            never a full name that starts with `refs/`, `heads/` or `tags/`.
     EnvironmentReviewers:
       type: object
       additionalProperties: false
@@ -6357,6 +6359,32 @@ components:
           items:
             type: string
             format: uuid
+    EnvironmentReviewersView:
+      type: object
+      additionalProperties: false
+      required: [UserIds, TeamIds, UserCount, TeamCount, IdsShown]
+      description: >-
+        The ids are shown only to a caller who may manage the environment, over a session. Everyone else, and every API
+        token, gets empty lists and the counts.
+      properties:
+        UserIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        TeamIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        UserCount:
+          type: integer
+          minimum: 0
+        TeamCount:
+          type: integer
+          minimum: 0
+        IdsShown:
+          type: boolean
     EnvironmentIsolation:
       type: string
       enum: [container]
@@ -6387,7 +6415,7 @@ components:
           type: boolean
           description: Pull requests from the same repository may deploy here. Pull requests from forks never do.
         Reviewers:
-          $ref: "#/components/schemas/EnvironmentReviewers"
+          $ref: "#/components/schemas/EnvironmentReviewersView"
         RequiredApprovals:
           type: integer
           minimum: 1
@@ -6531,8 +6559,10 @@ components:
     CreateEnvironmentRequest:
       type: object
       additionalProperties: false
-      required: [Name]
+      required: [Name, CurrentFactor]
       properties:
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
         Name:
           type: string
           pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"

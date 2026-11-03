@@ -1519,7 +1519,7 @@ export interface paths {
         put?: never;
         /**
          * Create an environment
-         * @description Needs `environment.manage` on the project (Admin and Owner, or an Admin binding on this project). A pipeline file never creates an environment: a job that names a missing one fails with `ENVIRONMENT_NOT_FOUND`. The name is unique among the project's environments (409 `ENVIRONMENT_EXISTS`) and never changes. Rules left out take their defaults, and `AllowedRefs` defaults to the default branch of the linked repository (`main` without one). A reviewer who is not a member, or whose role on the project is below Developer, or a team of another organization, answers 422 `REVIEWER_NOT_ELIGIBLE`. An archived project answers 409 `PROJECT_ARCHIVED`.
+         * @description Needs `environment.manage` on the project (Admin and Owner, or an Admin binding on this project) and a fresh `CurrentFactor`. A pipeline file never creates an environment: a job that names a missing one fails with `ENVIRONMENT_NOT_FOUND`. The name is unique among the project's environments (409 `ENVIRONMENT_EXISTS`) and never changes. Rules left out take their defaults, and `AllowedRefs` defaults to the default branch of the linked repository (`main` without one). A reviewer who is not a member, or whose role on the project is below Developer, or a team of another organization, answers 422 `REVIEWER_NOT_ELIGIBLE`. An archived project answers 409 `PROJECT_ARCHIVED`.
          */
         post: operations["createEnvironment"];
         delete?: never;
@@ -3479,12 +3479,20 @@ export interface components {
         EnvironmentRefKind: "branch" | "tag";
         EnvironmentRef: {
             Kind: components["schemas"]["EnvironmentRefKind"];
-            /** @description A glob on the branch or tag name: `*` and `?` within one part between slashes, `**` alone for any number of parts. Without `..`, `//`, a leading or trailing slash, spaces, `~`, `^`, `:`, brackets or braces. */
+            /** @description A glob on the short branch or tag name (`Kind` says which): `*` and `?` within one part between slashes, `**` alone for any number of parts, none included, so `release/**` also matches `release`. Without `..`, `//`, a leading or trailing slash, spaces, invisible characters, `~`, `^`, `:`, brackets or braces, and never a full name that starts with `refs/`, `heads/` or `tags/`. */
             Pattern: string;
         };
         EnvironmentReviewers: {
             UserIds: string[];
             TeamIds: string[];
+        };
+        /** @description The ids are shown only to a caller who may manage the environment, over a session. Everyone else, and every API token, gets empty lists and the counts. */
+        EnvironmentReviewersView: {
+            UserIds: string[];
+            TeamIds: string[];
+            UserCount: number;
+            TeamCount: number;
+            IdsShown: boolean;
         };
         /** @enum {string} */
         EnvironmentIsolation: "container";
@@ -3493,7 +3501,7 @@ export interface components {
             AllowedRefs: components["schemas"]["EnvironmentRef"][];
             /** @description Pull requests from the same repository may deploy here. Pull requests from forks never do. */
             AllowPullRequests: boolean;
-            Reviewers: components["schemas"]["EnvironmentReviewers"];
+            Reviewers: components["schemas"]["EnvironmentReviewersView"];
             /** @description One reviewer in Community. */
             RequiredApprovals: number;
             /** @description The person who started the run may approve it. Off by default; only `environment.manage` turns it on, for a team of one. */
@@ -3563,6 +3571,7 @@ export interface components {
             Data?: components["schemas"]["Environment"][];
         };
         CreateEnvironmentRequest: {
+            CurrentFactor: components["schemas"]["CurrentFactor"];
             /** @description The name a job writes in `environment:`. Lowercase letters, digits, `_` and `-`. */
             Name: string;
             Description?: string;

@@ -76,7 +76,9 @@ func (e FactorMethod) Valid() bool {
 
 // CreateEnvironmentRequest defines model for CreateEnvironmentRequest.
 type CreateEnvironmentRequest struct {
-	Description *string `json:"Description,omitempty"`
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+	Description   *string       `json:"Description,omitempty"`
 
 	// Name The name a job writes in `environment:`. Lowercase letters, digits, `_` and `-`.
 	Name string `json:"Name"`
@@ -157,7 +159,7 @@ type EnvironmentListResponse struct {
 type EnvironmentRef struct {
 	Kind EnvironmentRefKind `json:"Kind"`
 
-	// Pattern A glob on the branch or tag name: `*` and `?` within one part between slashes, `**` alone for any number of parts. Without `..`, `//`, a leading or trailing slash, spaces, `~`, `^`, `:`, brackets or braces.
+	// Pattern A glob on the short branch or tag name (`Kind` says which): `*` and `?` within one part between slashes, `**` alone for any number of parts, none included, so `release/**` also matches `release`. Without `..`, `//`, a leading or trailing slash, spaces, invisible characters, `~`, `^`, `:`, brackets or braces, and never a full name that starts with `refs/`, `heads/` or `tags/`.
 	Pattern string `json:"Pattern"`
 }
 
@@ -181,6 +183,15 @@ type EnvironmentResponse struct {
 type EnvironmentReviewers struct {
 	TeamIds []openapi_types.UUID `json:"TeamIds"`
 	UserIds []openapi_types.UUID `json:"UserIds"`
+}
+
+// EnvironmentReviewersView The ids are shown only to a caller who may manage the environment, over a session. Everyone else, and every API token, gets empty lists and the counts.
+type EnvironmentReviewersView struct {
+	IdsShown  bool                 `json:"IdsShown"`
+	TeamCount int                  `json:"TeamCount"`
+	TeamIds   []openapi_types.UUID `json:"TeamIds"`
+	UserCount int                  `json:"UserCount"`
+	UserIds   []openapi_types.UUID `json:"UserIds"`
 }
 
 // EnvironmentRules defines model for EnvironmentRules.
@@ -207,7 +218,9 @@ type EnvironmentRules struct {
 	// RequiredApprovals One reviewer in Community.
 	RequiredApprovals int                  `json:"RequiredApprovals"`
 	RequiredIsolation EnvironmentIsolation `json:"RequiredIsolation"`
-	Reviewers         EnvironmentReviewers `json:"Reviewers"`
+
+	// Reviewers The ids are shown only to a caller who may manage the environment, over a session. Everyone else, and every API token, gets empty lists and the counts.
+	Reviewers EnvironmentReviewersView `json:"Reviewers"`
 
 	// SupersedePending A newer run on the same ref replaces an older run still waiting for approval.
 	SupersedePending bool `json:"SupersedePending"`

@@ -131,7 +131,7 @@ func organizationBody(env *apptest.Env, fx fixture, rule policy.Rule) any {
 	case "POST /organizations/{id}/projects/{projectId}/runs":
 		return map[string]string{"Ref": "main"}
 	case "POST /organizations/{id}/projects/{projectId}/environments":
-		return map[string]string{"Name": "rt-" + randomSuffix(env.T)}
+		return map[string]any{"Name": "rt-" + randomSuffix(env.T), "CurrentFactor": wrong}
 	case "PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}":
 		return map[string]any{"Version": 1, "CurrentFactor": wrong, "Description": "Route table"}
 	case "POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/remove",

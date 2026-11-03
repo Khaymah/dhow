@@ -3,8 +3,11 @@ package environments
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	response "github.com/Khaymah/dhow/apps/server/internal/Core/Response"
 	gen "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments/Gen"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments/Models"
@@ -72,7 +75,29 @@ func rulesInputOf(in *gen.EnvironmentRulesInput) *models.RulesInput {
 	return out
 }
 
-func toGen(e models.Environment) gen.Environment {
+func showsReviewerIDs(ctx context.Context, org, project uuid.UUID) bool {
+	p, ok := auth.PrincipalFrom(ctx)
+	if !ok || p.ViaToken() {
+		return false
+	}
+	role, _ := p.RoleIn(org)
+	if p.ProjectID == project && p.ProjectRole != "" {
+		role = p.ProjectRole
+	}
+	return policy.Allows(role, policy.EnvironmentManage)
+}
+
+func reviewersOf(r models.Reviewers, show bool) gen.EnvironmentReviewersView {
+	out := gen.EnvironmentReviewersView{
+		UserIds: []uuid.UUID{}, TeamIds: []uuid.UUID{}, UserCount: len(r.UserIDs), TeamCount: len(r.TeamIDs), IdsShown: show,
+	}
+	if show {
+		out.UserIds, out.TeamIds = r.UserIDs, r.TeamIDs
+	}
+	return out
+}
+
+func toGen(ctx context.Context, e models.Environment) gen.Environment {
 	r := e.Rules
 	refs := make([]gen.EnvironmentRef, 0, len(r.AllowedRefs))
 	for _, ref := range r.AllowedRefs {
@@ -84,7 +109,7 @@ func toGen(e models.Environment) gen.Environment {
 		CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt,
 		Rules: gen.EnvironmentRules{
 			AllowedRefs: refs, AllowPullRequests: r.AllowPullRequests, RequiredApprovals: r.RequiredApprovals,
-			Reviewers:         gen.EnvironmentReviewers{UserIds: r.Reviewers.UserIDs, TeamIds: r.Reviewers.TeamIDs},
+			Reviewers:         reviewersOf(r.Reviewers, showsReviewerIDs(ctx, e.OrganizationID, e.ProjectID)),
 			AllowSelfApproval: r.AllowSelfApproval, WaitMinutes: r.WaitMinutes, ApprovalTimeoutHours: r.ApprovalTimeoutHours,
 			RequirePinnedImages: r.RequirePinnedImages, AllowedPlugins: r.AllowedPlugins,
 			RequiredIsolation: gen.EnvironmentIsolation(r.RequiredIsolation), AllowAdminBypass: r.AllowAdminBypass,
@@ -105,7 +130,7 @@ func (c *Controller) ListEnvironments(ctx context.Context, req gen.ListEnvironme
 	}
 	items := make([]gen.Environment, 0, len(list.Items))
 	for _, e := range list.Items {
-		items = append(items, toGen(e))
+		items = append(items, toGen(ctx, e))
 	}
 	return gen.ListEnvironments200JSONResponse{
 		Success: true, Message: ptrOf(messageListed), Data: &items, Meta: &gen.PageMeta{Page: page, Limit: limit, Total: int(list.Total)},
@@ -118,11 +143,11 @@ func (c *Controller) CreateEnvironment(ctx context.Context, req gen.CreateEnviro
 	}
 	e, err := c.service.Create(ctx, req.Id, req.ProjectId, models.CreateInput{
 		Name: req.Body.Name, Description: req.Body.Description, Rules: rulesInputOf(req.Body.Rules),
-	})
+	}, factorOf(req.Body.CurrentFactor))
 	if err != nil {
 		return nil, err
 	}
-	data := toGen(e)
+	data := toGen(ctx, e)
 	return gen.CreateEnvironment201JSONResponse{Success: true, Message: ptrOf(messageCreated), Data: &data}, nil
 }
 
@@ -131,7 +156,7 @@ func (c *Controller) GetEnvironment(ctx context.Context, req gen.GetEnvironmentR
 	if err != nil {
 		return nil, err
 	}
-	data := toGen(e)
+	data := toGen(ctx, e)
 	return gen.GetEnvironment200JSONResponse{Success: true, Message: ptrOf(messageLoaded), Data: &data}, nil
 }
 
@@ -145,7 +170,7 @@ func (c *Controller) UpdateEnvironment(ctx context.Context, req gen.UpdateEnviro
 	if err != nil {
 		return nil, err
 	}
-	data := toGen(e)
+	data := toGen(ctx, e)
 	return gen.UpdateEnvironment200JSONResponse{Success: true, Message: ptrOf(messageUpdated), Data: &data}, nil
 }
 
@@ -157,7 +182,7 @@ func (c *Controller) RemoveEnvironment(ctx context.Context, req gen.RemoveEnviro
 	if err != nil {
 		return nil, err
 	}
-	data := toGen(e)
+	data := toGen(ctx, e)
 	return gen.RemoveEnvironment200JSONResponse{Success: true, Message: ptrOf(messageRemoved), Data: &data}, nil
 }
 
@@ -169,7 +194,7 @@ func (c *Controller) PauseEnvironment(ctx context.Context, req gen.PauseEnvironm
 	if err != nil {
 		return nil, err
 	}
-	data := toGen(e)
+	data := toGen(ctx, e)
 	return gen.PauseEnvironment200JSONResponse{Success: true, Message: ptrOf(messagePaused), Data: &data}, nil
 }
 
@@ -181,6 +206,6 @@ func (c *Controller) ResumeEnvironment(ctx context.Context, req gen.ResumeEnviro
 	if err != nil {
 		return nil, err
 	}
-	data := toGen(e)
+	data := toGen(ctx, e)
 	return gen.ResumeEnvironment200JSONResponse{Success: true, Message: ptrOf(messageResumed), Data: &data}, nil
 }
