@@ -5,7 +5,9 @@ import { OrganizationAr } from '@/I18n/Locales/Workspace/OrganizationAr';
 import { OrgPagesAr } from '@/I18n/Locales/Workspace/OrgPagesAr';
 import { OidcSettingsAr } from '@/I18n/Locales/Workspace/OidcSettingsAr';
 import { PagesAr } from '@/I18n/Locales/Workspace/PagesAr';
+import { ProjectsAr } from '@/I18n/Locales/Workspace/ProjectsAr';
 import { RunnersAr } from '@/I18n/Locales/Workspace/RunnersAr';
+import { RunsAr } from '@/I18n/Locales/Workspace/RunsAr';
 import { SettingsAr } from '@/I18n/Locales/Workspace/SettingsAr';
 
 export const WorkspaceAr = {
@@ -388,6 +390,8 @@ export const WorkspaceAr = {
   ...OrganizationAr,
   ...JobsAr,
   ...RunnersAr,
+  ...ProjectsAr,
+  ...RunsAr,
   ...PagesAr,
   ...HomeAr,
   ...OrgPagesAr,

@@ -3,6 +3,7 @@ export const BootAr = {
 
   'shell.nav.label': 'التنقّل الرئيسي',
   'shell.nav.home': 'الرئيسية',
+  'shell.nav.projects': 'المشاريع',
   'shell.nav.jobs': 'التشغيلات',
   'shell.nav.runners': 'أجهزة التشغيل',
   'shell.nav.runnerTokens': 'رموز التسجيل',
@@ -34,6 +35,7 @@ export const BootAr = {
   'shell.crumbs.label': 'مسار الصفحة',
   'shell.crumb.member': 'تفاصيل العضو',
   'shell.crumb.team': 'تفاصيل الفريق',
+  'shell.crumb.project': 'تفاصيل المشروع',
   'shell.sections.org': 'أقسام المؤسسة',
   'shell.sections.account': 'أقسام الحساب',
   'shell.sections.runners': 'أقسام أجهزة التشغيل',

@@ -1,0 +1,112 @@
+import { useEffect, useState } from 'react';
+
+import { Card } from '@/Core/Ui/Card';
+import { EmptyState } from '@/Core/Ui/EmptyState';
+import { InlineAlert } from '@/Core/Ui/InlineAlert';
+import { Skeleton } from '@/Core/Ui/Skeleton';
+import { useT } from '@/I18n/useT';
+import type { TRepository, TRepositoryWithSecret } from '@/Modules/Projects/Api/ProjectsApi';
+import { DeployKeyStep, HostKeyStep } from '@/Modules/Projects/Components/LinkKeySteps';
+import { StatusStep, WebhookStep } from '@/Modules/Projects/Components/LinkFinalSteps';
+import { LinkSourceStep } from '@/Modules/Projects/Components/LinkSourceStep';
+import { LinkStepper, stepsFor, type TLinkStep } from '@/Modules/Projects/Components/LinkStepper';
+import { useOrganizationAccess } from '@/Modules/Projects/Hooks/useProjectAccess';
+import { useProject } from '@/Modules/Projects/Hooks/useProjects';
+import { isNotLinked, useRepository, useRepositorySaved } from '@/Modules/Projects/Hooks/useRepository';
+import { canOnProject } from '@/Modules/Projects/Types/ProjectAccess';
+
+export interface IRepositoryLinkBodyProps {
+  projectId: string | undefined;
+  onDone: () => void;
+}
+
+interface IFlowProps {
+  organizationId: string;
+  projectId: string;
+  current: TRepository | undefined;
+  onDone: () => void;
+}
+
+const firstStep = (current: TRepository | undefined): TLinkStep =>
+  current?.PendingHostKeyFingerprint === undefined ? 'source' : 'host-key';
+
+const LinkFlow = ({ organizationId, projectId, current, onDone }: IFlowProps) => {
+  const t = useT();
+  const saved = useRepositorySaved(organizationId, projectId);
+  const [Step, setStep] = useState<TLinkStep>(() => firstStep(current));
+  const [Repository, setRepository] = useState<TRepository | undefined>(current);
+  const [Secret, setSecret] = useState<string | null>(null);
+  const ssh = (Repository ?? current)?.Transport === 'ssh';
+  const steps = stepsFor(ssh || Step === 'deploy-key' || Step === 'host-key');
+
+  useEffect(
+    () => () => {
+      setSecret(null);
+    },
+    [],
+  );
+
+  const go = (next: TLinkStep) => {
+    if (Step === 'webhook' && next !== 'webhook') setSecret(null);
+    setStep(next);
+  };
+
+  const HandleLinked = (result: TRepositoryWithSecret) => {
+    setRepository(result.Repository);
+    saved(result.Repository);
+    setSecret(result.WebhookSecret ?? null);
+    setStep(result.Repository.Transport === 'ssh' ? 'deploy-key' : 'webhook');
+  };
+
+  const HandlePinned = (repository: TRepository) => {
+    setRepository(repository);
+    go('webhook');
+  };
+
+  return (
+    <div className="grid gap-6">
+      <LinkStepper steps={steps} current={Step} />
+      {Step === 'source' ? <LinkSourceStep organizationId={organizationId} projectId={projectId} current={Repository} onLinked={HandleLinked} /> : null}
+      {Step === 'deploy-key' && Repository !== undefined ? <DeployKeyStep repository={Repository} onNext={() => { go('host-key'); }} /> : null}
+      {Step === 'host-key' && Repository !== undefined ? (
+        <HostKeyStep organizationId={organizationId} projectId={projectId} repository={Repository} onPinned={HandlePinned} onBack={() => { go('source'); }} />
+      ) : null}
+      {Step === 'webhook' && Repository !== undefined ? (
+        <WebhookStep
+          organizationId={organizationId}
+          projectId={projectId}
+          repository={Repository}
+          secret={Secret}
+          onSecret={setSecret}
+          onNext={() => { go('status'); }}
+        />
+      ) : null}
+      {Step === 'status' ? <StatusStep organizationId={organizationId} projectId={projectId} onDone={onDone} /> : null}
+      {Step !== 'source' && Repository === undefined ? <InlineAlert accent="failed" title={t('repository.error.lost')} /> : null}
+    </div>
+  );
+};
+
+const Denied = ({ text }: { text: string }) => (
+  <Card>
+    <EmptyState icon="shield" text={text} />
+  </Card>
+);
+
+export const RepositoryLinkBody = ({ projectId, onDone }: IRepositoryLinkBodyProps) => {
+  const t = useT();
+  const access = useOrganizationAccess();
+  const organizationId = access.Kind === 'allowed' ? access.OrganizationId : '';
+  const project = useProject(organizationId, projectId ?? '');
+  const repository = useRepository(organizationId, projectId ?? '');
+  if (projectId === undefined || access.Kind === 'denied') return <Denied text={t('repository.link.missing')} />;
+  if (access.Kind === 'loading' || project.isPending || (repository.isPending && repository.fetchStatus !== 'idle')) {
+    return <Skeleton label={t('ui.loading')} lines={5} />;
+  }
+  if (project.isError) return <InlineAlert accent="failed" title={t('projects.detail.error')} />;
+  const role = project.data.CallerRole ?? access.Role;
+  if (!canOnProject(role, 'project.manage')) return <Denied text={t('repository.link.forbidden')} />;
+  if (project.data.State === 'archived') return <Denied text={t('repository.link.archived')} />;
+  if (repository.isError && !isNotLinked(repository.error)) return <InlineAlert accent="failed" title={t('repository.error.load')} />;
+  return <LinkFlow organizationId={organizationId} projectId={projectId} current={repository.data} onDone={onDone} />;
+};

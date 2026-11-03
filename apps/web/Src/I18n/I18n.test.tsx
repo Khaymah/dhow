@@ -37,7 +37,7 @@ describe('locale catalogs', () => {
 });
 
 describe('the UI glossary (ADR-0034)', () => {
-  const ALLOWED_LATIN = new Set(['English', 'commit', 'DHOW_DATABASE_URL', 'API']);
+  const ALLOWED_LATIN = new Set(['English', 'commit', 'DHOW_DATABASE_URL', 'API', 'Git', 'GitHub', 'GitLab', 'SSH', 'HTTPS']);
 
   it('keeps English words out of the Arabic copy, except the language name, one first-mention term and a technical value', () => {
     const stray = Object.entries(Ar).flatMap(([key, text]) =>
@@ -76,8 +76,10 @@ describe('the UI glossary (ADR-0034)', () => {
     for (const text of Object.values(En)) expect(text.toLowerCase()).not.toContain('workspace');
   });
 
-  it('keeps projects out of the shell until M4', () => {
-    expect(Object.keys(Ar).filter((key) => key.startsWith('shell.') && /project|soon/i.test(key))).toEqual([]);
+  it('names projects in the shell from M4 on', () => {
+    expect(Ar['shell.nav.projects']).toBe('المشاريع');
+    expect(En['shell.nav.projects']).toBe('Projects');
+    expect(Object.keys(Ar).filter((key) => key.startsWith('shell.') && /soon/i.test(key))).toEqual([]);
   });
 });
 

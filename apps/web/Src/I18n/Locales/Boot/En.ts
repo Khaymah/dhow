@@ -5,6 +5,7 @@ export const BootEn: TBootMessages = {
 
   'shell.nav.label': 'Main navigation',
   'shell.nav.home': 'Home',
+  'shell.nav.projects': 'Projects',
   'shell.nav.jobs': 'Jobs',
   'shell.nav.runners': 'Runners',
   'shell.nav.runnerTokens': 'Registration tokens',
@@ -36,6 +37,7 @@ export const BootEn: TBootMessages = {
   'shell.crumbs.label': 'Page path',
   'shell.crumb.member': 'Member details',
   'shell.crumb.team': 'Team details',
+  'shell.crumb.project': 'Project details',
   'shell.sections.org': 'Organization sections',
   'shell.sections.account': 'Account sections',
   'shell.sections.runners': 'Runner sections',

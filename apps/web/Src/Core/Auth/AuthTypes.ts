@@ -28,6 +28,7 @@ const MEMBER_MANAGE_ROLES: readonly TRole[] = ['owner', 'admin'];
 const TOKEN_MANAGE_ROLES: readonly TRole[] = ['owner', 'admin'];
 const RUNNER_READ_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer', 'developer'];
 const RUNNER_MANAGE_ROLES: readonly TRole[] = ['owner', 'admin'];
+const PROJECT_CREATE_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer'];
 
 export const canReadAudit = (role: TRole | undefined): boolean => role !== undefined && AUDIT_ROLES.includes(role);
 
@@ -45,6 +46,9 @@ export const canReadRunners = (role: TRole | undefined): boolean => role !== und
 
 export const canManageRunners = (role: TRole | undefined): boolean =>
   role !== undefined && RUNNER_MANAGE_ROLES.includes(role);
+
+export const canCreateProjects = (role: TRole | undefined): boolean =>
+  role !== undefined && PROJECT_CREATE_ROLES.includes(role);
 
 export const rankOf = (role: TRole | undefined): number => (role === undefined ? 0 : ROLES.length - ROLES.indexOf(role));
 
