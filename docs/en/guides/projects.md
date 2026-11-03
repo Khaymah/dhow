@@ -29,7 +29,9 @@ From the project page or its settings, “Link a repository” opens a series of
 4. **Webhook:** copy the URL and the secret. The secret is shown once only, never lands in the URL, the browser history or its storage, and is cleared from the page when you continue.
 5. **Status:** the page waits for the first signed webhook. Dhow has no test button: push a commit or use the test button of the Git server.
 
-The project settings renew the deploy key and the webhook secret, and “Unlink the repository” sits in the danger zone behind a confirmation.
+The project settings renew the deploy key and the webhook secret, and “Unlink the repository” sits in the danger zone behind a confirmation. Unlinking erases the stored key and secret, cancels the open runs with “the repository was unlinked”, and no run is approved, run again or started by hand until you link a repository again.
+
+If you close the steps while the secret shows, the page asks first. If you open them again before the first webhook, they start at the webhook step.
 
 ## Runs
 
@@ -50,4 +52,4 @@ Pages refresh by themselves every few seconds while a run is active, and stop wh
 GET /api/v1/organizations/{id}/projects/{projectId}/manual-inputs
 ```
 
-`Known` is `false` until a run reads the file the first time, and `Enabled` says whether the file allows manual runs. The server checks the inputs again when the run starts.
+This request needs the right to start runs (developer and above). `Known` is `false` until a run reads the file the first time, and `Enabled` says whether the file allows manual runs. The server checks the inputs again when the run starts.

@@ -88,4 +88,4 @@ To rotate the secret, use `POST .../repository/rotate-webhook-secret`. The new s
 DELETE /api/v1/organizations/{id}/projects/{projectId}/repository
 ```
 
-It needs `project.manage`. The deploy key and the webhook stop at once: a webhook to the old URL answers `401`, and no new run starts until you link a repository again. Linking again makes a new key, a new URL and a new secret. Remove the key and the webhook from the Git server too.
+It needs `project.manage`. The deploy key and the webhook stop at once, Dhow erases the stored key and secret, cancels the open runs with `REPOSITORY_UNLINKED` and abandons the commit statuses it has not sent: a webhook to the old URL answers `401`, and no new run starts until you link a repository again. Linking again makes a new key, a new URL and a new secret. Remove the key and the webhook from the Git server too.
