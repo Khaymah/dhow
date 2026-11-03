@@ -30,7 +30,7 @@ var (
 
 	rePhaseDirective = regexp.MustCompile(`(?i)^--\s*dhow:phase\s+(\S+)\s*$`)
 	reFloorDirective = regexp.MustCompile(`(?i)^--\s*dhow:floor\s+(\S+)\s*$`)
-	reConcurrentIdx  = regexp.MustCompile(`(?is)^CREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY\s+(?:IF\s+NOT\s+EXISTS\s+)?("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)`)
+	reConcurrentIdx  = regexp.MustCompile(`(?is)^CREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY\s+(?:IF\s+NOT\s+EXISTS\s+)?("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)\s+ON\b`)
 )
 
 type annotation string
@@ -83,6 +83,7 @@ type splitter struct {
 	state splitState
 	buf   strings.Builder
 	done  bool
+	body  bool
 }
 
 func (s *splitter) emit() {
@@ -110,9 +111,11 @@ func (s *splitter) annotate(line string) error {
 	case a == annDown:
 		return splitErr("-- +goose Down must follow -- +goose Up and close every StatementBegin")
 	case a == annBegin && s.state == splitUp:
-		s.state = splitBlock
+		s.state, s.body = splitBlock, false
 	case a == annBegin:
 		return splitErr("-- +goose StatementBegin must follow -- +goose Up")
+	case a == annEnd && s.state == splitBlock && !s.body:
+		return splitErr("an empty -- +goose StatementBegin/StatementEnd block; goose would read the next line as a statement of its own")
 	case a == annEnd && s.state == splitBlock:
 		s.emit()
 		s.state = splitUp
@@ -151,6 +154,9 @@ func (s *splitter) line(line string) error {
 	if s.buf.Len() == 0 && (strings.HasPrefix(trimmed, "--") || line == "") {
 		return nil
 	}
+	if s.state == splitBlock && !strings.HasPrefix(trimmed, "--") && trimmed != "" {
+		s.body = true
+	}
 	s.buf.WriteString(line)
 	s.buf.WriteByte('\n')
 	if s.state == splitUp && endsStatement(line) {
@@ -159,12 +165,25 @@ func (s *splitter) line(line string) error {
 	return nil
 }
 
+func (s *splitter) afterDown(line string) {
+	if strings.HasPrefix(strings.TrimSpace(line), "--") && strings.Contains(line, "+goose") {
+		if a, err := parseAnnotation(line); err == nil && a == annNoTx {
+			s.out.UseTx = false
+		}
+	}
+}
+
 func ParseUp(text string) (ParsedFile, error) {
 	s := &splitter{out: ParsedFile{UseTx: true}}
 	scanner := bufio.NewScanner(strings.NewReader(text))
 	scanner.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
-	for !s.done && scanner.Scan() {
-		if err := s.line(scanner.Text()); err != nil {
+	for scanner.Scan() {
+		line := scanner.Text()
+		if s.done {
+			s.afterDown(line)
+			continue
+		}
+		if err := s.line(line); err != nil {
 			return ParsedFile{}, err
 		}
 	}

@@ -49,6 +49,16 @@ func TestParseUp(t *testing.T) {
 			useTx: true,
 		},
 		{
+			name: "NO TRANSACTION after the Down section, as goose reads it",
+			in:   "-- dhow:phase expand\n-- +goose Up\nSELECT 1;\n-- +goose Down\nSELECT 2;\n-- +goose NO TRANSACTION\n",
+			want: []string{"SELECT 1;"}, phase: "expand",
+		},
+		{
+			name: "NO TRANSACTION inside the Up section",
+			in:   "-- +goose Up\nSELECT 1;\n-- +goose NO TRANSACTION\nSELECT 2;\n",
+			want: []string{"SELECT 1;", "SELECT 2;"},
+		},
+		{
 			name:  "an Up section with no statements",
 			in:    "-- +goose Up\n-- nothing\n-- +goose Down\n",
 			useTx: true,
@@ -107,6 +117,11 @@ func TestParseUpReadsEveryEmbeddedMigration(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
+		for k, stmt := range parsed.Up {
+			if TransactionControl(stmt) {
+				t.Errorf("%s: statement %d controls the transaction", name, k+1)
+			}
+		}
 		if len(parsed.Up) == 0 {
 			t.Errorf("%s: no statements", name)
 		}
@@ -123,9 +138,39 @@ func TestConcurrentIndexNames(t *testing.T) {
 		`CREATE INDEX CONCURRENTLY "IX ""q""" ON "T" ("X");`,
 		`CREATE INDEX "IX_NotConcurrent" ON "T" ("X");`,
 		`ALTER TABLE "T" VALIDATE CONSTRAINT "C";`,
+		`CREATE INDEX CONCURRENTLY ON "T" ("X");`,
+		`CREATE UNIQUE INDEX CONCURRENTLY ON ONLY "T" ("X");`,
 	})
 	want := []string{"IX_A", "ix_b", `IX "q"`}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTransactionControl(t *testing.T) {
+	for stmt, want := range map[string]bool{
+		"COMMIT;":                  true,
+		"commit work;":             true,
+		"END;":                     true,
+		"ROLLBACK;":                true,
+		"ABORT;":                   true,
+		"BEGIN;":                   true,
+		"START TRANSACTION;":       true,
+		"SAVEPOINT s;":             true,
+		"RELEASE SAVEPOINT s;":     true,
+		"PREPARE TRANSACTION 'x';": true,
+		"COMMIT PREPARED 'x';":     true,
+		"CREATE TABLE \"A\" (\"Id\" int); COMMIT;": true,
+		"-- a note\nCOMMIT;":                       true,
+		"SELECT 'COMMIT; END;';":                   false,
+		"CREATE FUNCTION f() RETURNS int AS $$ BEGIN RETURN 1; END $$ LANGUAGE plpgsql;": false,
+		"DO $body$ BEGIN PERFORM 1; END $body$;":                                         false,
+		"SELECT 1; -- COMMIT;":                                                           false,
+		"/* ROLLBACK; */ SELECT 1;":                                                      false,
+		"CREATE TABLE \"Commit\" (\"End\" int);":                                         false,
+	} {
+		if got := TransactionControl(stmt); got != want {
+			t.Errorf("TransactionControl(%q) = %v, want %v", stmt, got, want)
+		}
 	}
 }

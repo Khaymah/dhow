@@ -47,6 +47,9 @@ CREATE_INDEX = re.compile(r"^CREATE\s+(?:UNIQUE\s+)?INDEX\s+(CONCURRENTLY\s+)?(I
 UPDATE = re.compile(r"\bUPDATE\s+(?:ONLY\s+)?(" + NAME + r")(?:\s+(?:AS\s+)?" + IDENT + r")?\s+SET\b", FLAGS)
 IDEMPOTENT = re.compile(r"\bIF\s+NOT\s+EXISTS\b|\bIF\s+EXISTS\b|\bVALIDATE\b", FLAGS)
 FLOOR_UPDATE = re.compile(r"\bUPDATE\s+\"Instance\"\s+SET\s+\"SchemaFloor\"\s*=\s*'([^']*)'", FLAGS)
+TX_CONTROL = re.compile(r"^(?:BEGIN|START\s+TRANSACTION|COMMIT|END|ROLLBACK|ABORT|SAVEPOINT|RELEASE|"
+                        r"PREPARE\s+TRANSACTION)\b", FLAGS)
+ATOMIC_BODY = re.compile(r"^CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b.*\bBEGIN\s+ATOMIC\b", FLAGS)
 LIST_KEYWORDS = {"only", "cascade", "restrict", "restart", "continue", "identity"}
 
 
@@ -313,13 +316,38 @@ def m6(stmt, ctx, new):
     return None
 
 
+def m10(stmt, _ctx, _new):
+    if ATOMIC_BODY.match(stmt):
+        return None
+    for piece in stmt.split(";"):
+        m = TX_CONTROL.match(piece.strip())
+        if m:
+            return (m.group(0).upper(),)
+    return None
+
+
+def empty_block(up):
+    inside, body = False, False
+    for raw, line in zip(up.split("\n"), mask(up).split("\n")):
+        stripped = raw.strip()
+        if BEGIN.match(stripped):
+            inside, body = True, False
+        elif END.match(stripped):
+            if inside and not body:
+                return True
+            inside = False
+        elif inside and line.strip():
+            body = True
+    return False
+
+
 def m9(stmt, ctx, _new):
     if ctx["no_tx"] and not IDEMPOTENT.search(stmt):
         return (stmt[:80],)
     return None
 
 
-STATEMENT_RULES = (("M2", m2), ("M3", m3), ("M4", m4), ("M5", m5), ("M6", m6), ("M9", m9))
+STATEMENT_RULES = (("M2", m2), ("M3", m3), ("M4", m4), ("M5", m5), ("M6", m6), ("M10", m10), ("M9", m9))
 
 
 def phase_of(directives):
@@ -363,6 +391,8 @@ def verdict(text, tags):
         "no_tx": any(NO_TX.match(ln.strip()) for ln in text.split("\n")),
         "backfill": any(BACKFILL.match(d) for d in directives),
     }
+    if empty_block(up):
+        return ("M11",)
     new = {"table": set(), "function": set(), "type": set()}
     for stmt in statements(up):
         record_new(stmt, new)
@@ -415,6 +445,14 @@ def message(found):
     if rule == "M8":
         return (f"`-- dhow:floor {args[0]}` is not a released version: there is no tag v{args[0]} in the repo. "
                 "The floor is a version that shipped, or 0.0.0 before the first release.")
+    if rule == "M10":
+        return (f"`{args[0]}` controls the transaction. goose runs each file in its own transaction (or none, with "
+                "`-- +goose NO TRANSACTION`), and `dhow-server migrate dry-run` relies on one transaction it can roll "
+                "back. A migration never runs BEGIN, COMMIT, END, ROLLBACK, ABORT, SAVEPOINT, RELEASE or PREPARE "
+                "TRANSACTION. Split the work into separate files instead.")
+    if rule == "M11":
+        return ("a `-- +goose StatementBegin` ... `-- +goose StatementEnd` block has no statement in it. goose then "
+                "reads the next line as a statement of its own, while dhow's splitter does not. Remove the empty block.")
     return (f"`{args[0]}` in a NO TRANSACTION file is not idempotent. If the migration stops halfway it runs "
             "again, so every statement uses IF NOT EXISTS, IF EXISTS or VALIDATE.")
 

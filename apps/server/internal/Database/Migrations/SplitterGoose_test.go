@@ -66,12 +66,12 @@ func dumpSchema(t *testing.T, ctx context.Context, argv []string, schema string)
 	return strings.Join(keep, "\n")
 }
 
-func applyWithSplitter(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+func applyWithSplitter(t *testing.T, ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) {
 	t.Helper()
-	names, err := fs.Glob(migrations.FS, "*.sql")
+	names, err := fs.Glob(fsys, "*.sql")
 	require.NoError(t, err)
 	for _, name := range names {
-		body, err := fs.ReadFile(migrations.FS, name)
+		body, err := fs.ReadFile(fsys, name)
 		require.NoError(t, err)
 		parsed, err := migrations.ParseUp(string(body))
 		require.NoError(t, err, name)
@@ -92,19 +92,36 @@ func applyWithSplitter(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	}
 }
 
+const (
+	noTxAfterDown = "-- dhow:phase expand\n-- +goose Up\n" +
+		"CREATE INDEX CONCURRENTLY IF NOT EXISTS \"IX_Instance_Late\" ON \"Instance\" (\"CreatedAt\");\n" +
+		"-- +goose Down\nDROP INDEX IF EXISTS \"IX_Instance_Late\";\n-- +goose NO TRANSACTION\n"
+	emptyBlock = "-- dhow:phase expand\n-- +goose Up\n-- +goose StatementBegin\n-- +goose StatementEnd\n" +
+		"CREATE TABLE \"EmptyBlock\" (\"Id\" int)\n;\n"
+)
+
 func TestSplitterBuildsTheSameSchemaAsGoose(t *testing.T) {
 	ctx := context.Background()
-	byGoose := dbtest.NewPool(t)
+	fsys := withFiles(t, map[string]string{"99001_no_tx_after_down.sql": noTxAfterDown})
+	byGoose := dbtest.NewEmptyPool(t)
+	_, err := migrator(t, byGoose, fsys, migrations.Binary{}).Up(ctx)
+	require.NoError(t, err)
 	bySplitter := dbtest.NewEmptyPool(t)
 	var server int
 	require.NoError(t, byGoose.QueryRow(ctx, "SELECT current_setting('server_version_num')::int / 10000").Scan(&server))
 	argv := pgDump(t, ctx, server)
 
-	applyWithSplitter(t, ctx, bySplitter)
+	applyWithSplitter(t, ctx, bySplitter, fsys)
 
 	want := dumpSchema(t, ctx, argv, schemaOf(t, ctx, byGoose))
 	got := dumpSchema(t, ctx, argv, schemaOf(t, ctx, bySplitter))
 	require.Contains(t, want, `CREATE TABLE SCHEMA."Instance"`, "the dump must hold the schema")
 	require.Contains(t, want, `"SchemaFloor" text DEFAULT '0.0.0'::text NOT NULL`)
+	require.Contains(t, want, `"IX_Instance_Late"`, "goose ran the file outside a transaction")
 	assert.Equal(t, want, got, "the splitter and goose must build the same schema from every migration")
+}
+
+func TestSplitterRefusesAnEmptyBlockThatGooseReadsDifferently(t *testing.T) {
+	_, err := migrations.ParseUp(emptyBlock)
+	require.ErrorIs(t, err, migrations.ErrSplit, "goose turns the next line into a statement of its own, so the splitter refuses the file")
 }

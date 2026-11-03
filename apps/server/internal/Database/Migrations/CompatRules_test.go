@@ -24,7 +24,6 @@ var (
 	reGooseDown    = ci(`^--\s*\+goose\s+Down\b`)
 	reBegin        = ci(`^--\s*\+goose\s+StatementBegin\b`)
 	reEnd          = ci(`^--\s*\+goose\s+StatementEnd\b`)
-	reDollarTag    = regexp.MustCompile(`^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$`)
 	reName         = ci(sqlName)
 	reCreateTable  = ci(`^CREATE\s+(?:(?:GLOBAL|LOCAL)\s+)?(?:(?:TEMP|TEMPORARY|UNLOGGED)\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(` + sqlName + `)`)
 	reCreateRoutin = ci(`^CREATE\s+(FUNCTION|TYPE)\s+(` + sqlName + `)`)
@@ -59,87 +58,6 @@ type compatContext struct {
 	backfill bool
 	tables   map[string]bool
 	routines map[string]map[string]bool
-}
-
-func isIdentByte(c byte) bool {
-	return c == '_' || c == '$' || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-}
-
-func blankRange(out []byte, start, end int, fill byte) {
-	for k := start; k < end; k++ {
-		if out[k] != '\n' {
-			out[k] = fill
-		}
-	}
-}
-
-func stringEnd(text string, i int, escaped bool) int {
-	for i < len(text) {
-		switch {
-		case escaped && text[i] == '\\':
-			i += 2
-		case strings.HasPrefix(text[i:], "''"):
-			i += 2
-		case text[i] == '\'':
-			return i + 1
-		default:
-			i++
-		}
-	}
-	return len(text)
-}
-
-func identifierEnd(text string, i int) int {
-	for i < len(text) {
-		switch {
-		case strings.HasPrefix(text[i:], `""`):
-			i += 2
-		case text[i] == '"':
-			return i + 1
-		default:
-			i++
-		}
-	}
-	return len(text)
-}
-
-func endOrLen(idx, from, extra, n int) int {
-	if idx < 0 {
-		return n
-	}
-	return from + idx + extra
-}
-
-func maskSQL(text string) string {
-	out, n := []byte(text), len(text)
-	for i := 0; i < n; {
-		c := text[i]
-		switch {
-		case strings.HasPrefix(text[i:], "--"):
-			j := endOrLen(strings.IndexByte(text[i:], '\n'), i, 0, n)
-			blankRange(out, i, j, ' ')
-			i = j
-		case strings.HasPrefix(text[i:], "/*"):
-			j := endOrLen(strings.Index(text[i+2:], "*/"), i+2, 2, n)
-			blankRange(out, i, j, ' ')
-			i = j
-		case c == '\'':
-			escaped := i > 0 && (text[i-1] == 'e' || text[i-1] == 'E') && (i < 2 || !isIdentByte(text[i-2]))
-			j := stringEnd(text, i+1, escaped)
-			blankRange(out, i+1, max(i+1, j-1), 'x')
-			i = j
-		case c == '"':
-			i = identifierEnd(text, i+1)
-		case c == '$' && (i == 0 || !isIdentByte(text[i-1])) && reDollarTag.MatchString(text[i:]):
-			tag := reDollarTag.FindString(text[i:])
-			j := endOrLen(strings.Index(text[i+len(tag):], tag), i+len(tag), len(tag), n)
-			blankRange(out, i, j, ' ')
-			i = j
-		default:
-			i++
-		}
-	}
-	return string(out)
 }
 
 func splitSections(text string) ([]string, string) {
@@ -359,6 +277,30 @@ func (c *compatContext) m6(stmt string) bool {
 	return m != nil && !c.tables[lastPart(m[1])]
 }
 
+func (c *compatContext) m10(stmt string) bool {
+	return TransactionControl(stmt)
+}
+
+func emptyBlock(up string) bool {
+	inside, body := false, false
+	masked := strings.Split(maskSQL(up), "\n")
+	for k, raw := range strings.Split(up, "\n") {
+		trimmed := strings.TrimSpace(raw)
+		switch {
+		case reBegin.MatchString(trimmed):
+			inside, body = true, false
+		case reEnd.MatchString(trimmed):
+			if inside && !body {
+				return true
+			}
+			inside = false
+		case inside && strings.TrimSpace(masked[k]) != "":
+			body = true
+		}
+	}
+	return false
+}
+
 func (c *compatContext) m9(stmt string) bool {
 	return c.noTx && !reIdempotent.MatchString(stmt)
 }
@@ -427,7 +369,10 @@ func compatVerdict(text string, tags map[string]bool) string {
 	rules := []struct {
 		id    string
 		check func(string) bool
-	}{{"M2", c.m2}, {"M3", c.m3}, {"M4", c.m4}, {"M5", c.m5}, {"M6", c.m6}, {"M9", c.m9}}
+	}{{"M2", c.m2}, {"M3", c.m3}, {"M4", c.m4}, {"M5", c.m5}, {"M6", c.m6}, {"M10", c.m10}, {"M9", c.m9}}
+	if emptyBlock(up) {
+		return "M11"
+	}
 	for _, stmt := range splitStatements(up) {
 		c.recordNew(stmt)
 		for _, r := range rules {

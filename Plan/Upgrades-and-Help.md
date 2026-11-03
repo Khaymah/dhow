@@ -360,6 +360,8 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 | M7 | `contract` من غير `-- dhow:floor X.Y.Z`، أو من غير `UPDATE "Instance" SET "SchemaFloor" = 'X.Y.Z'` بنفس القيمة (مع `0.0.0` الـ UPDATE مش مطلوب، لأن العمود مش موجود لحد U2 وقيمته الافتراضية `0.0.0`، ولو موجود لازم يبقى بنفس القيمة) | الـ floor هو اللي بيحمي الـ binary القديم |
 | M8 | `-- dhow:floor` مش `0.0.0` ومفيش tag `vX.Y.Z` في الريبو | الـ floor نسخة اتعمل لها release |
 | M9 | ملف `NO TRANSACTION` فيه statement مش idempotent (`IF NOT EXISTS` أو `IF EXISTS` أو `VALIDATE`) | الملف ده ممكن يقف في النص ويتعاد |
+| M10 | أي statement بيتحكم في الـ transaction (`BEGIN` و`START TRANSACTION` و`COMMIT` و`END` و`ROLLBACK` و`ABORT` و`SAVEPOINT` و`RELEASE` و`PREPARE TRANSACTION`)، حتى جوه `StatementBegin/End`، إلا جسم `BEGIN ATOMIC` | goose بيشغّل كل ملف في transaction، والـ dry run معتمد على transaction واحدة بيرجع فيها (U2) |
+| M11 | بلوك `StatementBegin/End` فاضي أو فيه كومنتات بس | goose بيقرا السطر اللي بعده statement لوحده، والـ splitter بتاعنا بيرفضه |
 
 **الاختبارات (table-driven):**
 - كل قاعدة بحالة مرفوضة وحالة مقبولة.
