@@ -1,6 +1,7 @@
 package keys_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -144,15 +145,21 @@ func TestCreateKeyringFileNeverReplacesAFile(t *testing.T) {
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
-func TestReplaceKeyringFileKeepsModeAndOwner(t *testing.T) {
+func TestAppendKeyringVersionKeepsModeOwnerAndEveryKey(t *testing.T) {
 	ring, err := keys.GenerateKeyring(1)
 	require.NoError(t, err)
 	dir := privateDir(t)
 	path := writeKeyring(t, dir, ring)
-	next, _, err := ring.WithNextVersion()
-	require.NoError(t, err)
-	require.NoError(t, keys.ReplaceKeyringFile(path, next))
+	if os.Geteuid() != 0 {
+		require.NoError(t, os.Chmod(path, 0o400))
+		_, err = keys.AppendKeyringVersion(path, keys.FileRules{})
+		require.Error(t, err, "a read-only file is not changed")
+		require.NoError(t, os.Chmod(path, 0o600))
+	}
 
+	v, err := keys.AppendKeyringVersion(path, keys.FileRules{})
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), v)
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
@@ -162,11 +169,24 @@ func TestReplaceKeyringFileKeepsModeAndOwner(t *testing.T) {
 	got, err := keys.ReadKeyringFile(path, keys.FileRules{})
 	require.NoError(t, err)
 	assert.Equal(t, []int32{1, 2}, got.Versions())
+	assert.True(t, bytes.HasPrefix(got.Marshal(), ring.Marshal()), "version 1 is unchanged")
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
 	assert.Len(t, entries, 1, "no temporary file is left behind")
 
+	noNewline := filepath.Join(dir, "no-newline")
+	require.NoError(t, os.WriteFile(noNewline, bytes.TrimSuffix(ring.Marshal(), []byte("\n")), 0o600))
+	_, err = keys.AppendKeyringVersion(noNewline, keys.FileRules{})
+	require.NoError(t, err)
+	fixed, err := keys.ReadKeyringFile(noNewline, keys.FileRules{})
+	require.NoError(t, err)
+	assert.Equal(t, []int32{1, 2}, fixed.Versions())
+
 	require.NoError(t, os.Chmod(path, 0o644))
-	err = keys.ReplaceKeyringFile(path, next)
+	_, err = keys.AppendKeyringVersion(path, keys.FileRules{})
+	assert.Equal(t, keys.CodeKeyringInsecure, keys.CodeOf(err))
+	link := filepath.Join(dir, "link")
+	require.NoError(t, os.Symlink(path, link))
+	_, err = keys.AppendKeyringVersion(link, keys.FileRules{})
 	assert.Equal(t, keys.CodeKeyringInsecure, keys.CodeOf(err))
 }

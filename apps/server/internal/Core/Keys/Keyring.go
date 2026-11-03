@@ -208,14 +208,19 @@ func (k *Keyring) key(version int32) ([]byte, bool) {
 func (k *Keyring) Marshal() []byte {
 	var b bytes.Buffer
 	for _, v := range k.versions {
-		b.WriteString(lineKeyword)
-		b.WriteByte(' ')
-		b.WriteString(strconv.FormatInt(int64(v), 10))
-		b.WriteByte(' ')
-		b.WriteString(keyEncoding.EncodeToString(k.keys[v]))
-		b.WriteByte('\n')
+		b.Write(k.line(v))
 	}
 	return b.Bytes()
+}
+
+func (k *Keyring) line(version int32) []byte {
+	out := make([]byte, 0, len(lineKeyword)+maxVersionDigits+encodedKeyLen+3)
+	out = append(out, lineKeyword...)
+	out = append(out, ' ')
+	out = strconv.AppendInt(out, int64(version), 10)
+	out = append(out, ' ')
+	out = keyEncoding.AppendEncode(out, k.keys[version])
+	return append(out, '\n')
 }
 
 func (k *Keyring) Destroy() {
