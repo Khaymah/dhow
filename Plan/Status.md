@@ -78,6 +78,7 @@
 |---|---|---|---|
 | M4.10: واجهة المشاريع وGit العام والتنفيذات والملفات الناتجة، ومدة حفظ السجلات، و`RepositoryLinked` و`CallerRole` و`Kind` في الـ API، وفصل المستودع بيمسح المفاتيح ويلغي التنفيذات المفتوحة | `feat/web-projects-runs` | — | مراجعة الأمان والـ UX اتصلّحت، وPlaywright على Forgejo أخضر من غير أي console error. فاضل: الـ PR والـ CI. وGitHub وGitLab مستنيين M4.5 وM4.6 |
 | U1: hook قاعدة الـ migrations (`migration_rules.py` بالقواعد M1 لـ M9) و`Compat_test.go` بنفس الحالات من `testdata/compat/` (ADR-0077) | `feat/migration-rule-hook` | — | خلص و`make check` أخضر. فاضل: الـ PR والـ CI |
+| M4.11 وM3.13: `fuzz-nightly.yml` (30 دقيقة لكل target)، وtargets جديدة (`cachekey` و`pathglob` و`jobspec` والـ CONNECT)، ومراجعة التهديدات STRIDE في `docs/security-model.md`، و`deploy/m4-demo/run.sh` و`leak-sweep.sh` و`deploy/m3-demo/run.sh` في `demo.yml`، وهيكل `providers.yml` | `feat/m4-hardening-demo` | — | `deploy/m4-demo/run.sh` عدّى 22 من 22 هنا بنسخة محلية لـ cgroup v1. فاضل: الـ PR، وأول تشغيل لـ `demo.yml` على `ubuntu-26.04`، وjob `providers` مع M4.5 وM4.6 |
 | `runner.revoked` (إلغاء اللوحة وإلغاء الـ runner لنفسه) بيتنشر على الـ event bus بعد الـ commit، فلو الـ process وقع بينهم الـ audit بيضيع. الـ bus مافيهوش outbox | — | — | outbox للأحداث اللي بتتسجّل، أو نشرها جوه نفس الـ transaction |
 
 M2.6 وM3.6 والتطوير المحلي وإصلاحات مراجعة M3.6 وتغيير الاسم وM3.7 وتجهيز Windows وM3.9 اتدمجوا في 2026-10-28، ومن #35 لـ #59 اتدمجوا في 2026-10-28 و2026-10-29.
@@ -99,7 +100,7 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
 | M3.10 | خلص على Debian وUbuntu (#57، #60، #61). SELinux بعد أول نسخة (ADR-0067، ADR-0068) |
 | M3.11 | driver الـ Kubernetes والـ Helm chart، و`make helm-e2e` على kind |
 | M3.12 | خلص (#39، #44، #48، #50) |
-| M3.13 | fuzz إضافي، ومراجعة تهديدات الـ runner plane، و`deploy/m3-demo/run.sh` لشرط الخلاص |
+| M3.13 | خلص في M4.11 (`feat/m4-hardening-demo`): الـ fuzz الإضافي (`Wire` و`jobspec` والـ CONNECT)، ومراجعة تهديدات الـ runner plane وقايمة المراجعة الخارجية في `docs/security-model.md`، و`deploy/m3-demo/run.sh`. فاضل: `make helm-e2e` مع M3.11 بعد أول نسخة، وتنضيف `"RunnerSessions"` |
 
 ## خطة السهولة (ملاحظات Sabry، بالترتيب)
 
@@ -118,7 +119,7 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
 
 [ADR-0068](ADR/0068-first-production-release-scope.md) حدّد نطاق أول نسخة production: الـ runners على Debian وUbuntu بـ Podman rootless بس، والنشر على SSH/VPS وDocker Compose، وGitHub وGitLab وGit عام، ونسخة Community بس. الترتيب: M3.13 ← M4 ← M5 ← M6 ← M7 ← M9 ← M10 ← M11، واللي اتأجّل (SELinux وKubernetes وHelm وgVisor وBitbucket وStatic/CDN/SFTP والمحرر المرئي وTeams وWhatsApp وM8 ومكوّن GitLab CI) في قسم «بعد أول نسخة» في [`docs/roadmap.md`](../docs/roadmap.md).
 
-**M4 شغّال:** خطته في [`M4-Pipelines.md`](M4-Pipelines.md) اتقبلت، وSabry جاوب أسئلتها كلها بالتوصية يوم 2026-10-30. **M4.1** (`internal/pipelinespec`، [ADR-0069](ADR/0069-pipeline-spec-parser-and-validator.md)) اتدمج في #65، و**M4.2** (`dhow lint`) في #66، و**M4.3** (`Projects` والـ ports، [ADR-0070](ADR/0070-ports-in-core-and-project-permissions.md)) في #68. **M4.4** (`Sources` وGit عام، [ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) اتدمج في #71. وقرار Sabry الجديد لربط Git (الـ OAuth للتجهيز بس والـ deploy keys للوصول) في [ADR-0074](ADR/0074-git-connection-oauth-for-setup-deploy-keys-for-access.md)، وفيه نقط لازم تتحسم في أول M4.6. **M4.7** (الـ runner بأكتر من حاوية والـ checkout والإضافات، [ADR-0075](ADR/0075-multi-container-attempts-checkout-and-plugins.md)) اتدمج في #74. **M4.8** (`Pipelines`، [ADR-0076](ADR/0076-pipeline-runs-definitions-and-forks.md)) اتدمج في #73، والربط بالـ checkout وإصلاحات مراجعته في #75. **M4.9** (الـ artifacts والـ cache، [ADR-0078](ADR/0078-artifacts-cache-and-blob-store.md)) اتدمج في #79، و**M4.10** (الواجهة) على `feat/web-projects-runs`. وفاضل M4.5 وM4.6 (مستنيين حسابات الاختبار) وM4.11.
+**M4 شغّال:** خطته في [`M4-Pipelines.md`](M4-Pipelines.md) اتقبلت، وSabry جاوب أسئلتها كلها بالتوصية يوم 2026-10-30. **M4.1** (`internal/pipelinespec`، [ADR-0069](ADR/0069-pipeline-spec-parser-and-validator.md)) اتدمج في #65، و**M4.2** (`dhow lint`) في #66، و**M4.3** (`Projects` والـ ports، [ADR-0070](ADR/0070-ports-in-core-and-project-permissions.md)) في #68. **M4.4** (`Sources` وGit عام، [ADR-0072](ADR/0072-webhooks-and-git-credentials.md)) اتدمج في #71. وقرار Sabry الجديد لربط Git (الـ OAuth للتجهيز بس والـ deploy keys للوصول) في [ADR-0074](ADR/0074-git-connection-oauth-for-setup-deploy-keys-for-access.md)، وفيه نقط لازم تتحسم في أول M4.6. **M4.7** (الـ runner بأكتر من حاوية والـ checkout والإضافات، [ADR-0075](ADR/0075-multi-container-attempts-checkout-and-plugins.md)) اتدمج في #74. **M4.8** (`Pipelines`، [ADR-0076](ADR/0076-pipeline-runs-definitions-and-forks.md)) اتدمج في #73، والربط بالـ checkout وإصلاحات مراجعته في #75. **M4.9** (الـ artifacts والـ cache، [ADR-0078](ADR/0078-artifacts-cache-and-blob-store.md)) اتدمج في #79، و**M4.10** (الواجهة) في #81، و**M4.11** (الـ fuzz الليلي ومراجعة التهديدات والـ demos وفحص تسريب بيانات الدخول) على `feat/m4-hardening-demo`. **M4 خلص ما عدا M4.5 وM4.6** (GitHub وGitLab)، مستنيين حسابات الاختبار، ومعاهم job `providers` في الـ CI اللي متعمل هيكل بس.
 
 **الترقيات والمساعدة جوه التطبيق:** الخطة في [`Upgrades-and-Help.md`](Upgrades-and-Help.md) و[ADR-0077](ADR/0077-upgrades-migrations-and-update-policy.md) (مقبولة، وSabry جاوب الأسئلة الـ 11 يوم 2026-11-02، وشرطه: كله ببلاش). قاعدة expand/contract شغّالة من 2026-11-02 على أي migration جديد. **U1 خلص** على `feat/migration-rule-hook`: الـ hook `migration_rules.py` بالقواعد M1 لـ M9، و`Compat_test.go` بيطبّقها في الـ CI على أي ملف بعد `00048`، والحالات المشتركة في `Database/Migrations/testdata/compat/`. وU2 (توافق الـ schema في الـ binary) هو اللي بعده، أولوية مع M4.
 
@@ -128,7 +129,7 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
 
 - **الـ runner:** حقل سقف الموارد في `RegisterRequest`، ورفض `RESOURCE_REQUEST_EXCEEDS_RUNNER` وقت الإنشاء.
 - **الحمل:** الـ token bucket لكل runner ورد «الـ pool مشغول» (ADR-0042). والإشعار بالـ labels لو الـ runners كتروا. وحدود الـ logs لكل instance مع HA.
-- **التنضيف:** تنضيف `"RunnerSessions"` في M3.13. (احتفاظ الـ logs لكل مؤسسة اتعمل في M4.9.)
+- **التنضيف:** تنضيف `"RunnerSessions"` (كان في M3.13 واتأجّل). (احتفاظ الـ logs لكل مؤسسة اتعمل في M4.9.)
 - **الهوية:** أول دخول بالـ IdP وقبول الدعوات بيه، وback-channel logout. وحذف مؤسسة.
 - **مع M4:** scopes المشروع والبيئة في الـ tokens والـ bindings.
 - **مع M5، قرار Sabry (2026-11-02):** قاعدة البيئة نفسها بتحدد الـ branches أو الـ tags اللي بتنشر عليها (مثلًا production من `main` بس، وstaging من `stage`)، والربط ده على السيرفر ومفيش commit يقدر يغيّره. فالـ job بيكتب `environment:` واحد، والـ job اللي الـ branch بتاعه مش في قاعدة البيئة بيتعلّم `skipped` بسبب واضح بدل ما يفشل. والمستودع الواحد بيفضل بـ deploy key واحد للـ checkout لكل الـ branches، ومفاتيح السيرفرات أسرار في كل بيئة.
