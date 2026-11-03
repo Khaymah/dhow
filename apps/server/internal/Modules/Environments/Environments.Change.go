@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -17,53 +18,38 @@ import (
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments/Models"
 )
 
-type reviewerView struct {
-	UserIds []uuid.UUID `json:"UserIds"`
-	TeamIds []uuid.UUID `json:"TeamIds"`
-}
-
 type diff struct {
 	fields []string
-	from   map[string]any
-	to     map[string]any
 	rules  bool
 }
 
-func (d *diff) add(field string, before, after any, rule bool) {
-	if reflect.DeepEqual(before, after) {
-		return
+func (d *diff) add(field string, changed, rule bool) {
+	if changed {
+		d.fields = append(d.fields, field)
+		d.rules = d.rules || rule
 	}
-	d.fields = append(d.fields, field)
-	d.from[field], d.to[field] = before, after
-	d.rules = d.rules || rule
 }
 
 func compare(old, updated models.Environment) diff {
-	d := diff{from: map[string]any{}, to: map[string]any{}}
+	d := diff{}
 	o, n := old.Rules, updated.Rules
-	d.add(fieldDescription, old.Description, updated.Description, false)
-	d.add(ruleAllowedRefs, o.AllowedRefs, n.AllowedRefs, true)
-	d.add(ruleAllowPullRequests, o.AllowPullRequests, n.AllowPullRequests, true)
-	d.add(ruleReviewers, reviewerView{o.Reviewers.UserIDs, o.Reviewers.TeamIDs}, reviewerView{n.Reviewers.UserIDs, n.Reviewers.TeamIDs}, true)
-	d.add(ruleRequiredApprovals, o.RequiredApprovals, n.RequiredApprovals, true)
-	d.add(ruleAllowSelfApproval, o.AllowSelfApproval, n.AllowSelfApproval, true)
-	d.add(ruleWaitMinutes, o.WaitMinutes, n.WaitMinutes, true)
-	d.add(ruleApprovalTimeoutHours, o.ApprovalTimeoutHours, n.ApprovalTimeoutHours, true)
-	d.add(ruleRequirePinnedImages, o.RequirePinnedImages, n.RequirePinnedImages, true)
-	d.add(ruleAllowedPlugins, o.AllowedPlugins, n.AllowedPlugins, true)
-	d.add(ruleRequiredIsolation, o.RequiredIsolation, n.RequiredIsolation, true)
-	d.add(ruleAllowAdminBypass, o.AllowAdminBypass, n.AllowAdminBypass, true)
-	d.add(ruleSupersedePending, o.SupersedePending, n.SupersedePending, true)
+	d.add(fieldDescription, old.Description != updated.Description, false)
+	d.add(ruleAllowedRefs, !reflect.DeepEqual(o.AllowedRefs, n.AllowedRefs), true)
+	d.add(ruleAllowPullRequests, o.AllowPullRequests != n.AllowPullRequests, true)
+	d.add(ruleReviewers, !reflect.DeepEqual(o.Reviewers, n.Reviewers), true)
+	d.add(ruleRequiredApprovals, o.RequiredApprovals != n.RequiredApprovals, true)
+	d.add(ruleAllowSelfApproval, o.AllowSelfApproval != n.AllowSelfApproval, true)
+	d.add(ruleWaitMinutes, o.WaitMinutes != n.WaitMinutes, true)
+	d.add(ruleApprovalTimeoutHours, o.ApprovalTimeoutHours != n.ApprovalTimeoutHours, true)
+	d.add(ruleRequirePinnedImages, o.RequirePinnedImages != n.RequirePinnedImages, true)
+	d.add(ruleAllowedPlugins, !reflect.DeepEqual(o.AllowedPlugins, n.AllowedPlugins), true)
+	d.add(ruleRequiredIsolation, o.RequiredIsolation != n.RequiredIsolation, true)
+	d.add(ruleAllowAdminBypass, o.AllowAdminBypass != n.AllowAdminBypass, true)
+	d.add(ruleSupersedePending, o.SupersedePending != n.SupersedePending, true)
 	return d
 }
 
-func compact(v map[string]any) string {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		return ""
-	}
-	return string(raw)
-}
+func (d diff) has(field string) bool { return slices.Contains(d.fields, field) }
 
 func (s *Service) lock(ctx context.Context, q *sqlc.Queries, org, project uuid.UUID, name string) (models.Environment, sqlc.Environment, error) {
 	if !ValidName(name) {
@@ -117,21 +103,19 @@ func (s *Service) Update(ctx context.Context, org, project uuid.UUID, name strin
 		if len(d.fields) == 0 {
 			return nil
 		}
-		reviewersChanged := d.to[ruleReviewers] != nil
-		if reviewersChanged {
+		if d.has(ruleReviewers) {
 			if err := checkReviewers(ctx, q, org, project, next.Rules.Reviewers); err != nil {
 				return err
 			}
 		}
-		out, err = s.save(ctx, q, row, next, d.rules, reviewersChanged)
-		return err
+		if out, err = s.save(ctx, q, row, next, d.rules, d.has(ruleReviewers)); err != nil {
+			return err
+		}
+		data := auditData{"Fields": strings.Join(d.fields, ","), "Version": versionOf(out)}
+		data.rules(current.Rules, out.Rules, false)
+		return s.audit(ctx, q, p, eventbus.EnvironmentUpdated, out, data)
 	})
-	if err != nil || len(d.fields) == 0 {
-		return out, err
-	}
-	return out, s.audit(ctx, p, eventbus.EnvironmentUpdated, out, map[string]string{
-		"Fields": strings.Join(d.fields, ","), "From": compact(d.from), "To": compact(d.to), "Version": versionOf(out),
-	})
+	return out, err
 }
 
 func (s *Service) save(ctx context.Context, q *sqlc.Queries, row sqlc.Environment, next models.Environment, rules, reviewers bool) (models.Environment, error) {
@@ -183,12 +167,15 @@ func (s *Service) Remove(ctx context.Context, org, project uuid.UUID, name strin
 			return err
 		}
 		out = current
-		return q.RemoveEnvironmentReviewers(ctx, sqlc.RemoveEnvironmentReviewersParams{OrganizationID: org, EnvironmentID: row.Id, Now: now})
+		if err := q.RemoveEnvironmentReviewers(ctx, sqlc.RemoveEnvironmentReviewersParams{OrganizationID: org, EnvironmentID: row.Id, Now: now}); err != nil {
+			return err
+		}
+		return s.audit(ctx, q, p, eventbus.EnvironmentRemoved, out, auditData{"Version": versionOf(out)})
 	})
 	if err != nil {
 		return models.Environment{}, err
 	}
-	return out, s.audit(ctx, p, eventbus.EnvironmentRemoved, out, map[string]string{"Version": versionOf(out)})
+	return out, nil
 }
 
 func (s *Service) Pause(ctx context.Context, org, project uuid.UUID, name, reason string) (models.Environment, error) {
@@ -199,7 +186,6 @@ func (s *Service) Pause(ctx context.Context, org, project uuid.UUID, name, reaso
 	if ae := validateReason(reason); ae != nil {
 		return models.Environment{}, ae
 	}
-	changed := false
 	var out models.Environment
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		current, row, err := s.lock(ctx, q, org, project, name)
@@ -214,14 +200,14 @@ func (s *Service) Pause(ctx context.Context, org, project uuid.UUID, name, reaso
 		if err != nil {
 			return err
 		}
-		changed = true
-		out, err = s.one(ctx, q, paused)
-		return err
+		if out, err = s.one(ctx, q, paused); err != nil {
+			return err
+		}
+		data := auditData{"Version": versionOf(out)}
+		data.reason(reason)
+		return s.audit(ctx, q, p, eventbus.EnvironmentPaused, out, data)
 	})
-	if err != nil || !changed {
-		return out, err
-	}
-	return out, s.audit(ctx, p, eventbus.EnvironmentPaused, out, map[string]string{"Reason": reason, "Version": versionOf(out)})
+	return out, err
 }
 
 func (s *Service) Resume(ctx context.Context, org, project uuid.UUID, name string, factor auth.Factor) (models.Environment, error) {
@@ -232,7 +218,6 @@ func (s *Service) Resume(ctx context.Context, org, project uuid.UUID, name strin
 	if err := s.confirm(ctx, p, factor); err != nil {
 		return models.Environment{}, err
 	}
-	changed := false
 	var out models.Environment
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		current, row, err := s.lock(ctx, q, org, project, name)
@@ -244,12 +229,10 @@ func (s *Service) Resume(ctx context.Context, org, project uuid.UUID, name strin
 		if err != nil {
 			return err
 		}
-		changed = true
-		out, err = s.one(ctx, q, resumed)
-		return err
+		if out, err = s.one(ctx, q, resumed); err != nil {
+			return err
+		}
+		return s.audit(ctx, q, p, eventbus.EnvironmentResumed, out, auditData{"Version": versionOf(out)})
 	})
-	if err != nil || !changed {
-		return out, err
-	}
-	return out, s.audit(ctx, p, eventbus.EnvironmentResumed, out, map[string]string{"Version": versionOf(out)})
+	return out, err
 }

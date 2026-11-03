@@ -178,13 +178,16 @@ func (s *Service) Get(ctx context.Context, org, project uuid.UUID, name string) 
 	return s.one(ctx, q, row)
 }
 
-func (s *Service) Create(ctx context.Context, org, project uuid.UUID, in models.CreateInput) (models.Environment, error) {
+func (s *Service) Create(ctx context.Context, org, project uuid.UUID, in models.CreateInput, factor auth.Factor) (models.Environment, error) {
 	p, err := principalOf(ctx)
 	if err != nil {
 		return models.Environment{}, err
 	}
 	if ae := validateInput(&in.Name, in.Description, in.Rules); ae != nil {
 		return models.Environment{}, ae
+	}
+	if err := s.confirm(ctx, p, factor); err != nil {
+		return models.Environment{}, err
 	}
 	var out models.Environment
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
@@ -228,13 +231,17 @@ func (s *Service) Create(ctx context.Context, org, project uuid.UUID, in models.
 		if err := insertReviewers(ctx, q, org, row.Id, rules.Reviewers, now); err != nil {
 			return err
 		}
-		out, err = s.one(ctx, q, row)
-		return err
+		if out, err = s.one(ctx, q, row); err != nil {
+			return err
+		}
+		data := auditData{"Version": versionOf(out)}
+		data.rules(models.Rules{}, out.Rules, true)
+		return s.audit(ctx, q, p, eventbus.EnvironmentCreated, out, data)
 	})
 	if err != nil {
 		return models.Environment{}, err
 	}
-	return out, s.audit(ctx, p, eventbus.EnvironmentCreated, out, map[string]string{"Version": versionOf(out)})
+	return out, nil
 }
 
 func insertReviewers(ctx context.Context, q *sqlc.Queries, org, env uuid.UUID, r models.Reviewers, now time.Time) error {
@@ -308,13 +315,3 @@ func teamDetails(ctx context.Context, q *sqlc.Queries, org uuid.UUID, teams []uu
 }
 
 func versionOf(e models.Environment) string { return strconv.FormatInt(e.RuleVersion, 10) }
-
-func (s *Service) audit(ctx context.Context, p auth.Principal, name string, e models.Environment, data map[string]string) error {
-	actor := p.UserID
-	data["Name"] = e.Name
-	data["ProjectId"] = e.ProjectID.String()
-	return s.bus.Publish(ctx, eventbus.Event{Name: name, Payload: eventbus.Audited{
-		OrganizationIDs: []uuid.UUID{e.OrganizationID}, ActorUserID: &actor, TargetType: targetEnvironment,
-		TargetID: e.ID.String(), IP: auth.RequestMetaFrom(ctx).IPString(), Data: data,
-	}})
-}

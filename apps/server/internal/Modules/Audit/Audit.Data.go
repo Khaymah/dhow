@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	maxDataEntries  = 24
+	maxDataEntries  = 32
 	maxDataValueLen = 256
 )
 
@@ -22,6 +22,11 @@ var allowedDataKeys = map[string]struct{}{
 	"Revoked": {}, "RevokedPats": {}, "RevokedSessions": {}, "Role": {}, "Scope": {}, "Scopes": {}, eventbus.SeverityKey: {},
 	"Slug": {}, "SpecDigest": {}, "State": {}, "Steps": {}, "SubjectDigest": {}, "Switches": {}, "To": {}, "Totp": {}, "Transport": {},
 	"UserId": {}, "Uses": {}, "Version": {}, "Window": {},
+	"AllowPullRequests": {}, "RequiredApprovals": {}, "AllowSelfApproval": {}, "WaitMinutes": {}, "ApprovalTimeoutHours": {},
+	"RequirePinnedImages": {}, "RequiredIsolation": {}, "AllowAdminBypass": {}, "SupersedePending": {},
+	"AllowedRefsCount": {}, "AllowedRefsDigest": {}, "AllowedRefsFrom": {}, "AllowedRefsTo": {},
+	"AllowedPluginsCount": {}, "AllowedPluginsDigest": {}, "AllowedPluginsFrom": {}, "AllowedPluginsTo": {},
+	"ReviewersCount": {}, "ReviewersDigest": {}, "ReviewersAdded": {}, "ReviewersRemoved": {}, "ReasonDigest": {}, "Truncated": {},
 }
 
 var credentialMarkers = []string{config.APITokenPrefix, config.RunnerAccessTokenPrefix, config.RunnerRegistrationTokenPrefix}

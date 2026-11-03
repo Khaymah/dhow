@@ -31,8 +31,8 @@ func TestTheTokenThatActedIsNeverCutByTheDataCap(t *testing.T) {
 	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Subject: policy.Subject{UserID: uuid.New(), TokenID: token}})
 	data := map[string]string{"Via": "browser", "ViaId": "forged"}
 	keys := audit.AllowedDataKeys()
-	require.Greater(t, len(keys), 30)
-	for i := range 30 {
+	require.Greater(t, len(keys), 40)
+	for i := range 40 {
 		data[keys[i]] = fmt.Sprintf("value %d", i)
 	}
 	require.NoError(t, f.service.Handle(ctx, eventbus.Event{Name: "test.many_keys", Payload: eventbus.Audited{
@@ -42,7 +42,7 @@ func TestTheTokenThatActedIsNeverCutByTheDataCap(t *testing.T) {
 	stored := storedData(t, f, "test.many_keys")
 	assert.Equal(t, "api_token", stored["Via"])
 	assert.Equal(t, token.String(), stored["ViaId"])
-	assert.Len(t, stored, 24+2, "the cap applies to the event's own data, and the credential comes on top")
+	assert.Len(t, stored, 32+2, "the cap applies to the event's own data, and the credential comes on top")
 }
 
 func TestEventsCannotClaimACredential(t *testing.T) {
