@@ -11,6 +11,13 @@ import {
 
 export const SHELL_PAGES = {
   home: lazyPage(() => import('@/App/Pages/HomePage').then((module) => module.HomePage)),
+  projects: lazyPage(() => import('@/App/Pages/ProjectsPage').then((module) => module.ProjectsPage), member),
+  project: lazyPage(() => import('@/App/Pages/ProjectPage').then((module) => module.ProjectPage), member),
+  projectSettings: lazyPage(
+    () => import('@/App/Pages/ProjectSettingsPage').then((module) => module.ProjectSettingsPage),
+    member,
+  ),
+  run: lazyPage(() => import('@/App/Pages/RunPage').then((module) => module.RunPage), member),
   jobs: lazyPage(() => import('@/App/Pages/JobsPage').then((module) => module.JobsPage), member),
   job: lazyPage(() => import('@/App/Pages/JobPage').then((module) => module.JobPage), member),
   runners: lazyPage(() => import('@/App/Pages/RunnersPage').then((module) => module.RunnersPage), canReadRunners),

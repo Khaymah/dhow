@@ -7,6 +7,7 @@ import { canEditOrganization } from '@/Core/Auth/AuthTypes';
 import { useT } from '@/I18n/useT';
 import { OrganizationCard } from '@/Modules/Organization/Components/OrganizationCard';
 import { SecondFactorCard } from '@/Modules/Organization/Components/SecondFactorCard';
+import { LogRetentionCard, LogRetentionSummary } from '@/Modules/Organization/Components/LogRetentionCard';
 import { DangerZone, SecondFactorSummary } from '@/Modules/Organization/Components/SettingsSection';
 
 export const OrgSettingsPage = () => {
@@ -26,6 +27,11 @@ export const OrgSettingsPage = () => {
                 <SecondFactorCard organization={organization} />
               ) : (
                 <SecondFactorSummary organization={organization} />
+              )}
+              {membership.Role === 'owner' ? (
+                <LogRetentionCard organization={organization} />
+              ) : (
+                <LogRetentionSummary organization={organization} />
               )}
             </PageGroup>
             <PageGroup title={t('orgSettings.group.danger')} lead={t('orgSettings.danger.lead')} icon="alert" danger>

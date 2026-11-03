@@ -8,6 +8,8 @@ import {
   LazyOrganizationTokenNewBody,
   LazyPasswordBody,
   LazyPasswordFooter,
+  LazyProjectNewBody,
+  LazyRepositoryLinkBody,
   LazyRunnerNewBody,
   LazyTeamNewBody,
   LazyThemeEditorBody,
@@ -16,6 +18,7 @@ import {
   LazyTotpBody,
   LazyTotpFooter,
   LazyTransferBody,
+  LazyTriggerRunBody,
 } from '@/App/Layout/LazySlides';
 import { oidcOf, themeOf, type TSlideId, type TStaticSlideId } from '@/App/Panels';
 import type { ICustomTheme } from '@/Core/Theme/ThemeTokens';
@@ -32,6 +35,9 @@ export interface ISlideContext {
   openHome: () => void;
   draftName: string | undefined;
   customThemes: readonly ICustomTheme[];
+  projectId: string | undefined;
+  openProject: (projectId: string) => void;
+  openRun: (projectId: string, runId: string) => void;
 }
 
 type TBuilder = (context: ISlideContext) => Omit<ISlide, 'id'>;
@@ -94,6 +100,28 @@ const BUILDERS: Record<Exclude<TStaticSlideId, 'theme-edit'>, TBuilder> = {
     title: t('settings.oidc.new.title'),
     subtitle: <span>{t('settings.oidc.new.subtitle')}</span>,
     children: <LazyOidcProviderBody onDone={close} />,
+  }),
+  'project-new': ({ t, openProject }) => ({
+    title: t('projects.new.title'),
+    subtitle: <span>{t('projects.new.subtitle')}</span>,
+    children: <LazyProjectNewBody onCreated={openProject} />,
+  }),
+  'repository-link': ({ t, close, projectId }) => ({
+    title: t('repository.link.title'),
+    subtitle: <span>{t('repository.link.subtitle')}</span>,
+    children: <LazyRepositoryLinkBody projectId={projectId} onDone={close} />,
+  }),
+  'run-trigger': ({ t, projectId, openRun }) => ({
+    title: t('runs.trigger.title'),
+    subtitle: <span>{t('runs.trigger.subtitle')}</span>,
+    children: (
+      <LazyTriggerRunBody
+        projectId={projectId}
+        onStarted={(runId) => {
+          if (projectId !== undefined) openRun(projectId, runId);
+        }}
+      />
+    ),
   }),
   'account-token-new': ({ t, close }) => ({
     title: t('tokens.slide.title'),

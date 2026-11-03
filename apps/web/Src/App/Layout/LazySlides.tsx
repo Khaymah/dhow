@@ -43,6 +43,15 @@ const LeaveBody = lazyComponent(() => import('@/Modules/Organization/Components/
 const OidcProviderBody = lazyComponent(() =>
   import('@/Modules/Settings/Components/OidcProviderBody').then((module) => module.OidcProviderBody),
 );
+const ProjectNewBody = lazyComponent(() =>
+  import('@/Modules/Projects/Components/ProjectNewBody').then((module) => module.ProjectNewBody),
+);
+const RepositoryLinkBody = lazyComponent(() =>
+  import('@/Modules/Projects/Components/RepositoryLinkBody').then((module) => module.RepositoryLinkBody),
+);
+const TriggerRunBody = lazyComponent(() =>
+  import('@/Modules/Projects/Components/TriggerRunBody').then((module) => module.TriggerRunBody),
+);
 const RunnerNewBody = lazyComponent(() => import('@/Modules/Runners/Components/RunnerNewBody').then((module) => module.RunnerNewBody));
 
 type TSlidePart = Exclude<TSlideId, `theme-edit-${string}` | `oidc-edit-${string}`>;
@@ -61,6 +70,9 @@ const PARTS: Record<TSlidePart, readonly IPreloadable[]> = {
   'member-remove': [MemberRemoveBody],
   'organization-leave': [LeaveBody],
   'oidc-new': [OidcProviderBody],
+  'project-new': [ProjectNewBody],
+  'repository-link': [RepositoryLinkBody],
+  'run-trigger': [TriggerRunBody],
 };
 
 const partOf = (id: TSlideId): TSlidePart => {
@@ -116,3 +128,6 @@ export const LazyRunnerNewBody = withSkeleton(RunnerNewBody);
 export const LazyOidcProviderBody = withSkeleton(OidcProviderBody);
 export const LazyMemberRemoveBody = withSkeleton(MemberRemoveBody);
 export const LazyLeaveBody = withSkeleton(LeaveBody);
+export const LazyProjectNewBody = withSkeleton(ProjectNewBody);
+export const LazyRepositoryLinkBody = withSkeleton(RepositoryLinkBody);
+export const LazyTriggerRunBody = withSkeleton(TriggerRunBody);

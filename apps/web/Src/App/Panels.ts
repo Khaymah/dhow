@@ -1,4 +1,4 @@
-import { canManageMembers, canManageRunners, canManageTokens, type TRole } from '@/Core/Auth/AuthTypes';
+import { canCreateProjects, canManageMembers, canManageRunners, canManageTokens, type TRole } from '@/Core/Auth/AuthTypes';
 import { isCustomThemeId } from '@/Core/Theme/ThemeIds';
 
 export const UNKNOWN_SLIDE = 'unknown';
@@ -17,6 +17,9 @@ const STATIC_SLIDES = [
   'member-remove',
   'organization-leave',
   'oidc-new',
+  'project-new',
+  'repository-link',
+  'run-trigger',
 ] as const;
 const THEME_EDIT_PREFIX = 'theme-edit-';
 const OIDC_EDIT_PREFIX = 'oidc-edit-';
@@ -52,6 +55,9 @@ export const isThemeEditSlide = (id: TSlideId): boolean => id === 'theme-edit' |
 
 const SLIDE_GATES: Partial<Record<TStaticSlideId, (role: TRole | undefined) => boolean>> = {
   'runner-new': canManageRunners,
+  'project-new': canCreateProjects,
+  'repository-link': (role) => role !== undefined,
+  'run-trigger': (role) => role !== undefined,
   'organization-invite': canManageMembers,
   'team-new': canManageMembers,
   'organization-token-new': canManageTokens,

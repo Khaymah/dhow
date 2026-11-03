@@ -15,6 +15,7 @@ export type TGroupId = 'run' | 'org' | 'watch' | 'account';
 
 export type TSectionId =
   | 'home'
+  | 'projects'
   | 'jobs'
   | 'runners'
   | 'runnerTokens'
@@ -34,6 +35,7 @@ export type TSectionId =
 
 export type TSectionPath =
   | '/'
+  | '/projects'
   | '/jobs'
   | '/runners'
   | '/runners/tokens'
@@ -75,6 +77,17 @@ export const MENU_GROUPS: readonly TGroupId[] = ['run', 'org', 'watch'];
 
 export const SECTIONS: readonly ISection[] = [
   { id: 'home', path: '/', label: 'shell.nav.home', icon: 'home', menu: true, allow: anyone },
+  {
+    id: 'projects',
+    path: '/projects',
+    label: 'shell.nav.projects',
+    icon: 'folder',
+    group: 'run',
+    menu: true,
+    detail: 'shell.crumb.project',
+    detailAllow: member,
+    allow: member,
+  },
   {
     id: 'jobs',
     path: '/jobs',

@@ -21,7 +21,7 @@ export const SlideHost = () => {
   const t = useT();
   const navigate = useNavigate();
   const { slide, invalid, close, discard } = useSlide();
-  const { memberId } = useParams({ strict: false });
+  const { memberId, projectId } = useParams({ strict: false });
   const role = useCurrentMembership()?.Role;
   const draftName = useThemeStore((state) => state.Draft?.Name);
   const customThemes = useThemeStore((state) => state.CustomThemes);
@@ -75,6 +75,13 @@ export const SlideHost = () => {
             },
             openHome: () => {
               void navigate({ to: '/' });
+            },
+            projectId: isUuid(projectId) ? projectId : undefined,
+            openProject: (id) => {
+              void navigate({ to: '/projects/$projectId', params: { projectId: id } });
+            },
+            openRun: (id, runId) => {
+              void navigate({ to: '/projects/$projectId/runs/$runId', params: { projectId: id, runId } });
             },
           }),
         ];

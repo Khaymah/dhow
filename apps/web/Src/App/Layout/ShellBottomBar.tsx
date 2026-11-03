@@ -32,6 +32,7 @@ export const ShellBottomBar = () => {
 
   const items: IBottomBarItem[] = [
     entry('home', 'home', t('shell.nav.home'), '/', section?.id === 'home'),
+    ...(member(role) ? [entry('projects', 'folder', t('shell.nav.projects'), '/projects', section?.id === 'projects')] : []),
     ...(member(role) ? [{ ...entry('jobs', 'play', t('shell.nav.jobs'), '/jobs', section?.id === 'jobs'), dot: jobsDot }] : []),
     ...(canReadRunners(role)
       ? [entry('runners', 'server', t('shell.nav.runners'), '/runners', section?.id === 'runners' || section?.parent === 'runners')]

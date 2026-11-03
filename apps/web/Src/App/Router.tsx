@@ -46,6 +46,10 @@ const page = <TPath extends string>(path: TPath, component: RouteComponent) =>
   createRoute({ getParentRoute: () => shellRoute, path, component });
 
 const homeRoute = page('/', SHELL_PAGES.home);
+const projectsRoute = page('projects', SHELL_PAGES.projects);
+const projectRoute = page('projects/$projectId', SHELL_PAGES.project);
+const projectSettingsRoute = page('projects/$projectId/settings', SHELL_PAGES.projectSettings);
+const runRoute = page('projects/$projectId/runs/$runId', SHELL_PAGES.run);
 const jobsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: 'jobs',
@@ -119,6 +123,10 @@ const oidcCallbackRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   shellRoute.addChildren([
     homeRoute,
+    projectsRoute,
+    projectRoute,
+    projectSettingsRoute,
+    runRoute,
     jobsRoute,
     jobRoute,
     runnersRoute.addChildren([runnerRoute]),

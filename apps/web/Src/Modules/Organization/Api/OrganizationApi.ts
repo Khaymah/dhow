@@ -36,6 +36,11 @@ export const changeSecondFactorRule = (id: string, rule: TSecondFactorRule, fact
     ApiClient.PUT('/organizations/{id}/second-factor-rule', { params: org(id), body: { RequireSecondFactor: rule, CurrentFactor: factor } }),
   );
 
+export const changeLogRetention = (id: string, days: number | null, factor: TCurrentFactor): Promise<TOrganization> =>
+  request(() =>
+    ApiClient.PUT('/organizations/{id}/log-retention', { params: org(id), body: { LogRetentionDays: days, CurrentFactor: factor } }),
+  );
+
 const member = (id: string, userId: string) => ({ path: { id, userId } });
 
 export const changeRole = (id: string, userId: string, role: TRole, factor?: TCurrentFactor): Promise<TMemberChange> =>
