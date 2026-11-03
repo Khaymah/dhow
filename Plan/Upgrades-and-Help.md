@@ -480,6 +480,7 @@ Sabry عايز داو «ذكي ومساعد على قد ما نقدر». الخ�
 - **التحقق:** `make upgrade-test` محليًا و`make lint-actions`.
 
 ### U4: الـ backfills في الخلفية
+- **الحالة:** اتعمل مع M5.2 على `feat/sealer-to-envelope-m52` ([ADR-0082](ADR/0082-sealer-users-move-to-the-envelope.md)). «عن داو» مستنية U6.
 - **الحجم:** S. **الاعتماد:** U2. **التوقيت:** مع أول تغيير محتاجه، وبالكتير قبل M9.
 - **المحتوى:** جدول `"Backfills"`، و`Core/Backfill` (register بالاسم، ودفعات بـ `SKIP LOCKED`، وadvisory lock، وthrottle، وتقدّم)، والـ guard للـ contract (`BACKFILL_NOT_DONE`)، والتقدّم في `migrate status` و«عن داو».
 - **قبول:** backfill لـ 100,000 صف بيتقتل (`kill -9`) 3 مرات في النص ويكمّل من مكانه من غير تكرار، والسيرفر بيخدم طلبات طول الوقت (p99 للـ API أقل من 2x الطبيعي في الاختبار).
