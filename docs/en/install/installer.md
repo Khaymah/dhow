@@ -93,6 +93,7 @@ At the end it prints the one-time setup link from the journal, which creates the
 | `/usr/local/bin/dhow-server` | `755` | The binary that ran the installer |
 | `/etc/dhow/`, `/etc/dhow/credentials/` | `700` | |
 | `/etc/dhow/credentials/dhow-secret-key` | `600` | 32 random bytes as hex, from the kernel's random generator |
+| `/etc/dhow/credentials/dhow-keyring` | `600` | The [keyring](keys.md): version 1 of the key encryption key, 32 random bytes. Export it after the install |
 | `/etc/dhow/credentials/dhow-database-url` | `600` | The database URL. For a local database: `postgres://dhow:<generated>@/dhow?host=/var/run/postgresql&port=5432&sslmode=require`, a Unix socket that never touches the network |
 | `/etc/dhow/dhow.env` | `600` | `DHOW_PUBLIC_URL`, `DHOW_LISTEN_ADDR`, `DHOW_TRUSTED_PROXIES`, `DHOW_LOG_LEVEL`, and `DHOW_BREACHED_PASSWORD_CHECK=false` only when the check is turned off |
 | `/etc/dhow/answers.yaml` | `600` | Your answers, without any secret, for re-runs, `doctor` and `uninstall` |
@@ -101,7 +102,7 @@ At the end it prints the one-time setup link from the journal, which creates the
 | `/etc/pki/rpm-gpg/RPM-GPG-KEY-dhow-pgdg`, `/etc/yum.repos.d/dhow-pgdg.repo` | `644` | The same on dnf systems, with `gpgcheck` and `repo_gpgcheck` on |
 | `/etc/caddy/dhow.caddyfile` or `/etc/nginx/conf.d/dhow.conf` | `644` | The proxy site |
 
-The Compose install writes `/etc/dhow/compose/compose.yaml` and `/etc/dhow/compose/.env` (mode `600`, with a generated `POSTGRES_PASSWORD` and `DHOW_SECRET_KEY`) instead of the unit and the credentials, pins `DHOW_IMAGE` to the installer's version, starts the stack with `docker compose up --wait`, and trusts the gateway of the `dhow_edge` network when a proxy on the host is in front of it.
+The Compose install writes `/etc/dhow/compose/compose.yaml`, `/etc/dhow/compose/.env` (mode `600`, with a generated `POSTGRES_PASSWORD` and `DHOW_SECRET_KEY`) and `/etc/dhow/compose/secrets/dhow-keyring` (mode `600`, owned by the container user `65532`) instead of the unit and the credentials, pins `DHOW_IMAGE` to the installer's version, starts the stack with `docker compose up --wait`, and trusts the gateway of the `dhow_edge` network when a proxy on the host is in front of it.
 
 ## Answers file
 
@@ -170,7 +171,8 @@ install_packages: false
 - The binary, the unit and the configuration exist, and the unit matches the one shipped with this release.
 - Ownership `root:root` and the modes in [What it writes](#what-it-writes).
 - The secret key and the database URL are present and pass the same checks as at boot. Doctor never generates a new secret key, because a new key cannot read the old data.
-- The service is enabled and running, and `/api/v1/health/ready` reports the database, the migrations, today's job log partition and the last settings reload as ready. It also says whether the first owner still has to be created.
+- The keyring: present, with the right owner and mode, well formed, and with check values that match the database (`KEYRING_MISSING_VERSION` or `KEYRING_MISMATCH` with the version). It warns when the keyring was never exported or the active version is more than a year old. Doctor never makes a new keyring and never prints a key. Comparing the check values reads the database, so it is skipped with Compose.
+- The service is enabled and running, and `/api/v1/health/ready` reports the database, the migrations, today's job log partition, the last settings reload and the keyring as ready. It also says whether the first owner still has to be created.
 - `DHOW_TRUSTED_PROXIES`: not `0.0.0.0/0` or `::/0`, no very large public range, and it includes `127.0.0.1` when the proxy runs on this host.
 - Through the public URL: the proxy answers, the TLS certificate has at least 21 days left, the proxy passes `Origin` (a request with your origin is not refused with `CSRF_FAILED`, one with a foreign origin is), and the client address reaches Dhow (a probe request shows up in the log with a `client_ip` that is not the proxy's). For nginx it also checks that the site sets `Host`, `X-Forwarded-For` and `X-Forwarded-Proto`. These checks are skipped with proxy `none`.
 - CPU cores and memory against the [hardware requirements](../requirements.md): below the minimum is a failure, below the recommended size a warning.
@@ -178,7 +180,7 @@ install_packages: false
 - Where each server setting and the sign-in providers come from: the environment, the database or the default. It names the setting, never its value. When `DHOW_OIDC_PROVIDERS` is set and some accounts are linked to providers saved in the database under an id the variable does not list, that is a warning with the number of accounts and providers, because those accounts cannot sign in with them. This check reads the database, so it is skipped with Compose.
 - Multipath TCP in the kernel (`/proc/sys/net/mptcp/enabled`), with the kernel release: a warning while it is on, for [CVE-2026-98432](../security/kernel-advisories.md). Doctor never changes the setting.
 
-Every finding comes with its fix: a command, such as restarting the service, renewing the certificate or restoring a file mode, or advice when a person must decide. In a terminal doctor asks before each fix. `--fix` applies them all, and without a terminal doctor only lists them. It exits with status `0` when everything is fine. The MPTCP warning alone does not change that: doctor then ends with "Nothing blocks Dhow, but read the warnings above."
+Every finding comes with its fix: a command, such as restarting the service, renewing the certificate or restoring a file mode, or advice when a person must decide. In a terminal doctor asks before each fix. `--fix` applies them all, and without a terminal doctor only lists them. It exits with status `0` when everything is fine. The MPTCP warning and the keyring export and age warnings alone do not change that: doctor then ends with "Nothing blocks Dhow, but read the warnings above."
 
 ## Upgrade
 
@@ -188,7 +190,7 @@ For Compose, the installer pins `DHOW_IMAGE` to its own version unless you pinne
 
 ## Back up
 
-Back up the database and `/etc/dhow` together, as shown in [Back up and restore](binary-systemd.md#back-up-and-restore). The database is useless without `/etc/dhow/credentials/dhow-secret-key`.
+Back up the database and `/etc/dhow` together, as shown in [Back up and restore](binary-systemd.md#back-up-and-restore). The database is useless without `/etc/dhow/credentials/dhow-secret-key` and `/etc/dhow/credentials/dhow-keyring`.
 
 ## Uninstall
 

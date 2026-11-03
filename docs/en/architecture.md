@@ -171,15 +171,15 @@ trigger (push / tag / PR / manual / API / external-CI artifact / schedule)
 
 ## 6. Secrets
 
-- **Envelope encryption.** Each environment (and also each org and each project) has its own DEK, generated randomly as AES-256-GCM with a 12-byte nonce. Each secret is encrypted with AAD = `org/project/env/name/version`.
-- **KEK.** DEKs are encrypted with a KEK that comes from a file or environment variable in Community, or from HashiCorp Vault Transit, AWS/GCP/Azure KMS or an HSM in Enterprise. KEKs are versioned, and rotation re-wraps the DEKs without re-encrypting the data.
+- **Envelope encryption (two layers).** Each owner has its own data key (DEK) of 32 random bytes: the instance itself, each organization, each project, each environment and each user. A value is encrypted with its owner's DEK using AES-256-GCM and a random 12-byte nonce, in the format `0x02 ‖ DataKeyId ‖ nonce ‖ ciphertext ‖ tag`. The AAD binds the value to its data key, its purpose and its row, and `Open` checks the owner of the data key, so a value copied to another row or another owner does not open. Removing an environment or a project destroys its key, so its values never open again (crypto-shredding).
+- **KEK.** The DEKs in the `"DataKeys"` table are wrapped with a key encryption key (KEK) that never enters the database. In Community it comes from the [keyring file](install/keys.md), a file separate from `DHOW_SECRET_KEY`; in Enterprise it can later come from HashiCorp Vault Transit, AWS/GCP/Azure KMS or an HSM through the same `KeyProvider` interface, and none of them is ever required. KEKs are versioned, each version has a check value in the database, and the server does not start when the keyring does not match it. Rotation re-wraps the DEKs in the background without re-encrypting any value.
 - **API exposure.** The API never returns secret values. Secrets are write-only, and reads return metadata only: name, version, updated-by and updated-at.
 - **Delivery.** Secrets are decrypted **only** at lease time, only for the job's environment scope, and sent over the runner channel. They are mounted as environment variables or tmpfs files and destroyed when the sandbox is torn down.
-- **Untrusted triggers.** Secrets are never available to jobs triggered by untrusted sources, such as PRs from forks, unless an admin explicitly approves the run.
+- **Untrusted triggers.** Secrets and environments are never available to jobs triggered by untrusted sources, such as PRs from forks, even when an admin approves the run ([ADR-0076](../../Plan/ADR/0076-pipeline-runs-definitions-and-forks.md)).
 
 ## 7. Workload identity (OIDC issuer)
 
-Dhow publishes a JWKS and signs short-lived job tokens. The claims include `org`, `project`, `environment`, `ref` and `deployment_id`, and the audience can be configured. With these tokens, cloud providers can trust Dhow jobs directly, and users do not need to store long-lived AWS/GCP/Azure keys.
+After the first release, Dhow publishes a JWKS and signs short-lived job tokens. The claims include `org`, `project`, `environment`, `ref` and `deployment_id`, and the audience can be configured. With these tokens, cloud providers can trust Dhow jobs directly, and users do not need to store long-lived AWS/GCP/Azure keys.
 
 ## 8. Artifacts and releases
 

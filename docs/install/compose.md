@@ -31,6 +31,8 @@ docker compose up -d
 
 صلاحيات الملف `0600`، و`init.sh` يرفض الكتابة فوق ملف `.env` موجود. احفظ نسخة من `DHOW_SECRET_KEY` في مكان آمن. بدونه لا يمكن فك الأسرار المحفوظة، والمفتاح الجديد لا يقرأ البيانات القديمة.
 
+ويكتب `init.sh` أيضًا [سلسلة المفاتيح](keys.md) في `./secrets/dhow-keyring` بصلاحية `0600`، ويجعل مالكها مستخدم الحاوية `65532`، لذلك يحتاج `chown` إلى root أو `sudo` مرة واحدة. السلسلة ليست متغير بيئة: `compose.yaml` يربطها بالحاوية كـ secret في `/run/secrets/dhow-keyring`، فلا تظهر في `docker inspect`. مع Docker بدون root، اضبط `DHOW_CONTAINER_UID` على رقم المستخدم الذي يقابل `65532` في `/etc/subuid`. صدّر السلسلة بعد أول تشغيل واحفظ النسخة بعيدًا عن الجهاز، كما في [النسخ الاحتياطي والتصدير](keys.md#النسخ-الاحتياطي-والتصدير).
+
 ينتظر `docker compose up -d` حتى يصبح PostgreSQL جاهزًا، ثم يطبّق تحديثات قاعدة البيانات (migrations)، ثم يشغّل داو. تحقّق من ذلك:
 
 ```sh
@@ -106,11 +108,12 @@ docker compose up -d
 
 ## النسخ الاحتياطي والاسترجاع
 
-خذ نسخة من قاعدة البيانات ومن `.env`. نسخة قاعدة البيانات لا فائدة منها بدون `DHOW_SECRET_KEY`.
+خذ نسخة من قاعدة البيانات ومن `.env` ومن المجلد `./secrets/`. نسخة قاعدة البيانات لا فائدة منها بدون `DHOW_SECRET_KEY` وسلسلة المفاتيح.
 
 ```sh
 docker compose exec -T postgres pg_dump -U dhow -d dhow --format=custom > dhow-$(date +%F).dump
 cp .env dhow-env-$(date +%F).backup
+sudo tar -czf dhow-secrets-$(date +%F).tar.gz secrets
 chmod 600 dhow-env-*.backup
 ```
 
@@ -123,7 +126,7 @@ docker compose exec -T postgres pg_restore -U dhow -d dhow --no-owner < dhow-202
 docker compose start dhow
 ```
 
-للاسترجاع على جهاز جديد: شغّل `./init.sh`، واستبدل `DHOW_SECRET_KEY` المولَّد في `.env` بالمفتاح من نسختك الاحتياطية. ثم شغّل PostgreSQL وحده بـ `docker compose up -d postgres`، وشغّل أمر `pg_restore`، ثم شغّل `docker compose up -d`.
+للاسترجاع على جهاز جديد: شغّل `./init.sh`، واستبدل `DHOW_SECRET_KEY` المولَّد في `.env` بالمفتاح من نسختك الاحتياطية، واستبدل `./secrets/dhow-keyring` بالسلسلة من النسخة (بالمالك `65532` والصلاحية `0600`). ثم شغّل PostgreSQL وحده بـ `docker compose up -d postgres`، وشغّل أمر `pg_restore`، ثم شغّل `docker compose up -d`. إذا لم تطابق السلسلةُ القاعدةَ المسترجعة، يتوقف داو برسالة فيها رقم الإصدار، ولا يعمل ببيانات تالفة.
 
 ## تحقق من صورة
 
