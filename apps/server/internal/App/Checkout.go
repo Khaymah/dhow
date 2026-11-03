@@ -10,6 +10,7 @@ import (
 
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
+	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
 	sources "github.com/Khaymah/dhow/apps/server/internal/Modules/Sources"
@@ -107,14 +108,19 @@ func (c *checkoutSecrets) checkoutCredential(ctx context.Context, req jobs.Secre
 
 func runsFor(
 	in Infra, bus *eventbus.Bus, limiter ratelimit.Limiter, jobsService *jobs.Service, secrets *checkoutSecrets,
-) (*pipelines.Service, *sources.Service, error) {
+) (*pipelines.Service, *sources.Service, *artifacts.Service, error) {
 	pipelinesService := pipelinesFor(in, bus, jobsService.Queue(), limiter)
 	jobsService.UseRunEvents(pipelinesService)
 	sourcesService, err := sourcesFor(in, bus, limiter, pipelinesService)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+	artifactsService, err := artifactsFor(in)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	pipelinesService.UseStatuses(sourcesService.StatusRecorder())
+	pipelinesService.UseArtifacts(artifactsService)
 	secrets.pipelines, secrets.sources = pipelinesService, sourcesService
-	return pipelinesService, sourcesService, nil
+	return pipelinesService, sourcesService, artifactsService, nil
 }

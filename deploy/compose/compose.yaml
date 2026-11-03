@@ -92,6 +92,8 @@ services:
       - "${DHOW_PUBLISH:-127.0.0.1:8080}:8080"
     tmpfs:
       - /tmp:mode=1777,size=16m
+    volumes:
+      - blobs:/var/lib/dhow/blobs
     networks: [data, edge]
     healthcheck:
       test: ["CMD", "/dhow-server", "healthcheck"]
@@ -107,3 +109,4 @@ networks:
 
 volumes:
   pgdata: {}
+  blobs: {}

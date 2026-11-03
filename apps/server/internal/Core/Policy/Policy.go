@@ -57,6 +57,7 @@ const (
 	RunTrigger        Action = "run.trigger"
 	RunCancel         Action = "run.cancel"
 	RunApprove        Action = "run.approve"
+	ArtifactRead      Action = "artifact.read"
 
 	InstanceSettingsManage Action = "instance.settings.manage"
 )
@@ -65,7 +66,7 @@ func Actions() []Action {
 	return []Action{
 		OrgRead, OrgUpdate, OrgLeave, OrgTransfer, OrgSecurity, MemberRead, MemberManage, AuditRead, SessionManageSelf, OrgCreate,
 		RunnerRead, RunnerManage, TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, InstanceSettingsManage,
-		ProjectRead, ProjectManage, RunRead, RunTrigger, RunCancel, RunApprove,
+		ProjectRead, ProjectManage, RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
 	}
 }
 
@@ -95,22 +96,23 @@ func Grants(role Role) []Action {
 		return []Action{
 			OrgRead, OrgUpdate, OrgLeave, OrgTransfer, OrgSecurity, MemberRead, MemberManage, AuditRead, SessionManageSelf, RunnerRead,
 			RunnerManage, TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, ProjectRead, ProjectManage,
-			RunRead, RunTrigger, RunCancel, RunApprove,
+			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
 		}
 	case RoleAdmin:
 		return []Action{
 			OrgRead, OrgUpdate, OrgLeave, MemberRead, MemberManage, AuditRead, SessionManageSelf, RunnerRead, RunnerManage,
 			TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, ProjectRead, ProjectManage,
-			RunRead, RunTrigger, RunCancel, RunApprove,
+			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
 		}
 	case RoleMaintainer:
 		return []Action{
 			OrgRead, OrgLeave, MemberRead, SessionManageSelf, RunnerRead, JobRead, JobCancel, LogRead, TokenCreate, ProjectRead, ProjectManage,
-			RunRead, RunTrigger, RunCancel, RunApprove,
+			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
 		}
 	case RoleDeveloper:
 		return []Action{
 			OrgRead, OrgLeave, MemberRead, SessionManageSelf, RunnerRead, JobRead, LogRead, TokenCreate, ProjectRead, RunRead, RunTrigger,
+			ArtifactRead,
 		}
 	case RoleViewer:
 		return []Action{OrgRead, OrgLeave, SessionManageSelf, JobRead, TokenCreate, ProjectRead, RunRead}

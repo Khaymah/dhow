@@ -29,6 +29,24 @@ type ApiToken struct {
 	LastUsedIp      string
 }
 
+type Artifact struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	ProjectId      uuid.UUID
+	RunId          uuid.UUID
+	RunJobId       uuid.UUID
+	RunJobKey      string
+	JobId          uuid.UUID
+	Name           string
+	Digest         []byte
+	SizeBytes      int64
+	Untrusted      bool
+	ExpiresAt      time.Time
+}
+
 type AttemptStep struct {
 	Id            uuid.UUID
 	CreatedAt     time.Time
@@ -77,6 +95,53 @@ type AuthChallenge struct {
 	ExpiresAt       time.Time
 	UsedAt          *time.Time
 	FirstMethod     string
+}
+
+type Blob struct {
+	Id         uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	IsDeleted  bool
+	Digest     []byte
+	SizeBytes  int64
+	LastUsedAt time.Time
+	StorageKey string
+}
+
+type BlobOwner struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	Digest         []byte
+}
+
+type BlobUpload struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	LeaseId        uuid.UUID
+	Kind           string
+	Name           string
+	State          string
+	Digest         []byte
+}
+
+type CacheEntry struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	ProjectId      uuid.UUID
+	Scope          string
+	Key            string
+	Digest         []byte
+	SizeBytes      int64
+	LastUsedAt     time.Time
 }
 
 type CommitStatusReport struct {
@@ -317,6 +382,7 @@ type Organization struct {
 	RequireSecondFactor            string
 	RequireSecondFactorSince       *time.Time
 	RequireSecondFactorAdminsSince *time.Time
+	LogRetentionDays               pgtype.Int4
 }
 
 type OrganizationTeamRole struct {

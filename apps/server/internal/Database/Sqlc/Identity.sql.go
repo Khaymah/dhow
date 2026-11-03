@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const completeInstanceSetup = `-- name: CompleteInstanceSetup :exec
@@ -38,7 +39,7 @@ func (q *Queries) CountMembers(ctx context.Context, organizationID uuid.UUID) (i
 }
 
 const getOrganizationForMember = `-- name: GetOrganizationForMember :one
-SELECT o."Id", o."Name", o."Slug", o."CreatedAt", o."RequireSecondFactor", o."RequireSecondFactorSince"
+SELECT o."Id", o."Name", o."Slug", o."CreatedAt", o."RequireSecondFactor", o."RequireSecondFactorSince", o."LogRetentionDays"
 FROM "Organizations" o
 JOIN "Memberships" m ON m."OrganizationId" = o."Id" AND m."UserId" = $1 AND NOT m."IsDeleted"
 WHERE o."Id" = $2 AND NOT o."IsDeleted"
@@ -56,6 +57,7 @@ type GetOrganizationForMemberRow struct {
 	CreatedAt                time.Time
 	RequireSecondFactor      string
 	RequireSecondFactorSince *time.Time
+	LogRetentionDays         pgtype.Int4
 }
 
 func (q *Queries) GetOrganizationForMember(ctx context.Context, arg GetOrganizationForMemberParams) (GetOrganizationForMemberRow, error) {
@@ -68,6 +70,7 @@ func (q *Queries) GetOrganizationForMember(ctx context.Context, arg GetOrganizat
 		&i.CreatedAt,
 		&i.RequireSecondFactor,
 		&i.RequireSecondFactorSince,
+		&i.LogRetentionDays,
 	)
 	return i, err
 }
@@ -360,6 +363,44 @@ type MarkSetupTokenUsedParams struct {
 func (q *Queries) MarkSetupTokenUsed(ctx context.Context, arg MarkSetupTokenUsedParams) error {
 	_, err := q.db.Exec(ctx, markSetupTokenUsed, arg.Now, arg.ID)
 	return err
+}
+
+const setOrganizationLogRetention = `-- name: SetOrganizationLogRetention :one
+UPDATE "Organizations"
+SET "LogRetentionDays" = $1::integer, "UpdatedAt" = $2
+WHERE "Id" = $3 AND NOT "IsDeleted"
+RETURNING "Id", "Name", "Slug", "CreatedAt", "RequireSecondFactor", "RequireSecondFactorSince", "LogRetentionDays"
+`
+
+type SetOrganizationLogRetentionParams struct {
+	Days pgtype.Int4
+	Now  time.Time
+	ID   uuid.UUID
+}
+
+type SetOrganizationLogRetentionRow struct {
+	Id                       uuid.UUID
+	Name                     string
+	Slug                     string
+	CreatedAt                time.Time
+	RequireSecondFactor      string
+	RequireSecondFactorSince *time.Time
+	LogRetentionDays         pgtype.Int4
+}
+
+func (q *Queries) SetOrganizationLogRetention(ctx context.Context, arg SetOrganizationLogRetentionParams) (SetOrganizationLogRetentionRow, error) {
+	row := q.db.QueryRow(ctx, setOrganizationLogRetention, arg.Days, arg.Now, arg.ID)
+	var i SetOrganizationLogRetentionRow
+	err := row.Scan(
+		&i.Id,
+		&i.Name,
+		&i.Slug,
+		&i.CreatedAt,
+		&i.RequireSecondFactor,
+		&i.RequireSecondFactorSince,
+		&i.LogRetentionDays,
+	)
+	return i, err
 }
 
 const setOrganizationSecondFactor = `-- name: SetOrganizationSecondFactor :one

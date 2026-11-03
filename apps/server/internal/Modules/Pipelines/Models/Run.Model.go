@@ -61,6 +61,8 @@ const (
 	ReasonOutputsTruncated      = "OUTPUTS_TRUNCATED"
 	ReasonRepositoryUnavailable = "REPOSITORY_UNAVAILABLE"
 	ReasonShaNotOnRef           = "SHA_NOT_ON_REF"
+	ReasonArtifactUntrusted     = "ARTIFACT_UNTRUSTED"
+	ReasonArtifactsUnavailable  = "ARTIFACTS_UNAVAILABLE"
 )
 
 const (

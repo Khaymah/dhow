@@ -89,44 +89,51 @@ func chainKey(org *uuid.UUID) string {
 }
 
 func (s *Service) append(ctx context.Context, org *uuid.UUID, action string, a eventbus.Audited) error {
+	if a.Tx != nil {
+		return s.appendIn(ctx, a.Tx, org, action, a)
+	}
 	return dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
-		if err := q.LockAuditChain(ctx, chainKey(org)); err != nil {
-			return err
-		}
-		prev, err := q.GetLastAuditHash(ctx, org)
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			prev = models.GenesisHash()
-		case err != nil:
-			return err
-		}
-		id, err := q.NextAuditId(ctx)
-		if err != nil {
-			return err
-		}
-		ev := models.Event{
-			ID:             id,
-			CreatedAt:      s.now().UTC().Truncate(time.Microsecond),
-			OrganizationID: org,
-			ActorUserID:    a.ActorUserID,
-			Action:         action,
-			TargetType:     a.TargetType,
-			TargetID:       a.TargetID,
-			IP:             a.IP,
-			Data:           withCredential(ctx, s.sanitizeData(ctx, action, a.Data)),
-			PrevHash:       prev,
-		}
-		if ev.Hash, err = models.ComputeHash(prev, ev); err != nil {
-			return err
-		}
-		data, err := json.Marshal(ev.Data)
-		if err != nil {
-			return fmt.Errorf("encode audit data: %w", err)
-		}
-		return q.InsertAuditEvent(ctx, sqlc.InsertAuditEventParams{
-			ID: ev.ID, CreatedAt: ev.CreatedAt, OrganizationID: org, ActorUserID: ev.ActorUserID, Action: ev.Action,
-			TargetType: ev.TargetType, TargetID: ev.TargetID, Ip: ev.IP, Data: data, PrevHash: prev, Hash: ev.Hash,
-		})
+		return s.appendIn(ctx, q, org, action, a)
+	})
+}
+
+func (s *Service) appendIn(ctx context.Context, q *sqlc.Queries, org *uuid.UUID, action string, a eventbus.Audited) error {
+	if err := q.LockAuditChain(ctx, chainKey(org)); err != nil {
+		return err
+	}
+	prev, err := q.GetLastAuditHash(ctx, org)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		prev = models.GenesisHash()
+	case err != nil:
+		return err
+	}
+	id, err := q.NextAuditId(ctx)
+	if err != nil {
+		return err
+	}
+	ev := models.Event{
+		ID:             id,
+		CreatedAt:      s.now().UTC().Truncate(time.Microsecond),
+		OrganizationID: org,
+		ActorUserID:    a.ActorUserID,
+		Action:         action,
+		TargetType:     a.TargetType,
+		TargetID:       a.TargetID,
+		IP:             a.IP,
+		Data:           withCredential(ctx, s.sanitizeData(ctx, action, a.Data)),
+		PrevHash:       prev,
+	}
+	if ev.Hash, err = models.ComputeHash(prev, ev); err != nil {
+		return err
+	}
+	data, err := json.Marshal(ev.Data)
+	if err != nil {
+		return fmt.Errorf("encode audit data: %w", err)
+	}
+	return q.InsertAuditEvent(ctx, sqlc.InsertAuditEventParams{
+		ID: ev.ID, CreatedAt: ev.CreatedAt, OrganizationID: org, ActorUserID: ev.ActorUserID, Action: ev.Action,
+		TargetType: ev.TargetType, TargetID: ev.TargetID, Ip: ev.IP, Data: data, PrevHash: prev, Hash: ev.Hash,
 	})
 }
 

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -187,8 +188,9 @@ func NewWithOptions(t *testing.T, o Options) *Env {
 	publicURL, err := url.Parse(PublicOrigin)
 	require.NoError(t, err)
 	cfg := config.Config{
-		SecretKey: secret, PublicURL: publicURL, ListenAddr: config.DefaultListenAddr,
+		SecretKey: secret, PublicURL: publicURL, ListenAddr: config.DefaultListenAddr, Artifacts: config.DefaultArtifacts(),
 	}
+	cfg.Artifacts.BlobDir = PrivateDir(t)
 	if o.Profile != nil {
 		o.Profile(&cfg)
 	}
@@ -224,6 +226,13 @@ func NewWithOptions(t *testing.T, o Options) *Env {
 		T: t, Pool: pool, Wired: wired, Handler: wired.Handler, Logs: logs, Clock: clock, Breach: breach, Hasher: hasher, Config: cfg,
 		Secrets: o.Secrets,
 	}
+}
+
+func PrivateDir(t testing.TB) string {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.Chmod(dir, 0o700)) //nolint:gosec // A directory needs its execute bit; 0700 keeps it private.
+	return dir
 }
 
 const AuditFieldDropped = "audit data field dropped"

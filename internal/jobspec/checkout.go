@@ -37,6 +37,12 @@ func Features(spec *runnerv1.JobSpec) []string {
 			break
 		}
 	}
+	if len(spec.GetArtifacts()) > 0 || len(spec.GetInputs()) > 0 {
+		out = append(out, FeatureArtifacts)
+	}
+	if spec.GetCache() != nil {
+		out = append(out, FeatureCache)
+	}
 	return out
 }
 

@@ -37,7 +37,8 @@ SELECT EXISTS (SELECT 1
                WHERE "Id" = @id AND "OrganizationId" = @organization_id AND NOT "IsDeleted")::boolean;
 
 -- name: GetLogAttempt :one
-SELECT "Id", "Number", "State", "LastSeq", ("LogTruncatedAt" IS NOT NULL)::boolean AS "Truncated", "LeasedAt"
+SELECT "Id", "Number", "State", "LastSeq", ("LogTruncatedAt" IS NOT NULL)::boolean AS "Truncated", "LeasedAt",
+       (SELECT o."LogRetentionDays" FROM "Organizations" o WHERE o."Id" = @organization_id) AS "OrgRetentionDays"
 FROM "JobAttempts"
 WHERE "JobId" = @job_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"
   AND (sqlc.narg(number)::integer IS NULL OR "Number" = sqlc.narg(number)::integer)
@@ -82,3 +83,16 @@ SELECT "LogPartitionReady"()::boolean;
 
 -- name: UnreadableLogPartitions :one
 SELECT "UnreadableLogPartitions"()::text[];
+
+-- name: OrganizationsWithLogRetention :many
+SELECT "Id", "LogRetentionDays"::integer AS "Days"
+FROM "Organizations"
+WHERE "LogRetentionDays" IS NOT NULL AND NOT "IsDeleted";
+
+-- name: ScrubOrganizationLogs :execrows
+UPDATE "LogChunks"
+SET "IsDeleted" = true, "Data" = '\x00'::bytea, "UpdatedAt" = now()
+WHERE ("Id", "CreatedAt") IN (SELECT l."Id", l."CreatedAt"
+                              FROM "LogChunks" l
+                              WHERE l."OrganizationId" = @organization_id AND l."CreatedAt" < @before AND NOT l."IsDeleted"
+                              LIMIT @batch);

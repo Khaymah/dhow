@@ -2,6 +2,7 @@ package i18n
 
 var enMessages = map[string]string{ //nolint:gosec // This is a message catalog, not credentials.
 	"errors.internal":                              "Something went wrong. Try again later.",
+	"errors.artifactGone":                          "The stored file of this artifact is gone. Run the job again to make it.",
 	"errors.notFound":                              "The requested resource does not exist.",
 	"errors.methodNotAllowed":                      "This method is not allowed here.",
 	"errors.badRequest":                            "The request is not valid. Check the data and try again.",
@@ -182,6 +183,7 @@ var enMessages = map[string]string{ //nolint:gosec // This is a message catalog,
 	"errors.shaNotOnRef":                           "This commit did not reach this branch or tag through a webhook, so it cannot run on it.",
 	"errors.refHeadUnknown":                        "The latest commit of this branch or tag is not known yet. Push to it once so a webhook arrives, then try again.",
 	"pipelines.runs.loaded":                        "The runs were loaded.",
+	"artifacts.list.loaded":                        "The artifacts were loaded.",
 	"pipelines.run.loaded":                         "The run was loaded.",
 	"pipelines.run.created":                        "The run was created. It starts once the pipeline file is read.",
 	"pipelines.run.cancelRequested":                "The run is being canceled.",

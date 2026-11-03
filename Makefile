@@ -237,7 +237,7 @@ FUZZ_TARGETS := \
 	Core/Auth:FuzzRecoveryCode Core/Auth:FuzzEmailAndName Core/Auth:FuzzPasswordLength Core/Auth:FuzzWebAuthnResponses \
 	Core/I18n:FuzzParseAcceptLanguage Core/Middleware:FuzzClientIP Core/RateLimit:FuzzNetwork \
 	Core/Oidc:FuzzEmailVerifiedClaim Core/Oidc:FuzzAcceptedEmail Modules/Sources/Test/Edge:FuzzWebhook \
-	Modules/Pipelines/Test/Edge:FuzzDefinitionProof
+	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName
 
 .PHONY: fuzz
 fuzz: ## Fuzz the auth inputs, FUZZTIME per target (default 10s; the M2.5 bar is 60s)
@@ -289,7 +289,8 @@ runner-chaos: ## Run the chaos scenarios: the real server and runner on Podman, 
 		$(CHAOS_DIR)/chaos.test -test.v -test.count=1 -test.timeout 60m
 
 RUNNER_FUZZ := Masking:FuzzMasker Masking:FuzzMaskerKeepsCleanText Logs:FuzzChunker Logs:FuzzSpillRecords \
-	Journal:FuzzJournalOpen Executor:FuzzVerifyGrant Sandbox/Wire:FuzzDecode Executor/Plugin:FuzzManifest Executor/Plugin:FuzzOutputs
+	Journal:FuzzJournalOpen Executor:FuzzVerifyGrant Sandbox/Wire:FuzzDecode Executor/Plugin:FuzzManifest Executor/Plugin:FuzzOutputs \
+	Sandbox/Archive:FuzzUnpack
 
 .PHONY: fuzz-runner
 fuzz-runner: ## Fuzz every runner target for FUZZTIME each (default 10s; the M3.5 bar is 60s)

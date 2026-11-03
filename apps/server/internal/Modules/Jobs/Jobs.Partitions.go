@@ -50,6 +50,30 @@ func (s *Service) MaintainLogPartitions(ctx context.Context) (PartitionResult, e
 	return out, err
 }
 
+func (s *Service) ScrubOrganizationLogs(ctx context.Context) (int64, error) {
+	orgs, err := s.queries().OrganizationsWithLogRetention(ctx)
+	if err != nil {
+		return 0, err
+	}
+	var total int64
+	for _, o := range orgs {
+		before := time.Now().Add(-time.Duration(o.Days) * 24 * time.Hour)
+		for {
+			n, err := s.queries().ScrubOrganizationLogs(ctx, sqlc.ScrubOrganizationLogsParams{
+				OrganizationID: o.Id, Before: before, Batch: config.LogScrubBatch,
+			})
+			if err != nil {
+				return total, fmt.Errorf("erase expired logs of an organization: %w", err)
+			}
+			total += n
+			if n < config.LogScrubBatch {
+				break
+			}
+		}
+	}
+	return total, nil
+}
+
 func (s *Service) RunLogMaintenance(ctx context.Context) {
 	ticker := time.NewTicker(config.LogMaintainInterval)
 	defer ticker.Stop()
@@ -58,6 +82,11 @@ func (s *Service) RunLogMaintenance(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+		}
+		if n, err := s.ScrubOrganizationLogs(ctx); err != nil && ctx.Err() == nil {
+			s.log.ErrorContext(ctx, "erasing logs past an organization's retention failed; the next pass retries", "error", err)
+		} else if n > 0 {
+			s.log.InfoContext(ctx, "logs past an organization's retention were erased", "chunks", n)
 		}
 		res, err := s.MaintainLogPartitions(ctx)
 		switch {

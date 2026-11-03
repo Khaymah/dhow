@@ -17,6 +17,7 @@ import (
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	response "github.com/Khaymah/dhow/apps/server/internal/Core/Response"
 	runnerauth "github.com/Khaymah/dhow/apps/server/internal/Core/RunnerAuth"
+	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
 	audit "github.com/Khaymah/dhow/apps/server/internal/Modules/Audit"
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
@@ -44,6 +45,7 @@ type Options struct {
 	Projects  *projects.Service
 	Sources   *sources.Service
 	Pipelines *pipelines.Service
+	Artifacts *artifacts.Service
 	Overview  *overview.Service
 	Tokens    *tokens.Service
 	Prefs     *preferences.Service
@@ -69,6 +71,7 @@ func Policies() []policy.Rule {
 	rules = append(rules, projects.Policies()...)
 	rules = append(rules, sources.Policies()...)
 	rules = append(rules, pipelines.Policies()...)
+	rules = append(rules, artifacts.Policies()...)
 	rules = append(rules, overview.Policies()...)
 	rules = append(rules, tokens.Policies()...)
 	rules = append(rules, preferences.Policies()...)
@@ -81,7 +84,7 @@ func RateLimited() []ratelimit.Route {
 }
 
 func RunnerPolicies() []policy.Rule {
-	return append(runners.Procedures(), jobs.Procedures()...)
+	return append(append(runners.Procedures(), jobs.Procedures()...), artifacts.Procedures()...)
 }
 
 type noSessions struct{}
@@ -184,6 +187,9 @@ func publicRouter(o Options) chi.Router {
 		})
 		if o.Jobs != nil {
 			jobs.Routes(api, jobs.Deps{Service: o.Jobs, Guard: guard, Log: o.Log})
+		}
+		if o.Artifacts != nil {
+			artifacts.Routes(api, artifacts.Deps{Service: o.Artifacts, Guard: guard, Log: o.Log})
 		}
 		if o.Tokens != nil {
 			tokens.Routes(api, tokens.Deps{Service: o.Tokens, Guard: guard, Log: o.Log})

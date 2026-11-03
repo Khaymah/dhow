@@ -48,6 +48,9 @@ func projectRequest(rule policy.Rule, org, project uuid.UUID, env *apptest.Env) 
 	if strings.Contains(path, "{runId}") {
 		path = strings.ReplaceAll(path, "{runId}", env.SeedRun(project, "awaiting_approval").String())
 	}
+	if strings.Contains(path, "{artifactId}") {
+		path = strings.ReplaceAll(path, "{artifactId}", env.SeedArtifact(project, "web", []byte("archive"), false).ID.String())
+	}
 	req := apptest.Request{Method: rule.Method, Path: path}
 	switch {
 	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/projects/{projectId}/runs":

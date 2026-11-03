@@ -64,6 +64,12 @@ tags:
       Served by the Pipelines module. A webhook, a person (`manual`) or an API token (`api`) starts a run; a run reads
       its pipeline file at the commit it runs, pins every image tag to a digest when it starts, and makes the jobs of
       the Jobs module, whose logs are under `/jobs/{jobId}`.
+  - name: artifacts
+    description: >-
+      Files a run's jobs kept (`artifacts:` in the pipeline file), as deterministic tar.gz archives named by their
+      SHA-256. Served by the Artifacts module. Runners upload and download them on /runner-api/, bound to their lease;
+      this API lists and downloads them. Artifacts of a run from a fork's pull request are marked `Untrusted` and can
+      never feed a deploy. The cache is never readable here.
   - name: overview
     description: >-
       Counts for the home page and the sidebar, in one request. Served by the Overview module, which reads the jobs,
@@ -1026,6 +1032,37 @@ paths:
       responses:
         "200":
           description: The organization with the new rule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/log-retention:
+    put:
+      operationId: updateLogRetention
+      tags: [identity]
+      summary: Keep this organization's job logs for fewer days
+      description: >-
+        Needs `org.security` (owners only), a current factor of the caller, and a second factor on the caller's own
+        account (`SECOND_FACTOR_REQUIRED` otherwise). `LogRetentionDays` from 7 to 3650 keeps the job logs of this
+        organization for that many days at most; `null` follows the server setting. The server setting still wins when
+        it is shorter. Older logs stop showing at once, and their content is erased within the hour. The change and its
+        audit entry are written together.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLogRetentionRequest"
+      responses:
+        "200":
+          description: The organization with the new retention.
           content:
             application/json:
               schema:
@@ -2635,6 +2672,62 @@ paths:
                 $ref: "#/components/schemas/RunDetailResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs/{runId}/artifacts:
+    get:
+      operationId: listRunArtifacts
+      tags: [artifacts]
+      summary: List the artifacts of a run
+      description: >-
+        Needs `artifact.read` on the project (Developer and above). Expired artifacts are not listed. A run of another
+        project or organization is 404.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: The artifacts of the run, by name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/artifacts/{artifactId}/download:
+    get:
+      operationId: downloadArtifact
+      tags: [artifacts]
+      summary: Download an artifact
+      description: >-
+        Needs `artifact.read` on the project. Streams the tar.gz archive as an attachment named after the artifact
+        (`<name>.tar.gz`, with every character outside letters, digits, `.`, `_` and `-` replaced). An expired artifact
+        is 404 `ARTIFACT_NOT_FOUND`, and a stored file that is missing or does not match its SHA-256 is 410
+        `ARTIFACT_GONE`.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/ArtifactId"
+      responses:
+        "200":
+          description: The archive.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+            X-Content-Type-Options:
+              schema:
+                type: string
+          content:
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/overview:
     get:
       operationId: getOrganizationOverview
@@ -3167,6 +3260,13 @@ components:
         format: uuid
     RunId:
       name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ArtifactId:
+      name: artifactId
       in: path
       required: true
       schema:
@@ -3904,6 +4004,23 @@ components:
           type: string
           format: date-time
           description: When the rule last reached more roles. Absent while the rule is `off`.
+        LogRetentionDays:
+          type: integer
+          minimum: 7
+          maximum: 3650
+          description: Days this organization keeps its job logs. Absent when it follows the server setting.
+    UpdateLogRetentionRequest:
+      type: object
+      additionalProperties: false
+      required: [LogRetentionDays, CurrentFactor]
+      properties:
+        LogRetentionDays:
+          type: integer
+          nullable: true
+          minimum: 7
+          maximum: 3650
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
     SecondFactorRule:
       type: string
       enum: [off, admins, everyone]
@@ -6100,6 +6217,48 @@ components:
           properties:
             Data:
               $ref: "#/components/schemas/Run"
+    Artifact:
+      type: object
+      additionalProperties: false
+      required: [Id, RunId, Name, RunJobKey, SizeBytes, Digest, Untrusted, CreatedAt, ExpiresAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        RunId:
+          type: string
+          format: uuid
+        Name:
+          type: string
+        RunJobKey:
+          type: string
+          description: The job of the run that uploaded it, with its matrix values.
+        SizeBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        Digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: The SHA-256 of the archive, in hex.
+        Untrusted:
+          type: boolean
+          description: The run came from a fork's pull request, so the artifact can never feed a deploy.
+        CreatedAt:
+          type: string
+          format: date-time
+        ExpiresAt:
+          type: string
+          format: date-time
+    ArtifactListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Artifact"
     RunDetailResponse:
       allOf:
         - $ref: "#/components/schemas/Envelope"

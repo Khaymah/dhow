@@ -53,6 +53,10 @@ type Client struct {
 	auth         runnerv1connect.AuthServiceClient
 	lease        runnerv1connect.LeaseServiceClient
 	logs         runnerv1connect.LogServiceClient
+	artifacts    runnerv1connect.ArtifactServiceClient
+	cache        runnerv1connect.CacheServiceClient
+	blobBase     string
+	version      string
 	tokens       *tokens
 	log          *slog.Logger
 }
@@ -91,6 +95,10 @@ func New(o Options) (*Client, error) {
 		auth:         runnerv1connect.NewAuthServiceClient(hc, base, opts...),
 		lease:        runnerv1connect.NewLeaseServiceClient(hc, base, opts...),
 		logs:         runnerv1connect.NewLogServiceClient(hc, base, opts...),
+		artifacts:    runnerv1connect.NewArtifactServiceClient(hc, base, opts...),
+		cache:        runnerv1connect.NewCacheServiceClient(hc, base, opts...),
+		blobBase:     base + "/blobs/",
+		version:      o.Version,
 		log:          o.Log,
 	}
 	if o.Identity != nil {

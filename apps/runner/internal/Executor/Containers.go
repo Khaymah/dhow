@@ -15,12 +15,16 @@ type segment struct {
 	image  string
 	steps  []int32
 	egress []string
+	save   bool
 }
 
 func segments(spec *runnerv1.JobSpec, checkoutImage string) []segment {
 	var out []segment
 	if co := spec.GetCheckout(); co != nil {
 		out = append(out, segment{kind: sandbox.KindCheckout, image: checkoutImage, egress: checkoutEgress(co)})
+	}
+	if restores(spec) {
+		out = append(out, segment{kind: sandbox.KindTransfer, image: checkoutImage})
 	}
 	for i, s := range spec.GetSteps() {
 		idx := int32(i)
@@ -33,6 +37,9 @@ func segments(spec *runnerv1.JobSpec, checkoutImage string) []segment {
 			continue
 		}
 		out = append(out, segment{kind: sandbox.KindJob, image: spec.GetImage(), steps: []int32{idx}, egress: spec.GetNetwork().GetEgress()})
+	}
+	if saves(spec) {
+		out = append(out, segment{kind: sandbox.KindTransfer, image: checkoutImage, save: true})
 	}
 	return out
 }
@@ -100,6 +107,11 @@ func (a *attempt) runSegment(ctx, jobCtx context.Context, seg segment) (result, 
 		return a.runCheckout(ctx, jobCtx)
 	case sandbox.KindPlugin:
 		return a.runPlugin(ctx, jobCtx, seg.steps[0])
+	case sandbox.KindTransfer:
+		if seg.save {
+			return a.saveTransfers(ctx, jobCtx)
+		}
+		return a.restoreTransfers(ctx, jobCtx)
 	default:
 		for _, idx := range seg.steps {
 			if r, stop := a.interrupted(jobCtx); stop {

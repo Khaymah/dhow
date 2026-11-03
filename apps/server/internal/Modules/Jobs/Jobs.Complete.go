@@ -55,7 +55,9 @@ func resultRules() map[runnerv1.AttemptResult]resultRule {
 			runnerv1.FailureReason_FAILURE_REASON_RUNNER_DISK_FULL, runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_FAILED,
 			runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_REF_MOVED, runnerv1.FailureReason_FAILURE_REASON_HOST_KEY_MISMATCH,
 			runnerv1.FailureReason_FAILURE_REASON_CHECKOUT_DISK_FULL, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_INPUT_INVALID,
-			runnerv1.FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID,
+			runnerv1.FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID, runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_DOWNLOAD_FAILED,
+			runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_UNSAFE, runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_UPLOAD_FAILED,
+			runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_TOO_LARGE,
 		}},
 		runnerv1.AttemptResult_ATTEMPT_RESULT_CANCELED: {
 			models.AttemptCanceled, runnerv1.FailureReason_FAILURE_REASON_CANCELED,

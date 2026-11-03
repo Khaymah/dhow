@@ -100,9 +100,10 @@ type Running struct {
 }
 
 type StartOptions struct {
-	URL    string
-	Timing *executor.Timing
-	Logs   func(*logs.Options)
+	URL       string
+	Timing    *executor.Timing
+	Logs      func(*logs.Options)
+	Workspace string
 }
 
 func (r *Runner) Start(rec fake.Recording, o StartOptions) *Running {
@@ -119,7 +120,7 @@ func (r *Runner) Start(rec fake.Recording, o StartOptions) *Running {
 	if o.Timing != nil {
 		timing = *o.Timing
 	}
-	driver := fake.New(rec, fake.Options{})
+	driver := fake.New(rec, fake.Options{WorkspaceRoot: o.Workspace})
 	outcomes := make(chan executor.Outcome, 16)
 	runner, err := app.NewRunner(app.RunnerOptions{
 		Config: cfg, Identity: r.Identity(), Driver: driver, Timing: timing, Backoff: FastBackoff(), Wait: time.Second,

@@ -104,6 +104,7 @@ type Server struct {
 	fencing  int64
 	calls    map[string]int
 	replays  []*runnerv1.SignedLeaseGrant
+	blobs    blobState
 }
 
 func NewServer(t testing.TB) *Server {
@@ -122,6 +123,7 @@ func NewServer(t testing.TB) *Server {
 		T: t, Token: config.RegistrationTokenPrefix + base64.RawURLEncoding.EncodeToString(raw), OrgID: uuid.NewString(),
 		signing: signing, wrongKey: wrong, sessions: map[string]time.Time{}, nonces: map[string]bool{},
 		leases: map[string]*Lease{}, calls: map[string]int{}, knobs: Knobs{LeaseTTL: DefaultLeaseTTL},
+		blobs: blobState{blobs: map[string][]byte{}, kinds: map[string]string{}, cache: map[string]string{}},
 	}
 	mux := http.NewServeMux()
 	opts := connect.WithInterceptors(s.gate())
@@ -130,6 +132,9 @@ func NewServer(t testing.TB) *Server {
 	mux.Handle(runnerv1connect.NewAuthServiceHandler(h, opts))
 	mux.Handle(runnerv1connect.NewLeaseServiceHandler(h, opts))
 	mux.Handle(runnerv1connect.NewLogServiceHandler(h, opts))
+	mux.Handle(runnerv1connect.NewArtifactServiceHandler(h, opts))
+	mux.Handle(runnerv1connect.NewCacheServiceHandler(cacheHandlers{s: s}, opts))
+	mux.HandleFunc(blobPath, s.serveBlob)
 	root := http.NewServeMux()
 	root.Handle(config.APIPrefix+"/", http.StripPrefix(config.APIPrefix, mux))
 	s.HTTP = httptest.NewUnstartedServer(root)
@@ -236,7 +241,8 @@ func (s *Server) gate() connect.Interceptor {
 			if req.Header().Get(config.ProtocolHeader) != config.ProtocolVersion {
 				return nil, rpcError(connect.CodeFailedPrecondition, "RUNNER_UPGRADE_REQUIRED")
 			}
-			if strings.Contains(procedure, "LeaseService") || strings.Contains(procedure, "LogService") {
+			if strings.Contains(procedure, "LeaseService") || strings.Contains(procedure, "LogService") ||
+				strings.Contains(procedure, "ArtifactService") || strings.Contains(procedure, "CacheService") {
 				token := strings.TrimPrefix(req.Header().Get("Authorization"), "Bearer ")
 				s.mu.Lock()
 				expiry, ok := s.sessions[token]

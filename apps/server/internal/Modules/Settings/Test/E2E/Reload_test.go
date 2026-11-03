@@ -69,8 +69,11 @@ func build(t *testing.T, secret []byte, env settingspec.Raw, pool *pgxpool.Pool)
 	publicURL, err := url.Parse(apptest.PublicOrigin)
 	require.NoError(t, err)
 	wired, err := app.Build(t.Context(), app.Infra{
-		Config: config.Config{SecretKey: secret, PublicURL: publicURL, ListenAddr: config.DefaultListenAddr, Settings: env},
-		Log:    logging.New(&apptest.SyncBuffer{}, slog.LevelDebug), Pool: pool, Migrations: currentMigrations{},
+		Config: config.Config{
+			SecretKey: secret, PublicURL: publicURL, ListenAddr: config.DefaultListenAddr, Settings: env,
+			Artifacts: config.Artifacts{BlobDir: apptest.PrivateDir(t)},
+		},
+		Log: logging.New(&apptest.SyncBuffer{}, slog.LevelDebug), Pool: pool, Migrations: currentMigrations{},
 		Build: buildinfo.Info{Version: "test"}, Breach: &apptest.FakeBreach{}, HashParams: ptr(apptest.TestParams()),
 	})
 	if err == nil {

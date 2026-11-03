@@ -29,14 +29,15 @@ type Output struct {
 }
 
 type Step struct {
-	Output     []Output `json:"Output"`
-	Outputs    string   `json:"Outputs"`
-	BadOutputs bool     `json:"BadOutputs"`
-	ExitCode   int32    `json:"ExitCode"`
-	Reason     string   `json:"Reason"`
-	HangMillis int      `json:"HangMillis"`
-	IgnoreTerm bool     `json:"IgnoreTerm"`
-	IgnoreKill bool     `json:"IgnoreKill"`
+	Output     []Output          `json:"Output"`
+	Outputs    string            `json:"Outputs"`
+	BadOutputs bool              `json:"BadOutputs"`
+	ExitCode   int32             `json:"ExitCode"`
+	Reason     string            `json:"Reason"`
+	HangMillis int               `json:"HangMillis"`
+	IgnoreTerm bool              `json:"IgnoreTerm"`
+	IgnoreKill bool              `json:"IgnoreKill"`
+	Writes     map[string]string `json:"Writes"`
 }
 
 type Recording struct {
@@ -49,6 +50,7 @@ type Recording struct {
 	PrepareDelayMillis int                          `json:"PrepareDelayMillis"`
 	KillSurvivors      bool                         `json:"KillSurvivors"`
 	DestroySurvivors   bool                         `json:"DestroySurvivors"`
+	Workspace          map[string]string            `json:"Workspace"`
 }
 
 type EventKind string
@@ -90,11 +92,13 @@ type Driver struct {
 	onEvent  func(Event)
 	levels   []runnerv1.Isolation
 	lastSpec sandbox.PrepareSpec
+	root     string
 }
 
 type Options struct {
-	OnEvent   func(Event)
-	Isolation []runnerv1.Isolation
+	OnEvent       func(Event)
+	Isolation     []runnerv1.Isolation
+	WorkspaceRoot string
 }
 
 func New(rec Recording, o Options) *Driver {
@@ -102,7 +106,7 @@ func New(rec Recording, o Options) *Driver {
 	if len(levels) == 0 {
 		levels = []runnerv1.Isolation{runnerv1.Isolation_ISOLATION_CONTAINER}
 	}
-	return &Driver{rec: rec, onEvent: o.OnEvent, levels: levels}
+	return &Driver{rec: rec, onEvent: o.OnEvent, levels: levels, root: o.WorkspaceRoot}
 }
 
 func Load(path string) (Recording, error) {
@@ -182,6 +186,9 @@ func (d *Driver) Workspace(_ context.Context, spec sandbox.WorkspaceSpec) (sandb
 	d.record(Event{Kind: EventWorkspace, AttemptID: spec.AttemptID})
 	if d.rec.WorkspaceError {
 		return nil, sandbox.ErrSandbox
+	}
+	if err := d.seedWorkspace(spec.AttemptID); err != nil {
+		return nil, err
 	}
 	return &workspace{d: d, attempt: spec.AttemptID}, nil
 }

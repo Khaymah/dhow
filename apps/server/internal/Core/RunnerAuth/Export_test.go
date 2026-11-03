@@ -8,5 +8,5 @@ import (
 )
 
 func CheckForTest(ctx context.Context, g *Gate, table *policy.Table, procedure string, header http.Header) (context.Context, error) {
-	return g.check(ctx, table, procedure, header)
+	return g.check(ctx, table, http.MethodPost, procedure, header)
 }

@@ -63,6 +63,7 @@ func Validate(spec *runnerv1.JobSpec) error {
 		c.add("Isolation", ReasonInvalid)
 	}
 	c.labels(spec.GetLabels())
+	c.transfers(spec)
 	c.derived(spec)
 	if len(c.violations) > 0 {
 		return &Error{Violations: c.violations}

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	artifactindex "github.com/Khaymah/dhow/apps/server/internal/Core/ArtifactIndex"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	commitstatus "github.com/Khaymah/dhow/apps/server/internal/Core/CommitStatus"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
@@ -58,6 +59,7 @@ type Service struct {
 	now           func() time.Time
 	queue         jobqueue.Queue
 	statuses      commitstatus.Recorder
+	artifacts     artifactindex.Index
 	definitions   Definitions
 	images        ImageResolver
 	checkoutImage string
@@ -91,6 +93,8 @@ func NewService(o Options) *Service {
 }
 
 func (s *Service) UseStatuses(r commitstatus.Recorder) { s.statuses = r }
+
+func (s *Service) UseArtifacts(i artifactindex.Index) { s.artifacts = i }
 
 func (s *Service) queries() *sqlc.Queries { return sqlc.New(s.db) }
 

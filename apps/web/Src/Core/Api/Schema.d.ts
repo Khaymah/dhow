@@ -699,6 +699,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/log-retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Keep this organization's job logs for fewer days
+         * @description Needs `org.security` (owners only), a current factor of the caller, and a second factor on the caller's own account (`SECOND_FACTOR_REQUIRED` otherwise). `LogRetentionDays` from 7 to 3650 keeps the job logs of this organization for that many days at most; `null` follows the server setting. The server setting still wins when it is shorter. Older logs stop showing at once, and their content is erased within the hour. The change and its audit entry are written together.
+         */
+        put: operations["updateLogRetention"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/members": {
         parameters: {
             query?: never;
@@ -1692,6 +1712,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/runs/{runId}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the artifacts of a run
+         * @description Needs `artifact.read` on the project (Developer and above). Expired artifacts are not listed. A run of another project or organization is 404.
+         */
+        get: operations["listRunArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/artifacts/{artifactId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an artifact
+         * @description Needs `artifact.read` on the project. Streams the tar.gz archive as an attachment named after the artifact (`<name>.tar.gz`, with every character outside letters, digits, `.`, `_` and `-` replaced). An expired artifact is 404 `ARTIFACT_NOT_FOUND`, and a stored file that is missing or does not match its SHA-256 is 410 `ARTIFACT_GONE`.
+         */
+        get: operations["downloadArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/overview": {
         parameters: {
             query?: never;
@@ -2280,6 +2340,12 @@ export interface components {
              * @description When the rule last reached more roles. Absent while the rule is `off`.
              */
             RequireSecondFactorSince?: string;
+            /** @description Days this organization keeps its job logs. Absent when it follows the server setting. */
+            LogRetentionDays?: number;
+        };
+        UpdateLogRetentionRequest: {
+            LogRetentionDays: number | null;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
         };
         /**
          * @description Who must use two-step verification in the organization.
@@ -3362,6 +3428,28 @@ export interface components {
         RunResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["Run"];
         };
+        Artifact: {
+            /** Format: uuid */
+            Id: string;
+            /** Format: uuid */
+            RunId: string;
+            Name: string;
+            /** @description The job of the run that uploaded it, with its matrix values. */
+            RunJobKey: string;
+            /** Format: int64 */
+            SizeBytes: number;
+            /** @description The SHA-256 of the archive, in hex. */
+            Digest: string;
+            /** @description The run came from a fork's pull request, so the artifact can never feed a deploy. */
+            Untrusted: boolean;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            ExpiresAt: string;
+        };
+        ArtifactListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Artifact"][];
+        };
         RunDetailResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["RunDetail"];
         };
@@ -3517,6 +3605,7 @@ export interface components {
         BindingId: string;
         ProjectId: string;
         RunId: string;
+        ArtifactId: string;
         Page: number;
         Limit: number;
     };
@@ -4475,6 +4564,33 @@ export interface operations {
         };
         responses: {
             /** @description The organization with the new rule. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateLogRetention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLogRetentionRequest"];
+            };
+        };
+        responses: {
+            /** @description The organization with the new retention. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6068,6 +6184,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunDetailResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRunArtifacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The artifacts of the run, by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    downloadArtifact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                artifactId: components["parameters"]["ArtifactId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    "X-Content-Type-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/gzip": string;
                 };
             };
             default: components["responses"]["Error"];

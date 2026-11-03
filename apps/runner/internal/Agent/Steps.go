@@ -40,6 +40,8 @@ type job struct {
 	argv    []string
 	script  string
 	shell   bool
+	stdin   bool
+	input   *os.File
 	env     map[string]string
 	secrets []*agentv1.SecretFile
 }
@@ -49,10 +51,13 @@ func stepOf(s *agentv1.RunStep) job {
 }
 
 func execOf(e *agentv1.RunExec) job {
-	return job{index: e.GetIndex(), argv: e.GetArgv(), env: e.GetEnv(), secrets: e.GetSecretFiles()}
+	return job{index: e.GetIndex(), argv: e.GetArgv(), env: e.GetEnv(), secrets: e.GetSecretFiles(), stdin: e.GetStdin()}
 }
 
 func (a *Agent) runStep(ctx context.Context, step job) (*agentv1.Frame, error) {
+	if step.input != nil {
+		defer func() { _ = step.input.Close() }()
+	}
 	if len(step.argv) == 0 || step.argv[0] == "" {
 		return stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_START_FAILED, nil), nil
 	}
@@ -82,6 +87,9 @@ func (a *Agent) runProcess(ctx context.Context, step job) (int32, int32, agentv1
 	if step.shell {
 		cmd.Stdin = stdinReader(step.script)
 	}
+	if step.input != nil {
+		cmd.Stdin = step.input
+	}
 	cmd.SysProcAttr = &unix.SysProcAttr{Setpgid: true}
 	outR, outW, err := os.Pipe()
 	if err != nil {
@@ -95,6 +103,9 @@ func (a *Agent) runProcess(ctx context.Context, step job) (int32, int32, agentv1
 	cmd.Stdout, cmd.Stderr = outW, errW
 	startErr := cmd.Start()
 	closeAll(outW, errW)
+	if step.input != nil {
+		closeAll(step.input)
+	}
 	if startErr != nil {
 		closeAll(outR, errR)
 		return 1, 0, startFailure(startErr), nil
