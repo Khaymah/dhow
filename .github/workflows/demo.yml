@@ -1,0 +1,48 @@
+name: Demo
+
+on:
+  schedule:
+    - cron: "29 3 * * *"
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - apps/server/**
+      - apps/runner/**
+      - internal/**
+      - packages/proto/**
+      - deploy/dev/**
+      - deploy/dhow-git/**
+      - deploy/m3-demo/**
+      - deploy/m4-demo/**
+      - go.mod
+      - go.sum
+      - .github/workflows/demo.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  demo:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    name: ${{ matrix.demo }} on a clean Ubuntu 26.04 with Docker
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        demo: [m3-demo, m4-demo]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Let rootless Podman in the runner container make user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Run the demo
+        env:
+          DEMO: ${{ matrix.demo }}
+        run: bash "deploy/$DEMO/run.sh"

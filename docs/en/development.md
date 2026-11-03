@@ -74,6 +74,7 @@ Everyday commands, from the root of the clone:
 | `DHOW_DEV_DB_PORT` | `55432` | PostgreSQL, for `psql` or the native tools. It is not 5432, so a PostgreSQL already installed on the machine does not block it. `.env.dev` keeps the port of the first start |
 | `DHOW_DEV_POLL_SECONDS` | `1` | How often the server and the runner check the Go files |
 | `DHOW_DEV_RUNNER_MAX_MEMORY`, `DHOW_DEV_RUNNER_MAX_DISK` | `2GiB`, `4GiB` | The most memory and disk one job may ask for (`DHOW_RUNNER_MAX_MEMORY` and `DHOW_RUNNER_MAX_DISK`). Lower them on a small machine, and ask for no more in the job's `Resources` |
+| `DHOW_DEV_RUNNER_CHECKOUT_IMAGE`, `DHOW_DEV_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS` | empty | The checkout image (`DHOW_RUNNER_CHECKOUT_IMAGE`) and the private ranges a job may reach (`DHOW_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS`), for a Git server inside the stack, like the Forgejo of the M4 demo |
 | `DHOW_DEV_POSTGRES_IMAGE`, `DHOW_DEV_GO_IMAGE`, `DHOW_DEV_NODE_IMAGE` | `postgres:18`, `golang:1.27.3-bookworm`, `node:26-bookworm-slim` | Another registry or mirror, such as `mirror.gcr.io/library/postgres:18` |
 
 On Linux and macOS, `DHOW_DEV_DB_PORT=55433 docker compose -f deploy/dev/compose.yaml up`. In PowerShell, `$env:DHOW_DEV_DB_PORT = "55433"` first.
@@ -325,6 +326,12 @@ pnpm -C apps/web test
 pnpm -C apps/web build
 pnpm -C apps/web size
 ```
+
+### The M3 and M4 demos
+
+`deploy/m4-demo/run.sh` runs the whole M4 flow in Docker and prints PASS or FAIL for each check. It starts Forgejo, PostgreSQL, the server and the Podman runner of the stack above, and a TLS registry for the `dhow-git` image. Then it links a repository whose `.dhow.yml` has a DAG, a matrix, an artifact passed through `needs` and a cache, pushes twice, sends a forged and a replayed webhook, and ends with `deploy/m4-demo/leak-sweep.sh`, which looks for every credential in clear. `deploy/m3-demo/run.sh` runs jobs without a pipeline: the sandbox, the order of jobs and a killed runner.
+
+Both need cgroup v2, remove their containers and volumes at the end (`DHOW_DEMO_KEEP=1` keeps them), and use their own ports (`DHOW_DEMO_PORT`, `8480` by default), so they can run beside the development stack. CI runs them on Ubuntu 26.04 (`demo.yml`).
 
 `make gen` regenerates the code from `packages/openapi/openapi.yaml` and the SQL queries, and `pnpm -C apps/web gen:api` regenerates the web API types. Never edit generated files by hand.
 

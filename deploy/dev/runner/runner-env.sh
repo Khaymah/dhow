@@ -47,6 +47,12 @@ as_runner() {
   if [[ -n ${DHOW_DEV_RUNNER_MAX_DISK:-} ]]; then
     env+=(DHOW_RUNNER_MAX_DISK="$DHOW_DEV_RUNNER_MAX_DISK")
   fi
+  if [[ -n ${DHOW_DEV_RUNNER_CHECKOUT_IMAGE:-} ]]; then
+    env+=(DHOW_RUNNER_CHECKOUT_IMAGE="$DHOW_DEV_RUNNER_CHECKOUT_IMAGE")
+  fi
+  if [[ -n ${DHOW_DEV_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS:-} ]]; then
+    env+=(DHOW_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS="$DHOW_DEV_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS")
+  fi
   exec setpriv --reuid="$user" --regid="$user" --init-groups --inh-caps=-all --bounding-set="$capabilities" \
     env -i -C "$state" "${env[@]}" "$@"
 }
