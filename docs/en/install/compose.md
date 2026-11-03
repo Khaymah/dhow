@@ -102,7 +102,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Database migrations run automatically when Dhow starts, under a lock, so only one container migrates at a time. If a migration fails the server does not start and the old schema stays in place. Migrations only move forward: to go back to an older version, restore the backup you took in step 1.
+Database migrations run automatically when Dhow starts, under a lock, so only one container migrates at a time. If a migration fails the server does not start and the old schema stays in place. To try the migrations before you upgrade, and to go back to an older version, see [Upgrades and rolling back](upgrades.md). Going back with the previous image alone is enough in most cases; you need the backup you took in step 1 when a migration raised the database floor.
 
 ## Back up and restore
 
