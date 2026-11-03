@@ -58,6 +58,10 @@ const (
 	RunCancel         Action = "run.cancel"
 	RunApprove        Action = "run.approve"
 	ArtifactRead      Action = "artifact.read"
+	EnvironmentManage Action = "environment.manage"
+	EnvironmentPause  Action = "environment.pause"
+	EnvironmentBypass Action = "environment.bypass"
+	DeploymentApprove Action = "deployment.approve"
 
 	InstanceSettingsManage Action = "instance.settings.manage"
 )
@@ -67,6 +71,7 @@ func Actions() []Action {
 		OrgRead, OrgUpdate, OrgLeave, OrgTransfer, OrgSecurity, MemberRead, MemberManage, AuditRead, SessionManageSelf, OrgCreate,
 		RunnerRead, RunnerManage, TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, InstanceSettingsManage,
 		ProjectRead, ProjectManage, RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
+		EnvironmentManage, EnvironmentPause, EnvironmentBypass, DeploymentApprove,
 	}
 }
 
@@ -96,23 +101,23 @@ func Grants(role Role) []Action {
 		return []Action{
 			OrgRead, OrgUpdate, OrgLeave, OrgTransfer, OrgSecurity, MemberRead, MemberManage, AuditRead, SessionManageSelf, RunnerRead,
 			RunnerManage, TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, ProjectRead, ProjectManage,
-			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
+			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead, EnvironmentManage, EnvironmentPause, EnvironmentBypass, DeploymentApprove,
 		}
 	case RoleAdmin:
 		return []Action{
 			OrgRead, OrgUpdate, OrgLeave, MemberRead, MemberManage, AuditRead, SessionManageSelf, RunnerRead, RunnerManage,
 			TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, ProjectRead, ProjectManage,
-			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
+			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead, EnvironmentManage, EnvironmentPause, EnvironmentBypass, DeploymentApprove,
 		}
 	case RoleMaintainer:
 		return []Action{
 			OrgRead, OrgLeave, MemberRead, SessionManageSelf, RunnerRead, JobRead, JobCancel, LogRead, TokenCreate, ProjectRead, ProjectManage,
-			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
+			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead, EnvironmentPause, DeploymentApprove,
 		}
 	case RoleDeveloper:
 		return []Action{
 			OrgRead, OrgLeave, MemberRead, SessionManageSelf, RunnerRead, JobRead, LogRead, TokenCreate, ProjectRead, RunRead, RunTrigger,
-			ArtifactRead,
+			ArtifactRead, DeploymentApprove,
 		}
 	case RoleViewer:
 		return []Action{OrgRead, OrgLeave, SessionManageSelf, JobRead, TokenCreate, ProjectRead, RunRead}

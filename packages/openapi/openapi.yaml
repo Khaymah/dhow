@@ -70,6 +70,12 @@ tags:
       SHA-256. Served by the Artifacts module. Runners upload and download them on /runner-api/, bound to their lease;
       this API lists and downloads them. Artifacts of a run from a fork's pull request are marked `Untrusted` and can
       never feed a deploy. The cache is never readable here.
+  - name: environments
+    description: >-
+      Environments of a project and their protection rules, which live on the server only so no commit can change
+      them. Served by the Environments module. Only `environment.manage` (Admin and Owner, or an Admin binding on the
+      project) creates, changes or removes one; a Maintainer may pause one. Until the deploy gate arrives (M5.6), a job
+      with `environment:` is still skipped with `ENVIRONMENTS_UNAVAILABLE`.
   - name: overview
     description: >-
       Counts for the home page and the sidebar, in one request. Served by the Overview module, which reads the jobs,
@@ -2329,6 +2335,207 @@ paths:
                 $ref: "#/components/schemas/ProjectResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments:
+    get:
+      operationId: listEnvironments
+      tags: [environments]
+      summary: List the environments of a project
+      description: >-
+        Needs `project.read` on the project, after its role bindings. By name, with their protection rules and
+        reviewers.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of environments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createEnvironment
+      tags: [environments]
+      summary: Create an environment
+      description: >-
+        Needs `environment.manage` on the project (Admin and Owner, or an Admin binding on this project) and a fresh
+        `CurrentFactor`. A pipeline file never creates an environment: a job that names a missing one fails with `ENVIRONMENT_NOT_FOUND`. The name
+        is unique among the project's environments (409 `ENVIRONMENT_EXISTS`) and never changes. Rules left out take
+        their defaults, and `AllowedRefs` defaults to the default branch of the linked repository (`main` without one).
+        A reviewer who is not a member, or whose role on the project is below Developer, or a team of another
+        organization, answers 422 `REVIEWER_NOT_ELIGIBLE`. An archived project answers 409 `PROJECT_ARCHIVED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEnvironmentRequest"
+      responses:
+        "201":
+          description: The new environment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}:
+    get:
+      operationId: getEnvironment
+      tags: [environments]
+      summary: Read an environment
+      description: Needs `project.read` on the project. Its rules, reviewers and whether it is paused.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+      responses:
+        "200":
+          description: The environment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateEnvironment
+      tags: [environments]
+      summary: Change the description or the protection rules of an environment
+      description: >-
+        Needs `environment.manage` on the project and a fresh `CurrentFactor`. Changes only the fields that are sent.
+        `Version` is the one the caller read: an older one answers 409 `ENVIRONMENT_VERSION_CONFLICT` and changes
+        nothing. Any change to the rules or the reviewers raises `RuleVersion`, so an approval given before it no longer
+        counts. A Maintainer may pause an environment but never change its rules.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEnvironmentRequest"
+      responses:
+        "200":
+          description: The changed environment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/remove:
+    post:
+      operationId: removeEnvironment
+      tags: [environments]
+      summary: Remove an environment
+      description: >-
+        Needs `environment.manage` on the project and a fresh `CurrentFactor`. The environment and its reviewers are
+        marked deleted and its name can be used again. A job that still names it fails with `ENVIRONMENT_NOT_FOUND`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
+      responses:
+        "200":
+          description: The removed environment, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/pause:
+    post:
+      operationId: pauseEnvironment
+      tags: [environments]
+      summary: Stop new deploys to an environment
+      description: >-
+        Needs `environment.pause` on the project (Maintainer and above), without a second factor so it never waits
+        during an incident. Jobs already running finish; new ones wait. Pausing a paused environment changes nothing.
+        Raises `RuleVersion`. Only `environment.manage` resumes it.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PauseEnvironmentRequest"
+      responses:
+        "200":
+          description: The paused environment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/resume:
+    post:
+      operationId: resumeEnvironment
+      tags: [environments]
+      summary: Allow deploys to a paused environment again
+      description: >-
+        Needs `environment.manage` on the project and a fresh `CurrentFactor`, so a Maintainer who paused cannot resume.
+        Resuming an environment that is not paused changes nothing. Raises `RuleVersion`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
+      responses:
+        "200":
+          description: The environment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/projects/{projectId}/repository:
     get:
       operationId: getRepository
@@ -3324,6 +3531,13 @@ components:
       schema:
         type: string
         format: uuid
+    EnvironmentName:
+      name: environmentName
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
     Page:
       name: Page
       in: query
@@ -3914,7 +4128,8 @@ components:
             `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`,
             `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`,
             `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`,
-            `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED` or `FORK_POLICY_NOT_ALLOWED`.
+            `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`,
+            `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT` or `REVIEWER_NOT_ELIGIBLE`.
           example: INTERNAL
         Message:
           type: string
@@ -6108,6 +6323,281 @@ components:
           maxLength: 255
         ForkPolicy:
           $ref: "#/components/schemas/ForkPolicy"
+    EnvironmentRefKind:
+      type: string
+      enum: [branch, tag]
+    EnvironmentRef:
+      type: object
+      additionalProperties: false
+      required: [Kind, Pattern]
+      properties:
+        Kind:
+          $ref: "#/components/schemas/EnvironmentRefKind"
+        Pattern:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: >-
+            A glob on the short branch or tag name (`Kind` says which): `*` and `?` within one part between slashes,
+            `**` alone for any number of parts, none included, so `release/**` also matches `release`. Without `..`,
+            `//`, a leading or trailing slash, spaces, invisible characters, `~`, `^`, `:`, brackets or braces, and
+            never a full name that starts with `refs/`, `heads/` or `tags/`.
+    EnvironmentReviewers:
+      type: object
+      additionalProperties: false
+      required: [UserIds, TeamIds]
+      properties:
+        UserIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            format: uuid
+        TeamIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            format: uuid
+    EnvironmentReviewersView:
+      type: object
+      additionalProperties: false
+      required: [UserIds, TeamIds, UserCount, TeamCount, IdsShown]
+      description: >-
+        The ids are shown only to a caller who may manage the environment, over a session. Everyone else, and every API
+        token, gets empty lists and the counts.
+      properties:
+        UserIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        TeamIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        UserCount:
+          type: integer
+          minimum: 0
+        TeamCount:
+          type: integer
+          minimum: 0
+        IdsShown:
+          type: boolean
+    EnvironmentIsolation:
+      type: string
+      enum: [container]
+    EnvironmentRules:
+      type: object
+      additionalProperties: false
+      required:
+        - AllowedRefs
+        - AllowPullRequests
+        - Reviewers
+        - RequiredApprovals
+        - AllowSelfApproval
+        - WaitMinutes
+        - ApprovalTimeoutHours
+        - RequirePinnedImages
+        - AllowedPlugins
+        - RequiredIsolation
+        - AllowAdminBypass
+        - SupersedePending
+      properties:
+        AllowedRefs:
+          type: array
+          maxItems: 50
+          description: The branches and tags that may deploy here. Empty means nothing deploys. Never bypassed.
+          items:
+            $ref: "#/components/schemas/EnvironmentRef"
+        AllowPullRequests:
+          type: boolean
+          description: Pull requests from the same repository may deploy here. Pull requests from forks never do.
+        Reviewers:
+          $ref: "#/components/schemas/EnvironmentReviewersView"
+        RequiredApprovals:
+          type: integer
+          minimum: 1
+          maximum: 1
+          description: One reviewer in Community.
+        AllowSelfApproval:
+          type: boolean
+          description: >-
+            The person who started the run may approve it. Off by default; only `environment.manage` turns it on, for
+            a team of one.
+        WaitMinutes:
+          type: integer
+          minimum: 0
+          maximum: 43200
+        ApprovalTimeoutHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+        RequirePinnedImages:
+          type: boolean
+          description: Every image is pinned by digest in the pipeline file itself.
+        AllowedPlugins:
+          type: array
+          maxItems: 50
+          description: Image name prefixes of the plugins allowed here. Empty allows any plugin.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        RequiredIsolation:
+          $ref: "#/components/schemas/EnvironmentIsolation"
+        AllowAdminBypass:
+          type: boolean
+          description: An Admin may skip the reviewers and the timer, with a reason and a second factor.
+        SupersedePending:
+          type: boolean
+          description: A newer run on the same ref replaces an older run still waiting for approval.
+    EnvironmentRulesInput:
+      type: object
+      additionalProperties: false
+      description: Any subset of the rules. A field left out keeps its current value, or its default on create.
+      properties:
+        AllowedRefs:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/EnvironmentRef"
+        AllowPullRequests:
+          type: boolean
+        Reviewers:
+          $ref: "#/components/schemas/EnvironmentReviewers"
+        RequiredApprovals:
+          type: integer
+          minimum: 1
+          maximum: 1
+        AllowSelfApproval:
+          type: boolean
+        WaitMinutes:
+          type: integer
+          minimum: 0
+          maximum: 43200
+        ApprovalTimeoutHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+        RequirePinnedImages:
+          type: boolean
+        AllowedPlugins:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        RequiredIsolation:
+          $ref: "#/components/schemas/EnvironmentIsolation"
+        AllowAdminBypass:
+          type: boolean
+        SupersedePending:
+          type: boolean
+    Environment:
+      type: object
+      additionalProperties: false
+      required: [Id, OrganizationId, ProjectId, Name, Description, Version, RuleVersion, Rules, Paused, CreatedAt, UpdatedAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        OrganizationId:
+          type: string
+          format: uuid
+        ProjectId:
+          type: string
+          format: uuid
+        Name:
+          type: string
+        Description:
+          type: string
+        Version:
+          type: integer
+          format: int64
+          description: Rises with every change. Send it back to change the environment.
+        RuleVersion:
+          type: integer
+          format: int64
+          description: Rises with every change to the rules, the reviewers or the pause. Approvals are bound to it.
+        Rules:
+          $ref: "#/components/schemas/EnvironmentRules"
+        Paused:
+          type: boolean
+        PausedAt:
+          type: string
+          format: date-time
+        PausedByUserId:
+          type: string
+          format: uuid
+        PausedReason:
+          type: string
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+    EnvironmentResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/Environment"
+    EnvironmentListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Environment"
+    CreateEnvironmentRequest:
+      type: object
+      additionalProperties: false
+      required: [Name, CurrentFactor]
+      properties:
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+        Name:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+          description: The name a job writes in `environment:`. Lowercase letters, digits, `_` and `-`.
+        Description:
+          type: string
+          maxLength: 500
+        Rules:
+          $ref: "#/components/schemas/EnvironmentRulesInput"
+    UpdateEnvironmentRequest:
+      type: object
+      additionalProperties: false
+      required: [Version, CurrentFactor]
+      properties:
+        Version:
+          type: integer
+          format: int64
+          minimum: 1
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+        Description:
+          type: string
+          maxLength: 500
+        Rules:
+          $ref: "#/components/schemas/EnvironmentRulesInput"
+    PauseEnvironmentRequest:
+      type: object
+      additionalProperties: false
+      required: [Reason]
+      properties:
+        Reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Shown to everyone who can read the project, and kept in the audit log.
     RunState:
       type: string
       enum: [awaiting_approval, pending, queued, running, succeeded, failed, canceled, skipped]

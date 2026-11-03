@@ -30,6 +30,7 @@ import (
 	alerts "github.com/Khaymah/dhow/apps/server/internal/Modules/Alerts"
 	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
 	audit "github.com/Khaymah/dhow/apps/server/internal/Modules/Audit"
+	environments "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments"
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	overview "github.com/Khaymah/dhow/apps/server/internal/Modules/Overview"
@@ -175,6 +176,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Runners:   runnersService,
 		Jobs:      jobsService,
 		Projects:  projects.NewService(projects.Options{DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now}),
+		Envs:      environments.NewService(environments.Options{DB: in.Pool, Factors: sessionService, Bus: bus, Log: in.Log, Now: in.Now}),
 		Sources:   sourcesService,
 		Pipelines: pipelinesService,
 		Artifacts: artifactsService,

@@ -3,7 +3,10 @@ package policy
 import "slices"
 
 func ProjectActions() []Action {
-	return []Action{ProjectRead, ProjectManage, RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead}
+	return []Action{
+		ProjectRead, ProjectManage, RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
+		EnvironmentManage, EnvironmentPause, EnvironmentBypass, DeploymentApprove,
+	}
 }
 
 func IsProjectAction(a Action) bool { return slices.Contains(ProjectActions(), a) }

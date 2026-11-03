@@ -34,6 +34,7 @@ type Querier interface {
 	ConsumeRegistrationToken(ctx context.Context, arg ConsumeRegistrationTokenParams) (ConsumeRegistrationTokenRow, error)
 	CountActiveUserTokens(ctx context.Context, arg CountActiveUserTokensParams) (int64, error)
 	CountAuditEvents(ctx context.Context, arg CountAuditEventsParams) (int64, error)
+	CountEnvironments(ctx context.Context, arg CountEnvironmentsParams) (int64, error)
 	CountIdentitiesByProvider(ctx context.Context) ([]CountIdentitiesByProviderRow, error)
 	CountJobs(ctx context.Context, arg CountJobsParams) (int64, error)
 	CountMatchingRunners(ctx context.Context, arg CountMatchingRunnersParams) (int64, error)
@@ -93,6 +94,8 @@ type Querier interface {
 	GetAuditEvent(ctx context.Context, arg GetAuditEventParams) (GetAuditEventRow, error)
 	GetCheckoutRepository(ctx context.Context, arg GetCheckoutRepositoryParams) (GetCheckoutRepositoryRow, error)
 	GetConfirmedTotp(ctx context.Context, userID uuid.UUID) (GetConfirmedTotpRow, error)
+	GetEnvironment(ctx context.Context, arg GetEnvironmentParams) (Environment, error)
+	GetEnvironmentProject(ctx context.Context, arg GetEnvironmentProjectParams) (GetEnvironmentProjectRow, error)
 	GetInstance(ctx context.Context) (Instance, error)
 	GetJob(ctx context.Context, arg GetJobParams) (Job, error)
 	GetJobProject(ctx context.Context, arg GetJobProjectParams) (uuid.UUID, error)
@@ -141,6 +144,8 @@ type Querier interface {
 	InsertAuditEvent(ctx context.Context, arg InsertAuditEventParams) error
 	InsertAuthChallenge(ctx context.Context, arg InsertAuthChallengeParams) (uuid.UUID, error)
 	InsertCacheEntry(ctx context.Context, arg InsertCacheEntryParams) (uuid.UUID, error)
+	InsertEnvironment(ctx context.Context, arg InsertEnvironmentParams) (Environment, error)
+	InsertEnvironmentReviewer(ctx context.Context, arg InsertEnvironmentReviewerParams) error
 	InsertIdentity(ctx context.Context, arg InsertIdentityParams) (InsertIdentityRow, error)
 	InsertInstanceSetting(ctx context.Context, arg InsertInstanceSettingParams) (int64, error)
 	InsertInvitation(ctx context.Context, arg InsertInvitationParams) (uuid.UUID, error)
@@ -183,6 +188,8 @@ type Querier interface {
 	ListApiTokens(ctx context.Context, arg ListApiTokensParams) ([]ListApiTokensRow, error)
 	ListAuditEvents(ctx context.Context, arg ListAuditEventsParams) ([]ListAuditEventsRow, error)
 	ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobsParams) ([]ListDriftedRunJobsRow, error)
+	ListEnvironmentReviewers(ctx context.Context, arg ListEnvironmentReviewersParams) ([]ListEnvironmentReviewersRow, error)
+	ListEnvironments(ctx context.Context, arg ListEnvironmentsParams) ([]Environment, error)
 	ListInstanceSettings(ctx context.Context) ([]ListInstanceSettingsRow, error)
 	ListInvalidIndexDrops(ctx context.Context, names []string) ([]string, error)
 	ListJobAttempts(ctx context.Context, arg ListJobAttemptsParams) ([]JobAttempt, error)
@@ -223,6 +230,7 @@ type Querier interface {
 	LockAuditChain(ctx context.Context, chainKey string) error
 	LockBlobsShared(ctx context.Context, lockKey int64) error
 	LockConcurrencyGroup(ctx context.Context, arg LockConcurrencyGroupParams) error
+	LockEnvironment(ctx context.Context, arg LockEnvironmentParams) (Environment, error)
 	LockInstance(ctx context.Context) (*time.Time, error)
 	LockInstanceSetting(ctx context.Context, groupName string) (LockInstanceSettingRow, error)
 	LockJob(ctx context.Context, arg LockJobParams) (Job, error)
@@ -279,6 +287,7 @@ type Querier interface {
 	OrganizationsWithLogRetention(ctx context.Context) ([]OrganizationsWithLogRetentionRow, error)
 	OriginUsedElsewhere(ctx context.Context, arg OriginUsedElsewhereParams) (bool, error)
 	OwnedBlobSize(ctx context.Context, arg OwnedBlobSizeParams) (int64, error)
+	PauseEnvironment(ctx context.Context, arg PauseEnvironmentParams) (Environment, error)
 	PeekPendingTotp(ctx context.Context, arg PeekPendingTotpParams) (PeekPendingTotpRow, error)
 	PickCanceledUnstartedLease(ctx context.Context, graceSeconds float64) (uuid.UUID, error)
 	PickExpiredLease(ctx context.Context, graceSeconds float64) (uuid.UUID, error)
@@ -307,6 +316,8 @@ type Querier interface {
 	ReleaseRunClaim(ctx context.Context, id uuid.UUID) error
 	RemoveAllTeamBindings(ctx context.Context, arg RemoveAllTeamBindingsParams) error
 	RemoveAllTeamMembers(ctx context.Context, arg RemoveAllTeamMembersParams) error
+	RemoveEnvironment(ctx context.Context, arg RemoveEnvironmentParams) (Environment, error)
+	RemoveEnvironmentReviewers(ctx context.Context, arg RemoveEnvironmentReviewersParams) error
 	RemoveMemberTeams(ctx context.Context, arg RemoveMemberTeamsParams) error
 	RemoveMembership(ctx context.Context, arg RemoveMembershipParams) (int64, error)
 	RemoveOidcProvider(ctx context.Context, arg RemoveOidcProviderParams) (int64, error)
@@ -323,6 +334,7 @@ type Querier interface {
 	ResolveApiToken(ctx context.Context, arg ResolveApiTokenParams) (ResolveApiTokenRow, error)
 	ResolveRunnerSession(ctx context.Context, tokenHash []byte) (ResolveRunnerSessionRow, error)
 	ResolveSession(ctx context.Context, arg ResolveSessionParams) (ResolveSessionRow, error)
+	ResumeEnvironment(ctx context.Context, arg ResumeEnvironmentParams) (Environment, error)
 	RetentionClock(ctx context.Context) (time.Time, error)
 	RetireArtifact(ctx context.Context, arg RetireArtifactParams) error
 	RetireBlobOwners(ctx context.Context, digests [][]byte) error
@@ -334,6 +346,8 @@ type Querier interface {
 	RetireUserPasskeys(ctx context.Context, arg RetireUserPasskeysParams) (int64, error)
 	RetireUserRecoveryCodes(ctx context.Context, arg RetireUserRecoveryCodesParams) (int64, error)
 	RetireUserTotp(ctx context.Context, arg RetireUserTotpParams) (int64, error)
+	ReviewerTeams(ctx context.Context, arg ReviewerTeamsParams) ([]uuid.UUID, error)
+	ReviewerUserRoles(ctx context.Context, arg ReviewerUserRolesParams) ([]ReviewerUserRolesRow, error)
 	RevokeAllUserSessions(ctx context.Context, arg RevokeAllUserSessionsParams) (int64, error)
 	RevokeApiToken(ctx context.Context, arg RevokeApiTokenParams) (RevokeApiTokenRow, error)
 	RevokeInvitation(ctx context.Context, arg RevokeInvitationParams) (int64, error)
@@ -387,6 +401,7 @@ type Querier interface {
 	TryRetentionLock(ctx context.Context, lockKey int64) (bool, error)
 	UnlinkRepository(ctx context.Context, arg UnlinkRepositoryParams) (Repository, error)
 	UnreadableLogPartitions(ctx context.Context) ([]string, error)
+	UpdateEnvironmentRules(ctx context.Context, arg UpdateEnvironmentRulesParams) (Environment, error)
 	UpdateInstanceSetting(ctx context.Context, arg UpdateInstanceSettingParams) (int64, error)
 	UpdateOidcProvider(ctx context.Context, arg UpdateOidcProviderParams) (int64, error)
 	UpdateOrganizationName(ctx context.Context, arg UpdateOrganizationNameParams) (UpdateOrganizationNameRow, error)

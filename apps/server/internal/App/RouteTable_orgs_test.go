@@ -96,6 +96,10 @@ func organizationPath(env *apptest.Env, fx fixture, rule policy.Rule) string {
 		if strings.Contains(path, "{artifactId}") {
 			path = strings.ReplaceAll(path, "{artifactId}", env.SeedArtifact(project, "web", []byte("archive"), false).ID.String())
 		}
+		if strings.Contains(path, "{environmentName}") {
+			env.SeedEnvironment(project, apptest.RouteTableEnvironment)
+			path = strings.ReplaceAll(path, "{environmentName}", apptest.RouteTableEnvironment)
+		}
 	}
 	if strings.Contains(path, "{invitationId}") {
 		path = strings.ReplaceAll(path, "{invitationId}", seedInvitation(env, fx.orgA, fx.byRole[policy.RoleOwner], string(policy.RoleViewer)))
@@ -126,6 +130,15 @@ func organizationBody(env *apptest.Env, fx fixture, rule policy.Rule) any {
 		return map[string]string{"Name": "Route table project", "Slug": "rt-" + randomSuffix(env.T)}
 	case "POST /organizations/{id}/projects/{projectId}/runs":
 		return map[string]string{"Ref": "main"}
+	case "POST /organizations/{id}/projects/{projectId}/environments":
+		return map[string]any{"Name": "rt-" + randomSuffix(env.T), "CurrentFactor": wrong}
+	case "PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}":
+		return map[string]any{"Version": 1, "CurrentFactor": wrong, "Description": "Route table"}
+	case "POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/remove",
+		"POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/resume":
+		return map[string]any{"CurrentFactor": wrong}
+	case "POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/pause":
+		return map[string]string{"Reason": "Route table"}
 	case "PUT /organizations/{id}/log-retention":
 		return map[string]any{"LogRetentionDays": 1, "CurrentFactor": wrong}
 	case "POST /organizations/{id}/invitations":

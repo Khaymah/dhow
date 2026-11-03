@@ -84,6 +84,12 @@ const (
 	RunCancelRequested = "project.run_cancel_requested"
 	RunRerunRequested  = "project.run_rerun_requested"
 	RunApproved        = "project.run_approved"
+
+	EnvironmentCreated = "environment.created"
+	EnvironmentUpdated = "environment.updated"
+	EnvironmentRemoved = "environment.removed"
+	EnvironmentPaused  = "environment.paused"
+	EnvironmentResumed = "environment.resumed"
 )
 
 func AuditedEvents() []string {
@@ -155,6 +161,11 @@ func AuditedEvents() []string {
 		RunCancelRequested,
 		RunRerunRequested,
 		RunApproved,
+		EnvironmentCreated,
+		EnvironmentUpdated,
+		EnvironmentRemoved,
+		EnvironmentPaused,
+		EnvironmentResumed,
 	}
 }
 

@@ -51,7 +51,10 @@ func (r SecondFactorRule) Covers(role Role) bool {
 }
 
 func SensitiveActions() []Action {
-	return []Action{OrgUpdate, OrgTransfer, OrgSecurity, MemberManage, RunnerManage, JobCreate, TokenCreate, ProjectManage, RunApprove}
+	return []Action{
+		OrgUpdate, OrgTransfer, OrgSecurity, MemberManage, RunnerManage, JobCreate, TokenCreate, ProjectManage, RunApprove,
+		EnvironmentManage, EnvironmentBypass, DeploymentApprove,
+	}
 }
 
 func IsSensitive(a Action) bool { return slices.Contains(SensitiveActions(), a) }

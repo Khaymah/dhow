@@ -292,3 +292,5 @@ func (a *analysis) needs(needs []string, path string) []string {
 	}
 	return out
 }
+
+func ValidEnvironmentName(name string) bool { return environmentPattern.MatchString(name) }
