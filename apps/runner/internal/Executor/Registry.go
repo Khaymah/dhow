@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	config "github.com/Khaymah/dhow/apps/runner/internal/Config"
+	masking "github.com/Khaymah/dhow/apps/runner/internal/Masking"
 )
 
 const (
@@ -41,7 +42,10 @@ func (a *attempt) openRegistries(values map[string][]byte) error {
 		}
 		clear(raw)
 		delete(values, ra.GetSecretName())
-		a.masker.Add([]byte(l.Password))
+		if !a.masker.Add([]byte(l.Password)) {
+			a.pipe.Systemf(nil, "dhow: warning: the registry password for %s is shorter than %d characters, so the log does not hide it",
+				ra.GetHost(), masking.MinLength)
+		}
 		a.scan.Add([]byte(l.Password))
 		a.registries[ra.GetHost()] = l
 	}

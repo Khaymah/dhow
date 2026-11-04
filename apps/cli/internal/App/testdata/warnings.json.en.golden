@@ -4,16 +4,8 @@
   "Lang": "en",
   "Valid": true,
   "Errors": 0,
-  "Warnings": 3,
+  "Warnings": 1,
   "Issues": [
-    {
-      "Code": "SECRETS_UNAVAILABLE",
-      "Severity": "warning",
-      "Path": "jobs.deploy",
-      "Line": 5,
-      "Column": 3,
-      "Message": "secrets arrive with M5: until then a job that asks for a secret fails when it is queued"
-    },
     {
       "Code": "IMAGE_NOT_PINNED",
       "Severity": "warning",
@@ -21,14 +13,6 @@
       "Line": 6,
       "Column": 5,
       "Message": "the image is not pinned by digest: the runner refuses it unless unpinned images are allowed"
-    },
-    {
-      "Code": "ENVIRONMENTS_UNAVAILABLE",
-      "Severity": "warning",
-      "Path": "jobs.deploy.environment",
-      "Line": 7,
-      "Column": 5,
-      "Message": "environments arrive with M5: until then this job is skipped"
     }
   ]
 }

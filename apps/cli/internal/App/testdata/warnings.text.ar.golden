@@ -1,4 +1,2 @@
-testdata/warnings.dhow.yml:5:3: تحذير SECRETS_UNAVAILABLE في jobs.deploy: الأسرار تأتي مع M5: حتى ذلك الوقت يفشل التشغيل الذي يطلب سرًا عند إدخاله في الطابور
 testdata/warnings.dhow.yml:6:5: تحذير IMAGE_NOT_PINNED في jobs.deploy.image: الصورة غير مثبّتة بالـ digest: يرفضها جهاز التشغيل إلا إذا سُمح بالصور غير المثبّتة
-testdata/warnings.dhow.yml:7:5: تحذير ENVIRONMENTS_UNAVAILABLE في jobs.deploy.environment: البيئات تأتي مع M5: حتى ذلك الوقت نتخطى هذا التشغيل
-testdata/warnings.dhow.yml: خطوات النشر صحيحة، وفيها تحذيرات عددها 3.
+testdata/warnings.dhow.yml: خطوات النشر صحيحة، وفيها تحذيرات عددها 1.

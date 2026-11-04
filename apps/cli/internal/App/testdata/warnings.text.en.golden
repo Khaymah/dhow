@@ -1,4 +1,2 @@
-testdata/warnings.dhow.yml:5:3: warning SECRETS_UNAVAILABLE at jobs.deploy: secrets arrive with M5: until then a job that asks for a secret fails when it is queued
 testdata/warnings.dhow.yml:6:5: warning IMAGE_NOT_PINNED at jobs.deploy.image: the image is not pinned by digest: the runner refuses it unless unpinned images are allowed
-testdata/warnings.dhow.yml:7:5: warning ENVIRONMENTS_UNAVAILABLE at jobs.deploy.environment: environments arrive with M5: until then this job is skipped
-testdata/warnings.dhow.yml: the pipeline is valid, with warnings: 3.
+testdata/warnings.dhow.yml: the pipeline is valid, with warnings: 1.

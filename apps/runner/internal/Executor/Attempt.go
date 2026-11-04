@@ -132,7 +132,9 @@ func (a *attempt) forgetSecrets() {
 		clear(v)
 	}
 	a.secrets = nil
+	a.registries = nil
 	a.masker.Clear()
+	a.scan.Clear()
 }
 
 func (a *attempt) masked(err error) string {
