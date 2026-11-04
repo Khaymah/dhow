@@ -60,6 +60,11 @@ const (
 	CodeSecretsNotAllowed      = "SECRETS_NOT_ALLOWED"
 	CodeSecretNotWholeValue    = "SECRET_NOT_WHOLE_VALUE"
 	CodeSecretsUnavailable     = "SECRETS_UNAVAILABLE"
+	CodeSecretFileInvalid      = "SECRET_FILE_INVALID"
+	CodeSecretFileNotSecret    = "SECRET_FILE_NOT_SECRET"
+	CodeTooManySecretFiles     = "TOO_MANY_SECRET_FILES"
+	CodeSecretFilesOnPlugin    = "SECRET_FILES_ON_PLUGIN"
+	CodeIDTokenUnsupported     = "ID_TOKEN_NOT_SUPPORTED_YET" //nolint:gosec // An issue code, not a credential.
 	CodeEnvironmentInvalid     = "ENVIRONMENT_INVALID"
 	CodeEnvironmentsDeferred   = "ENVIRONMENTS_UNAVAILABLE"
 	CodeMatrixTooLarge         = "MATRIX_TOO_LARGE"
@@ -256,11 +261,21 @@ func valueMessage(code string) string {
 	case CodeSecretNotWholeValue:
 		return "a secret is the whole value (${{ secrets.NAME }}), never part of a larger expression"
 	case CodeSecretsUnavailable:
-		return "secrets arrive with M5: until then a job that asks for a secret fails when it is queued"
+		return "the secret store did not answer"
+	case CodeSecretFileInvalid:
+		return "a secret file name is 1 to 128 of A-Z, a-z, 0-9, ., _ and -, and starts with a letter or a digit"
+	case CodeSecretFileNotSecret:
+		return "a file under files: is a whole secret, ${{ secrets.NAME }}"
+	case CodeTooManySecretFiles:
+		return "a job has at most 20 secret files"
+	case CodeSecretFilesOnPlugin:
+		return "a plugin step gets its secrets through with:, not files:"
+	case CodeIDTokenUnsupported:
+		return "id_token: arrives after the first release; use a secret until then"
 	case CodeEnvironmentInvalid:
 		return "an environment name is 1 to 64 of a-z, 0-9, _ and -"
 	case CodeEnvironmentsDeferred:
-		return "environments arrive with M5: until then this job is skipped"
+		return "the environment gate is not available yet: this job is skipped"
 	case CodeTimeoutInvalid:
 		return "a duration is like 90s, 20m or 1h30m, from 1s to 24h, and a step is not longer than its job"
 	case CodeResourceInvalid:

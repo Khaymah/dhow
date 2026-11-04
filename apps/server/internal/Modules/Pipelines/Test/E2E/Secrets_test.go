@@ -139,3 +139,33 @@ func TestStartRechecksTheRunBeforeOpeningAnySecret(t *testing.T) {
 	require.NoError(t, w.env.Pool.QueryRow(context.Background(), `SELECT "LastUsedAt"::text FROM "Secrets" WHERE "Name" = 'DEPLOY_TOKEN'`).Scan(&used))
 	assert.Nil(t, used, "the secret was never opened")
 }
+
+const varsPipeline = `version: 1
+on:
+  push: {}
+jobs:
+  build:
+    image: IMAGE
+    if: ${{ vars.REGION == "us" }}
+    env:
+      REGION: ${{ vars.REGION }}
+      BUCKET: ${{ vars.BUCKET }}
+    steps:
+      - run: ./build.sh
+`
+
+func TestVariablesFillTheContextWithTheClosestScope(t *testing.T) {
+	w := newWorld(t)
+	w.env.SeedVariable(apptest.SecretRef(w.org, nil, ""), "REGION", "eu")
+	w.env.SeedVariable(apptest.SecretRef(w.org, nil, ""), "BUCKET", "artifacts-eu")
+	w.env.SeedVariable(apptest.SecretRef(w.org, &w.project, ""), "region", "us")
+	w.defs.Put(shaA, pipeline(varsPipeline))
+	run := w.push("refs/heads/main", shaA)
+	w.env.StartRuns()
+	state, reason := w.env.RunState(run)
+	require.Equal(t, "active", w.env.RunJobs(run)["build"].State, "the project value wins in if: (run %s %s, job %s)", state, reason, w.env.RunJobs(run)["build"].Reason)
+	_, g := w.leaseKey(t, "build")
+	env := g.Grant.GetSpec().GetEnv()
+	assert.Equal(t, "us", env["REGION"])
+	assert.Equal(t, "artifacts-eu", env["BUCKET"])
+}

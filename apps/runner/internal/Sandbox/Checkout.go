@@ -1,7 +1,8 @@
 package sandbox
 
 const (
-	OutputPath = "/tmp/.dhow-output"
+	OutputPath  = "/tmp/.dhow-output"
+	SecretsPath = "/run/dhow/secrets"
 
 	CheckoutCommand        = "__checkout"
 	CheckoutEnvURL         = "DHOW_CHECKOUT_URL"

@@ -33,6 +33,18 @@ type SecretScope struct {
 
 func (s *Service) UseSecrets(store secretstore.Store) { s.secrets = store }
 
+func (s *Service) UseVariables(store secretstore.VariableStore) { s.vars = store }
+
+func (s *Service) variablesOf(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun) (map[string]string, error) {
+	if s.vars == nil || run.IsFork {
+		return map[string]string{}, nil
+	}
+	if q == nil {
+		q = s.queries()
+	}
+	return s.vars.Variables(ctx, q, run.OrganizationId, run.ProjectId, nil)
+}
+
 func (s *Service) SecretScopeOfJob(ctx context.Context, org, job uuid.UUID) (SecretScope, error) {
 	row, err := s.queries().SecretScopeOfJob(ctx, sqlc.SecretScopeOfJobParams{JobID: job, OrganizationID: org})
 	if errors.Is(err, pgx.ErrNoRows) {

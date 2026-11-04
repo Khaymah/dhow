@@ -131,14 +131,14 @@ func gitContext(run sqlc.PipelineRun) pipelinespec.Git {
 	return g
 }
 
-func evalContext(run sqlc.PipelineRun, project string, needs map[string]any) (pipelinespec.Context, error) {
+func evalContext(run sqlc.PipelineRun, project string, needs map[string]any, vars map[string]string) (pipelinespec.Context, error) {
 	inputs, err := decodeInputs(run.Inputs)
 	if err != nil {
 		return pipelinespec.Context{}, err
 	}
 	return pipelinespec.Context{
 		Git: gitContext(run), Project: pipelinespec.Project{ID: run.ProjectId.String(), Name: project},
-		Vars: map[string]string{}, Inputs: inputs, Needs: needs, Env: map[string]string{},
+		Vars: vars, Inputs: inputs, Needs: needs, Env: map[string]string{},
 	}, nil
 }
 

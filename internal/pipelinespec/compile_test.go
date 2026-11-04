@@ -87,8 +87,8 @@ func TestCompileFullExample(t *testing.T) {
 		codes[w.Code] = true
 		assert.Equal(t, SeverityWarning, w.Severity)
 	}
-	assert.True(t, codes[CodeSecretsUnavailable])
-	assert.True(t, codes[CodeEnvironmentsDeferred])
+	assert.False(t, codes[CodeSecretsUnavailable], "secrets are no longer a warning")
+	assert.False(t, codes[CodeEnvironmentsDeferred], "environments are no longer a warning")
 }
 
 func TestCompileIsDeterministic(t *testing.T) {

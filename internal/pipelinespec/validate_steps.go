@@ -46,6 +46,10 @@ func (a *analysis) steps(ja *jobAnalysis) {
 		}
 		a.stepBody(ja, &sa, p)
 		sa.env = a.envMap(ja, s.Env, scopeStepValue, p+".env")
+		sa.files = a.filesMap(ja, s.Files, scopeStepValue, p+".files")
+		if s.Uses != "" && len(s.Files) > 0 {
+			a.issues.add(CodeSecretFilesOnPlugin, p+".files")
+		}
 		if s.Timeout != "" {
 			t, ok := jobTimeout(s.Timeout)
 			if !ok || (ja.timeout > 0 && t > ja.timeout) {

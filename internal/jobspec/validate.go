@@ -214,6 +214,10 @@ func (c *checker) secretTarget(field string, s *runnerv1.SecretRef, spec *runner
 	}
 }
 
+func ValidSecretFile(name string) bool {
+	return name != "." && name != ".." && secretFile.MatchString(name) && len(name) <= MaxSecretFileLength
+}
+
 func usesEnv(spec *runnerv1.JobSpec, name string) bool {
 	if _, ok := spec.GetEnv()[name]; ok {
 		return true

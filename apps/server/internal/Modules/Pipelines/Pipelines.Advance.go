@@ -30,6 +30,7 @@ type step struct {
 	c       compiled
 	rows    []sqlc.RunJob
 	byKey   map[string]int
+	vars    map[string]string
 }
 
 func (st *step) settled(rj sqlc.RunJob) (done, ok bool) {
@@ -64,7 +65,11 @@ func (s *Service) advance(ctx context.Context, q *sqlc.Queries, run sqlc.Pipelin
 	if err != nil {
 		return err
 	}
-	st := &step{run: run, project: project, c: c, rows: rows, byKey: make(map[string]int, len(rows))}
+	vars, err := s.variablesOf(ctx, q, run)
+	if err != nil {
+		return err
+	}
+	st := &step{run: run, project: project, c: c, rows: rows, byKey: make(map[string]int, len(rows)), vars: vars}
 	for i, rj := range rows {
 		st.byKey[rj.Key] = i
 	}
@@ -130,7 +135,7 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 	if err != nil {
 		return err
 	}
-	evalCtx, err := evalContext(st.run, st.project, needs)
+	evalCtx, err := evalContext(st.run, st.project, needs, st.vars)
 	if err != nil {
 		return err
 	}

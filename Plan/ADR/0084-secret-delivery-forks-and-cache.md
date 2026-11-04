@@ -19,13 +19,13 @@
    - الـ job لازم أصله `pipeline`، والتنفيذ مش fork، والـ `RunJob` لسه `active` والـ job ده هو الـ `CurrentJobId`. غير كده: `SECRETS_UNAVAILABLE` من غير ما أي قيمة تتفك.
    - بعدها `SecretStore.Resolve` (اللي بيرفض الـ fork تاني)، والقيم بتتختم لمفتاح الـ runner (ADR-0045 زي ما هو).
    - الـ job اليدوي (`manual`) مالوش مشروع، فمالوش أسرار: `Accepts` بيرفضه وقت الإنشاء.
-   - `Jobs.SecretRequest` و`Accepts` بياخدوا `OriginKind` و`OriginID` (العقد بتاع ADR-0045 بيتعدّل في الاتنين مع بعض).
+   - `Accepts` بياخد أصل الـ job (`jobs.Origin`: المؤسسة والنوع والـ ID)، و`Resolve` بيلاقي الأصل من صف الـ job نفسه بالـ `JobID` (نفس طريق الـ checkout)، فـ `SecretRequest` مااتغيّرش.
    - الـ audit: `job.secrets_delivered` بالأسماء والنطاقات وأرقام الإصدارات بس، مرة لكل attempt، في الـ transaction بتاعة `Start`.
 3. **`files:` (القرار 14):** على الخطوة أو على الـ job، `files: {deploy_key: ${{ secrets.DEPLOY_KEY }}}`:
    - كل ملف `SecretRef.as_file` باسم الملف، و`step_indexes` الخطوة دي (أو كل خطوات `run` لو على الـ job، ومش الإضافات).
-   - الاسم `^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$`، و20 ملف بالكتير لكل job، والقيمة لازم `${{ secrets.NAME }}` كاملة.
+   - الاسم بنفس قاعدة `jobspec` لملفات الأسرار (`^[A-Za-z0-9][A-Za-z0-9._-]*$`، 128 حرف بالكتير، ومش `.` ولا `..`)، و20 ملف بالكتير لكل job، والقيمة لازم `${{ secrets.NAME }}` كاملة. وخطوة الإضافة مابتاخدش `files:` (`SECRET_FILES_ON_PLUGIN`).
    - الـ runner بيكتبها في `/run/dhow/secrets/<name>` بـ `0400` زي M3، و`DHOW_SECRETS_DIR` بيشاور على المجلد.
-4. **`vars.*`:** `Pipelines` بيملا السياق من `Core/SecretStore.Variables` (المؤسسة ثم المشروع، والبيئة في M5.6) قبل `if` والـ `env`. الـ forks بتاخد سياق فاضي.
+4. **`vars.*`:** `Pipelines` بيملا السياق من `Core/SecretStore.Variables` (المؤسسة ثم المشروع، والبيئة في M5.6) قبل `if` والـ `env` ومجموعة التزامن. الأسماء من غير فرق في الحروف، فكل كتابة للاسم موجودة في أي نطاق (`REGION` و`region`) بتاخد قيمة النطاق الأقرب. الـ forks بتاخد سياق فاضي.
 5. **الـ warnings:** `SECRETS_UNAVAILABLE` و`ENVIRONMENTS_UNAVAILABLE` مابقوش warnings في الـ validator، والأكواد بتفضل محجوزة. و`id_token:` بيترفض بـ `ID_TOKEN_NOT_SUPPORTED_YET` لحد M5.8.
 6. **فحص الـ artifacts والـ cache (القرار 16):** الـ runner بيعدّي كل ملف قبل الأرشفة على نفس Aho-Corasick بقيم الـ job بكل صيغها:
    - artifact فيه قيمة: الـ attempt بيفشل `ARTIFACT_CONTAINS_SECRET` (إضافة للـ proto)، والرسالة فيها اسم الـ artifact والملف بس.

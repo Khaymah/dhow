@@ -131,6 +131,7 @@ func runsFor(
 		return runServices{}, err
 	}
 	pipelinesService.UseSecrets(secretsService)
+	pipelinesService.UseVariables(secretsService)
 	if in.Secrets == nil {
 		secrets.next = &pipelineSecrets{runs: pipelinesService, store: secretsService, bus: bus, log: in.Log}
 	}

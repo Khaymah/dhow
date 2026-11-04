@@ -74,3 +74,7 @@ type RegistryLogin struct {
 type RegistryLogins interface {
 	RegistryLogin(ctx context.Context, org, project uuid.UUID, host string) (RegistryLogin, bool, error)
 }
+
+type VariableStore interface {
+	Variables(ctx context.Context, q *sqlc.Queries, org, project uuid.UUID, environment *uuid.UUID) (map[string]string, error)
+}
