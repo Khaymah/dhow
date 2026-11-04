@@ -32,6 +32,7 @@ const (
 	RunTrigger    ApiTokenScope = "run.trigger"
 	RunnerManage  ApiTokenScope = "runner.manage"
 	RunnerRead    ApiTokenScope = "runner.read"
+	SecretRead    ApiTokenScope = "secret.read"
 )
 
 // Valid indicates whether the value is a known member of the ApiTokenScope enum.
@@ -64,6 +65,8 @@ func (e ApiTokenScope) Valid() bool {
 	case RunnerManage:
 		return true
 	case RunnerRead:
+		return true
+	case SecretRead:
 		return true
 	default:
 		return false
