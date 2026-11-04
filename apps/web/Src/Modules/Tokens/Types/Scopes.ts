@@ -16,6 +16,7 @@ export const SCOPES: readonly TApiTokenScope[] = [
   'run.read',
   'run.trigger',
   'run.cancel',
+  'secret.read',
 ];
 
 const DEVELOPER: readonly TApiTokenScope[] = [
@@ -26,6 +27,7 @@ const DEVELOPER: readonly TApiTokenScope[] = [
   'project.read',
   'run.read',
   'run.trigger',
+  'secret.read',
 ];
 const MAINTAINER: readonly TApiTokenScope[] = [...DEVELOPER, 'job.cancel', 'project.manage', 'run.cancel'];
 

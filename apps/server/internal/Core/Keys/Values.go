@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -21,11 +22,18 @@ type Spec struct {
 	Column       string
 	Label        string
 	Owner        OwnerKind
+	AlsoOwners   []OwnerKind
 	MaxPlaintext int
 	MaxSealed    int
 }
 
 func (s Spec) Name() string { return s.Table + "." + s.Column }
+
+func (s Spec) Allows(kind OwnerKind) bool {
+	return kind == s.Owner || slices.Contains(s.AlsoOwners, kind)
+}
+
+func (s Spec) OwnerKinds() []OwnerKind { return append([]OwnerKind{s.Owner}, s.AlsoOwners...) }
 
 func (s Spec) Valid() error {
 	switch {
@@ -33,7 +41,7 @@ func (s Spec) Valid() error {
 		return errors.New("a value location needs its table and column")
 	case s.Label == "" || len(s.Label) > maxLabelBytes:
 		return fmt.Errorf("%s: %w", s.Name(), ErrBadLabel)
-	case !knownKind(s.Owner):
+	case !knownKind(s.Owner) || slices.ContainsFunc(s.AlsoOwners, func(k OwnerKind) bool { return !knownKind(k) || k == OwnerInstance }):
 		return fmt.Errorf("%s: %w", s.Name(), ErrBadOwner)
 	case s.MaxPlaintext <= 0 || s.MaxPlaintext > MaxPlaintext:
 		return fmt.Errorf("%s: the largest plaintext must be 1 byte to 1 MiB", s.Name())
@@ -113,7 +121,7 @@ type Column struct {
 func (c *Column) Spec() Spec { return c.spec }
 
 func (c *Column) SealIn(ctx context.Context, q *sqlc.Queries, owner Owner, rowContext, plaintext []byte) ([]byte, error) {
-	if owner.Kind != c.spec.Owner {
+	if !c.spec.Allows(owner.Kind) {
 		return nil, ErrWrongOwnerKind
 	}
 	if len(plaintext) > c.spec.MaxPlaintext {
@@ -123,7 +131,7 @@ func (c *Column) SealIn(ctx context.Context, q *sqlc.Queries, owner Owner, rowCo
 }
 
 func (c *Column) Open(ctx context.Context, owner Owner, rowContext, sealed []byte) ([]byte, error) {
-	if owner.Kind != c.spec.Owner {
+	if !c.spec.Allows(owner.Kind) {
 		return nil, ErrWrongOwnerKind
 	}
 	if len(sealed) == 0 {

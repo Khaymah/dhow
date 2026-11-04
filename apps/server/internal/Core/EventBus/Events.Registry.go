@@ -96,6 +96,17 @@ const (
 	EnvironmentRemoved = "environment.removed"
 	EnvironmentPaused  = "environment.paused"
 	EnvironmentResumed = "environment.resumed"
+
+	SecretCreated             = "secret.created"
+	SecretUpdated             = "secret.updated"
+	SecretVersionRestored     = "secret.version_restored"
+	SecretRemoved             = "secret.removed"
+	VariableCreated           = "variable.created"
+	VariableUpdated           = "variable.updated"
+	VariableRemoved           = "variable.removed"
+	RegistryCredentialCreated = "registry_credential.created"
+	RegistryCredentialUpdated = "registry_credential.updated"
+	RegistryCredentialRemoved = "registry_credential.removed"
 )
 
 func AuditedEvents() []string {
@@ -178,6 +189,16 @@ func AuditedEvents() []string {
 		EnvironmentRemoved,
 		EnvironmentPaused,
 		EnvironmentResumed,
+		SecretCreated,
+		SecretUpdated,
+		SecretVersionRestored,
+		SecretRemoved,
+		VariableCreated,
+		VariableUpdated,
+		VariableRemoved,
+		RegistryCredentialCreated,
+		RegistryCredentialUpdated,
+		RegistryCredentialRemoved,
 	}
 }
 

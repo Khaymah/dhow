@@ -206,3 +206,50 @@ func TestEnvironmentActionsFollowTheProjectRole(t *testing.T) {
 	}
 	assert.False(t, policy.IsSensitive(policy.EnvironmentPause), "pausing during an incident never waits for a second factor")
 }
+
+func TestSecretActions(t *testing.T) {
+	org, project, other := uuid.New(), uuid.New(), uuid.New()
+	member := func(role policy.Role) policy.Subject {
+		return policy.Subject{UserID: uuid.New(), Memberships: []policy.Membership{{OrganizationID: org, Role: role}}}
+	}
+	on := func(id uuid.UUID, bindings ...policy.Role) policy.Resource {
+		return policy.Resource{OrganizationID: org, ProjectID: id, ProjectBindings: bindings}
+	}
+	token := policy.Subject{
+		UserID: uuid.New(), TokenID: uuid.New(), TokenScopes: policy.TokenActions(),
+		Memberships: []policy.Membership{{OrganizationID: org, Role: policy.RoleOwner}},
+	}
+	tests := []struct {
+		name     string
+		subject  policy.Subject
+		action   policy.Action
+		resource policy.Resource
+		want     bool
+	}{
+		{"a developer reads secret names", member(policy.RoleDeveloper), policy.SecretRead, on(project), true},
+		{"a viewer does not read secret names", member(policy.RoleViewer), policy.SecretRead, on(project), false},
+		{"a maintainer manages project secrets", member(policy.RoleMaintainer), policy.SecretManage, on(project), true},
+		{"a developer does not manage project secrets", member(policy.RoleDeveloper), policy.SecretManage, on(project), false},
+		{"a maintainer binding lets a developer manage its project", member(policy.RoleDeveloper), policy.SecretManage, on(project, policy.RoleMaintainer), true},
+		{"a maintainer binding grants nothing on another project", member(policy.RoleDeveloper), policy.SecretManage, on(other), false},
+		{"a viewer binding stops a maintainer", member(policy.RoleMaintainer), policy.SecretManage, on(project, policy.RoleViewer), false},
+		{"a maintainer does not manage organization secrets", member(policy.RoleMaintainer), policy.OrgSecretManage, on(uuid.Nil), false},
+		{"an admin manages organization secrets", member(policy.RoleAdmin), policy.OrgSecretManage, on(uuid.Nil), true},
+		{"a token reads secret names", token, policy.SecretRead, on(project), true},
+		{"a token never writes project secrets", token, policy.SecretManage, on(project), false},
+		{"a token never writes organization secrets", token, policy.OrgSecretManage, on(uuid.Nil), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, policy.Can(tt.subject, tt.action, tt.resource))
+		})
+	}
+	assert.True(t, policy.IsProjectAction(policy.SecretRead))
+	assert.True(t, policy.IsProjectAction(policy.SecretManage))
+	assert.False(t, policy.IsProjectAction(policy.OrgSecretManage))
+	assert.Equal(t, []bool{true, false, false},
+		[]bool{policy.IsTokenAction(policy.SecretRead), policy.IsTokenAction(policy.SecretManage), policy.IsTokenAction(policy.OrgSecretManage)})
+	assert.True(t, policy.IsSensitive(policy.SecretManage))
+	assert.True(t, policy.IsSensitive(policy.OrgSecretManage))
+	assert.False(t, policy.IsSensitive(policy.SecretRead))
+}

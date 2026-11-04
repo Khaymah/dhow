@@ -280,7 +280,7 @@ type Querier interface {
 	ListRunners(ctx context.Context, arg ListRunnersParams) ([]Runner, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]PipelineRun, error)
 	ListSecretProjectAccess(ctx context.Context, secretIds []uuid.UUID) ([]ListSecretProjectAccessRow, error)
-	ListSecretsInScope(ctx context.Context, arg ListSecretsInScopeParams) ([]Secret, error)
+	ListSecretsInScope(ctx context.Context, arg ListSecretsInScopeParams) ([]ListSecretsInScopeRow, error)
 	ListStalledRuns(ctx context.Context, arg ListStalledRunsParams) ([]uuid.UUID, error)
 	ListSupersededDataKeyIds(ctx context.Context) ([]uuid.UUID, error)
 	ListTeamBindings(ctx context.Context, arg ListTeamBindingsParams) ([]ListTeamBindingsRow, error)

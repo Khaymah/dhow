@@ -54,3 +54,14 @@ func (e *Envelope) lockedDataKey(ctx context.Context, q *sqlc.Queries, owner Own
 	}
 	return DataKey{}, fmt.Errorf("%w: %s", ErrNoLiveDataKey, owner)
 }
+
+func (e *Envelope) DestroyIn(ctx context.Context, q *sqlc.Queries, owner Owner) (int64, error) {
+	if !owner.Valid() || owner.Kind == OwnerInstance {
+		return 0, ErrBadOwner
+	}
+	n, err := q.DestroyDataKeysOfOwner(ctx, sqlc.DestroyDataKeysOfOwnerParams{OwnerKind: string(owner.Kind), OwnerID: owner.idPtr()})
+	if err != nil {
+		return 0, fmt.Errorf("destroy the data key of %s: %w", owner, err)
+	}
+	return n, nil
+}

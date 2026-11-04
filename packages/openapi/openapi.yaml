@@ -70,6 +70,12 @@ tags:
       SHA-256. Served by the Artifacts module. Runners upload and download them on /runner-api/, bound to their lease;
       this API lists and downloads them. Artifacts of a run from a fork's pull request are marked `Untrusted` and can
       never feed a deploy. The cache is never readable here.
+  - name: secrets
+    description: >-
+      Secrets, variables and private registry credentials of an organization, a project or an environment. Served by
+      the Secrets module. Secrets are write-only: no response ever carries a value, a hash or a fingerprint. The
+      closest scope wins: environment, then project, then organization. API tokens may only read names and metadata
+      (`secret.read`).
   - name: environments
     description: >-
       Environments of a project and their protection rules, which live on the server only so no commit can change
@@ -2558,6 +2564,777 @@ paths:
                 $ref: "#/components/schemas/EnvironmentResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/secrets:
+    get:
+      operationId: listOrganizationSecrets
+      tags: [secrets]
+      summary: List the secrets of the organization
+      description: >-
+        Needs `secret.read`. Names and metadata only: no value, hash or fingerprint is ever returned. `Overrides` lists the
+        wider scopes whose secret of the same name this one covers.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of secrets.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/secrets/{secretName}:
+    put:
+      operationId: putOrganizationSecret
+      tags: [secrets]
+      summary: Create a secret of the organization, or write a new version
+      description: >-
+        Needs `org.secret.manage`. Creates the secret or a new version of it. The value is UTF-8 without NUL, 8 bytes
+        (`SECRET_TOO_SHORT`) to 32 KiB (`SECRET_TOO_LARGE`), and is never returned. Names are unique in the
+        scope whatever their case, and names that start with `DHOW_` answer `SECRET_NAME_RESERVED`. The
+        value of a version older than the last five, or replaced more than 30 days ago, is erased.
+        `Visibility` and `ProjectIds` choose the projects that may use it.
+        `AvailableToPullRequests` lets runs of pull requests from the same repository use it.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/SecretName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutSecretRequest"
+      responses:
+        "200":
+          description: The secret, without its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/secrets/{secretName}/remove:
+    post:
+      operationId: removeOrganizationSecret
+      tags: [secrets]
+      summary: Remove a secret of the organization
+      description: >-
+        Needs `org.secret.manage`. Marks the secret deleted and erases the values of all its versions in the same
+        transaction. The name can be used again.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/SecretName"
+      responses:
+        "200":
+          description: The removed secret, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/secrets/{secretName}/restore-version:
+    post:
+      operationId: restoreOrganizationSecretVersion
+      tags: [secrets]
+      summary: Restore an earlier version of a secret of the organization
+      description: >-
+        Needs `org.secret.manage`. Writes the value of an earlier version as a new version. A version whose value
+        was erased answers 409 `SECRET_VERSION_ERASED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/SecretName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreSecretVersionRequest"
+      responses:
+        "200":
+          description: The secret with its new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/variables:
+    get:
+      operationId: listOrganizationVariables
+      tags: [secrets]
+      summary: List the variables of the organization
+      description: >-
+        Needs `project.read`. Variables are not secret: anyone who can read the project reads their values.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of variables.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariableListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/variables/{variableName}:
+    put:
+      operationId: putOrganizationVariable
+      tags: [secrets]
+      summary: Create or change a variable of the organization
+      description: >-
+        Needs `org.secret.manage`. The value is UTF-8 text up to 4 KiB. Same name rules as secrets.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/VariableName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutVariableRequest"
+      responses:
+        "200":
+          description: The variable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariableResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/variables/{variableName}/remove:
+    post:
+      operationId: removeOrganizationVariable
+      tags: [secrets]
+      summary: Remove a variable of the organization
+      description: >-
+        Needs `org.secret.manage`. The name can be used again.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/VariableName"
+      responses:
+        "200":
+          description: The removed variable, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariableResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/registry-credentials:
+    get:
+      operationId: listOrganizationRegistryCredentials
+      tags: [secrets]
+      summary: List the registry credentials of the organization
+      description: >-
+        Needs `secret.read`. Host and username only: the password is never returned.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of registry credentials.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryCredentialListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createOrganizationRegistryCredential
+      tags: [secrets]
+      summary: Add a registry credential to the organization
+      description: >-
+        Needs `org.secret.manage`. One per host in the scope (409 `REGISTRY_CREDENTIAL_EXISTS`). The host is a DNS
+        name with an optional port, never an IP address. The server sends it only to that host, and to a token
+        realm on the same host over https.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRegistryCredentialRequest"
+      responses:
+        "201":
+          description: The new registry credential, without its password.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryCredentialResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/registry-credentials/{credentialId}:
+    put:
+      operationId: updateOrganizationRegistryCredential
+      tags: [secrets]
+      summary: Change a registry credential of the organization
+      description: >-
+        Needs `org.secret.manage`. Changes the username and the password. The host never changes.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/RegistryCredentialId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRegistryCredentialRequest"
+      responses:
+        "200":
+          description: The registry credential, without its password.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryCredentialResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/registry-credentials/{credentialId}/remove:
+    post:
+      operationId: removeOrganizationRegistryCredential
+      tags: [secrets]
+      summary: Remove a registry credential of the organization
+      description: >-
+        Needs `org.secret.manage`. The password is erased in the same transaction.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/RegistryCredentialId"
+      responses:
+        "200":
+          description: The removed registry credential, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryCredentialResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/secrets:
+    get:
+      operationId: listProjectSecrets
+      tags: [secrets]
+      summary: List the secrets of a project
+      description: >-
+        Needs `secret.read`. Names and metadata only: no value, hash or fingerprint is ever returned. `Overrides` lists the
+        wider scopes whose secret of the same name this one covers.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of secrets.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/secrets/{secretName}:
+    put:
+      operationId: putProjectSecret
+      tags: [secrets]
+      summary: Create a secret of a project, or write a new version
+      description: >-
+        Needs `secret.manage`. Creates the secret or a new version of it. The value is UTF-8 without NUL, 8 bytes
+        (`SECRET_TOO_SHORT`) to 32 KiB (`SECRET_TOO_LARGE`), and is never returned. Names are unique in the
+        scope whatever their case, and names that start with `DHOW_` answer `SECRET_NAME_RESERVED`. The
+        value of a version older than the last five, or replaced more than 30 days ago, is erased.
+        `AvailableToPullRequests` lets runs of pull requests from the same repository use it.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/SecretName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutSecretRequest"
+      responses:
+        "200":
+          description: The secret, without its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/secrets/{secretName}/remove:
+    post:
+      operationId: removeProjectSecret
+      tags: [secrets]
+      summary: Remove a secret of a project
+      description: >-
+        Needs `secret.manage`. Marks the secret deleted and erases the values of all its versions in the same
+        transaction. The name can be used again.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/SecretName"
+      responses:
+        "200":
+          description: The removed secret, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/secrets/{secretName}/restore-version:
+    post:
+      operationId: restoreProjectSecretVersion
+      tags: [secrets]
+      summary: Restore an earlier version of a secret of a project
+      description: >-
+        Needs `secret.manage`. Writes the value of an earlier version as a new version. A version whose value
+        was erased answers 409 `SECRET_VERSION_ERASED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/SecretName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreSecretVersionRequest"
+      responses:
+        "200":
+          description: The secret with its new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/variables:
+    get:
+      operationId: listProjectVariables
+      tags: [secrets]
+      summary: List the variables of a project
+      description: >-
+        Needs `project.read`. Variables are not secret: anyone who can read the project reads their values.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of variables.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariableListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/variables/{variableName}:
+    put:
+      operationId: putProjectVariable
+      tags: [secrets]
+      summary: Create or change a variable of a project
+      description: >-
+        Needs `secret.manage`. The value is UTF-8 text up to 4 KiB. Same name rules as secrets.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/VariableName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutVariableRequest"
+      responses:
+        "200":
+          description: The variable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariableResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/variables/{variableName}/remove:
+    post:
+      operationId: removeProjectVariable
+      tags: [secrets]
+      summary: Remove a variable of a project
+      description: >-
+        Needs `secret.manage`. The name can be used again.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/VariableName"
+      responses:
+        "200":
+          description: The removed variable, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariableResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/registry-credentials:
+    get:
+      operationId: listProjectRegistryCredentials
+      tags: [secrets]
+      summary: List the registry credentials of a project
+      description: >-
+        Needs `secret.read`. Host and username only: the password is never returned.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of registry credentials.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryCredentialListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createProjectRegistryCredential
+      tags: [secrets]
+      summary: Add a registry credential to a project
+      description: >-
+        Needs `secret.manage`. One per host in the scope (409 `REGISTRY_CREDENTIAL_EXISTS`). The host is a DNS
+        name with an optional port, never an IP address. The server sends it only to that host, and to a token
+        realm on the same host over https.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRegistryCredentialRequest"
+      responses:
+        "201":
+          description: The new registry credential, without its password.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryCredentialResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/registry-credentials/{credentialId}:
+    put:
+      operationId: updateProjectRegistryCredential
+      tags: [secrets]
+      summary: Change a registry credential of a project
+      description: >-
+        Needs `secret.manage`. Changes the username and the password. The host never changes.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RegistryCredentialId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRegistryCredentialRequest"
+      responses:
+        "200":
+          description: The registry credential, without its password.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryCredentialResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/registry-credentials/{credentialId}/remove:
+    post:
+      operationId: removeProjectRegistryCredential
+      tags: [secrets]
+      summary: Remove a registry credential of a project
+      description: >-
+        Needs `secret.manage`. The password is erased in the same transaction.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RegistryCredentialId"
+      responses:
+        "200":
+          description: The removed registry credential, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryCredentialResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets:
+    get:
+      operationId: listEnvironmentSecrets
+      tags: [secrets]
+      summary: List the secrets of an environment
+      description: >-
+        Needs `secret.read`. Names and metadata only: no value, hash or fingerprint is ever returned. `Overrides` lists the
+        wider scopes whose secret of the same name this one covers.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of secrets.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets/{secretName}:
+    put:
+      operationId: putEnvironmentSecret
+      tags: [secrets]
+      summary: Create a secret of an environment, or write a new version
+      description: >-
+        Needs `environment.manage`. Creates the secret or a new version of it. The value is UTF-8 without NUL, 8 bytes
+        (`SECRET_TOO_SHORT`) to 32 KiB (`SECRET_TOO_LARGE`), and is never returned. Names are unique in the
+        scope whatever their case, and names that start with `DHOW_` answer `SECRET_NAME_RESERVED`. The
+        value of a version older than the last five, or replaced more than 30 days ago, is erased.
+        Only jobs that name this environment receive it, once the environment lets them deploy.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/SecretName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutSecretRequest"
+      responses:
+        "200":
+          description: The secret, without its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets/{secretName}/remove:
+    post:
+      operationId: removeEnvironmentSecret
+      tags: [secrets]
+      summary: Remove a secret of an environment
+      description: >-
+        Needs `environment.manage`. Marks the secret deleted and erases the values of all its versions in the same
+        transaction. The name can be used again.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/SecretName"
+      responses:
+        "200":
+          description: The removed secret, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets/{secretName}/restore-version:
+    post:
+      operationId: restoreEnvironmentSecretVersion
+      tags: [secrets]
+      summary: Restore an earlier version of a secret of an environment
+      description: >-
+        Needs `environment.manage`. Writes the value of an earlier version as a new version. A version whose value
+        was erased answers 409 `SECRET_VERSION_ERASED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/SecretName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreSecretVersionRequest"
+      responses:
+        "200":
+          description: The secret with its new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/variables:
+    get:
+      operationId: listEnvironmentVariables
+      tags: [secrets]
+      summary: List the variables of an environment
+      description: >-
+        Needs `project.read`. Variables are not secret: anyone who can read the project reads their values.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of variables.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariableListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/variables/{variableName}:
+    put:
+      operationId: putEnvironmentVariable
+      tags: [secrets]
+      summary: Create or change a variable of an environment
+      description: >-
+        Needs `environment.manage`. The value is UTF-8 text up to 4 KiB. Same name rules as secrets.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/VariableName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutVariableRequest"
+      responses:
+        "200":
+          description: The variable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariableResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/variables/{variableName}/remove:
+    post:
+      operationId: removeEnvironmentVariable
+      tags: [secrets]
+      summary: Remove a variable of an environment
+      description: >-
+        Needs `environment.manage`. The name can be used again.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/VariableName"
+      responses:
+        "200":
+          description: The removed variable, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariableResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/projects/{projectId}/repository:
     get:
       operationId: getRepository
@@ -3548,6 +4325,27 @@ components:
         format: uuid
     ArtifactId:
       name: artifactId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SecretName:
+      name: secretName
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+    VariableName:
+      name: variableName
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+    RegistryCredentialId:
+      name: credentialId
       in: path
       required: true
       schema:
@@ -5703,7 +6501,7 @@ components:
     ApiTokenScope:
       type: string
       enum: [org.read, org.update, member.read, member.manage, audit.read, runner.read, runner.manage, job.read, job.cancel, project.read, project.manage,
-             run.read, run.trigger, run.cancel]
+             run.read, run.trigger, run.cancel, secret.read]
     ApiTokenStatus:
       type: string
       enum: [active, expired, revoked, inactive]
@@ -7209,3 +8007,214 @@ components:
           properties:
             Data:
               $ref: "#/components/schemas/OrganizationOverview"
+    SecretScope:
+      type: string
+      enum: [organization, project, environment]
+    SecretVisibility:
+      type: string
+      enum: [all_projects, selected_projects]
+      description: Organization secrets only. `selected_projects` limits it to `ProjectIds`.
+    Secret:
+      type: object
+      additionalProperties: false
+      description: A secret without its value. No response carries a value, a hash or a fingerprint.
+      required: [Name, Scope, Description, Version, SizeBytes, AvailableToPullRequests, Visibility, ProjectIds, Overrides, CreatedAt, UpdatedAt, UpdatedByUserId]
+      properties:
+        Name:
+          type: string
+        Scope:
+          $ref: "#/components/schemas/SecretScope"
+        Description:
+          type: string
+        Version:
+          type: integer
+        SizeBytes:
+          type: integer
+        AvailableToPullRequests:
+          type: boolean
+        Visibility:
+          $ref: "#/components/schemas/SecretVisibility"
+        ProjectIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        Overrides:
+          type: array
+          description: The wider scopes whose secret of the same name this one covers.
+          items:
+            $ref: "#/components/schemas/SecretScope"
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+        UpdatedByUserId:
+          type: string
+          format: uuid
+        LastUsedAt:
+          type: string
+          format: date-time
+    SecretResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/Secret"
+    SecretListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Secret"
+    PutSecretRequest:
+      type: object
+      additionalProperties: false
+      required: [Value]
+      properties:
+        Value:
+          type: string
+          writeOnly: true
+          description: UTF-8 without NUL, 8 bytes to 32 KiB. Never returned.
+        Description:
+          type: string
+          maxLength: 256
+        AvailableToPullRequests:
+          type: boolean
+          description: Organization and project secrets. Environments decide this in their rules.
+        Visibility:
+          $ref: "#/components/schemas/SecretVisibility"
+        ProjectIds:
+          type: array
+          maxItems: 500
+          items:
+            type: string
+            format: uuid
+    RestoreSecretVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [Version]
+      properties:
+        Version:
+          type: integer
+          minimum: 1
+    Variable:
+      type: object
+      additionalProperties: false
+      required: [Name, Scope, Value, Overrides, CreatedAt, UpdatedAt, UpdatedByUserId]
+      properties:
+        Name:
+          type: string
+        Scope:
+          $ref: "#/components/schemas/SecretScope"
+        Value:
+          type: string
+        Overrides:
+          type: array
+          items:
+            $ref: "#/components/schemas/SecretScope"
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+        UpdatedByUserId:
+          type: string
+          format: uuid
+    VariableResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/Variable"
+    VariableListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Variable"
+    PutVariableRequest:
+      type: object
+      additionalProperties: false
+      required: [Value]
+      properties:
+        Value:
+          type: string
+          description: UTF-8 text up to 4 KiB.
+    RegistryCredential:
+      type: object
+      additionalProperties: false
+      description: A registry credential without its password.
+      required: [Id, Scope, Host, Username, CreatedAt, UpdatedAt, UpdatedByUserId]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        Scope:
+          $ref: "#/components/schemas/SecretScope"
+        Host:
+          type: string
+        Username:
+          type: string
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+        UpdatedByUserId:
+          type: string
+          format: uuid
+    RegistryCredentialResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/RegistryCredential"
+    RegistryCredentialListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/RegistryCredential"
+    CreateRegistryCredentialRequest:
+      type: object
+      additionalProperties: false
+      required: [Host, Username, Password]
+      properties:
+        Host:
+          type: string
+          maxLength: 259
+        Username:
+          type: string
+          minLength: 1
+          maxLength: 256
+        Password:
+          type: string
+          writeOnly: true
+    UpdateRegistryCredentialRequest:
+      type: object
+      additionalProperties: false
+      required: [Username, Password]
+      properties:
+        Username:
+          type: string
+          minLength: 1
+          maxLength: 256
+        Password:
+          type: string
+          writeOnly: true

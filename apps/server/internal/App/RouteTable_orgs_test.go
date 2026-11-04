@@ -87,20 +87,14 @@ func organizationPath(env *apptest.Env, fx fixture, rule policy.Rule) string {
 	if strings.Contains(path, "{eventId}") {
 		path = strings.ReplaceAll(path, "{eventId}", auditEventOf(env, fx.orgA))
 	}
+	var project *uuid.UUID
 	if strings.Contains(path, "{projectId}") {
-		project := env.SeedProject(uuid.MustParse(fx.orgA), uuid.MustParse(fx.byRole[policy.RoleOwner]))
-		path = strings.ReplaceAll(path, "{projectId}", project.String())
-		if strings.Contains(path, "{runId}") {
-			path = strings.ReplaceAll(path, "{runId}", env.SeedRun(project, "awaiting_approval").String())
-		}
-		if strings.Contains(path, "{artifactId}") {
-			path = strings.ReplaceAll(path, "{artifactId}", env.SeedArtifact(project, "web", []byte("archive"), false).ID.String())
-		}
-		if strings.Contains(path, "{environmentName}") {
-			env.SeedEnvironment(project, apptest.RouteTableEnvironment)
-			path = strings.ReplaceAll(path, "{environmentName}", apptest.RouteTableEnvironment)
-		}
+		seeded := env.SeedProject(uuid.MustParse(fx.orgA), uuid.MustParse(fx.byRole[policy.RoleOwner]))
+		project = &seeded
+		path = strings.ReplaceAll(path, "{projectId}", seeded.String())
+		path = projectParams(env, path, seeded)
 	}
+	path = secretsPath(env, path, uuid.MustParse(fx.orgA), project)
 	if strings.Contains(path, "{invitationId}") {
 		path = strings.ReplaceAll(path, "{invitationId}", seedInvitation(env, fx.orgA, fx.byRole[policy.RoleOwner], string(policy.RoleViewer)))
 	}
@@ -148,6 +142,6 @@ func organizationBody(env *apptest.Env, fx fixture, rule policy.Rule) any {
 	case "POST /invitations/accept":
 		return map[string]string{"Token": "not-a-token", "Name": "Route Table", "Password": "a long enough password"}
 	default:
-		return nil
+		return secretsBody(env, rule)
 	}
 }

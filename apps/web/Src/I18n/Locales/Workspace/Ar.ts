@@ -264,6 +264,7 @@ export const WorkspaceAr = {
   'scope.run.read': 'يشاهد تنفيذات خطوات النشر',
   'scope.run.trigger': 'يبدأ تنفيذ خطوات النشر ويعيد التشغيلات التي فشلت',
   'scope.run.cancel': 'يلغي تنفيذات خطوات النشر',
+  'scope.secret.read': 'يشاهد أسماء الأسرار، ولا يقرأ قيمها',
 
   'sessions.current': 'هذا الجهاز',
   'sessions.device': '{browser} على {os}',

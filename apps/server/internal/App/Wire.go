@@ -40,6 +40,7 @@ import (
 	preferences "github.com/Khaymah/dhow/apps/server/internal/Modules/Preferences"
 	projects "github.com/Khaymah/dhow/apps/server/internal/Modules/Projects"
 	runners "github.com/Khaymah/dhow/apps/server/internal/Modules/Runners"
+	secretsmodule "github.com/Khaymah/dhow/apps/server/internal/Modules/Secrets"
 	session "github.com/Khaymah/dhow/apps/server/internal/Modules/Session"
 	settings "github.com/Khaymah/dhow/apps/server/internal/Modules/Settings"
 	sources "github.com/Khaymah/dhow/apps/server/internal/Modules/Sources"
@@ -166,6 +167,11 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
+	secretsService, err := secretsmodule.NewService(secretsmodule.Options{DB: in.Pool, Values: values, Bus: bus, Log: in.Log, Now: in.Now})
+	if err != nil {
+		return nil, err
+	}
+	secretsmodule.Subscribe(bus, secretsService)
 
 	opts := Options{
 		Config: in.Config,
@@ -181,6 +187,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Jobs:      jobsService,
 		Projects:  projects.NewService(projects.Options{DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now}),
 		Envs:      environments.NewService(environments.Options{DB: in.Pool, Factors: sessionService, Bus: bus, Log: in.Log, Now: in.Now}),
+		Secrets:   secretsService,
 		Sources:   sourcesService,
 		Pipelines: pipelinesService,
 		Artifacts: artifactsService,

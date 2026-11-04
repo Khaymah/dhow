@@ -69,3 +69,14 @@ WHERE "Id" IN (
     LIMIT @batch
     FOR UPDATE SKIP LOCKED
 );
+
+-- name: EraseExpiredSecretVersions :execrows
+UPDATE "SecretVersions"
+SET "ValueSealed" = NULL, "ErasedAt" = now(), "UpdatedAt" = now()
+WHERE "Id" IN (
+    SELECT v."Id" FROM "SecretVersions" v
+    WHERE v."ValueSealed" IS NOT NULL AND v."SupersededAt" IS NOT NULL AND v."SupersededAt" < @before::timestamptz
+    ORDER BY v."SupersededAt"
+    LIMIT @batch
+    FOR UPDATE SKIP LOCKED
+);

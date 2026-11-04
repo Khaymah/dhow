@@ -52,12 +52,12 @@ func (q *Queries) CountSecretsInScope(ctx context.Context, arg CountSecretsInSco
 
 const eraseAllSecretVersions = `-- name: EraseAllSecretVersions :execrows
 UPDATE "SecretVersions"
-SET "ValueSealed" = NULL, "ErasedAt" = $1, "UpdatedAt" = $1
+SET "ValueSealed" = NULL, "ErasedAt" = $1::timestamptz, "UpdatedAt" = $1::timestamptz
 WHERE "SecretId" = $2 AND "ValueSealed" IS NOT NULL
 `
 
 type EraseAllSecretVersionsParams struct {
-	Now      *time.Time
+	Now      time.Time
 	SecretID uuid.UUID
 }
 
@@ -69,41 +69,14 @@ func (q *Queries) EraseAllSecretVersions(ctx context.Context, arg EraseAllSecret
 	return result.RowsAffected(), nil
 }
 
-const eraseExpiredSecretVersions = `-- name: EraseExpiredSecretVersions :execrows
-UPDATE "SecretVersions"
-SET "ValueSealed" = NULL, "ErasedAt" = $1, "UpdatedAt" = $1
-WHERE "Id" IN (
-    SELECT v."Id"
-    FROM "SecretVersions" v
-    WHERE v."ValueSealed" IS NOT NULL AND v."SupersededAt" IS NOT NULL AND v."SupersededAt" < $2
-    ORDER BY v."SupersededAt"
-    LIMIT $3
-    FOR UPDATE SKIP LOCKED
-)
-`
-
-type EraseExpiredSecretVersionsParams struct {
-	Now    *time.Time
-	Cutoff *time.Time
-	Batch  int32
-}
-
-func (q *Queries) EraseExpiredSecretVersions(ctx context.Context, arg EraseExpiredSecretVersionsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, eraseExpiredSecretVersions, arg.Now, arg.Cutoff, arg.Batch)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const eraseSecretVersionsBelow = `-- name: EraseSecretVersionsBelow :execrows
 UPDATE "SecretVersions"
-SET "ValueSealed" = NULL, "ErasedAt" = $1, "UpdatedAt" = $1
+SET "ValueSealed" = NULL, "ErasedAt" = $1::timestamptz, "UpdatedAt" = $1::timestamptz
 WHERE "SecretId" = $2 AND "Version" <= $3 AND "ValueSealed" IS NOT NULL
 `
 
 type EraseSecretVersionsBelowParams struct {
-	Now      *time.Time
+	Now      time.Time
 	SecretID uuid.UUID
 	Version  int32
 }
@@ -118,12 +91,12 @@ func (q *Queries) EraseSecretVersionsBelow(ctx context.Context, arg EraseSecretV
 
 const eraseSecretVersionsOf = `-- name: EraseSecretVersionsOf :execrows
 UPDATE "SecretVersions"
-SET "ValueSealed" = NULL, "ErasedAt" = $1, "UpdatedAt" = $1
+SET "ValueSealed" = NULL, "ErasedAt" = $1::timestamptz, "UpdatedAt" = $1::timestamptz
 WHERE "SecretId" = ANY($2::uuid[]) AND "ValueSealed" IS NOT NULL
 `
 
 type EraseSecretVersionsOfParams struct {
-	Now       *time.Time
+	Now       time.Time
 	SecretIds []uuid.UUID
 }
 
@@ -350,13 +323,14 @@ func (q *Queries) ListSecretProjectAccess(ctx context.Context, secretIds []uuid.
 }
 
 const listSecretsInScope = `-- name: ListSecretsInScope :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "EnvironmentId", "Scope", "Name", "Description", "CurrentVersion", "Visibility", "AvailableToPullRequests", "CreatedByUserId", "UpdatedByUserId", "LastUsedAt"
-FROM "Secrets"
-WHERE "OrganizationId" = $1
-  AND "ProjectId" IS NOT DISTINCT FROM $2::uuid
-  AND "EnvironmentId" IS NOT DISTINCT FROM $3::uuid
-  AND NOT "IsDeleted"
-ORDER BY lower("Name")
+SELECT s."Id", s."CreatedAt", s."UpdatedAt", s."IsDeleted", s."OrganizationId", s."ProjectId", s."EnvironmentId", s."Scope", s."Name", s."Description", s."CurrentVersion", s."Visibility", s."AvailableToPullRequests", s."CreatedByUserId", s."UpdatedByUserId", s."LastUsedAt", v."SizeBytes"
+FROM "Secrets" s
+JOIN "SecretVersions" v ON v."SecretId" = s."Id" AND v."Version" = s."CurrentVersion"
+WHERE s."OrganizationId" = $1
+  AND s."ProjectId" IS NOT DISTINCT FROM $2::uuid
+  AND s."EnvironmentId" IS NOT DISTINCT FROM $3::uuid
+  AND NOT s."IsDeleted"
+ORDER BY lower(s."Name")
 LIMIT $5 OFFSET $4
 `
 
@@ -368,7 +342,12 @@ type ListSecretsInScopeParams struct {
 	PageLimit      int32
 }
 
-func (q *Queries) ListSecretsInScope(ctx context.Context, arg ListSecretsInScopeParams) ([]Secret, error) {
+type ListSecretsInScopeRow struct {
+	Secret    Secret
+	SizeBytes int32
+}
+
+func (q *Queries) ListSecretsInScope(ctx context.Context, arg ListSecretsInScopeParams) ([]ListSecretsInScopeRow, error) {
 	rows, err := q.db.Query(ctx, listSecretsInScope,
 		arg.OrganizationID,
 		arg.ProjectID,
@@ -380,26 +359,27 @@ func (q *Queries) ListSecretsInScope(ctx context.Context, arg ListSecretsInScope
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Secret{}
+	items := []ListSecretsInScopeRow{}
 	for rows.Next() {
-		var i Secret
+		var i ListSecretsInScopeRow
 		if err := rows.Scan(
-			&i.Id,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.IsDeleted,
-			&i.OrganizationId,
-			&i.ProjectId,
-			&i.EnvironmentId,
-			&i.Scope,
-			&i.Name,
-			&i.Description,
-			&i.CurrentVersion,
-			&i.Visibility,
-			&i.AvailableToPullRequests,
-			&i.CreatedByUserId,
-			&i.UpdatedByUserId,
-			&i.LastUsedAt,
+			&i.Secret.Id,
+			&i.Secret.CreatedAt,
+			&i.Secret.UpdatedAt,
+			&i.Secret.IsDeleted,
+			&i.Secret.OrganizationId,
+			&i.Secret.ProjectId,
+			&i.Secret.EnvironmentId,
+			&i.Secret.Scope,
+			&i.Secret.Name,
+			&i.Secret.Description,
+			&i.Secret.CurrentVersion,
+			&i.Secret.Visibility,
+			&i.Secret.AvailableToPullRequests,
+			&i.Secret.CreatedByUserId,
+			&i.Secret.UpdatedByUserId,
+			&i.Secret.LastUsedAt,
+			&i.SizeBytes,
 		); err != nil {
 			return nil, err
 		}
@@ -560,12 +540,12 @@ func (q *Queries) ResolveSecrets(ctx context.Context, arg ResolveSecretsParams) 
 
 const supersedeSecretVersions = `-- name: SupersedeSecretVersions :exec
 UPDATE "SecretVersions"
-SET "SupersededAt" = $1, "UpdatedAt" = $1
+SET "SupersededAt" = $1::timestamptz, "UpdatedAt" = $1::timestamptz
 WHERE "SecretId" = $2 AND "Version" < $3 AND "SupersededAt" IS NULL
 `
 
 type SupersedeSecretVersionsParams struct {
-	Now      *time.Time
+	Now      time.Time
 	SecretID uuid.UUID
 	Version  int32
 }
@@ -577,12 +557,12 @@ func (q *Queries) SupersedeSecretVersions(ctx context.Context, arg SupersedeSecr
 
 const touchSecretsUsed = `-- name: TouchSecretsUsed :exec
 UPDATE "Secrets"
-SET "LastUsedAt" = $1
+SET "LastUsedAt" = $1::timestamptz
 WHERE "Id" = ANY($2::uuid[]) AND NOT "IsDeleted"
 `
 
 type TouchSecretsUsedParams struct {
-	Now *time.Time
+	Now time.Time
 	Ids []uuid.UUID
 }
 

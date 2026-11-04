@@ -47,16 +47,12 @@ func projectRules(scope policy.Scope) []policy.Rule {
 
 func projectRequest(rule policy.Rule, org, project uuid.UUID, env *apptest.Env) apptest.Request {
 	path := strings.NewReplacer("{id}", org.String(), "{projectId}", project.String()).Replace(rule.Path)
-	if strings.Contains(path, "{runId}") {
-		path = strings.ReplaceAll(path, "{runId}", env.SeedRun(project, "awaiting_approval").String())
+	var seeded *uuid.UUID
+	if project != uuid.Nil {
+		seeded = &project
+		path = projectParams(env, path, project)
 	}
-	if strings.Contains(path, "{artifactId}") {
-		path = strings.ReplaceAll(path, "{artifactId}", env.SeedArtifact(project, "web", []byte("archive"), false).ID.String())
-	}
-	if strings.Contains(path, "{environmentName}") {
-		env.SeedEnvironment(project, apptest.RouteTableEnvironment)
-		path = strings.ReplaceAll(path, "{environmentName}", apptest.RouteTableEnvironment)
-	}
+	path = secretsPath(env, path, org, seeded)
 	req := apptest.Request{Method: rule.Method, Path: path}
 	switch {
 	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/projects/{projectId}/runs":
@@ -65,6 +61,9 @@ func projectRequest(rule policy.Rule, org, project uuid.UUID, env *apptest.Env) 
 		req.Body = map[string]string{"Name": "Bound project " + randomSuffix(env.T)}
 	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/projects":
 		req.Body = map[string]string{"Name": "Bound project", "Slug": "bp-" + randomSuffix(env.T)}
+	}
+	if body := secretsBody(env, rule); body != nil {
+		req.Body = body
 	}
 	return req
 }

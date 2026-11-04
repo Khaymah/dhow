@@ -265,6 +265,7 @@ export const WorkspaceEn: TWorkspaceMessages = {
   'scope.run.read': 'View pipeline runs',
   'scope.run.trigger': 'Start pipeline runs and run failed jobs again',
   'scope.run.cancel': 'Cancel pipeline runs',
+  'scope.secret.read': 'View secret names, never their values',
 
   'sessions.current': 'This device',
   'sessions.device': '{browser} on {os}',

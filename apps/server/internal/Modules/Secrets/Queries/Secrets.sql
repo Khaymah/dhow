@@ -7,13 +7,14 @@ WHERE "OrganizationId" = @organization_id
   AND NOT "IsDeleted";
 
 -- name: ListSecretsInScope :many
-SELECT *
-FROM "Secrets"
-WHERE "OrganizationId" = @organization_id
-  AND "ProjectId" IS NOT DISTINCT FROM sqlc.narg('project_id')::uuid
-  AND "EnvironmentId" IS NOT DISTINCT FROM sqlc.narg('environment_id')::uuid
-  AND NOT "IsDeleted"
-ORDER BY lower("Name")
+SELECT sqlc.embed(s), v."SizeBytes"
+FROM "Secrets" s
+JOIN "SecretVersions" v ON v."SecretId" = s."Id" AND v."Version" = s."CurrentVersion"
+WHERE s."OrganizationId" = @organization_id
+  AND s."ProjectId" IS NOT DISTINCT FROM sqlc.narg('project_id')::uuid
+  AND s."EnvironmentId" IS NOT DISTINCT FROM sqlc.narg('environment_id')::uuid
+  AND NOT s."IsDeleted"
+ORDER BY lower(s."Name")
 LIMIT @page_limit OFFSET @page_offset;
 
 -- name: GetSecretForUpdate :one
@@ -56,30 +57,18 @@ VALUES (@organization_id, @secret_id, @version, @value_sealed, @size_bytes, @use
 
 -- name: SupersedeSecretVersions :exec
 UPDATE "SecretVersions"
-SET "SupersededAt" = @now, "UpdatedAt" = @now
+SET "SupersededAt" = @now::timestamptz, "UpdatedAt" = @now::timestamptz
 WHERE "SecretId" = @secret_id AND "Version" < @version AND "SupersededAt" IS NULL;
 
 -- name: EraseSecretVersionsBelow :execrows
 UPDATE "SecretVersions"
-SET "ValueSealed" = NULL, "ErasedAt" = @now, "UpdatedAt" = @now
+SET "ValueSealed" = NULL, "ErasedAt" = @now::timestamptz, "UpdatedAt" = @now::timestamptz
 WHERE "SecretId" = @secret_id AND "Version" <= @version AND "ValueSealed" IS NOT NULL;
 
 -- name: EraseAllSecretVersions :execrows
 UPDATE "SecretVersions"
-SET "ValueSealed" = NULL, "ErasedAt" = @now, "UpdatedAt" = @now
+SET "ValueSealed" = NULL, "ErasedAt" = @now::timestamptz, "UpdatedAt" = @now::timestamptz
 WHERE "SecretId" = @secret_id AND "ValueSealed" IS NOT NULL;
-
--- name: EraseExpiredSecretVersions :execrows
-UPDATE "SecretVersions"
-SET "ValueSealed" = NULL, "ErasedAt" = @now, "UpdatedAt" = @now
-WHERE "Id" IN (
-    SELECT v."Id"
-    FROM "SecretVersions" v
-    WHERE v."ValueSealed" IS NOT NULL AND v."SupersededAt" IS NOT NULL AND v."SupersededAt" < @cutoff
-    ORDER BY v."SupersededAt"
-    LIMIT @batch
-    FOR UPDATE SKIP LOCKED
-);
 
 -- name: GetSecretVersion :one
 SELECT "Version", "ValueSealed", "SizeBytes"
@@ -129,7 +118,7 @@ WHERE s."OrganizationId" = @organization_id AND NOT s."IsDeleted" AND lower(s."N
 
 -- name: TouchSecretsUsed :exec
 UPDATE "Secrets"
-SET "LastUsedAt" = @now
+SET "LastUsedAt" = @now::timestamptz
 WHERE "Id" = ANY(@ids::uuid[]) AND NOT "IsDeleted";
 
 -- name: RemoveEnvironmentSecrets :many
@@ -140,5 +129,5 @@ RETURNING "Id";
 
 -- name: EraseSecretVersionsOf :execrows
 UPDATE "SecretVersions"
-SET "ValueSealed" = NULL, "ErasedAt" = @now, "UpdatedAt" = @now
+SET "ValueSealed" = NULL, "ErasedAt" = @now::timestamptz, "UpdatedAt" = @now::timestamptz
 WHERE "SecretId" = ANY(@secret_ids::uuid[]) AND "ValueSealed" IS NOT NULL;
