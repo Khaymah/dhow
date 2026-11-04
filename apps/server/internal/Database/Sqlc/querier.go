@@ -171,6 +171,7 @@ type Querier interface {
 	GetSchemaFloor(ctx context.Context) (string, error)
 	GetSecretForUpdate(ctx context.Context, arg GetSecretForUpdateParams) (Secret, error)
 	GetSecretVersion(ctx context.Context, arg GetSecretVersionParams) (GetSecretVersionRow, error)
+	GetSecretVersionForUpdate(ctx context.Context, arg GetSecretVersionForUpdateParams) (GetSecretVersionForUpdateRow, error)
 	GetSecretsEnvironment(ctx context.Context, arg GetSecretsEnvironmentParams) (uuid.UUID, error)
 	GetSecretsProject(ctx context.Context, arg GetSecretsProjectParams) (string, error)
 	GetTeam(ctx context.Context, arg GetTeamParams) (GetTeamRow, error)
@@ -327,6 +328,8 @@ type Querier interface {
 	LockRunnerLease(ctx context.Context, runnerID uuid.UUID) (uuid.UUID, error)
 	LockRunnerSlots(ctx context.Context, runnerID string) error
 	LockRunnerThrottle(ctx context.Context, key string) (LockRunnerThrottleRow, error)
+	LockSecretsEnvironment(ctx context.Context, arg LockSecretsEnvironmentParams) (uuid.UUID, error)
+	LockSecretsProject(ctx context.Context, arg LockSecretsProjectParams) (string, error)
 	LockSecretsScope(ctx context.Context, scopeKey string) error
 	LockSupersededDataKeys(ctx context.Context) ([]uuid.UUID, error)
 	LockTeam(ctx context.Context, arg LockTeamParams) (LockTeamRow, error)

@@ -66,6 +66,45 @@ func (q *Queries) GetSecretsProject(ctx context.Context, arg GetSecretsProjectPa
 	return State, err
 }
 
+const lockSecretsEnvironment = `-- name: LockSecretsEnvironment :one
+SELECT "Id"
+FROM "Environments"
+WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND "Name" = $3 AND NOT "IsDeleted"
+FOR SHARE
+`
+
+type LockSecretsEnvironmentParams struct {
+	ProjectID      uuid.UUID
+	OrganizationID uuid.UUID
+	Name           string
+}
+
+func (q *Queries) LockSecretsEnvironment(ctx context.Context, arg LockSecretsEnvironmentParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockSecretsEnvironment, arg.ProjectID, arg.OrganizationID, arg.Name)
+	var Id uuid.UUID
+	err := row.Scan(&Id)
+	return Id, err
+}
+
+const lockSecretsProject = `-- name: LockSecretsProject :one
+SELECT "State"
+FROM "Projects"
+WHERE "Id" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+FOR SHARE
+`
+
+type LockSecretsProjectParams struct {
+	ProjectID      uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) LockSecretsProject(ctx context.Context, arg LockSecretsProjectParams) (string, error) {
+	row := q.db.QueryRow(ctx, lockSecretsProject, arg.ProjectID, arg.OrganizationID)
+	var State string
+	err := row.Scan(&State)
+	return State, err
+}
+
 const lockSecretsScope = `-- name: LockSecretsScope :exec
 SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
 `

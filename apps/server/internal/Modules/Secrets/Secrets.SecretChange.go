@@ -74,7 +74,7 @@ func (s *Service) RestoreSecretVersion(ctx context.Context, ref models.Ref, name
 		if version < 1 || version > int(row.CurrentVersion) {
 			return apperrors.NotFound()
 		}
-		old, err := q.GetSecretVersion(ctx, sqlc.GetSecretVersionParams{SecretID: row.Id, Version: int32(version)}) //nolint:gosec // bounded by CurrentVersion above.
+		old, err := q.GetSecretVersionForUpdate(ctx, sqlc.GetSecretVersionForUpdateParams{SecretID: row.Id, Version: int32(version)}) //nolint:gosec // bounded by CurrentVersion above.
 		if err != nil {
 			return notFoundOr(err)
 		}

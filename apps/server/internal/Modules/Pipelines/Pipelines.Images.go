@@ -225,7 +225,10 @@ func (s session) loginRealm(realm *url.URL) bool {
 	}
 	registryHost, registryPort := splitHostPort(s.registry)
 	if realm.Hostname() == registryHost {
-		return realm.Port() == "" || realm.Port() == "443" || realm.Port() == registryPort
+		if registryPort != "" {
+			return realm.Port() == registryPort
+		}
+		return realm.Port() == "" || realm.Port() == "443"
 	}
 	return s.registry == dockerHubRegistry && realm.Hostname() == dockerHubTokens && (realm.Port() == "" || realm.Port() == "443")
 }

@@ -95,7 +95,7 @@ func (s *Service) target(ctx context.Context, q *sqlc.Queries, ref models.Ref, w
 	if ref.ProjectID == nil {
 		return t, nil
 	}
-	state, err := q.GetSecretsProject(ctx, sqlc.GetSecretsProjectParams{ProjectID: *ref.ProjectID, OrganizationID: ref.OrganizationID})
+	state, err := s.projectState(ctx, q, ref, write)
 	if err != nil {
 		return models.Target{}, notFoundOr(err)
 	}
@@ -106,9 +106,7 @@ func (s *Service) target(ctx context.Context, q *sqlc.Queries, ref models.Ref, w
 	if ref.EnvironmentName == "" {
 		return t, nil
 	}
-	env, err := q.GetSecretsEnvironment(ctx, sqlc.GetSecretsEnvironmentParams{
-		ProjectID: *ref.ProjectID, OrganizationID: ref.OrganizationID, Name: ref.EnvironmentName,
-	})
+	env, err := s.environmentID(ctx, q, ref, write)
 	if err != nil {
 		return models.Target{}, notFoundOr(err)
 	}
@@ -194,3 +192,21 @@ func valueOr[T any](v *T, fallback T) T {
 }
 
 func itoa(v int32) string { return strconv.FormatInt(int64(v), 10) }
+
+func (s *Service) projectState(ctx context.Context, q *sqlc.Queries, ref models.Ref, write bool) (string, error) {
+	if write {
+		return q.LockSecretsProject(ctx, sqlc.LockSecretsProjectParams{ProjectID: *ref.ProjectID, OrganizationID: ref.OrganizationID})
+	}
+	return q.GetSecretsProject(ctx, sqlc.GetSecretsProjectParams{ProjectID: *ref.ProjectID, OrganizationID: ref.OrganizationID})
+}
+
+func (s *Service) environmentID(ctx context.Context, q *sqlc.Queries, ref models.Ref, write bool) (uuid.UUID, error) {
+	if write {
+		return q.LockSecretsEnvironment(ctx, sqlc.LockSecretsEnvironmentParams{
+			ProjectID: *ref.ProjectID, OrganizationID: ref.OrganizationID, Name: ref.EnvironmentName,
+		})
+	}
+	return q.GetSecretsEnvironment(ctx, sqlc.GetSecretsEnvironmentParams{
+		ProjectID: *ref.ProjectID, OrganizationID: ref.OrganizationID, Name: ref.EnvironmentName,
+	})
+}

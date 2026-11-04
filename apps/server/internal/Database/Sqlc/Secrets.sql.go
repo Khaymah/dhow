@@ -179,6 +179,31 @@ func (q *Queries) GetSecretVersion(ctx context.Context, arg GetSecretVersionPara
 	return i, err
 }
 
+const getSecretVersionForUpdate = `-- name: GetSecretVersionForUpdate :one
+SELECT "Version", "ValueSealed", "SizeBytes"
+FROM "SecretVersions"
+WHERE "SecretId" = $1 AND "Version" = $2
+FOR UPDATE
+`
+
+type GetSecretVersionForUpdateParams struct {
+	SecretID uuid.UUID
+	Version  int32
+}
+
+type GetSecretVersionForUpdateRow struct {
+	Version     int32
+	ValueSealed []byte
+	SizeBytes   int32
+}
+
+func (q *Queries) GetSecretVersionForUpdate(ctx context.Context, arg GetSecretVersionForUpdateParams) (GetSecretVersionForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getSecretVersionForUpdate, arg.SecretID, arg.Version)
+	var i GetSecretVersionForUpdateRow
+	err := row.Scan(&i.Version, &i.ValueSealed, &i.SizeBytes)
+	return i, err
+}
+
 const insertSecret = `-- name: InsertSecret :one
 INSERT INTO "Secrets" (
     "OrganizationId", "ProjectId", "EnvironmentId", "Scope", "Name", "Description", "Visibility", "AvailableToPullRequests",

@@ -71,6 +71,10 @@ func loginHandler(seen *seenAuth) http.Handler {
 		}
 		_, _ = w.Write([]byte(`{"token":"private-token"}`))
 	})
+	mux.HandleFunc("/default-port-token", func(w http.ResponseWriter, r *http.Request) {
+		seen.record("/default-port-token", r.Header.Get("Authorization"))
+		_, _ = w.Write([]byte(`{"token":"private-token"}`))
+	})
 	mux.HandleFunc("/foreign-token", func(w http.ResponseWriter, r *http.Request) {
 		seen.record("/foreign-token", r.Header.Get("Authorization"))
 		_, _ = w.Write([]byte(`{"token":"private-token"}`))
@@ -78,6 +82,7 @@ func loginHandler(seen *seenAuth) http.Handler {
 	for path, realm := range map[string]string{
 		"/v2/private/own/manifests/v1":     "https://registry.example.com/own-token",
 		"/v2/private/foreign/manifests/v1": "https://auth.docker.io/foreign-token",
+		"/v2/private/ported/manifests/v1":  "https://registry.example.com/default-port-token",
 	} {
 		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 			if r.Header.Get("Authorization") != "Bearer private-token" {
@@ -159,6 +164,10 @@ func TestARegistryLoginReachesTheRegistryHostOnly(t *testing.T) {
 	require.NoError(t, err, "a known token service still answers anonymously")
 	assert.Equal(t, "registry.example.com/private/foreign:v1@"+indexDigest, got)
 	assert.Empty(t, seen.get("/foreign-token"), "a token realm on another host never gets the login")
+
+	_, err = r.ResolveWith(ctx, "registry.example.com:5000/private/ported:v1", login("registry.example.com:5000"))
+	require.NoError(t, err)
+	assert.Empty(t, seen.get("/default-port-token"), "a registry on port 5000 never sends its login to another port of the host")
 }
 
 func TestTheRegistryHostOfAnImage(t *testing.T) {

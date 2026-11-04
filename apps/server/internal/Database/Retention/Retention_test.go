@@ -127,7 +127,7 @@ func TestRetentionDeletesOnlyRowsPastTheirPeriod(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, report.Ran)
 	assert.Equal(t, map[string]int64{
-		"LoginThrottles": 1, "RunnerThrottles": 1, "AuthChallenges": 1, "OidcFlows": 1, "Invitations": 2, "SetupTokens": 1, "RateLimits": 1,
+		"LoginThrottles": 1, "RunnerThrottles": 1, "AuthChallenges": 1, "OidcFlows": 1, "Invitations": 2, "SetupTokens": 1, "RateLimits": 1, "SecretVersions": 0,
 	}, report.Deleted)
 
 	keys := func(table string) []string {
@@ -240,7 +240,7 @@ func TestARowInUseIsSkipped(t *testing.T) {
 }
 
 func TestRetentionCoversTheFixedTableList(t *testing.T) {
-	assert.Equal(t, []string{"LoginThrottles", "RunnerThrottles", "AuthChallenges", "OidcFlows", "Invitations", "SetupTokens", "RateLimits"}, retention.Tables())
+	assert.Equal(t, []string{"LoginThrottles", "RunnerThrottles", "AuthChallenges", "OidcFlows", "Invitations", "SetupTokens", "RateLimits", "SecretVersions"}, retention.Tables())
 }
 
 func TestWithoutAClockRetentionUsesTheDatabaseTime(t *testing.T) {

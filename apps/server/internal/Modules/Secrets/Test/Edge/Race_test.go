@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -73,4 +74,35 @@ func TestConcurrentCreatesStopAtTheLimit(t *testing.T) {
 	var n int
 	require.NoError(t, env.Pool.QueryRow(context.Background(), `SELECT count(*) FROM "Secrets" WHERE "ProjectId" = $1 AND NOT "IsDeleted"`, project).Scan(&n))
 	assert.Equal(t, 200, n, "the limit holds under concurrent creates")
+}
+
+func TestAWriteWaitsForAnEnvironmentBeingRemoved(t *testing.T) {
+	env := apptest.New(t)
+	owner, d := env.SetupAndLogin()
+	org := env.OrganizationID(d.OrgSlug)
+	project := env.SeedProject(org, uuid.MustParse(owner.UserID))
+	envID := env.SeedEnvironment(project, "production")
+	ctx := context.Background()
+	tx, err := env.Pool.Begin(ctx)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback(ctx) }()
+	_, err = tx.Exec(ctx, `UPDATE "Environments" SET "IsDeleted" = true WHERE "Id" = $1`, envID)
+	require.NoError(t, err)
+	done := make(chan apptest.Response, 1)
+	go func() {
+		done <- owner.Do(apptest.Request{Method: http.MethodPut,
+			Path: apptest.OrgPath(org, "/projects/"+project.String()+"/environments/production/secrets/LATE"),
+			Body: map[string]string{"Value": "written during the removal"}})
+	}()
+	select {
+	case res := <-done:
+		t.Fatalf("the write did not wait for the removal: %d %s", res.Status, res.Raw)
+	case <-time.After(300 * time.Millisecond):
+	}
+	require.NoError(t, tx.Commit(ctx))
+	res := <-done
+	assert.Equal(t, http.StatusNotFound, res.Status, string(res.Raw))
+	var n int
+	require.NoError(t, env.Pool.QueryRow(ctx, `SELECT count(*) FROM "Secrets" WHERE "EnvironmentId" = $1`, envID).Scan(&n))
+	assert.Zero(t, n)
 }

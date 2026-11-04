@@ -131,3 +131,9 @@ RETURNING "Id";
 UPDATE "SecretVersions"
 SET "ValueSealed" = NULL, "ErasedAt" = @now::timestamptz, "UpdatedAt" = @now::timestamptz
 WHERE "SecretId" = ANY(@secret_ids::uuid[]) AND "ValueSealed" IS NOT NULL;
+
+-- name: GetSecretVersionForUpdate :one
+SELECT "Version", "ValueSealed", "SizeBytes"
+FROM "SecretVersions"
+WHERE "SecretId" = @secret_id AND "Version" = @version
+FOR UPDATE;
