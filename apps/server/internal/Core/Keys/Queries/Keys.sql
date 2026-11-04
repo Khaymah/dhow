@@ -1,8 +1,8 @@
 -- name: LockKeyring :exec
-SELECT pg_advisory_xact_lock(hashtextextended('dhow.keyring', 0));
+SELECT pg_advisory_xact_lock(hashtextextended('dhow.keyring:' || current_schema(), 0));
 
 -- name: TryLockKeyRewrap :one
-SELECT pg_try_advisory_xact_lock(hashtextextended('dhow.keyring-rewrap', 0))::boolean;
+SELECT pg_try_advisory_xact_lock(hashtextextended('dhow.keyring-rewrap:' || current_schema(), 0))::boolean;
 
 -- name: ListKeyEncryptionKeys :many
 SELECT "Version", "CheckValue", "Provider", "State", "ActivatedAt", "RetiredAt", "LastExportedAt"

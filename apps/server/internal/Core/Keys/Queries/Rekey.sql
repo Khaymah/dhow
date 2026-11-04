@@ -1,8 +1,8 @@
 -- name: TryLockKeyRekey :one
-SELECT pg_try_advisory_lock(hashtextextended('dhow.keyring-rekey', 0))::boolean;
+SELECT pg_try_advisory_lock(hashtextextended('dhow.keyring-rekey:' || current_schema(), 0))::boolean;
 
 -- name: UnlockKeyRekey :one
-SELECT pg_advisory_unlock(hashtextextended('dhow.keyring-rekey', 0))::boolean;
+SELECT pg_advisory_unlock(hashtextextended('dhow.keyring-rekey:' || current_schema(), 0))::boolean;
 
 -- name: GetOpenKeyRekey :one
 SELECT "Id", "Cutoff", "Superseded", "Resealed", "Destroyed"

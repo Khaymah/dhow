@@ -237,7 +237,7 @@ func TestRewrapSkipsWhileAnotherServerHoldsTheLock(t *testing.T) {
 	tx, err := pool.Begin(t.Context())
 	require.NoError(t, err)
 	defer func() { _ = tx.Rollback(context.Background()) }()
-	_, err = tx.Exec(t.Context(), `SELECT pg_advisory_xact_lock(hashtextextended('dhow.keyring-rewrap', 0))`)
+	_, err = tx.Exec(t.Context(), `SELECT pg_advisory_xact_lock(hashtextextended('dhow.keyring-rewrap:' || current_schema(), 0))`)
 	require.NoError(t, err)
 	res, err := server.Rewrap(t.Context())
 	require.NoError(t, err)

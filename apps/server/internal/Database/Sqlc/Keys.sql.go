@@ -430,7 +430,7 @@ func (q *Queries) LockActiveDataKeyForOwner(ctx context.Context, arg LockActiveD
 }
 
 const lockKeyring = `-- name: LockKeyring :exec
-SELECT pg_advisory_xact_lock(hashtextextended('dhow.keyring', 0))
+SELECT pg_advisory_xact_lock(hashtextextended('dhow.keyring:' || current_schema(), 0))
 `
 
 func (q *Queries) LockKeyring(ctx context.Context) error {
@@ -568,7 +568,7 @@ func (q *Queries) RewrapDataKey(ctx context.Context, arg RewrapDataKeyParams) (i
 }
 
 const tryLockKeyRewrap = `-- name: TryLockKeyRewrap :one
-SELECT pg_try_advisory_xact_lock(hashtextextended('dhow.keyring-rewrap', 0))::boolean
+SELECT pg_try_advisory_xact_lock(hashtextextended('dhow.keyring-rewrap:' || current_schema(), 0))::boolean
 `
 
 func (q *Queries) TryLockKeyRewrap(ctx context.Context) (bool, error) {
