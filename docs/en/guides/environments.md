@@ -4,7 +4,7 @@
 
 An environment is where a project deploys, such as `staging` or `production`. Its protection rules live on the server only, so no commit can change them: a job only names its environment with `environment:` in the pipeline file.
 
-Until the deploy gate arrives (M5.6), a job with `environment:` is still skipped with `ENVIRONMENTS_UNAVAILABLE`. You can already create environments and their rules so they are ready.
+A job with `environment:` passes [the gate](#the-gate) before it starts, and gets the secrets and variables of the environment only after it. Approvals arrive in a coming update. Until then a job on an environment with reviewers waits and does not start.
 
 ## Who can do what
 
@@ -49,6 +49,42 @@ Names, patterns, the description and the pause reason never accept invisible cha
 
 A reviewer must be a member of the organization with the Developer role or above on the project, and a team must belong to the same organization. Otherwise the request answers `REVIEWER_NOT_ELIGIBLE` with the reviewer that failed.
 
+## The gate
+
+Once every job it needs has succeeded, we check in this order:
+
+| Check | Result when it fails |
+|---|---|
+| The run comes from a fork | Skipped with `FORK_PR_NO_ENVIRONMENT` |
+| The environment exists | Fails with `ENVIRONMENT_NOT_FOUND` |
+| The `if:` condition, with the variables of the environment, the project and the organization | Skipped with `CONDITION_FALSE` |
+| The branch or tag is in `AllowedRefs` | Skipped with `ENVIRONMENT_REF_NOT_ALLOWED`, and the run does not fail for it |
+| The images are written with their digest in the file, and the plugins come from `AllowedPlugins` | Fails with `ENVIRONMENT_REQUIRES_PINNED_IMAGES` or `ENVIRONMENT_PLUGIN_NOT_ALLOWED` |
+| The secrets the job asks for exist | Fails with `SECRET_NOT_FOUND` |
+| The environment is not paused | Waits (`Gate` = `paused`) |
+| There are no reviewers | Waits for approval (`Gate` = `approval`) |
+| `WaitMinutes` has passed | Waits until `GateOpensAt` (`Gate` = `timer`) |
+| No other run holds the environment | Waits (`Gate` = `environment_busy`) |
+
+- The kind is part of the match: a tag named `main` does not match the branch rule `main`.
+- A pull request from the same repository needs `AllowPullRequests`, and we match the branch it merges into (such as `main`).
+- A waiting job stays `waiting`, and we check again every few seconds.
+- Before we hand the secrets of the environment to the runner, we check again: the environment exists and is not paused, the branch is still allowed, and the rules did not change since the gate. If anything changed, the job fails with `ENVIRONMENT_RULE_CHANGED` and gets no secret.
+
+## One run at a time
+
+The first job that passes the gate makes its run hold the environment. The run holds it until every job of the run on this environment has finished, so no other run comes in between a deploy and a database migration, for example. When the environment is free, the run with the lowest number among those waiting for it takes it.
+
+## The deployment log
+
+Every job that passes the gate is added to the deployment log, with its run, branch, commit and state:
+
+```http
+GET /api/v1/organizations/{id}/projects/{projectId}/environments/{environmentName}/deployments
+```
+
+Newest first, and "deployed now" is the newest deploy whose state is `succeeded`. Everyone who can see runs (`run.read`) reads it.
+
 ## Change the rules
 
 ```http
@@ -70,7 +106,7 @@ POST /api/v1/organizations/{id}/projects/{projectId}/environments/{environmentNa
 {"Reason": "The database migration failed"}
 ```
 
-Jobs that already run finish. Only an Admin resumes, with the second step (`.../resume` with `CurrentFactor`).
+Jobs that already run finish, and a job that has not reached the gate yet waits until the environment is resumed. A job that passed the gate but has not started yet gets no secret: if it asks for one, it fails with `ENVIRONMENT_RULE_CHANGED`. Only an Admin resumes, with the second step (`.../resume` with `CurrentFactor`).
 
 ## Remove an environment
 
