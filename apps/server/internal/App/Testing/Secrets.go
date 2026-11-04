@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	RouteTableSecret   = "ROUTE_TABLE_SECRET"
+	RouteTableSecret   = "ROUTE_TABLE_SECRET" //nolint:gosec // A secret name for tests, not a credential.
 	RouteTableVariable = "ROUTE_TABLE_VARIABLE"
 	RouteTableRegistry = "registry.example.com"
 )

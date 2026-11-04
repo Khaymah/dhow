@@ -4,7 +4,7 @@ import "time"
 
 const (
 	SecretSealLabel           = "dhow/secret"
-	RegistryCredentialLabel   = "dhow/registry-credential"
+	RegistryCredentialLabel   = "dhow/registry-credential" //nolint:gosec // A seal label, not a credential.
 	SecretMinBytes            = 8
 	SecretMaxBytes            = 32 * 1024
 	SecretSealedMax           = 33024

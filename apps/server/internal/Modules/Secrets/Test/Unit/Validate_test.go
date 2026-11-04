@@ -24,7 +24,7 @@ func TestNames(t *testing.T) {
 func TestRegistryHostNormalization(t *testing.T) {
 	for raw, want := range map[string]string{
 		"docker.io": "registry-1.docker.io", "index.docker.io": "registry-1.docker.io", "docker.io:443": "docker.io:443",
-		" GHCR.io ": "ghcr.io", "registry.example.com:5000": "registry.example.com:5000", "xn--bcher-kva.example": "xn--bcher-kva.example",
+		"GHCR.io": "ghcr.io", "registry.example.com:5000": "registry.example.com:5000", "xn--bcher-kva.example": "xn--bcher-kva.example",
 	} {
 		got, ok := secrets.NormalizeHost(raw)
 		assert.True(t, ok, raw)

@@ -90,10 +90,9 @@ func (s *Service) projectAccess(ctx context.Context, q *sqlc.Queries, rows []sql
 }
 
 type writeResult struct {
-	row      sqlc.Secret
-	size     int32
-	created  bool
-	restored int32
+	row     sqlc.Secret
+	size    int32
+	created bool
 }
 
 func (s *Service) PutSecret(ctx context.Context, ref models.Ref, name string, in models.PutSecretInput) (models.Secret, error) {

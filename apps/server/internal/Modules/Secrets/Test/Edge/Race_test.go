@@ -29,8 +29,10 @@ func TestConcurrentWritesMakeOneSecretWithContiguousVersions(t *testing.T) {
 			if i%2 == 1 {
 				name = "raced"
 			}
-			res := owner.Do(apptest.Request{Method: http.MethodPut, Path: apptest.OrgPath(org, "/projects/"+project.String()+"/secrets/"+name),
-				Body: map[string]string{"Value": "value from writer " + strconv.Itoa(i)}})
+			res := owner.Do(apptest.Request{
+				Method: http.MethodPut, Path: apptest.OrgPath(org, "/projects/"+project.String()+"/secrets/"+name),
+				Body: map[string]string{"Value": "value from writer " + strconv.Itoa(i)},
+			})
 			statuses[i] = res.Status
 		})
 	}
@@ -61,8 +63,10 @@ func TestConcurrentCreatesStopAtTheLimit(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range 20 {
 		wg.Go(func() {
-			owner.Do(apptest.Request{Method: http.MethodPut, Path: apptest.OrgPath(org, "/projects/"+project.String()+"/secrets/NEW_"+strconv.Itoa(i)),
-				Body: map[string]string{"Value": "a long value"}})
+			owner.Do(apptest.Request{
+				Method: http.MethodPut, Path: apptest.OrgPath(org, "/projects/"+project.String()+"/secrets/NEW_"+strconv.Itoa(i)),
+				Body: map[string]string{"Value": "a long value"},
+			})
 		})
 	}
 	wg.Wait()

@@ -163,16 +163,10 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	pipelinesService, sourcesService, artifactsService, err := runsFor(in, values, bus, limiter, jobsService, secrets)
+	runs, err := runsFor(in, values, bus, limiter, jobsService, secrets)
 	if err != nil {
 		return nil, err
 	}
-	secretsService, err := secretsmodule.NewService(secretsmodule.Options{DB: in.Pool, Values: values, Bus: bus, Log: in.Log, Now: in.Now})
-	if err != nil {
-		return nil, err
-	}
-	secretsmodule.Subscribe(bus, secretsService)
-	pipelinesService.UseLogins(secretsService)
 
 	opts := Options{
 		Config: in.Config,
@@ -188,10 +182,10 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Jobs:      jobsService,
 		Projects:  projects.NewService(projects.Options{DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now}),
 		Envs:      environments.NewService(environments.Options{DB: in.Pool, Factors: sessionService, Bus: bus, Log: in.Log, Now: in.Now}),
-		Secrets:   secretsService,
-		Sources:   sourcesService,
-		Pipelines: pipelinesService,
-		Artifacts: artifactsService,
+		Secrets:   runs.secrets,
+		Sources:   runs.sources,
+		Pipelines: runs.pipelines,
+		Artifacts: runs.artifacts,
 		Overview:  overview.NewService(overview.Options{Counter: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
 		Tokens:    tokensService,
 		Prefs:     preferences.NewService(in.Pool, in.Log, in.Now),
@@ -207,7 +201,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	}
 	wired := &Wired{
 		Options: opts, Handler: NewRouter(opts), Identity: identityService, Jobs: jobsService, JobQueue: jobsService.Queue(),
-		Projects: opts.Projects, Sources: sourcesService, Pipelines: pipelinesService, Artifacts: artifactsService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
+		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
 		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now}),
 	}
 	if in.Config.RunnerPlaneSeparate() {
@@ -405,4 +399,14 @@ func envProviderIDs(providers []config.OIDCProvider) []string {
 		out = append(out, p.ID)
 	}
 	return out
+}
+
+func secretsFor(in Infra, values *keys.Values, bus *eventbus.Bus, runs *pipelines.Service) (*secretsmodule.Service, error) {
+	s, err := secretsmodule.NewService(secretsmodule.Options{DB: in.Pool, Values: values, Bus: bus, Log: in.Log, Now: in.Now})
+	if err != nil {
+		return nil, err
+	}
+	secretsmodule.Subscribe(bus, s)
+	runs.UseLogins(s)
+	return s, nil
 }

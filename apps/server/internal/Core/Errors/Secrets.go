@@ -9,8 +9,8 @@ const (
 	CodeSecretLimitReached             = "SECRET_LIMIT_REACHED"
 	CodeSecretVersionErased            = "SECRET_VERSION_ERASED"
 	CodeVariableLimitReached           = "VARIABLE_LIMIT_REACHED"
-	CodeRegistryCredentialExists       = "REGISTRY_CREDENTIAL_EXISTS"
-	CodeRegistryCredentialLimitReached = "REGISTRY_CREDENTIAL_LIMIT_REACHED"
+	CodeRegistryCredentialExists       = "REGISTRY_CREDENTIAL_EXISTS"        //nolint:gosec // An error code, not a credential.
+	CodeRegistryCredentialLimitReached = "REGISTRY_CREDENTIAL_LIMIT_REACHED" //nolint:gosec // An error code, not a credential.
 	KeySecretTooShort                  = "errors.secretTooShort"
 	KeySecretTooLarge                  = "errors.secretTooLarge"
 	KeySecretNameReserved              = "errors.secretNameReserved"

@@ -104,9 +104,9 @@ const (
 	VariableCreated           = "variable.created"
 	VariableUpdated           = "variable.updated"
 	VariableRemoved           = "variable.removed"
-	RegistryCredentialCreated = "registry_credential.created"
-	RegistryCredentialUpdated = "registry_credential.updated"
-	RegistryCredentialRemoved = "registry_credential.removed"
+	RegistryCredentialCreated = "registry_credential.created" //nolint:gosec // An audit action name, not a credential.
+	RegistryCredentialUpdated = "registry_credential.updated" //nolint:gosec // An audit action name, not a credential.
+	RegistryCredentialRemoved = "registry_credential.removed" //nolint:gosec // An audit action name, not a credential.
 )
 
 func AuditedEvents() []string {

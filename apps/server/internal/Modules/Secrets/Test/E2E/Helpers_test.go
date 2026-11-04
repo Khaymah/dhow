@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,8 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
-	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
-	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	secrets "github.com/Khaymah/dhow/apps/server/internal/Modules/Secrets"
 )
 
@@ -52,10 +49,6 @@ func newWorld(t *testing.T) world {
 }
 
 func (w world) service() *secrets.Service { return w.env.Wired.Options.Secrets }
-
-func (w world) ownerContext() context.Context {
-	return auth.WithPrincipal(context.Background(), auth.Principal{Subject: policy.Subject{UserID: w.ownerID}})
-}
 
 func (w world) member(t *testing.T, role string) *apptest.Client {
 	t.Helper()

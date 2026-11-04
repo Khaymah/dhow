@@ -28,7 +28,7 @@ const (
 	registryTokenBytes    = 64 << 10
 	dockerHubIndex        = "docker.io"
 	dockerHubRegistry     = "registry-1.docker.io"
-	dockerHubTokens       = "auth.docker.io"
+	dockerHubTokens       = "auth.docker.io" //nolint:gosec // A host name, not a credential.
 	schemeBasic           = "Basic"
 	schemeBearer          = "Bearer"
 	defaultTag            = "latest"

@@ -23,7 +23,7 @@ func TestSecretLimits(t *testing.T) {
 	requireError(t, put(w.owner, base+"dhow_token", map[string]string{"Value": "a long value"}), http.StatusUnprocessableEntity, "SECRET_NAME_RESERVED")
 	requireError(t, put(w.owner, base+"WITH_NUL", map[string]string{"Value": "a long\x00value"}), http.StatusUnprocessableEntity, "VALIDATION_FAILED")
 	requireError(t, put(w.owner, base+"1NAME", map[string]string{"Value": "a long value"}), http.StatusUnprocessableEntity, "VALIDATION_FAILED")
-	requireError(t, put(w.owner, base+"HIDDEN", map[string]any{"Value": "a long value", "Description": "bad‮text"}), http.StatusUnprocessableEntity, "VALIDATION_FAILED")
+	requireError(t, put(w.owner, base+"HIDDEN", map[string]any{"Value": "a long value", "Description": "bad\u202etext"}), http.StatusUnprocessableEntity, "VALIDATION_FAILED")
 	requireError(t, put(w.owner, base+"PICKED", map[string]any{"Value": "a long value", "Visibility": "selected_projects"}), http.StatusUnprocessableEntity, "VALIDATION_FAILED")
 
 	first := secretOf(t, put(w.owner, base+"Token", map[string]string{"Value": "first value"}), http.StatusOK)
