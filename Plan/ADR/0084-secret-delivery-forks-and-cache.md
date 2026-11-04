@@ -32,7 +32,7 @@
    - cache فيه قيمة: مابيتحفظش، وسطر تحذير في السجل.
    - الفحص على الملفات زي ما هي، فالملف المضغوط أو المتشفّر جوه الـ artifact مش متغطي، ومكتوب في الوثائق.
 7. **بيانات دخول الـ registry (`registry_auth`):** `JobSpec.registry_auth[] {host, secret_name}` و`RunnerFeature.REGISTRY_AUTH`:
-   - السيرفر بيضيفه وقت الإدراج لصور الـ job اللي ليها حساب في المشروع أو المؤسسة، ومش للـ forks أبدًا.
+   - السيرفر بيضيفه وقت الإدراج لصور الـ job اللي ليها حساب في المشروع أو المؤسسة، ومش للـ forks ولا لطلبات الدمج أبدًا (من المراجعة الأمنية وقرار Sabry يوم 2026-11-04: PR من نفس المستودع كان هيقدر يشغّل صورة خاصة ويقرا محتواها). و`Start` بيرفض أي `dhow.registry.N` لتنفيذ PR تاني. وعلامة «متاح لطلبات الدمج» على الحساب ممكن تتضاف بعدين لو احتاجناها.
    - القيمة بتوصل في نفس الـ bundle باسم محجوز `dhow.registry.<n>` (اسم المستخدم وكلمة السر)، ومش بتعدّي على `Check` لأنها مش اسم في الـ spec.
    - الـ runner بيكتب authfile مؤقت في مجلد حالته الخاص (`0600`، بره أي sandbox)، ويسحب بـ `--authfile`، ويمسحه بعد السحب، وكلمة السر في الـ masker.
    - runner من غير الـ feature: الـ job بيستنى `NO_MATCHING_RUNNER` ظاهر (زي M4).
@@ -41,6 +41,11 @@
    - `"CacheEntries"."HadSecrets"` بيتعلّم لما الـ job اللي كتب الـ cache وصله أي سر أو `registry_auth`.
    - تنفيذ fork: مابيرجّعش أي cache مع `none`، ومع `default_branch` بيرجّع نطاق الفرع الافتراضي بس، وعمره ما بيرجّع `"HadSecrets"`.
 9. **الـ migrations** كلها expand: `"RunJobs"."FailureDetail"` (`jsonb NOT NULL DEFAULT '{}'`)، و`"Projects"."ForkCacheRestore"` (`TEXT NOT NULL DEFAULT 'none'`)، و`"CacheEntries"."HadSecrets"` (`boolean NOT NULL DEFAULT false`)، والـ CHECKs بـ `NOT VALID` وبعدها `VALIDATE`.
+
+10. **من المراجعة الأمنية، ومقبول:**
+    - `FailureNames` بيقول لمن يقدر يبدأ تنفيذ إن اسم سر موجود أو مش للـ PRs. الأسماء أصلًا في ملف خطوات النشر، والقيم عمرها ما بتظهر.
+    - حساب الـ registry على المؤسسة بيوصل لكل مشاريعها، من غير `Visibility` زي الأسرار. اللي عايز يقصره يحطه على المشروع.
+    - الـ authfile في مجلد الـ attempt نفسه، والحاويات بتشوف `control-*` و`workspace/` بس منه.
 
 ## البدائل اللي اترفضت
 - **الفحص في `Start` بس:** السر الناقص كان هيبان بعد ما الـ job ياخد runner ويستنى في الطابور، بدل ما يبان أول ما التنفيذ يبدأ.

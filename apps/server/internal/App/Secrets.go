@@ -116,6 +116,9 @@ func (p *pipelineSecrets) resolveRegistries(
 	ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope, registries map[string]string, out map[string][]byte,
 ) ([]string, error) {
 	hosts := make([]string, 0, len(registries))
+	if len(registries) > 0 && scope.PullRequest {
+		return nil, jobs.ErrSecretsUnavailable
+	}
 	for _, name := range slices.Sorted(maps.Keys(registries)) {
 		if p.logins == nil {
 			return nil, jobs.ErrSecretsUnavailable

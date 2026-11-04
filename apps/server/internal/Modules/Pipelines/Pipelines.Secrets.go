@@ -144,7 +144,7 @@ func jobImages(spec *runnerv1.JobSpec) []string {
 }
 
 func (s *Service) attachRegistryAuth(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, spec *runnerv1.JobSpec) error {
-	if s.logins == nil || run.IsFork {
+	if s.logins == nil || run.IsFork || run.Trigger == triggerPullRequest {
 		return nil
 	}
 	var hosts []string

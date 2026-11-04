@@ -80,7 +80,7 @@ POST /api/v1/organizations/{id}/projects/{projectId}/registry-credentials
 - **Place:** the organization for all its projects, or a project. A project credential wins over an organization one for the same registry. One credential per registry, and 20 in each place.
 - **Password:** never shown after it is saved. An update (`PUT .../registry-credentials/{credentialId}`) changes the username and the password together.
 
-The server uses the credential when it pins an image to its digest. It sends it to the registry itself only, and to the token service when it is on the same registry over `https` (or `auth.docker.io` for Docker Hub). Runs from forks pin images without any credential.
+The server uses the credential when it pins an image to its digest. It sends it to the registry itself only, and to the token service when it is on the same registry over `https` (or `auth.docker.io` for Docker Hub). Runs of pull requests (from the same repository or a fork) use no credential, neither to pin nor to pull.
 
 ## The audit log
 

@@ -228,3 +228,30 @@ jobs:
 	_, g := w.leaseKey(t, "build")
 	assert.Empty(t, g.Grant.GetSpec().GetRegistryAuth())
 }
+
+func TestAPullRequestNeverGetsARegistryLogin(t *testing.T) {
+	w := newWorld(t)
+	w.env.SeedRegistryCredential(apptest.SecretRef(w.org, &w.project, ""), "registry.example.com", "robot", deployValue)
+	r := w.env.SeedConnectedRunner(w.org, w.ownerID, apptest.SeedRunnerSpec{Capacity: 4, Features: []string{"checkout", "plugins", "registry_auth"}})
+	w.defs.Put(shaB, pipeline(`version: 1
+on:
+  pull_request: {}
+jobs:
+  build:
+    image: IMAGE
+    steps:
+      - run: ./build.sh
+`))
+	tr := w.trigger("pull_request", "refs/pull/4/head", shaB)
+	tr.BaseRef, tr.BaseSha, tr.PrNumber, tr.Origin = "refs/heads/main", shaA, 4, triggers.PullOriginSameRepository
+	got := w.env.Deliver(tr)
+	require.True(t, got.Created)
+	w.env.StartRuns()
+	require.Equal(t, "active", w.env.RunJobs(got.RunID)["build"].State)
+	g, err := r.Lease(context.Background(), 1, 0)
+	require.NoError(t, err)
+	if g == nil {
+		_, g = w.leaseKey(t, "build")
+	}
+	assert.Empty(t, g.Grant.GetSpec().GetRegistryAuth(), "a pull request run never gets a registry login")
+}
