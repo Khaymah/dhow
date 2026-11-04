@@ -6,7 +6,7 @@ A secret is a value nobody should see, like an SSH key or an API token. A variab
 
 Dhow stores a secret encrypted and never shows it again once it is saved. Neither the web app nor the API has any way to read a secret value, not even for the organization owner. If you forget the value, write a new one.
 
-Until delivery to jobs arrives (M5.5), secrets are only stored and do not reach jobs yet.
+Organization and project secrets reach a job only when it starts, sealed for the runner that took it. Environment secrets arrive with the deploy gate (M5.6). A job that asks for a missing secret fails before it is queued with `SECRET_NOT_FOUND`, and `FailureNames` lists the missing names (never values).
 
 ## Where a secret lives
 
