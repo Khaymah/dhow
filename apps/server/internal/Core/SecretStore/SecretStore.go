@@ -64,3 +64,13 @@ type Store interface {
 	Check(ctx context.Context, q *sqlc.Queries, r Request) (CheckResult, error)
 	Resolve(ctx context.Context, r Request) ([]Secret, error)
 }
+
+type RegistryLogin struct {
+	Host     string
+	Username string
+	Password Value
+}
+
+type RegistryLogins interface {
+	RegistryLogin(ctx context.Context, org, project uuid.UUID, host string) (RegistryLogin, bool, error)
+}

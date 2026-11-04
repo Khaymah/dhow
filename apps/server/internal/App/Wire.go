@@ -172,6 +172,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		return nil, err
 	}
 	secretsmodule.Subscribe(bus, secretsService)
+	pipelinesService.UseLogins(secretsService)
 
 	opts := Options{
 		Config: in.Config,

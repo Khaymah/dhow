@@ -20,6 +20,7 @@ import (
 	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	runevents "github.com/Khaymah/dhow/apps/server/internal/Core/RunEvents"
+	secretstore "github.com/Khaymah/dhow/apps/server/internal/Core/SecretStore"
 	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
@@ -62,6 +63,7 @@ type Service struct {
 	artifacts     artifactindex.Index
 	definitions   Definitions
 	images        ImageResolver
+	logins        secretstore.RegistryLogins
 	checkoutImage string
 	publicURL     string
 	limiter       ratelimit.Limiter
@@ -93,6 +95,8 @@ func NewService(o Options) *Service {
 }
 
 func (s *Service) UseStatuses(r commitstatus.Recorder) { s.statuses = r }
+
+func (s *Service) UseLogins(l secretstore.RegistryLogins) { s.logins = l }
 
 func (s *Service) UseArtifacts(i artifactindex.Index) { s.artifacts = i }
 

@@ -31,7 +31,7 @@
    - **مفيش طريقة تقرا قيمة**، ولا حتى للـ Owner. اللي نسي القيمة بيكتب واحدة جديدة.
 5. **الإصدارات والاحتفاظ (القرار 10):**
    - كل `PUT` بيعمل إصدار جديد. القيمة بتفضل في آخر 5 إصدارات بس: الإصدار السادس بيمسح قيمة الأول في نفس الـ transaction.
-   - أي إصدار مش الحالي قيمته بتتمسح بعد 30 يوم من ما إصدار أحدث اتعمل (worker كل ساعة، وتحت advisory lock).
+   - أي إصدار مش الحالي قيمته بتتمسح بعد 30 يوم من ما إصدار أحدث اتعمل (في `Database/Retention` اللي بيشتغل كل 10 دقايق تحت advisory lock).
    - المسح `"ValueSealed" = NULL` ومعاه `"ErasedAt"`، والـ CHECK بيربطهم. مفيش `DELETE`.
    - `restore-version` على إصدار قيمته اتمسحت: `409 SECRET_VERSION_ERASED`.
    - `remove` بيعلّم السر ممسوح وبيمسح قيم كل إصداراته في نفس الـ transaction، والاسم يرجع متاح.
@@ -46,7 +46,8 @@
 8. **بيانات دخول الـ registry (القرار 13):**
    - `"RegistryCredentials"` على المؤسسة (لكل مشاريعها) أو المشروع: `Host` و`Username` (256) و`Password` (1 لـ 4096 byte، للكتابة بس). الأولوية للمشروع على نفس الـ host. 20 لكل نطاق.
    - `Host` اسم بقواعد `jobspec.ParseEgress` (ASCII أو punycode، من غير wildcard ولا IP خاص)، ومعاه بورت لو موجود، وفريد في النطاق. `docker.io` بيتحوّل لـ `registry-1.docker.io` لأن ده الـ host اللي الصور بتتسحب منه.
-   - **السيرفر** بيستخدمها وهو بيثبّت الـ tag بالـ digest: بيبعت Basic للـ host نفسه بس، وللـ token realm بس لو الـ realm على نفس الـ host أو نفس الـ registrable domain و`https`، وكل اتصال من خلال `netguard`. الـ realm على host تاني أو IP خاص: بيتسأل من غير بيانات دخول.
+   - **السيرفر** بيستخدمها وهو بيثبّت الـ tag بالـ digest (`Core/SecretStore.RegistryLogins`، و`Pipelines` بيناديه): بيبعت Basic للـ host نفسه بس لما يطلب Basic، وللـ token realm بس لو الـ realm `https` على نفس الـ host والبورت، أو `auth.docker.io` لـ `registry-1.docker.io`. أي realm تاني مسموح (زي `ghcr.io` لـ registry مختلف) بيتسأل من غير بيانات دخول، وكل اتصال من خلال `netguard`. اترفض «نفس الـ registrable domain» لأنه محتاج قايمة الـ public suffixes، وده اعتمادية جديدة لحالة نادرة.
+   - **تنفيذات الـ forks** بتثبّت الصور من غير بيانات دخول أبدًا، عشان PR من fork مايقدرش يعرف digest صورة خاصة.
    - الـ runner بياخدها في M5.5.
 9. **الصلاحيات:**
 

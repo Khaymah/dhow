@@ -2,10 +2,12 @@ package secrets
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	secretstore "github.com/Khaymah/dhow/apps/server/internal/Core/SecretStore"
@@ -140,4 +142,31 @@ func (s *Service) Resolve(ctx context.Context, r secretstore.Request) ([]secrets
 		}
 	}
 	return out, nil
+}
+
+var _ secretstore.RegistryLogins = (*Service)(nil)
+
+func (s *Service) RegistryLogin(ctx context.Context, org, project uuid.UUID, host string) (secretstore.RegistryLogin, bool, error) {
+	normalized, ok := NormalizeHost(host)
+	if !ok {
+		return secretstore.RegistryLogin{}, false, nil
+	}
+	row, err := sqlc.New(s.db).ResolveRegistryCredential(ctx, sqlc.ResolveRegistryCredentialParams{
+		OrganizationID: org, Host: normalized, ProjectID: &project,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return secretstore.RegistryLogin{}, false, nil
+	}
+	if err != nil {
+		return secretstore.RegistryLogin{}, false, err
+	}
+	scope := models.ScopeOrganization
+	if row.ProjectId != nil {
+		scope = models.ScopeProject
+	}
+	plain, err := s.registry.Open(ctx, ownerOf(scope, row.OrganizationId, row.ProjectId, nil), registryContext(row.Id), row.PasswordSealed)
+	if err != nil {
+		return secretstore.RegistryLogin{}, false, err
+	}
+	return secretstore.RegistryLogin{Host: row.Host, Username: row.Username, Password: plain}, true, nil
 }
