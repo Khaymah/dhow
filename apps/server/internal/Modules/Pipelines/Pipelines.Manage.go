@@ -123,6 +123,9 @@ func (s *Service) cancelLocked(ctx context.Context, q *sqlc.Queries, id uuid.UUI
 	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: id, State: models.RunCanceled, FailureReason: reason}); err != nil {
 		return err
 	}
+	if err := s.releaseRun(ctx, q, run); err != nil {
+		return err
+	}
 	return s.recordStatus(ctx, q, run, commitstatus.StateCanceled)
 }
 

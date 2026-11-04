@@ -46,6 +46,17 @@ func (p *pipelineSecrets) Accepts(_ context.Context, origin jobs.Origin, _ []str
 	return nil
 }
 
+func (p *pipelineSecrets) Admit(ctx context.Context, req jobs.SecretRequest) error {
+	scope, err := p.runs.SecretScopeOfJob(ctx, req.OrganizationID, req.JobID)
+	if errors.Is(err, pipelines.ErrNoSecretScope) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return p.checkEnvironment(ctx, req, scope)
+}
+
 func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (map[string][]byte, error) {
 	scope, err := p.runs.SecretScopeOfJob(ctx, req.OrganizationID, req.JobID)
 	if errors.Is(err, pipelines.ErrNoSecretScope) {

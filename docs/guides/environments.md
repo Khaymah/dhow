@@ -59,7 +59,7 @@ POST /api/v1/organizations/{id}/projects/{projectId}/environments
 | البيئة موجودة | يفشل بـ `ENVIRONMENT_NOT_FOUND` |
 | شرط `if:` بمتغيّرات البيئة والمشروع والمؤسسة | يُتخطّى بـ `CONDITION_FALSE` |
 | الفرع أو الوسم في `AllowedRefs` | يُتخطّى بـ `ENVIRONMENT_REF_NOT_ALLOWED`، والتنفيذ لا يفشل بسببه |
-| الصور مكتوبة ببصمتها في الملف، والإضافات من `AllowedPlugins` | يفشل بـ `ENVIRONMENT_REQUIRES_PINNED_IMAGES` أو `ENVIRONMENT_PLUGIN_NOT_ALLOWED` |
+| الصور مكتوبة ببصمتها في الملف، والإضافات من `AllowedPlugins` (البداية تطابق جزءًا كاملًا من الاسم، فـ `ghcr.io/acme` لا تطابق `ghcr.io/acme-x`) | يفشل بـ `ENVIRONMENT_REQUIRES_PINNED_IMAGES` أو `ENVIRONMENT_PLUGIN_NOT_ALLOWED` |
 | الأسرار التي يطلبها موجودة | يفشل بـ `SECRET_NOT_FOUND` |
 | البيئة غير موقوفة | ينتظر (`Gate` = `paused`) |
 | لا يوجد مراجعون | ينتظر الموافقة (`Gate` = `approval`) |
@@ -69,7 +69,7 @@ POST /api/v1/organizations/{id}/projects/{projectId}/environments
 - النوع جزء من المطابقة: وسم اسمه `main` لا يطابق قاعدة الفرع `main`.
 - طلب الدمج من المستودع نفسه يحتاج إلى `AllowPullRequests`، ونطابق الفرع الذي يُدمج فيه (مثل `main`).
 - الـ job الذي ينتظر يبقى `waiting`، ونعيد الفحص كل بضع ثوانٍ.
-- قبل أن نسلّم أسرار البيئة للـ runner نفحص مرة أخرى: البيئة موجودة وغير موقوفة، والفرع ما زال مسموحًا، والقواعد لم تتغيّر منذ البوابة. لو تغيّر شيء، يفشل الـ job بـ `ENVIRONMENT_RULE_CHANGED` ولا يأخذ أي سر.
+- حين يبدأ الـ job على الـ runner، وقبل أي سر، نفحص مرة أخرى: البيئة موجودة وغير موقوفة، والفرع ما زال مسموحًا، والقواعد لم تتغيّر منذ البوابة. لو تغيّر شيء، يفشل الـ job بـ `ENVIRONMENT_RULE_CHANGED` ولا يأخذ أي سر.
 
 ## تنفيذ واحد في كل مرة
 
@@ -106,7 +106,7 @@ POST /api/v1/organizations/{id}/projects/{projectId}/environments/{environmentNa
 {"Reason": "The database migration failed"}
 ```
 
-الـ jobs التي بدأت تكمل، والـ job الذي لم يصل إلى البوابة بعد ينتظر حتى إعادة التشغيل. والـ job الذي عبر البوابة ولم يبدأ بعد لا يأخذ أي سر: لو طلب سرًا، يفشل بـ `ENVIRONMENT_RULE_CHANGED`. المدير فقط يعيد التشغيل، بالخطوة الثانية (`.../resume` مع `CurrentFactor`).
+الـ jobs التي بدأت تكمل، والـ job الذي لم يصل إلى البوابة بعد ينتظر حتى إعادة التشغيل. والـ job الذي عبر البوابة ولم يبدأ بعد يفشل بـ `ENVIRONMENT_RULE_CHANGED` ولا يأخذ أي سر. المدير فقط يعيد التشغيل، بالخطوة الثانية (`.../resume` مع `CurrentFactor`).
 
 ## حذف بيئة
 

@@ -39,6 +39,10 @@ type SecretResolver interface {
 	Resolve(ctx context.Context, req SecretRequest) (map[string][]byte, error)
 }
 
+type StartGuard interface {
+	Admit(ctx context.Context, req SecretRequest) error
+}
+
 type NoSecrets struct{}
 
 func (NoSecrets) Accepts(context.Context, Origin, []string) error { return ErrSecretsUnavailable }

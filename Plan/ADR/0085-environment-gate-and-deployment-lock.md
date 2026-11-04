@@ -32,7 +32,7 @@
    - push وtag ويدوي: الـ ref بنوعه (`branch` أو `tag`) لازم يطابق `Pattern` بنفس النوع بـ `internal/pathglob`. النوع جزء من المطابقة، فـ tag اسمه `main` مايعدّيش قاعدة الفرع `main` (من مراجعة M5.3).
    - PR من نفس المستودع: لازم `AllowPullRequests`، والمطابقة على **فرع الـ base** (الـ ref بتاع الـ PR `refs/pull/N/head` ومالوش اسم فرع). يعني PR على `main` يقدر ينشر على بيئة معاينة قاعدتها `main` لو الـ PRs مسموحة.
    - `AllowedRefs` فاضية: مفيش حاجة تنشر.
-5. **«الصور بالـ digest» والإضافات (القرار 20):** الـ digest لازم يبقى **مكتوب في الملف** (`@sha256:`) لصورة الـ job وكل صورة إضافة. التثبيت اللي السيرفر بيعمله للـ tag (§12.5) مابيتحسبش. و`AllowedPlugins` بادئة اسم الصورة بعد `QualifyImage`، والفاضية = أي إضافة.
+5. **«الصور بالـ digest» والإضافات (القرار 20):** الـ digest لازم يبقى **مكتوب في الملف** (`@sha256:`) لصورة الـ job وكل صورة إضافة. التثبيت اللي السيرفر بيعمله للـ tag (§12.5) مابيتحسبش، ولو أكتر من كتابة في الملف بتشاور على نفس الصورة المثبّتة بناخد اللي من غير digest. و`AllowedPlugins` بادئة بتتطابق على **أجزاء كاملة** من الاسم بعد `QualifyImage` (لازم بعدها `/` أو `:` أو `@` أو نهاية الاسم، فـ `ghcr.io/khaymah` مابتطابقش `ghcr.io/khaymah-evil`)، والفاضية = أي إضافة.
 6. **التزامن (القرار 19):**
    - `"Environments"."LockedByRunId"`: الـ run بيمسك البيئة من أول job بيتدرج عليها لحد ما مايبقاش فيه `RunJob` منه على البيئة دي مش منتهي (حسب الـ plan، فالـ job اللي لسه ماوصلش البوابة بيتحسب). كده `deploy` و`migrate-db` في نفس الـ run مايتداخلش بينهم run تاني.
    - الفك في آخر كل `advance` (بعد ما الـ jobs تتحرك) وفي `abandon`، و`ReleaseStale` في الـ reconciler بيفك أي قفل صاحبه خلص.
@@ -41,9 +41,16 @@
 7. **إعادة التقييم:** الـ reconciler كل 5 ثواني بيعدّي على التنفيذات اللي فيها `RunJob` مستني ببوابة (`ListGatedRuns`) ويعيد `advance`. و`ListUnsettledRuns` بقى مابيرجّعش تنفيذ كل اللي مستني فيه ببوابة، عشان مايتعدّش «unsettled» كل 5 ثواني لمدة أيام.
 8. **سجل النشر `"Deployments"`** (`queued` ثم `succeeded` أو `failed` أو `canceled`): صف لكل job عدّى البوابة، بالبيئة والـ run والـ `RunJob` والـ job والـ sha والـ ref و`"RuleVersion"` وقت البوابة. `running` محجوز في الـ CHECK لـ M6، لأن `Pipelines` مابيعرفش إمتى الـ attempt بدأ. «المنشور دلوقتي» = آخر `succeeded`.
 9. **الفحص تاني وقت `Start`:** لو الـ `RunJob` ليه `"EnvironmentId"`، الـ resolver بيتأكد إن البيئة لسه موجودة ومش متوقفة، وإن الـ ref لسه مسموح، وإن `"RuleVersion"` هو نفسه اللي في صف النشر. غير كده المحاولة بتفشل `ENVIRONMENT_RULE_CHANGED` من غير ما أي قيمة تتفك. وأسرار البيئة ومتغيّراتها بتوصل بنطاق `"RunJobs"."EnvironmentId"` (مش من الـ spec).
-   - الفحص ده جوه الـ resolver، فبيحصل بس لو الـ job طلب سر. job على بيئة من غير أي سر اتدرج قبل الإيقاف بيشتغل، وده مقبول: مفيش حاجة تتحمى، وأغلب jobs النشر بتطلب مفتاح. وقفه هو كمان محتاج فحص في `Start` لكل job، ودي نقطة نرجعلها مع (ب) لو احتجناها.
+   - الفحص بيحصل في كل `Start` حتى لو الـ job مابيطلبش أي سر (`jobs.StartGuard`)، عشان الإيقاف وتشديد القاعدة يوقفوا job اتدرج قبلهم (من المراجعة الأمنية).
 10. **الـ API:** الـ `RunJob` بيزيد عليه `Environment` و`Gate` و`GateOpensAt`، و`GET .../environments/{environmentName}/deployments` بـ `run.read` وصفحات.
 11. **الأسباب الجديدة** على `"RunJobs"."FailureReason"` (`TEXT` من غير CHECK على القايمة): `ENVIRONMENT_NOT_FOUND` و`ENVIRONMENT_REF_NOT_ALLOWED` و`ENVIRONMENT_REQUIRES_PINNED_IMAGES` و`ENVIRONMENT_PLUGIN_NOT_ALLOWED` و`ENVIRONMENT_ISOLATION_REQUIRED` و`ENVIRONMENT_RULE_CHANGED`.
+
+12. **من المراجعة الأمنية المستقلة:**
+    - (MEDIUM، اتصلّح) الفحص وقت `Start` كان جوه الـ resolver بس، فـ job من غير أسرار كان بيعدّي إيقاف حصل بعد البوابة. بقى `jobs.StartGuard` بيتنادى في كل `Start`.
+    - (MEDIUM، اتصلّح) `AllowedPlugins` كانت `HasPrefix` على النص، فـ `ghcr.io/khaymah` كانت بتسمح بـ `ghcr.io/khaymah-evil`. بقت على أجزاء الاسم.
+    - (LOW، اتصلّح) إلغاء الـ run بيفك القفل على طول بدل ما يستنى الـ reconciler، والفك بيقفل الصفوف بترتيب الـ `Id`، و`writtenImage` بقى ثابت.
+    - (LOW، مقبول) متغيّرات البيئة بتدخل `if:` قبل قاعدة الـ ref، زي ترتيب الخطة، عشان job شرطه `false` مايستناش. اللي على ref مش مسموح مابيشوفش القيم، وبس ممكن يعرف من نوع التخطّي.
+    - (LOW، مقبول) run بيقفل بيئتين بترتيب الـ jobs في الملف، فـ runين بملفين مختلفين ممكن يعملوا deadlock، وPostgres بيلغي واحد والـ reconciler بيعيده.
 
 ## البدائل اللي اترفضت
 - **حالة جديدة `gated` على `"RunJobs"`:** الـ binary القديم كان هيشوف حالة مايعرفهاش، وتعديل الـ triggers بيكسر الرجوع (U3).

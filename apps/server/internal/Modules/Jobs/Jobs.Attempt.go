@@ -147,6 +147,11 @@ func (s *Service) markStarted(ctx context.Context, q *sqlc.Queries, l sqlc.LockA
 }
 
 func (s *Service) resolveSecrets(ctx context.Context, l sqlc.LockActiveLeaseRow, spec *runnerv1.JobSpec) (map[string][]byte, error) {
+	if g, ok := s.secrets.(StartGuard); ok {
+		if err := g.Admit(ctx, SecretRequest{OrganizationID: l.OrganizationId, JobID: l.JobId, AttemptID: l.AttemptId}); err != nil {
+			return nil, err
+		}
+	}
 	names := jobspec.SecretNames(spec)
 	if len(names) == 0 {
 		return nil, nil

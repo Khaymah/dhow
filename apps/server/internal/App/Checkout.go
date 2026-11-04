@@ -28,7 +28,10 @@ type checkoutSecrets struct {
 	log       *slog.Logger
 }
 
-var _ jobs.SecretResolver = (*checkoutSecrets)(nil)
+var (
+	_ jobs.SecretResolver = (*checkoutSecrets)(nil)
+	_ jobs.StartGuard     = (*checkoutSecrets)(nil)
+)
 
 func newCheckoutSecrets(in Infra) *checkoutSecrets {
 	var next jobs.SecretResolver = jobs.NoSecrets{}
@@ -55,6 +58,13 @@ func (c *checkoutSecrets) Accepts(ctx context.Context, origin jobs.Origin, names
 		return nil
 	}
 	return c.next.Accepts(ctx, origin, rest)
+}
+
+func (c *checkoutSecrets) Admit(ctx context.Context, req jobs.SecretRequest) error {
+	if g, ok := c.next.(jobs.StartGuard); ok {
+		return g.Admit(ctx, req)
+	}
+	return nil
 }
 
 func (c *checkoutSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (map[string][]byte, error) {
@@ -112,6 +122,7 @@ type runServices struct {
 	sources   *sources.Service
 	artifacts *artifacts.Service
 	secrets   *secretsmodule.Service
+	envs      *environments.Service
 }
 
 func runsFor(
@@ -141,5 +152,5 @@ func runsFor(
 	pipelinesService.UseStatuses(sourcesService.StatusRecorder())
 	pipelinesService.UseArtifacts(artifactsService)
 	secrets.pipelines, secrets.sources = pipelinesService, sourcesService
-	return runServices{pipelines: pipelinesService, sources: sourcesService, artifacts: artifactsService, secrets: secretsService}, nil
+	return runServices{pipelines: pipelinesService, sources: sourcesService, artifacts: artifactsService, secrets: secretsService, envs: envs}, nil
 }

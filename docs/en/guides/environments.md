@@ -59,7 +59,7 @@ Once every job it needs has succeeded, we check in this order:
 | The environment exists | Fails with `ENVIRONMENT_NOT_FOUND` |
 | The `if:` condition, with the variables of the environment, the project and the organization | Skipped with `CONDITION_FALSE` |
 | The branch or tag is in `AllowedRefs` | Skipped with `ENVIRONMENT_REF_NOT_ALLOWED`, and the run does not fail for it |
-| The images are written with their digest in the file, and the plugins come from `AllowedPlugins` | Fails with `ENVIRONMENT_REQUIRES_PINNED_IMAGES` or `ENVIRONMENT_PLUGIN_NOT_ALLOWED` |
+| The images are written with their digest in the file, and the plugins come from `AllowedPlugins` (a prefix matches whole parts of the name, so `ghcr.io/acme` does not match `ghcr.io/acme-x`) | Fails with `ENVIRONMENT_REQUIRES_PINNED_IMAGES` or `ENVIRONMENT_PLUGIN_NOT_ALLOWED` |
 | The secrets the job asks for exist | Fails with `SECRET_NOT_FOUND` |
 | The environment is not paused | Waits (`Gate` = `paused`) |
 | There are no reviewers | Waits for approval (`Gate` = `approval`) |
@@ -69,7 +69,7 @@ Once every job it needs has succeeded, we check in this order:
 - The kind is part of the match: a tag named `main` does not match the branch rule `main`.
 - A pull request from the same repository needs `AllowPullRequests`, and we match the branch it merges into (such as `main`).
 - A waiting job stays `waiting`, and we check again every few seconds.
-- Before we hand the secrets of the environment to the runner, we check again: the environment exists and is not paused, the branch is still allowed, and the rules did not change since the gate. If anything changed, the job fails with `ENVIRONMENT_RULE_CHANGED` and gets no secret.
+- When the job starts on the runner, and before any secret, we check again: the environment exists and is not paused, the branch is still allowed, and the rules did not change since the gate. If anything changed, the job fails with `ENVIRONMENT_RULE_CHANGED` and gets no secret.
 
 ## One run at a time
 
@@ -106,7 +106,7 @@ POST /api/v1/organizations/{id}/projects/{projectId}/environments/{environmentNa
 {"Reason": "The database migration failed"}
 ```
 
-Jobs that already run finish, and a job that has not reached the gate yet waits until the environment is resumed. A job that passed the gate but has not started yet gets no secret: if it asks for one, it fails with `ENVIRONMENT_RULE_CHANGED`. Only an Admin resumes, with the second step (`.../resume` with `CurrentFactor`).
+Jobs that already run finish, and a job that has not reached the gate yet waits until the environment is resumed. A job that passed the gate but has not started yet fails with `ENVIRONMENT_RULE_CHANGED` and gets no secret. Only an Admin resumes, with the second step (`.../resume` with `CurrentFactor`).
 
 ## Remove an environment
 

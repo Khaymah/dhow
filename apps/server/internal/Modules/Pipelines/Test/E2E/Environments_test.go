@@ -43,6 +43,17 @@ jobs:
           KEY: ${{ secrets.PROD_KEY }}
 `
 
+	plainDeployPipeline = `version: 1
+on:
+  push: {}
+jobs:
+  deploy:
+    image: IMAGE
+    environment: production
+    steps:
+      - run: ./deploy.sh
+`
+
 	missingEnvPipeline = `version: 1
 on:
   push: {}
@@ -328,4 +339,20 @@ func TestARuleChangeAfterTheGateGivesTheJobNoSecret(t *testing.T) {
 	w.reopen(t)
 	deploy := w.env.RunJobs(run)["deploy"]
 	assert.Equal(t, "ENVIRONMENT_RULE_CHANGED", deploy.Reason)
+}
+
+func TestAPauseAfterTheGateStopsAJobThatAsksForNoSecret(t *testing.T) {
+	w := newWorld(t)
+	env := w.production(t)
+	w.defs.Put(shaA, pipeline(plainDeployPipeline))
+	run := w.push("refs/heads/main", shaA)
+	w.env.StartRuns()
+	require.Equal(t, "active", w.env.RunJobs(run)["deploy"].State)
+	w.exec(t, `UPDATE "Environments" SET "PausedAt" = now(), "PausedByUserId" = $2, "PausedReason" = 'freeze', "RuleVersion" = "RuleVersion" + 1 WHERE "Id" = $1`, env, w.ownerID)
+
+	r, g := w.leaseKey(t, "deploy")
+	_, err := r.Start(g)
+	require.Error(t, err, "Start checks the environment even when the job asks for no secret")
+	w.reopen(t)
+	assert.Equal(t, "ENVIRONMENT_RULE_CHANGED", w.env.RunJobs(run)["deploy"].Reason)
 }

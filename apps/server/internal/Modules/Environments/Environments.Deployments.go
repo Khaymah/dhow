@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
-	"github.com/Khaymah/dhow/apps/server/internal/Core/Response"
+	response "github.com/Khaymah/dhow/apps/server/internal/Core/Response"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	gen "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments/Gen"
 )

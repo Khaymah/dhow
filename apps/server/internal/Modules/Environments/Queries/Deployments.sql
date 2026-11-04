@@ -33,18 +33,34 @@ WHERE d."RunId" = @run_id AND d."OrganizationId" = @organization_id AND d."State
   AND rj."State" IN ('succeeded', 'failed', 'canceled', 'skipped');
 
 -- name: ReleaseEnvironments :exec
-UPDATE "Environments"
-SET "LockedByRunId" = NULL, "LockedAt" = NULL
-WHERE "LockedByRunId" = @run_id AND "OrganizationId" = @organization_id AND NOT ("Name" = ANY(@keep::text[]));
-
--- name: ReleaseStaleEnvironments :execrows
+WITH held AS (
+    SELECT "Id"
+    FROM "Environments"
+    WHERE "LockedByRunId" = @run_id AND "OrganizationId" = @organization_id AND NOT ("Name" = ANY(@keep::text[]))
+    ORDER BY "Id"
+    FOR UPDATE
+)
 UPDATE "Environments" e
 SET "LockedByRunId" = NULL, "LockedAt" = NULL
-WHERE e."LockedByRunId" IS NOT NULL
-  AND NOT EXISTS (SELECT 1
-                  FROM "PipelineRuns" r
-                  WHERE r."Id" = e."LockedByRunId" AND r."OrganizationId" = e."OrganizationId"
-                    AND r."State" IN ('pending', 'queued', 'running') AND NOT r."IsDeleted");
+FROM held
+WHERE e."Id" = held."Id";
+
+-- name: ReleaseStaleEnvironments :execrows
+WITH stale AS (
+    SELECT e."Id"
+    FROM "Environments" e
+    WHERE e."LockedByRunId" IS NOT NULL
+      AND NOT EXISTS (SELECT 1
+                      FROM "PipelineRuns" r
+                      WHERE r."Id" = e."LockedByRunId" AND r."OrganizationId" = e."OrganizationId"
+                        AND r."State" IN ('pending', 'queued', 'running') AND NOT r."IsDeleted")
+    ORDER BY e."Id"
+    FOR UPDATE OF e SKIP LOCKED
+)
+UPDATE "Environments" e
+SET "LockedByRunId" = NULL, "LockedAt" = NULL
+FROM stale
+WHERE e."Id" = stale."Id";
 
 -- name: ListDeployments :many
 SELECT d.*

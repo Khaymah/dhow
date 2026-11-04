@@ -3,6 +3,7 @@ package pipelines
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -98,21 +99,44 @@ func refDetail(run sqlc.PipelineRun, env string) []byte {
 }
 
 func writtenImage(image string, pins map[string]string) string {
-	for written, pinned := range pins {
-		if pinned == image {
+	found := image
+	for _, written := range slices.Sorted(maps.Keys(pins)) {
+		if pins[written] != image {
+			continue
+		}
+		if !strings.Contains(written, digestMarker) {
 			return written
 		}
+		found = written
 	}
-	return image
+	return found
 }
 
-func pluginAllowed(image string, prefixes []string) bool {
+func qualifyPrefix(p string) string {
+	host, _, found := strings.Cut(p, "/")
+	switch {
+	case found && (strings.ContainsAny(host, ".:") || host == "localhost"):
+		return p
+	case !found:
+		return jobspec.DefaultRegistry + "/" + jobspec.DefaultNamespace + "/" + p
+	default:
+		return jobspec.DefaultRegistry + "/" + p
+	}
+}
+
+func PluginAllowed(image string, prefixes []string) bool {
 	if len(prefixes) == 0 {
 		return true
 	}
 	qualified := jobspec.QualifyImage(image)
-	return slices.ContainsFunc(prefixes, func(p string) bool {
-		return strings.HasPrefix(qualified, p) || strings.HasPrefix(image, p)
+	return slices.ContainsFunc(prefixes, func(raw string) bool {
+		p := qualifyPrefix(raw)
+		if strings.HasSuffix(p, "/") {
+			return strings.HasPrefix(qualified, p)
+		}
+		return qualified == p || slices.ContainsFunc([]string{"/", ":", "@"}, func(sep string) bool {
+			return strings.HasPrefix(qualified, p+sep)
+		})
 	})
 }
 
@@ -130,7 +154,7 @@ func staticRefusal(env deployments.Environment, spec *runnerv1.JobSpec, pins map
 		if env.RequirePinnedImages && !strings.Contains(img, digestMarker) {
 			return models.ReasonEnvironmentPinnedImages
 		}
-		if !pluginAllowed(img, env.AllowedPlugins) {
+		if !PluginAllowed(img, env.AllowedPlugins) {
 			return models.ReasonEnvironmentPlugin
 		}
 	}
