@@ -2,6 +2,8 @@ package e2e_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -152,6 +154,13 @@ func TestEnvironmentSecretsReachTheJobOnAnAllowedBranch(t *testing.T) {
 	assert.Nil(t, holder, "the lock is released when no job of the run needs the environment")
 	runState, _ := w.env.RunState(run)
 	assert.Equal(t, "succeeded", runState)
+
+	res := w.owner.Get(apptest.OrgPath(w.org, "/projects/"+w.project.String()+"/environments/production/deployments"))
+	require.Equal(t, http.StatusOK, res.Status)
+	var list []struct{ RunId, State, Ref string }
+	require.NoError(t, json.Unmarshal(res.Data, &list))
+	require.Len(t, list, 1)
+	assert.Equal(t, []string{run.String(), "succeeded", "refs/heads/main"}, []string{list[0].RunId, list[0].State, list[0].Ref})
 }
 
 func TestABranchTheEnvironmentDoesNotAllowIsSkippedWithoutOpeningASecret(t *testing.T) {
@@ -220,6 +229,10 @@ func TestAPausedEnvironmentHoldsTheJobUntilItResumes(t *testing.T) {
 	require.Equal(t, "waiting", w.env.RunJobs(run)["deploy"].State)
 	gate, _ := w.gate(t, run, "deploy")
 	assert.Equal(t, "paused", gate)
+	res := w.owner.Get(w.runPath(run, ""))
+	require.Equal(t, http.StatusOK, res.Status)
+	assert.Contains(t, string(res.Data), `"Environment":"production"`)
+	assert.Contains(t, string(res.Data), `"Gate":"paused"`)
 	w.reopen(t)
 	gate, _ = w.gate(t, run, "deploy")
 	assert.Equal(t, "paused", gate, "the reconciler keeps it waiting")
