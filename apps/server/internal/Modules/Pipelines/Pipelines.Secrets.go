@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	secretstore "github.com/Khaymah/dhow/apps/server/internal/Core/SecretStore"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
@@ -20,6 +21,7 @@ import (
 
 const (
 	triggerPullRequest = "pull_request"
+	deliveredTarget    = "job"
 	failureDetailMax   = 1024
 )
 
@@ -168,4 +170,32 @@ func (s *Service) attachRegistryAuth(ctx context.Context, q *sqlc.Queries, run s
 		}
 	}
 	return nil
+}
+
+type Delivered struct {
+	OrganizationID uuid.UUID
+	JobID          uuid.UUID
+	AttemptID      uuid.UUID
+	Scope          SecretScope
+	Names          string
+	Truncated      bool
+	Registries     []string
+}
+
+func (s *Service) SecretsDelivered(ctx context.Context, d Delivered) error {
+	if s.bus == nil {
+		return nil
+	}
+	data := map[string]string{
+		"Delivered": d.Names, "ProjectId": d.Scope.ProjectID.String(), "RunId": d.Scope.RunID.String(), "AttemptId": d.AttemptID.String(),
+	}
+	if d.Truncated {
+		data["Truncated"] = "true"
+	}
+	if len(d.Registries) > 0 {
+		data["Registries"] = strings.Join(d.Registries, ",")
+	}
+	return s.bus.Publish(ctx, eventbus.Event{Name: eventbus.JobSecretsDelivered, Payload: eventbus.Audited{
+		OrganizationIDs: []uuid.UUID{d.OrganizationID}, TargetType: deliveredTarget, TargetID: d.JobID.String(), Data: data,
+	}})
 }

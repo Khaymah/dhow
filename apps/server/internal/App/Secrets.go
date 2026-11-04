@@ -20,10 +20,7 @@ import (
 	"github.com/Khaymah/dhow/internal/jobspec"
 )
 
-const (
-	deliveredTarget   = "job"
-	deliveredValueMax = 256
-)
+const deliveredValueMax = 256
 
 type pipelineSecrets struct {
 	runs   *pipelines.Service
@@ -159,16 +156,7 @@ func deliveredList(list []secretstore.Secret) (string, bool) {
 
 func (p *pipelineSecrets) audit(ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope, list []secretstore.Secret, hosts []string) error {
 	value, cut := deliveredList(list)
-	data := map[string]string{
-		"Secrets": value, "ProjectId": scope.ProjectID.String(), "RunId": scope.RunID.String(), "AttemptId": req.AttemptID.String(),
-	}
-	if cut {
-		data["Truncated"] = "true"
-	}
-	if len(hosts) > 0 {
-		data["Registries"] = strings.Join(hosts, ",")
-	}
-	return p.bus.Publish(ctx, eventbus.Event{Name: eventbus.JobSecretsDelivered, Payload: eventbus.Audited{
-		OrganizationIDs: []uuid.UUID{req.OrganizationID}, TargetType: deliveredTarget, TargetID: req.JobID.String(), Data: data,
-	}})
+	return p.runs.SecretsDelivered(ctx, pipelines.Delivered{
+		OrganizationID: req.OrganizationID, JobID: req.JobID, AttemptID: req.AttemptID, Scope: scope, Names: value, Truncated: cut, Registries: hosts,
+	})
 }
