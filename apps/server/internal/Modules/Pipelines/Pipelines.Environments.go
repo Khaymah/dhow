@@ -62,13 +62,18 @@ func (s *Service) environmentVars(ctx context.Context, q *sqlc.Queries, run sqlc
 	return s.vars.Variables(ctx, q, run.OrganizationId, run.ProjectId, &env)
 }
 
+type refRefusal struct {
+	Ref         string `json:"Ref"`
+	Environment string `json:"Environment"`
+}
+
 func refDetail(run sqlc.PipelineRun, env string) []byte {
 	t := TargetOf(run.Trigger, run.Ref, run.BaseRef.String)
 	ref := t.Name
 	if ref == "" {
 		ref = run.Ref
 	}
-	raw, err := json.Marshal(map[string]string{"Ref": ref, "Environment": env})
+	raw, err := json.Marshal(refRefusal{Ref: ref, Environment: env})
 	if err != nil || len(raw) > failureDetailMax {
 		return nil
 	}
