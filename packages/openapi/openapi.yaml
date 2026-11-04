@@ -2565,6 +2565,32 @@ paths:
                 $ref: "#/components/schemas/EnvironmentResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/deployments:
+    get:
+      operationId: listDeployments
+      tags: [environments]
+      summary: List the deployments to an environment
+      description: >-
+        Needs `run.read` on the project. Every job that passed the gate of the environment, newest first, with its
+        run, ref, commit and state. The environment deployed now is the newest `succeeded` entry.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of deployments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeploymentListResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/secrets:
     get:
       operationId: listOrganizationSecrets
@@ -7454,6 +7480,57 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/Environment"
+    DeploymentState:
+      type: string
+      enum: [queued, running, succeeded, failed, canceled]
+    Deployment:
+      type: object
+      additionalProperties: false
+      required: [Id, RunId, RunNumber, RunJobId, JobId, JobKey, Ref, RuleVersion, State, CreatedAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        RunId:
+          type: string
+          format: uuid
+        RunNumber:
+          type: integer
+          format: int64
+        RunJobId:
+          type: string
+          format: uuid
+        JobId:
+          type: string
+          format: uuid
+          description: The job that ran the deploy. Its logs are under `/jobs/{jobId}`.
+        JobKey:
+          type: string
+        Ref:
+          type: string
+        Sha:
+          type: string
+        RuleVersion:
+          type: integer
+          format: int64
+          description: The `RuleVersion` of the environment when the job passed the gate.
+        State:
+          $ref: "#/components/schemas/DeploymentState"
+        CreatedAt:
+          type: string
+          format: date-time
+        FinishedAt:
+          type: string
+          format: date-time
+    DeploymentListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Deployment"
     CreateEnvironmentRequest:
       type: object
       additionalProperties: false
@@ -7515,6 +7592,12 @@ components:
     RunJobState:
       type: string
       enum: [waiting, active, succeeded, failed, canceled, skipped]
+    RunJobGate:
+      type: string
+      enum: [approval, timer, paused, environment_busy]
+      description: >-
+        Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the
+        environment to be resumed, or for another run that holds the environment.
     RunIssue:
       type: object
       additionalProperties: false
@@ -7655,15 +7738,29 @@ components:
         FailureReason:
           type: string
           description: >-
-            For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`,
-            `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A
-            job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
+            For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`,
+            `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`,
+            `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as
+            `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
         FailureNames:
           type: array
           description: >-
             With `SECRET_NOT_FOUND` or `SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS`, the names of the secrets. Never a value.
           items:
             type: string
+        Environment:
+          type: string
+          description: The environment the job names in `environment:`, if any.
+        EnvironmentId:
+          type: string
+          format: uuid
+          description: The environment the job waits on or deployed to, once it reached the gate.
+        Gate:
+          $ref: "#/components/schemas/RunJobGate"
+        GateOpensAt:
+          type: string
+          format: date-time
+          description: With the `timer` gate, or after it, when the wait timer of the environment ends.
         CurrentJobId:
           type: string
           format: uuid

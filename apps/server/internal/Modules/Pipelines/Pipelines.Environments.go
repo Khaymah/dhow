@@ -47,6 +47,23 @@ func TargetOf(trigger, ref, baseRef string) RefTarget {
 	}
 }
 
+func (s *Service) environmentNames(run sqlc.PipelineRun) map[string]string {
+	out := map[string]string{}
+	if !run.DefinitionSource.Valid {
+		return out
+	}
+	c, err := s.compileRun(run)
+	if err != nil {
+		return out
+	}
+	for key, plan := range c.byKey {
+		if plan.Environment != "" {
+			out[key] = plan.Environment
+		}
+	}
+	return out
+}
+
 func (s *Service) lockEnvironment(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, name string) (deployments.Environment, bool, error) {
 	t := TargetOf(run.Trigger, run.Ref, run.BaseRef.String)
 	return s.gate.Lock(ctx, q, deployments.Target{

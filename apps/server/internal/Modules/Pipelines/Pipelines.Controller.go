@@ -53,6 +53,14 @@ func runToGen(r models.Run) gen.Run {
 	return out
 }
 
+func gateOf(g string) *gen.RunJobGate {
+	if g == "" {
+		return nil
+	}
+	v := gen.RunJobGate(g)
+	return &v
+}
+
 func detailToGen(d models.Detail) gen.RunDetail {
 	out := gen.RunDetail{
 		Run: runToGen(d.Run), Jobs: make([]gen.RunJob, 0, len(d.Jobs)), Issues: make([]gen.RunIssue, 0, len(d.Issues)),
@@ -62,7 +70,7 @@ func detailToGen(d models.Detail) gen.RunDetail {
 		out.Jobs = append(out.Jobs, gen.RunJob{
 			Id: j.ID, Key: j.Key, Kind: gen.RunJobKind(j.Kind), JobId: j.JobID, Name: j.Name, Matrix: j.Matrix, Needs: j.Needs, State: gen.RunJobState(j.State),
 			FailureReason: optional(j.FailureReason), FailureNames: namesOrNil(j.FailureNames), CurrentJobId: j.CurrentJobID, Attempts: j.Attempts, StartedAt: j.StartedAt,
-			FinishedAt: j.FinishedAt,
+			FinishedAt: j.FinishedAt, Environment: optional(j.Environment), EnvironmentId: j.EnvironmentID, Gate: gateOf(j.Gate), GateOpensAt: j.GateOpensAt,
 		})
 	}
 	for _, i := range d.Issues {

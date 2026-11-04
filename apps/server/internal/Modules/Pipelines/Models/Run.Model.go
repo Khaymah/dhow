@@ -159,6 +159,10 @@ type RunJob struct {
 	State         string
 	FailureReason string
 	FailureNames  []string
+	Environment   string
+	EnvironmentID *uuid.UUID
+	Gate          string
+	GateOpensAt   *time.Time
 	CurrentJobID  *uuid.UUID
 	Attempts      int
 	StartedAt     *time.Time
