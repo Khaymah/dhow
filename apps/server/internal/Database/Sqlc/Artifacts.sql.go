@@ -130,7 +130,7 @@ WHERE "Id" = (SELECT c."Id"
               WHERE c."ProjectId" = $1 AND c."Key" = $2 AND c."Scope" = ANY ($3::text[]) AND NOT c."IsDeleted"
               ORDER BY array_position($3::text[], c."Scope")
               LIMIT 1)
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Scope", "Key", "Digest", "SizeBytes", "LastUsedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Scope", "Key", "Digest", "SizeBytes", "LastUsedAt", "HadSecrets"
 `
 
 type FindCacheEntryParams struct {
@@ -154,6 +154,7 @@ func (q *Queries) FindCacheEntry(ctx context.Context, arg FindCacheEntryParams) 
 		&i.Digest,
 		&i.SizeBytes,
 		&i.LastUsedAt,
+		&i.HadSecrets,
 	)
 	return i, err
 }

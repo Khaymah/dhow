@@ -64,6 +64,7 @@ type Service struct {
 	definitions   Definitions
 	images        ImageResolver
 	logins        secretstore.RegistryLogins
+	secrets       secretstore.Store
 	checkoutImage string
 	publicURL     string
 	limiter       ratelimit.Limiter

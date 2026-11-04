@@ -156,6 +156,7 @@ type CacheEntry struct {
 	Digest         []byte
 	SizeBytes      int64
 	LastUsedAt     time.Time
+	HadSecrets     bool
 }
 
 type CommitStatusReport struct {
@@ -559,18 +560,19 @@ type PipelineRunCounter struct {
 }
 
 type Project struct {
-	Id              uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	IsDeleted       bool
-	OrganizationId  uuid.UUID
-	Slug            string
-	Name            string
-	PipelinePath    string
-	ForkPolicy      string
-	State           string
-	ArchivedAt      *time.Time
-	CreatedByUserId uuid.UUID
+	Id               uuid.UUID
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	IsDeleted        bool
+	OrganizationId   uuid.UUID
+	Slug             string
+	Name             string
+	PipelinePath     string
+	ForkPolicy       string
+	State            string
+	ArchivedAt       *time.Time
+	CreatedByUserId  uuid.UUID
+	ForkCacheRestore string
 }
 
 type RateLimit struct {
@@ -674,6 +676,7 @@ type RunJob struct {
 	Outputs        []byte
 	StartedAt      *time.Time
 	FinishedAt     *time.Time
+	FailureDetail  []byte
 }
 
 type Runner struct {

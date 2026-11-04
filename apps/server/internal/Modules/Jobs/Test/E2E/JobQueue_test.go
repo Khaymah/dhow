@@ -204,9 +204,6 @@ func TestEnqueueRefusesWhatOnlyTheAPIMayQueue(t *testing.T) {
 		{"an unpinned image", func(r *jobqueue.Request) { r.Spec.Image = "alpine" }, apperrors.CodeValidationFailed},
 		{"an invalid label", func(r *jobqueue.Request) { r.Spec.Labels = []string{"no spaces allowed"} }, apperrors.CodeValidationFailed},
 		{"a creator of another organization", func(r *jobqueue.Request) { r.CreatedByUserID = outsider }, ""},
-		{"a secret", func(r *jobqueue.Request) {
-			r.Spec.Secrets = []*runnerv1.SecretRef{{Name: "TOKEN", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "TOKEN"}}}
-		}, apperrors.CodeSecretsUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -319,4 +316,16 @@ func TestAManualJobAlsoNeedsTheFeaturesOfItsSpec(t *testing.T) {
 	noLease(t, r)
 	g := leaseNow(t, w.runner(apptest.SeedRunnerSpec{Features: []string{jobqueue.FeaturePlugins}}))
 	assert.Equal(t, created.Job.ID.String(), g.Grant.GetJobId())
+}
+
+func TestAPipelineJobWithSecretsIsQueuedForTheStartToResolve(t *testing.T) {
+	w := newWorld(t)
+	req := pipelineRequest(w)
+	req.Spec.Secrets = []*runnerv1.SecretRef{{Name: "TOKEN", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "TOKEN"}}}
+	err := dbtx.Run(context.Background(), w.env.Pool, func(q *sqlc.Queries) error {
+		_, err := w.env.Wired.JobQueue.Enqueue(context.Background(), q, req)
+		return err
+	})
+	require.NoError(t, err, "pipelines check the names before the queue, and the start opens them")
+	assert.Equal(t, 1, countJobs(t, w, req.OriginID))
 }

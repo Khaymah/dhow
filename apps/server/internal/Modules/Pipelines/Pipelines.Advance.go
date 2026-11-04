@@ -155,6 +155,12 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 	if st.run.IsFork && (len(spec.GetSecrets()) > 0 || hasPluginSecrets(plan)) {
 		return s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonForkSecrets)
 	}
+	if reason, detail, err := s.checkSecrets(ctx, q, st.run, spec); err != nil || reason != "" {
+		if err != nil {
+			return err
+		}
+		return s.failWithDetail(ctx, q, st, i, reason, detail)
+	}
 	if reason, err := s.attachTransfers(ctx, q, st, rj, plan, spec, evalCtx); err != nil || reason != "" {
 		if err != nil {
 			return err
@@ -166,6 +172,16 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 		return err
 	}
 	return s.endRunJob(ctx, q, st, i, models.JobFailed, reason)
+}
+
+func (s *Service) failWithDetail(ctx context.Context, q *sqlc.Queries, st *step, i int, reason string, detail []byte) error {
+	if err := s.endRunJob(ctx, q, st, i, models.JobFailed, reason); err != nil {
+		return err
+	}
+	if len(detail) == 0 {
+		return nil
+	}
+	return q.SetRunJobFailureDetail(ctx, sqlc.SetRunJobFailureDetailParams{FailureDetail: detail, ID: st.rows[i].Id, OrganizationID: st.run.OrganizationId})
 }
 
 func hasPluginSecrets(plan *pipelinespec.RunJob) bool {
