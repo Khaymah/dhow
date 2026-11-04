@@ -32,7 +32,7 @@ func (q *Queries) CountEnvironments(ctx context.Context, arg CountEnvironmentsPa
 }
 
 const getEnvironment = `-- name: GetEnvironment :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
 FROM "Environments"
 WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND "Name" = $3 AND NOT "IsDeleted"
 `
@@ -72,6 +72,8 @@ func (q *Queries) GetEnvironment(ctx context.Context, arg GetEnvironmentParams) 
 		&i.PausedByUserId,
 		&i.PausedReason,
 		&i.CreatedByUserId,
+		&i.LockedByRunId,
+		&i.LockedAt,
 	)
 	return i, err
 }
@@ -114,7 +116,7 @@ VALUES (
     $8, $9, $10, $11, $12::text[], $13,
     $14, $15, $16, $17, $17
 )
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
 `
 
 type InsertEnvironmentParams struct {
@@ -184,6 +186,8 @@ func (q *Queries) InsertEnvironment(ctx context.Context, arg InsertEnvironmentPa
 		&i.PausedByUserId,
 		&i.PausedReason,
 		&i.CreatedByUserId,
+		&i.LockedByRunId,
+		&i.LockedAt,
 	)
 	return i, err
 }
@@ -251,7 +255,7 @@ func (q *Queries) ListEnvironmentReviewers(ctx context.Context, arg ListEnvironm
 }
 
 const listEnvironments = `-- name: ListEnvironments :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
 FROM "Environments"
 WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
 ORDER BY "Name"
@@ -305,6 +309,8 @@ func (q *Queries) ListEnvironments(ctx context.Context, arg ListEnvironmentsPara
 			&i.PausedByUserId,
 			&i.PausedReason,
 			&i.CreatedByUserId,
+			&i.LockedByRunId,
+			&i.LockedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -317,7 +323,7 @@ func (q *Queries) ListEnvironments(ctx context.Context, arg ListEnvironmentsPara
 }
 
 const lockEnvironment = `-- name: LockEnvironment :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
 FROM "Environments"
 WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND "Name" = $3 AND NOT "IsDeleted"
 FOR UPDATE
@@ -358,6 +364,8 @@ func (q *Queries) LockEnvironment(ctx context.Context, arg LockEnvironmentParams
 		&i.PausedByUserId,
 		&i.PausedReason,
 		&i.CreatedByUserId,
+		&i.LockedByRunId,
+		&i.LockedAt,
 	)
 	return i, err
 }
@@ -367,7 +375,7 @@ UPDATE "Environments"
 SET "PausedAt" = $1::timestamptz, "PausedByUserId" = $2, "PausedReason" = $3,
     "RuleVersion" = "RuleVersion" + 1, "Version" = "Version" + 1, "UpdatedAt" = $1::timestamptz
 WHERE "Id" = $4 AND "OrganizationId" = $5 AND "PausedAt" IS NULL AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
 `
 
 type PauseEnvironmentParams struct {
@@ -413,6 +421,8 @@ func (q *Queries) PauseEnvironment(ctx context.Context, arg PauseEnvironmentPara
 		&i.PausedByUserId,
 		&i.PausedReason,
 		&i.CreatedByUserId,
+		&i.LockedByRunId,
+		&i.LockedAt,
 	)
 	return i, err
 }
@@ -421,7 +431,7 @@ const removeEnvironment = `-- name: RemoveEnvironment :one
 UPDATE "Environments"
 SET "IsDeleted" = true, "Version" = "Version" + 1, "UpdatedAt" = $1
 WHERE "Id" = $2 AND "OrganizationId" = $3 AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
 `
 
 type RemoveEnvironmentParams struct {
@@ -459,6 +469,8 @@ func (q *Queries) RemoveEnvironment(ctx context.Context, arg RemoveEnvironmentPa
 		&i.PausedByUserId,
 		&i.PausedReason,
 		&i.CreatedByUserId,
+		&i.LockedByRunId,
+		&i.LockedAt,
 	)
 	return i, err
 }
@@ -485,7 +497,7 @@ UPDATE "Environments"
 SET "PausedAt" = NULL, "PausedByUserId" = NULL, "PausedReason" = NULL,
     "RuleVersion" = "RuleVersion" + 1, "Version" = "Version" + 1, "UpdatedAt" = $1
 WHERE "Id" = $2 AND "OrganizationId" = $3 AND "PausedAt" IS NOT NULL AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
 `
 
 type ResumeEnvironmentParams struct {
@@ -523,6 +535,8 @@ func (q *Queries) ResumeEnvironment(ctx context.Context, arg ResumeEnvironmentPa
 		&i.PausedByUserId,
 		&i.PausedReason,
 		&i.CreatedByUserId,
+		&i.LockedByRunId,
+		&i.LockedAt,
 	)
 	return i, err
 }
@@ -620,7 +634,7 @@ SET "Description" = $1, "AllowedRefs" = $2, "AllowPullRequests" = $3,
     "RuleVersion" = "RuleVersion" + CASE WHEN $13::boolean THEN 1 ELSE 0 END,
     "Version" = "Version" + 1, "UpdatedAt" = $14
 WHERE "Id" = $15 AND "OrganizationId" = $16 AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
 `
 
 type UpdateEnvironmentRulesParams struct {
@@ -688,6 +702,8 @@ func (q *Queries) UpdateEnvironmentRules(ctx context.Context, arg UpdateEnvironm
 		&i.PausedByUserId,
 		&i.PausedReason,
 		&i.CreatedByUserId,
+		&i.LockedByRunId,
+		&i.LockedAt,
 	)
 	return i, err
 }

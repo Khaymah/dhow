@@ -32,7 +32,7 @@ PORT = SERVER + "Core/JobQueue/JobQueue.Port.go"
 
 class PortImportDirection(unittest.TestCase):
     def test_every_planned_port_is_known(self):
-        self.assertEqual(("JobQueue", "Triggers", "RunEvents", "CommitStatus", "ArtifactIndex"), port_rules.PORTS)
+        self.assertEqual(("JobQueue", "Triggers", "RunEvents", "CommitStatus", "ArtifactIndex", "Deployments"), port_rules.PORTS)
 
     def test_a_port_with_interfaces_and_types_is_allowed(self):
         self.assertIsNone(edit(PORT, GOOD_PORT))

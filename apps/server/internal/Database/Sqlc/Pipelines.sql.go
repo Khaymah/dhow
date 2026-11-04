@@ -15,17 +15,19 @@ import (
 
 const activateRunJob = `-- name: ActivateRunJob :execrows
 UPDATE "RunJobs"
-SET "State" = 'active', "CurrentJobId" = $1, "Attempts" = "Attempts" + 1, "StartedAt" = now(), "UpdatedAt" = now()
-WHERE "Id" = $2 AND "State" = 'waiting'
+SET "State" = 'active', "CurrentJobId" = $1, "Attempts" = "Attempts" + 1, "EnvironmentId" = $2,
+    "Gate" = NULL, "StartedAt" = now(), "UpdatedAt" = now()
+WHERE "Id" = $3 AND "State" = 'waiting'
 `
 
 type ActivateRunJobParams struct {
-	JobID *uuid.UUID
-	ID    uuid.UUID
+	JobID         *uuid.UUID
+	EnvironmentID *uuid.UUID
+	ID            uuid.UUID
 }
 
 func (q *Queries) ActivateRunJob(ctx context.Context, arg ActivateRunJobParams) (int64, error) {
-	result, err := q.db.Exec(ctx, activateRunJob, arg.JobID, arg.ID)
+	result, err := q.db.Exec(ctx, activateRunJob, arg.JobID, arg.EnvironmentID, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -225,6 +227,34 @@ func (q *Queries) DiscoveryLog(ctx context.Context, jobID uuid.UUID) ([][]byte, 
 	return items, nil
 }
 
+const environmentQueueAhead = `-- name: EnvironmentQueueAhead :one
+SELECT EXISTS (SELECT 1
+               FROM "RunJobs" rj
+               JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+               WHERE rj."EnvironmentId" = $1 AND rj."OrganizationId" = $2
+                 AND rj."Gate" = 'environment_busy' AND rj."State" = 'waiting' AND NOT rj."IsDeleted"
+                 AND r."State" = 'running' AND NOT r."IsDeleted" AND r."Id" <> $3 AND r."Number" < $4)::boolean
+`
+
+type EnvironmentQueueAheadParams struct {
+	EnvironmentID  *uuid.UUID
+	OrganizationID uuid.UUID
+	RunID          uuid.UUID
+	Number         int64
+}
+
+func (q *Queries) EnvironmentQueueAhead(ctx context.Context, arg EnvironmentQueueAheadParams) (bool, error) {
+	row := q.db.QueryRow(ctx, environmentQueueAhead,
+		arg.EnvironmentID,
+		arg.OrganizationID,
+		arg.RunID,
+		arg.Number,
+	)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const findCommitRun = `-- name: FindCommitRun :one
 SELECT "Id"
 FROM "PipelineRuns"
@@ -271,7 +301,8 @@ func (q *Queries) FinishRun(ctx context.Context, arg FinishRunParams) error {
 
 const finishRunJob = `-- name: FinishRunJob :execrows
 UPDATE "RunJobs"
-SET "State" = $1, "FailureReason" = $2, "Outputs" = $3, "FinishedAt" = now(), "UpdatedAt" = now()
+SET "State" = $1, "FailureReason" = $2, "Outputs" = $3, "Gate" = NULL,
+    "FinishedAt" = now(), "UpdatedAt" = now()
 WHERE "Id" = $4 AND "State" IN ('waiting', 'active')
 `
 
@@ -419,7 +450,7 @@ func (q *Queries) GetRun(ctx context.Context, arg GetRunParams) (PipelineRun, er
 }
 
 const getRunJob = `-- name: GetRunJob :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt", "FailureDetail"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt", "FailureDetail", "EnvironmentId", "Gate", "GateOpensAt"
 FROM "RunJobs"
 WHERE "Id" = $1 AND "OrganizationId" = $2
 `
@@ -455,6 +486,9 @@ func (q *Queries) GetRunJob(ctx context.Context, arg GetRunJobParams) (RunJob, e
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.FailureDetail,
+		&i.EnvironmentId,
+		&i.Gate,
+		&i.GateOpensAt,
 	)
 	return i, err
 }
@@ -629,7 +663,7 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (PipelineR
 const insertRunJob = `-- name: InsertRunJob :one
 INSERT INTO "RunJobs" ("OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, $10)
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt", "FailureDetail"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt", "FailureDetail", "EnvironmentId", "Gate", "GateOpensAt"
 `
 
 type InsertRunJobParams struct {
@@ -682,6 +716,9 @@ func (q *Queries) InsertRunJob(ctx context.Context, arg InsertRunJobParams) (Run
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.FailureDetail,
+		&i.EnvironmentId,
+		&i.Gate,
+		&i.GateOpensAt,
 	)
 	return i, err
 }
@@ -750,6 +787,42 @@ func (q *Queries) ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobs
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGatedRuns = `-- name: ListGatedRuns :many
+SELECT r."Id"
+FROM "PipelineRuns" r
+WHERE r."State" = 'running' AND NOT r."IsDeleted" AND r."UpdatedAt" < $1::timestamptz
+  AND EXISTS (SELECT 1
+              FROM "RunJobs" rj
+              WHERE rj."RunId" = r."Id" AND rj."State" = 'waiting' AND rj."Gate" IS NOT NULL AND NOT rj."IsDeleted")
+ORDER BY r."UpdatedAt"
+LIMIT $2
+`
+
+type ListGatedRunsParams struct {
+	UpdatedBefore time.Time
+	Batch         int32
+}
+
+func (q *Queries) ListGatedRuns(ctx context.Context, arg ListGatedRunsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listGatedRuns, arg.UpdatedBefore, arg.Batch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var Id uuid.UUID
+		if err := rows.Scan(&Id); err != nil {
+			return nil, err
+		}
+		items = append(items, Id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -869,7 +942,7 @@ func (q *Queries) ListRunCancellations(ctx context.Context, batch int32) ([]List
 }
 
 const listRunJobs = `-- name: ListRunJobs :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt", "FailureDetail"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt", "FailureDetail", "EnvironmentId", "Gate", "GateOpensAt"
 FROM "RunJobs"
 WHERE "RunId" = $1 AND NOT "IsDeleted"
 ORDER BY "Position"
@@ -907,6 +980,9 @@ func (q *Queries) ListRunJobs(ctx context.Context, runID uuid.UUID) ([]RunJob, e
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.FailureDetail,
+			&i.EnvironmentId,
+			&i.Gate,
+			&i.GateOpensAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1046,6 +1122,9 @@ WHERE r."State" = 'running' AND NOT r."IsDeleted" AND r."UpdatedAt" < $1::timest
   AND NOT EXISTS (SELECT 1
                   FROM "RunJobs" rj
                   WHERE rj."RunId" = r."Id" AND rj."State" = 'active')
+  AND NOT EXISTS (SELECT 1
+                  FROM "RunJobs" rj
+                  WHERE rj."RunId" = r."Id" AND rj."State" = 'waiting' AND rj."Gate" IS NOT NULL AND NOT rj."IsDeleted")
 ORDER BY r."UpdatedAt"
 LIMIT $2
 `
@@ -1266,7 +1345,8 @@ func (q *Queries) RequestRunCancel(ctx context.Context, arg RequestRunCancelPara
 
 const resetRunJob = `-- name: ResetRunJob :exec
 UPDATE "RunJobs"
-SET "State" = 'waiting', "FailureReason" = '', "Outputs" = '{}', "StartedAt" = NULL, "FinishedAt" = NULL, "UpdatedAt" = now()
+SET "State" = 'waiting', "FailureReason" = '', "FailureDetail" = '{}', "Outputs" = '{}', "StartedAt" = NULL, "FinishedAt" = NULL,
+    "EnvironmentId" = NULL, "Gate" = NULL, "GateOpensAt" = NULL, "UpdatedAt" = now()
 WHERE "Id" = $1 AND "State" IN ('failed', 'canceled', 'skipped')
 `
 
@@ -1295,7 +1375,8 @@ func (q *Queries) RunCreatorIsMember(ctx context.Context, arg RunCreatorIsMember
 }
 
 const secretScopeOfJob = `-- name: SecretScopeOfJob :one
-SELECT r."ProjectId", r."Id" AS "RunId", rj."Id" AS "RunJobId", r."IsFork", (r."Trigger" = 'pull_request')::boolean AS "PullRequest"
+SELECT r."ProjectId", r."Id" AS "RunId", rj."Id" AS "RunJobId", r."IsFork", (r."Trigger" = 'pull_request')::boolean AS "PullRequest",
+       rj."EnvironmentId", r."Ref", r."BaseRef"
 FROM "Jobs" j
 JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
     AND rj."CurrentJobId" = j."Id" AND rj."State" = 'active' AND NOT rj."IsDeleted"
@@ -1310,11 +1391,14 @@ type SecretScopeOfJobParams struct {
 }
 
 type SecretScopeOfJobRow struct {
-	ProjectId   uuid.UUID
-	RunId       uuid.UUID
-	RunJobId    uuid.UUID
-	IsFork      bool
-	PullRequest bool
+	ProjectId     uuid.UUID
+	RunId         uuid.UUID
+	RunJobId      uuid.UUID
+	IsFork        bool
+	PullRequest   bool
+	EnvironmentId *uuid.UUID
+	Ref           string
+	BaseRef       pgtype.Text
 }
 
 func (q *Queries) SecretScopeOfJob(ctx context.Context, arg SecretScopeOfJobParams) (SecretScopeOfJobRow, error) {
@@ -1326,6 +1410,9 @@ func (q *Queries) SecretScopeOfJob(ctx context.Context, arg SecretScopeOfJobPara
 		&i.RunJobId,
 		&i.IsFork,
 		&i.PullRequest,
+		&i.EnvironmentId,
+		&i.Ref,
+		&i.BaseRef,
 	)
 	return i, err
 }
@@ -1392,6 +1479,32 @@ type SetRunJobFailureDetailParams struct {
 
 func (q *Queries) SetRunJobFailureDetail(ctx context.Context, arg SetRunJobFailureDetailParams) error {
 	_, err := q.db.Exec(ctx, setRunJobFailureDetail, arg.FailureDetail, arg.ID, arg.OrganizationID)
+	return err
+}
+
+const setRunJobGate = `-- name: SetRunJobGate :exec
+UPDATE "RunJobs"
+SET "Gate" = $1::text, "GateOpensAt" = $2::timestamptz,
+    "EnvironmentId" = $3::uuid, "UpdatedAt" = now()
+WHERE "Id" = $4 AND "OrganizationId" = $5 AND "State" = 'waiting'
+`
+
+type SetRunJobGateParams struct {
+	Gate           pgtype.Text
+	GateOpensAt    *time.Time
+	EnvironmentID  *uuid.UUID
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) SetRunJobGate(ctx context.Context, arg SetRunJobGateParams) error {
+	_, err := q.db.Exec(ctx, setRunJobGate,
+		arg.Gate,
+		arg.GateOpensAt,
+		arg.EnvironmentID,
+		arg.ID,
+		arg.OrganizationID,
+	)
 	return err
 }
 

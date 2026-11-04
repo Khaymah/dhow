@@ -199,17 +199,20 @@ WHERE "Id" = @id AND "OrganizationId" = @organization_id;
 
 -- name: ActivateRunJob :execrows
 UPDATE "RunJobs"
-SET "State" = 'active', "CurrentJobId" = @job_id, "Attempts" = "Attempts" + 1, "StartedAt" = now(), "UpdatedAt" = now()
+SET "State" = 'active', "CurrentJobId" = @job_id, "Attempts" = "Attempts" + 1, "EnvironmentId" = @environment_id,
+    "Gate" = NULL, "StartedAt" = now(), "UpdatedAt" = now()
 WHERE "Id" = @id AND "State" = 'waiting';
 
 -- name: FinishRunJob :execrows
 UPDATE "RunJobs"
-SET "State" = @state, "FailureReason" = @failure_reason, "Outputs" = @outputs, "FinishedAt" = now(), "UpdatedAt" = now()
+SET "State" = @state, "FailureReason" = @failure_reason, "Outputs" = @outputs, "Gate" = NULL,
+    "FinishedAt" = now(), "UpdatedAt" = now()
 WHERE "Id" = @id AND "State" IN ('waiting', 'active');
 
 -- name: ResetRunJob :exec
 UPDATE "RunJobs"
-SET "State" = 'waiting', "FailureReason" = '', "Outputs" = '{}', "StartedAt" = NULL, "FinishedAt" = NULL, "UpdatedAt" = now()
+SET "State" = 'waiting', "FailureReason" = '', "FailureDetail" = '{}', "Outputs" = '{}', "StartedAt" = NULL, "FinishedAt" = NULL,
+    "EnvironmentId" = NULL, "Gate" = NULL, "GateOpensAt" = NULL, "UpdatedAt" = now()
 WHERE "Id" = @id AND "State" IN ('failed', 'canceled', 'skipped');
 
 -- name: ListRunCancellations :many
@@ -249,6 +252,9 @@ WHERE r."State" = 'running' AND NOT r."IsDeleted" AND r."UpdatedAt" < @updated_b
   AND NOT EXISTS (SELECT 1
                   FROM "RunJobs" rj
                   WHERE rj."RunId" = r."Id" AND rj."State" = 'active')
+  AND NOT EXISTS (SELECT 1
+                  FROM "RunJobs" rj
+                  WHERE rj."RunId" = r."Id" AND rj."State" = 'waiting' AND rj."Gate" IS NOT NULL AND NOT rj."IsDeleted")
 ORDER BY r."UpdatedAt"
 LIMIT @batch;
 
@@ -309,7 +315,8 @@ WHERE "ProjectId" = @project_id AND "DeliveryId" IS NOT NULL
   AND "CreatedAt" > now() - make_interval(secs => @window_seconds::double precision);
 
 -- name: SecretScopeOfJob :one
-SELECT r."ProjectId", r."Id" AS "RunId", rj."Id" AS "RunJobId", r."IsFork", (r."Trigger" = 'pull_request')::boolean AS "PullRequest"
+SELECT r."ProjectId", r."Id" AS "RunId", rj."Id" AS "RunJobId", r."IsFork", (r."Trigger" = 'pull_request')::boolean AS "PullRequest",
+       rj."EnvironmentId", r."Ref", r."BaseRef"
 FROM "Jobs" j
 JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
     AND rj."CurrentJobId" = j."Id" AND rj."State" = 'active' AND NOT rj."IsDeleted"
@@ -320,3 +327,27 @@ WHERE j."Id" = @job_id AND j."OrganizationId" = @organization_id AND j."OriginKi
 -- name: SetRunJobFailureDetail :exec
 UPDATE "RunJobs" SET "FailureDetail" = @failure_detail::jsonb, "UpdatedAt" = now()
 WHERE "Id" = @id AND "OrganizationId" = @organization_id;
+
+-- name: SetRunJobGate :exec
+UPDATE "RunJobs"
+SET "Gate" = sqlc.narg('gate')::text, "GateOpensAt" = sqlc.narg('gate_opens_at')::timestamptz,
+    "EnvironmentId" = sqlc.narg('environment_id')::uuid, "UpdatedAt" = now()
+WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "State" = 'waiting';
+
+-- name: ListGatedRuns :many
+SELECT r."Id"
+FROM "PipelineRuns" r
+WHERE r."State" = 'running' AND NOT r."IsDeleted" AND r."UpdatedAt" < @updated_before::timestamptz
+  AND EXISTS (SELECT 1
+              FROM "RunJobs" rj
+              WHERE rj."RunId" = r."Id" AND rj."State" = 'waiting' AND rj."Gate" IS NOT NULL AND NOT rj."IsDeleted")
+ORDER BY r."UpdatedAt"
+LIMIT @batch;
+
+-- name: EnvironmentQueueAhead :one
+SELECT EXISTS (SELECT 1
+               FROM "RunJobs" rj
+               JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+               WHERE rj."EnvironmentId" = @environment_id AND rj."OrganizationId" = @organization_id
+                 AND rj."Gate" = 'environment_busy' AND rj."State" = 'waiting' AND NOT rj."IsDeleted"
+                 AND r."State" = 'running' AND NOT r."IsDeleted" AND r."Id" <> @run_id AND r."Number" < @number)::boolean;

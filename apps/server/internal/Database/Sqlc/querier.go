@@ -41,6 +41,7 @@ type Querier interface {
 	CountDataKeysByVersion(ctx context.Context) ([]CountDataKeysByVersionRow, error)
 	CountDataKeysOnVersions(ctx context.Context, versions []int32) (int64, error)
 	CountDataKeysToSupersede(ctx context.Context, cutoff time.Time) (int64, error)
+	CountDeployments(ctx context.Context, arg CountDeploymentsParams) (int64, error)
 	CountEnvironments(ctx context.Context, arg CountEnvironmentsParams) (int64, error)
 	CountIdentitiesByProvider(ctx context.Context) ([]CountIdentitiesByProviderRow, error)
 	CountInstanceSettingSecretsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
@@ -102,6 +103,7 @@ type Querier interface {
 	EnsureThrottle(ctx context.Context, arg EnsureThrottleParams) error
 	EnsureWebauthnHandle(ctx context.Context, arg EnsureWebauthnHandleParams) ([]byte, error)
 	EnsureWebhookPartitions(ctx context.Context, daysAhead int32) (int32, error)
+	EnvironmentQueueAhead(ctx context.Context, arg EnvironmentQueueAheadParams) (bool, error)
 	EraseAllSecretVersions(ctx context.Context, arg EraseAllSecretVersionsParams) (int64, error)
 	EraseExpiredSecretVersions(ctx context.Context, arg EraseExpiredSecretVersionsParams) (int64, error)
 	EraseSecretVersionsBelow(ctx context.Context, arg EraseSecretVersionsBelowParams) (int64, error)
@@ -174,6 +176,7 @@ type Querier interface {
 	GetSecretVersionForUpdate(ctx context.Context, arg GetSecretVersionForUpdateParams) (GetSecretVersionForUpdateRow, error)
 	GetSecretsEnvironment(ctx context.Context, arg GetSecretsEnvironmentParams) (uuid.UUID, error)
 	GetSecretsProject(ctx context.Context, arg GetSecretsProjectParams) (string, error)
+	GetStartEnvironment(ctx context.Context, arg GetStartEnvironmentParams) (GetStartEnvironmentRow, error)
 	GetTeam(ctx context.Context, arg GetTeamParams) (GetTeamRow, error)
 	GetTokenMembership(ctx context.Context, arg GetTokenMembershipParams) (GetTokenMembershipRow, error)
 	GetUsableSetupToken(ctx context.Context, arg GetUsableSetupTokenParams) (GetUsableSetupTokenRow, error)
@@ -189,6 +192,7 @@ type Querier interface {
 	GetVariableForUpdate(ctx context.Context, arg GetVariableForUpdateParams) (Variable, error)
 	GroupBlocked(ctx context.Context, arg GroupBlockedParams) (bool, error)
 	HasIdentityForProvider(ctx context.Context, arg HasIdentityForProviderParams) (bool, error)
+	HoldEnvironment(ctx context.Context, arg HoldEnvironmentParams) error
 	InsertApiToken(ctx context.Context, arg InsertApiTokenParams) (InsertApiTokenRow, error)
 	InsertArtifact(ctx context.Context, arg InsertArtifactParams) (Artifact, error)
 	InsertAttempt(ctx context.Context, arg InsertAttemptParams) (JobAttempt, error)
@@ -197,6 +201,7 @@ type Querier interface {
 	InsertAuthChallenge(ctx context.Context, arg InsertAuthChallengeParams) (uuid.UUID, error)
 	InsertCacheEntry(ctx context.Context, arg InsertCacheEntryParams) (uuid.UUID, error)
 	InsertDataKey(ctx context.Context, arg InsertDataKeyParams) (int64, error)
+	InsertDeployment(ctx context.Context, arg InsertDeploymentParams) error
 	InsertEnvironment(ctx context.Context, arg InsertEnvironmentParams) (Environment, error)
 	InsertEnvironmentReviewer(ctx context.Context, arg InsertEnvironmentReviewerParams) error
 	InsertIdentity(ctx context.Context, arg InsertIdentityParams) (InsertIdentityRow, error)
@@ -250,10 +255,12 @@ type Querier interface {
 	ListBackfills(ctx context.Context) ([]ListBackfillsRow, error)
 	ListDataKeysToRewrap(ctx context.Context, arg ListDataKeysToRewrapParams) ([]ListDataKeysToRewrapRow, error)
 	ListDataKeysToSupersede(ctx context.Context, arg ListDataKeysToSupersedeParams) ([]ListDataKeysToSupersedeRow, error)
+	ListDeployments(ctx context.Context, arg ListDeploymentsParams) ([]Deployment, error)
 	ListDoneBackfills(ctx context.Context, names []string) ([]string, error)
 	ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobsParams) ([]ListDriftedRunJobsRow, error)
 	ListEnvironmentReviewers(ctx context.Context, arg ListEnvironmentReviewersParams) ([]ListEnvironmentReviewersRow, error)
 	ListEnvironments(ctx context.Context, arg ListEnvironmentsParams) ([]Environment, error)
+	ListGatedRuns(ctx context.Context, arg ListGatedRunsParams) ([]uuid.UUID, error)
 	ListInstanceSettings(ctx context.Context) ([]ListInstanceSettingsRow, error)
 	ListInvalidIndexDrops(ctx context.Context, names []string) ([]string, error)
 	ListJobAttempts(ctx context.Context, arg ListJobAttemptsParams) ([]JobAttempt, error)
@@ -305,6 +312,7 @@ type Querier interface {
 	LockBlobsShared(ctx context.Context, lockKey int64) error
 	LockConcurrencyGroup(ctx context.Context, arg LockConcurrencyGroupParams) error
 	LockEnvironment(ctx context.Context, arg LockEnvironmentParams) (Environment, error)
+	LockGateEnvironment(ctx context.Context, arg LockGateEnvironmentParams) (LockGateEnvironmentRow, error)
 	LockInstance(ctx context.Context) (*time.Time, error)
 	LockInstanceSetting(ctx context.Context, groupName string) (LockInstanceSettingRow, error)
 	LockJob(ctx context.Context, arg LockJobParams) (Job, error)
@@ -394,8 +402,10 @@ type Querier interface {
 	RehashUserPassword(ctx context.Context, arg RehashUserPasswordParams) error
 	ReissueInvitation(ctx context.Context, arg ReissueInvitationParams) (int64, error)
 	ReleaseBlobSweepLock(ctx context.Context, lockKey int64) (bool, error)
+	ReleaseEnvironments(ctx context.Context, arg ReleaseEnvironmentsParams) error
 	ReleaseRetentionLock(ctx context.Context, lockKey int64) (bool, error)
 	ReleaseRunClaim(ctx context.Context, id uuid.UUID) error
+	ReleaseStaleEnvironments(ctx context.Context) (int64, error)
 	RemoveAllTeamBindings(ctx context.Context, arg RemoveAllTeamBindingsParams) error
 	RemoveAllTeamMembers(ctx context.Context, arg RemoveAllTeamMembersParams) error
 	RemoveEnvironment(ctx context.Context, arg RemoveEnvironmentParams) (Environment, error)
@@ -486,11 +496,13 @@ type Querier interface {
 	SetRunDefinition(ctx context.Context, arg SetRunDefinitionParams) error
 	SetRunIssues(ctx context.Context, arg SetRunIssuesParams) error
 	SetRunJobFailureDetail(ctx context.Context, arg SetRunJobFailureDetailParams) error
+	SetRunJobGate(ctx context.Context, arg SetRunJobGateParams) error
 	SetRunSource(ctx context.Context, arg SetRunSourceParams) error
 	SetRunnerFeatures(ctx context.Context, arg SetRunnerFeaturesParams) error
 	SetTeamBindingRole(ctx context.Context, arg SetTeamBindingRoleParams) (int64, error)
 	SetUserLocale(ctx context.Context, arg SetUserLocaleParams) error
 	SetUserPassword(ctx context.Context, arg SetUserPasswordParams) error
+	SettleDeployments(ctx context.Context, arg SettleDeploymentsParams) error
 	SignInProviderActive(ctx context.Context, arg SignInProviderActiveParams) (bool, error)
 	StartAttempt(ctx context.Context, id uuid.UUID) (JobAttempt, error)
 	StartRun(ctx context.Context, id uuid.UUID) error

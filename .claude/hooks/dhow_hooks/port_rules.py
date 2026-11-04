@@ -4,7 +4,7 @@ from .common import GENERATED_PATH, is_test, new_lines
 
 SERVER_INTERNAL = "apps/server/internal/"
 SERVER_IMPORT = re.compile(r'"github\.com/Khaymah/dhow/apps/server/internal/([^"]+)"')
-PORTS = ("JobQueue", "Triggers", "RunEvents", "CommitStatus", "ArtifactIndex")
+PORTS = ("JobQueue", "Triggers", "RunEvents", "CommitStatus", "ArtifactIndex", "Deployments")
 PORT_IMPORTS = ("Database/Sqlc",)
 PORT_IMPORTERS = ("App", "Modules")
 TOP_LEVEL_CODE = re.compile(r"^(func|var)\s")
