@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -114,4 +116,56 @@ func namesOrNil(names []string) *[]string {
 		return nil
 	}
 	return &names
+}
+
+func imageHost(image string) string {
+	ref := jobspec.QualifyImage(image)
+	host, _, found := strings.Cut(ref, "/")
+	if !found {
+		return ""
+	}
+	if host == dockerHubIndex {
+		return dockerHubRegistry
+	}
+	return host
+}
+
+func jobImages(spec *runnerv1.JobSpec) []string {
+	var out []string
+	if spec.GetImage() != "" {
+		out = append(out, spec.GetImage())
+	}
+	for _, st := range spec.GetSteps() {
+		if img := st.GetPlugin().GetImage(); img != "" {
+			out = append(out, img)
+		}
+	}
+	return out
+}
+
+func (s *Service) attachRegistryAuth(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, spec *runnerv1.JobSpec) error {
+	if s.logins == nil || run.IsFork {
+		return nil
+	}
+	var hosts []string
+	for _, img := range jobImages(spec) {
+		if h := imageHost(img); h != "" && !slices.Contains(hosts, h) {
+			hosts = append(hosts, h)
+		}
+	}
+	for _, h := range hosts {
+		if len(spec.GetRegistryAuth()) >= jobspec.MaxRegistryAuth {
+			return nil
+		}
+		ok, err := s.logins.HasRegistryLogin(ctx, q, run.OrganizationId, run.ProjectId, h)
+		if err != nil {
+			return err
+		}
+		if ok {
+			spec.RegistryAuth = append(spec.RegistryAuth, &runnerv1.RegistryAuth{
+				Host: h, SecretName: jobspec.RegistrySecretPrefix + strconv.Itoa(len(spec.GetRegistryAuth())),
+			})
+		}
+	}
+	return nil
 }

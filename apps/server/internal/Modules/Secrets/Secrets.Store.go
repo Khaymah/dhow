@@ -204,3 +204,18 @@ func (s *Service) Variables(ctx context.Context, q *sqlc.Queries, org, project u
 	}
 	return out, nil
 }
+
+func (s *Service) HasRegistryLogin(ctx context.Context, q *sqlc.Queries, org, project uuid.UUID, host string) (bool, error) {
+	normalized, ok := NormalizeHost(host)
+	if !ok {
+		return false, nil
+	}
+	if q == nil {
+		q = sqlc.New(s.db)
+	}
+	_, err := q.ResolveRegistryCredential(ctx, sqlc.ResolveRegistryCredentialParams{OrganizationID: org, Host: normalized, ProjectID: &project})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}

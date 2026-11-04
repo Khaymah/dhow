@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -14,6 +17,7 @@ import (
 	secretstore "github.com/Khaymah/dhow/apps/server/internal/Core/SecretStore"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
+	"github.com/Khaymah/dhow/internal/jobspec"
 )
 
 const (
@@ -22,10 +26,16 @@ const (
 )
 
 type pipelineSecrets struct {
-	runs  *pipelines.Service
-	store secretstore.Store
-	bus   *eventbus.Bus
-	log   *slog.Logger
+	runs   *pipelines.Service
+	store  secretstore.Store
+	logins secretstore.RegistryLogins
+	bus    *eventbus.Bus
+	log    *slog.Logger
+}
+
+type registryValue struct {
+	Username string
+	Password string
 }
 
 var _ jobs.SecretResolver = (*pipelineSecrets)(nil)
@@ -49,9 +59,8 @@ func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (
 		p.log.WarnContext(ctx, "a job of a fork asked for secrets at start and got none", "job_id", req.JobID.String())
 		return nil, jobs.ErrSecretsUnavailable
 	}
-	list, err := p.store.Resolve(ctx, secretstore.Request{
-		OrganizationID: req.OrganizationID, ProjectID: scope.ProjectID, Names: req.Names, PullRequest: scope.PullRequest,
-	})
+	names, registries := splitRegistry(req)
+	list, err := p.resolveNamed(ctx, req, scope, names)
 	if errors.Is(err, secretstore.ErrMissingName) || errors.Is(err, secretstore.ErrFork) ||
 		errors.Is(err, secretstore.ErrTooMany) || errors.Is(err, secretstore.ErrTooLarge) {
 		return nil, jobs.ErrSecretsUnavailable
@@ -59,15 +68,74 @@ func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string][]byte, len(list))
+	out := make(map[string][]byte, len(list)+len(registries))
 	for _, s := range list {
 		out[s.Name] = s.Value
 	}
-	if err := p.audit(ctx, req, scope, list); err != nil {
-		secretstore.Wipe(list)
+	hosts, err := p.resolveRegistries(ctx, req, scope, registries, out)
+	if err != nil {
+		wipeAll(out)
+		return nil, err
+	}
+	if err := p.audit(ctx, req, scope, list, hosts); err != nil {
+		wipeAll(out)
 		return nil, err
 	}
 	return out, nil
+}
+
+func wipeAll(values map[string][]byte) {
+	for _, v := range values {
+		clear(v)
+	}
+}
+
+func splitRegistry(req jobs.SecretRequest) ([]string, map[string]string) {
+	names := make([]string, 0, len(req.Names))
+	registries := map[string]string{}
+	for _, n := range req.Names {
+		if host, ok := req.Registries[n]; ok && strings.HasPrefix(n, jobspec.RegistrySecretPrefix) {
+			registries[n] = host
+			continue
+		}
+		names = append(names, n)
+	}
+	return names, registries
+}
+
+func (p *pipelineSecrets) resolveNamed(ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope, names []string) ([]secretstore.Secret, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	return p.store.Resolve(ctx, secretstore.Request{
+		OrganizationID: req.OrganizationID, ProjectID: scope.ProjectID, Names: names, PullRequest: scope.PullRequest,
+	})
+}
+
+func (p *pipelineSecrets) resolveRegistries(
+	ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope, registries map[string]string, out map[string][]byte,
+) ([]string, error) {
+	hosts := make([]string, 0, len(registries))
+	for _, name := range slices.Sorted(maps.Keys(registries)) {
+		if p.logins == nil {
+			return nil, jobs.ErrSecretsUnavailable
+		}
+		login, ok, err := p.logins.RegistryLogin(ctx, req.OrganizationID, scope.ProjectID, registries[name])
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, jobs.ErrSecretsUnavailable
+		}
+		raw, err := json.Marshal(registryValue{Username: login.Username, Password: string(login.Password)})
+		login.Password.Wipe()
+		if err != nil {
+			return nil, err
+		}
+		out[name] = raw
+		hosts = append(hosts, registries[name])
+	}
+	return hosts, nil
 }
 
 func deliveredList(list []secretstore.Secret) (string, bool) {
@@ -86,13 +154,16 @@ func deliveredList(list []secretstore.Secret) (string, bool) {
 	return v[:end], true
 }
 
-func (p *pipelineSecrets) audit(ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope, list []secretstore.Secret) error {
+func (p *pipelineSecrets) audit(ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope, list []secretstore.Secret, hosts []string) error {
 	value, cut := deliveredList(list)
 	data := map[string]string{
 		"Secrets": value, "ProjectId": scope.ProjectID.String(), "RunId": scope.RunID.String(), "AttemptId": req.AttemptID.String(),
 	}
 	if cut {
 		data["Truncated"] = "true"
+	}
+	if len(hosts) > 0 {
+		data["Registries"] = strings.Join(hosts, ",")
 	}
 	return p.bus.Publish(ctx, eventbus.Event{Name: eventbus.JobSecretsDelivered, Payload: eventbus.Audited{
 		OrganizationIDs: []uuid.UUID{req.OrganizationID}, TargetType: deliveredTarget, TargetID: req.JobID.String(), Data: data,

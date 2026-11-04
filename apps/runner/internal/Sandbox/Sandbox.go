@@ -73,6 +73,7 @@ type PrepareSpec struct {
 	DiskMode  string
 	Egress    []string
 	Workspace Workspace
+	AuthFile  string
 }
 
 type StepSpec struct {

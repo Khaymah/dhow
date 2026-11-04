@@ -20,6 +20,12 @@ message JobSpec {
   repeated ArtifactUpload artifacts = 12;
   repeated ArtifactInput inputs = 13;
   Cache cache = 14;
+  repeated RegistryAuth registry_auth = 15;
+}
+
+message RegistryAuth {
+  string host = 1;
+  string secret_name = 2;
 }
 
 message ArtifactUpload {

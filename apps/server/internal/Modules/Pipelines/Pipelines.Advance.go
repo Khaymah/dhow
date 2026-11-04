@@ -160,6 +160,9 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 	if st.run.IsFork && (len(spec.GetSecrets()) > 0 || hasPluginSecrets(plan)) {
 		return s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonForkSecrets)
 	}
+	if err := s.attachRegistryAuth(ctx, q, st.run, spec); err != nil {
+		return err
+	}
 	if reason, detail, err := s.checkSecrets(ctx, q, st.run, spec); err != nil || reason != "" {
 		if err != nil {
 			return err

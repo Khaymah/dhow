@@ -19,6 +19,7 @@ const (
 	FeaturePlugins   = "plugins"
 	FeatureArtifacts = "artifacts"
 	FeatureCache     = "cache"
+	FeatureRegistry  = "registry_auth"
 )
 
 type Request struct {

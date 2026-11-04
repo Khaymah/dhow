@@ -133,7 +133,7 @@ func runsFor(
 	pipelinesService.UseSecrets(secretsService)
 	pipelinesService.UseVariables(secretsService)
 	if in.Secrets == nil {
-		secrets.next = &pipelineSecrets{runs: pipelinesService, store: secretsService, bus: bus, log: in.Log}
+		secrets.next = &pipelineSecrets{runs: pipelinesService, store: secretsService, logins: secretsService, bus: bus, log: in.Log}
 	}
 	pipelinesService.UseStatuses(sourcesService.StatusRecorder())
 	pipelinesService.UseArtifacts(artifactsService)

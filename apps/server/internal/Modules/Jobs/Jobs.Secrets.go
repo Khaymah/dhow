@@ -17,6 +17,7 @@ type SecretRequest struct {
 	AttemptID      uuid.UUID
 	Names          []string
 	Checkout       *runnerv1.Checkout
+	Registries     map[string]string
 }
 
 const (

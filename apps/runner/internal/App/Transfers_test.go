@@ -328,3 +328,39 @@ func TestAnArtifactWithoutSecretsIsUploadedWhenTheJobHasSecrets(t *testing.T) {
 	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, out.Result, out.Reason.String())
 	assert.Len(t, srv.Artifacts(), 1)
 }
+
+func TestARegistryLoginIsUsedForThePullAndThenRemoved(t *testing.T) {
+	srv := runnertest.NewServer(t)
+	r := checkoutRunner(t, srv)
+	spec := transferSpec()
+	spec.RegistryAuth = []*runnerv1.RegistryAuth{{Host: "registry.example.com", SecretName: "dhow.registry.0"}}
+	login := `{"Username":"robot","Password":"` + leakedSecret + `"}`
+	srv.Enqueue(spec, map[string][]byte{"dhow.registry.0": []byte(login)})
+	root := t.TempDir()
+	running := r.Start(fake.Recording{Steps: []fake.Step{{Output: []fake.Output{{Stream: "stdout", Data: "using " + leakedSecret + "\n"}}}}},
+		runnertest.StartOptions{Workspace: root})
+	out := running.Next(t, finishWithin)
+	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, out.Result, out.Reason.String())
+
+	var prepare fake.Event
+	for _, e := range running.Driver.Events() {
+		if e.Kind == fake.EventPrepare {
+			prepare = e
+			break
+		}
+	}
+	require.NotEmpty(t, prepare.Auth, "the pull got an authfile")
+	assert.Contains(t, string(prepare.Auth), `"registry.example.com"`)
+	assert.NotContains(t, string(prepare.Auth), "docker.io")
+	matches, err := filepath.Glob(filepath.Join(r.StateDir, "attempts", "*", "registry-auth-*.json"))
+	require.NoError(t, err)
+	assert.Empty(t, matches, "the authfile is gone after the pull")
+	for _, e := range running.Driver.Events() {
+		if e.Kind == fake.EventExec {
+			assert.NotContains(t, e.EnvNames, "dhow.registry.0", "the job never sees the login")
+		}
+	}
+	text := logText(srv.Leases()[0])
+	assert.Contains(t, text, "using ***")
+	assert.NotContains(t, text, leakedSecret, "the password is masked")
+}

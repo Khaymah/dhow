@@ -157,7 +157,7 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 	if err := config.EnsurePrivateDir(l.controlDir); err != nil {
 		return nil, err
 	}
-	imageID, labels, err := d.pull(ctx, spec.Image)
+	imageID, labels, err := d.pull(ctx, spec.Image, spec.AuthFile)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", sandbox.ErrImagePull, err)
 	}
@@ -184,7 +184,7 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 	return box, nil
 }
 
-func (d *Driver) pull(ctx context.Context, image string) (string, map[string]string, error) {
+func (d *Driver) pull(ctx context.Context, image, authFile string) (string, map[string]string, error) {
 	if !qualified(image) {
 		return "", nil, ErrShortImageName
 	}
@@ -194,7 +194,11 @@ func (d *Driver) pull(ctx context.Context, image string) (string, map[string]str
 	if d.skipPull {
 		out, err = r.run(ctx, "image", "inspect", "--format", "{{.Id}}", "--", image)
 	} else {
-		out, err = r.run(ctx, "pull", "--quiet", "--", dockerTransport+image)
+		args := []string{"pull", "--quiet"}
+		if authFile != "" {
+			args = append(args, "--authfile", authFile)
+		}
+		out, err = r.run(ctx, append(args, "--", dockerTransport+image)...)
 	}
 	if err != nil {
 		return "", nil, err

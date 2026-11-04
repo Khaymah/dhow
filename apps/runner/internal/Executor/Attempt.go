@@ -60,6 +60,7 @@ type attempt struct {
 	dir        string
 	masker     *masking.Masker
 	scan       *masking.Masker
+	registries map[string]registryLogin
 	pipe       *logs.Pipeline
 	fence      *fence
 	shutdown   <-chan struct{}

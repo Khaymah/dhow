@@ -82,6 +82,7 @@ type Event struct {
 	Image     string
 	Box       sandbox.Kind
 	Seq       int
+	Auth      []byte
 	At        time.Time
 }
 
@@ -160,7 +161,15 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 	d.mu.Lock()
 	d.lastSpec = spec
 	d.mu.Unlock()
-	d.record(Event{Kind: EventPrepare, AttemptID: spec.AttemptID, Image: spec.Image, Box: spec.Kind, Seq: spec.Seq})
+	ev := Event{Kind: EventPrepare, AttemptID: spec.AttemptID, Image: spec.Image, Box: spec.Kind, Seq: spec.Seq}
+	if spec.AuthFile != "" {
+		raw, err := os.ReadFile(spec.AuthFile)
+		if err != nil {
+			return nil, sandbox.ErrImagePull
+		}
+		ev.Auth = raw
+	}
+	d.record(ev)
 	if spec.Workspace == nil {
 		return nil, sandbox.ErrSandbox
 	}

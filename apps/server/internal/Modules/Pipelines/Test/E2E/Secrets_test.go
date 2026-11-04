@@ -169,3 +169,62 @@ func TestVariablesFillTheContextWithTheClosestScope(t *testing.T) {
 	assert.Equal(t, "us", env["REGION"])
 	assert.Equal(t, "artifacts-eu", env["BUCKET"])
 }
+
+const registryPipeline = `version: 1
+on:
+  push: {}
+jobs:
+  build:
+    image: IMAGE
+    steps:
+      - run: ./build.sh
+`
+
+func TestARegistryLoginReachesTheRunnerAtStart(t *testing.T) {
+	w := newWorld(t)
+	w.env.SeedRegistryCredential(apptest.SecretRef(w.org, &w.project, ""), "registry.example.com", "robot", deployValue)
+	r := w.env.SeedConnectedRunner(w.org, w.ownerID, apptest.SeedRunnerSpec{Capacity: 4, Features: []string{"checkout", "plugins", "registry_auth"}})
+	w.defs.Put(shaA, pipeline(registryPipeline))
+	run := w.push("refs/heads/main", shaA)
+	w.env.StartRuns()
+	require.Equal(t, "active", w.env.RunJobs(run)["build"].State)
+
+	g, err := r.Lease(context.Background(), 1, 0)
+	require.NoError(t, err)
+	require.NotNil(t, g, "only a runner with registry_auth gets the job")
+	auth := g.Grant.GetSpec().GetRegistryAuth()
+	require.Len(t, auth, 1)
+	assert.Equal(t, "registry.example.com", auth[0].GetHost())
+	assert.Equal(t, "dhow.registry.0", auth[0].GetSecretName())
+	start, err := r.Start(g)
+	require.NoError(t, err)
+	values := openStart(t, r, g, start)
+	assert.JSONEq(t, `{"Username":"robot","Password":"`+deployValue+`"}`, values["dhow.registry.0"])
+	var data string
+	require.NoError(t, w.env.Pool.QueryRow(context.Background(),
+		`SELECT "Data"::text FROM "AuditEvents" WHERE "Action" = 'job.secrets_delivered'`).Scan(&data))
+	assert.Contains(t, data, "registry.example.com")
+	assert.NotContains(t, data, deployValue)
+}
+
+func TestAForkNeverGetsARegistryLogin(t *testing.T) {
+	w := newWorld(t)
+	w.env.SeedRegistryCredential(apptest.SecretRef(w.org, &w.project, ""), "registry.example.com", "robot", deployValue)
+	w.defs.Put(shaA, pipeline(`version: 1
+on:
+  pull_request: {}
+jobs:
+  build:
+    image: IMAGE
+    steps:
+      - run: ./build.sh
+`))
+	run := w.forkPR()
+	maintainer, _ := w.env.SignedIn(w.org, "maintainer@example.com", "maintainer")
+	w.env.StartRuns()
+	require.Equal(t, 200, w.post(t, maintainer, run, "approve").Status)
+	w.env.StartRuns()
+	require.Equal(t, "active", w.env.RunJobs(run)["build"].State)
+	_, g := w.leaseKey(t, "build")
+	assert.Empty(t, g.Grant.GetSpec().GetRegistryAuth())
+}

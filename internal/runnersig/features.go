@@ -15,6 +15,7 @@ const (
 	FeaturePlugins   = "plugins"
 	FeatureArtifacts = "artifacts"
 	FeatureCache     = "cache"
+	FeatureRegistry  = "registry_auth"
 )
 
 var ErrFeature = errors.New("the runner declared an unknown or repeated feature")
@@ -29,6 +30,8 @@ func featureName(f runnerv1.RunnerFeature) string {
 		return FeatureArtifacts
 	case runnerv1.RunnerFeature_RUNNER_FEATURE_CACHE:
 		return FeatureCache
+	case runnerv1.RunnerFeature_RUNNER_FEATURE_REGISTRY_AUTH:
+		return FeatureRegistry
 	default:
 		return ""
 	}
