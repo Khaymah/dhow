@@ -107,7 +107,16 @@ func TestAForkNeverWritesTheCache(t *testing.T) {
 	require.True(t, g.Grant.GetSpec().GetCache().GetReadOnly())
 	hit, err := w.runner.LookupCache(g.Ref, cacheKey)
 	require.NoError(t, err)
-	assert.True(t, hit.GetHit(), "a fork may read the default branch")
+	assert.False(t, hit.GetHit(), "a fork restores nothing by default")
+	w.setForkCache(t, "default_branch")
+	hit, err = w.runner.LookupCache(g.Ref, cacheKey)
+	require.NoError(t, err)
+	assert.True(t, hit.GetHit(), "with the project setting a fork reads the default branch")
+	_, err = w.env.Pool.Exec(context.Background(), `UPDATE "CacheEntries" SET "HadSecrets" = true`)
+	require.NoError(t, err)
+	hit, err = w.runner.LookupCache(g.Ref, cacheKey)
+	require.NoError(t, err)
+	assert.False(t, hit.GetHit(), "a cache written by a job with secrets never reaches a fork")
 	res := w.runner.PutBlob(g.Ref, "cache", "", []byte("poison"))
 	assert.Equal(t, http.StatusForbidden, res.Status)
 	assert.Equal(t, "CACHE_READ_ONLY", res.Code)
@@ -207,4 +216,10 @@ func TestAManualRunOfAnOlderCommitOnlyReadsTheCache(t *testing.T) {
 	_, err := w.runner.CommitCache(g.Ref, cacheKey, []byte("built from an old commit"))
 	assert.Equal(t, "CACHE_READ_ONLY", reason(err))
 	assert.Empty(t, w.liveKeys(t))
+}
+
+func (w world) setForkCache(t *testing.T, v string) {
+	t.Helper()
+	_, err := w.env.Pool.Exec(context.Background(), `UPDATE "Projects" SET "ForkCacheRestore" = $1 WHERE "Id" = $2`, v, w.project)
+	require.NoError(t, err)
 }

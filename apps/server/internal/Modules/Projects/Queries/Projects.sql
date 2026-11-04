@@ -30,7 +30,7 @@ FOR UPDATE;
 
 -- name: UpdateProject :one
 UPDATE "Projects"
-SET "Name" = @name, "PipelinePath" = @pipeline_path, "ForkPolicy" = @fork_policy, "UpdatedAt" = @now
+SET "Name" = @name, "PipelinePath" = @pipeline_path, "ForkPolicy" = @fork_policy, "ForkCacheRestore" = @fork_cache_restore, "UpdatedAt" = @now
 WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "State" = 'active' AND NOT "IsDeleted"
 RETURNING *;
 

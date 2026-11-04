@@ -36,7 +36,7 @@ func (s *Service) LookupCache(ctx context.Context, lease *runnerv1.LeaseRef, key
 		if len(scopes) == 0 {
 			return nil
 		}
-		entry, err := q.FindCacheEntry(ctx, sqlc.FindCacheEntryParams{ProjectID: *l.row.ProjectId, Key: key, Scopes: scopes})
+		entry, err := q.FindCacheEntry(ctx, sqlc.FindCacheEntryParams{ProjectID: *l.row.ProjectId, Key: key, Scopes: scopes, WithoutSecrets: l.fork()})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -94,6 +94,7 @@ func (s *Service) CommitCache(ctx context.Context, lease *runnerv1.LeaseRef, key
 		}
 		id, err := q.InsertCacheEntry(ctx, sqlc.InsertCacheEntryParams{
 			OrganizationID: l.row.OrganizationId, ProjectID: *l.row.ProjectId, Scope: where, Key: key, Digest: d[:], SizeBytes: size,
+			HadSecrets: l.hadSecrets(),
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil

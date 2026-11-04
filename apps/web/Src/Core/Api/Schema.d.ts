@@ -1499,7 +1499,7 @@ export interface paths {
         head?: never;
         /**
          * Rename a project or change its pipeline path or fork policy
-         * @description Needs `project.manage` on the project, after its role bindings, so a Developer with a Maintainer binding may change that project and no other. Setting `ForkPolicy` to `automatic` needs Admin on the project and answers 403 `FORK_POLICY_NOT_ALLOWED` otherwise. An archived project answers 409 `PROJECT_ARCHIVED`.
+         * @description Needs `project.manage` on the project, after its role bindings, so a Developer with a Maintainer binding may change that project and no other. Setting `ForkPolicy` to `automatic` needs Admin on the project and answers 403 `FORK_POLICY_NOT_ALLOWED` otherwise. Setting `ForkCacheRestore` to `default_branch` also needs Admin and answers 403 `FORK_CACHE_NOT_ALLOWED` otherwise. An archived project answers 409 `PROJECT_ARCHIVED`.
          */
         patch: operations["updateProject"];
         trace?: never;
@@ -4048,6 +4048,11 @@ export interface components {
          * @enum {string}
          */
         ForkPolicy: "approval" | "automatic";
+        /**
+         * @description What a run from a fork may restore from the cache. `none` (the default): nothing. `default_branch`: the cache of the default branch only, never an entry written by a job that got a secret.
+         * @enum {string}
+         */
+        ForkCacheRestore: "none" | "default_branch";
         Project: {
             /** Format: uuid */
             Id: string;
@@ -4058,6 +4063,7 @@ export interface components {
             /** @description Where the pipeline file lives in the repository, relative to its root. */
             PipelinePath: string;
             ForkPolicy: components["schemas"]["ForkPolicy"];
+            ForkCacheRestore: components["schemas"]["ForkCacheRestore"];
             State: components["schemas"]["ProjectState"];
             /** @description A repository is linked, so `getRepository` answers it instead of 404 `REPOSITORY_NOT_LINKED`. */
             RepositoryLinked: boolean;
@@ -4088,6 +4094,7 @@ export interface components {
             Name?: string;
             PipelinePath?: string;
             ForkPolicy?: components["schemas"]["ForkPolicy"];
+            ForkCacheRestore?: components["schemas"]["ForkCacheRestore"];
         };
         /** @enum {string} */
         EnvironmentRefKind: "branch" | "tag";

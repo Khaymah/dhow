@@ -2,6 +2,7 @@
 SELECT l."Id" AS "LeaseId", l."JobId", l."OrganizationId", j."Spec", j."OriginKind", j."OriginId",
        rj."Id" AS "RunJobId", rj."Key" AS "RunJobKey", r."Id" AS "RunId", r."ProjectId", r."Trigger", r."Ref", r."IsFork",
        r."PrNumber", r."Sha", r."RepositoryId", COALESCE(repo."DefaultBranch", '')::text AS "DefaultBranch",
+       COALESCE((SELECT p."ForkCacheRestore" FROM "Projects" p WHERE p."Id" = r."ProjectId"), 'none')::text AS "ForkCacheRestore",
        COALESCE((SELECT h."Sha"
                  FROM "PipelineRuns" h
                  WHERE h."RepositoryId" = r."RepositoryId" AND h."Ref" = r."Ref" AND h."Trigger" IN ('push', 'tag')
@@ -143,6 +144,7 @@ SET "LastUsedAt" = now(), "UpdatedAt" = now()
 WHERE "Id" = (SELECT c."Id"
               FROM "CacheEntries" c
               WHERE c."ProjectId" = @project_id AND c."Key" = @key AND c."Scope" = ANY (@scopes::text[]) AND NOT c."IsDeleted"
+                AND (NOT @without_secrets::boolean OR NOT c."HadSecrets")
               ORDER BY array_position(@scopes::text[], c."Scope")
               LIMIT 1)
 RETURNING *;
@@ -151,8 +153,8 @@ RETURNING *;
 SELECT pg_advisory_xact_lock(hashtextextended('dhow-cache:' || @project_id::text, 0));
 
 -- name: InsertCacheEntry :one
-INSERT INTO "CacheEntries" ("OrganizationId", "ProjectId", "Scope", "Key", "Digest", "SizeBytes")
-VALUES (@organization_id, @project_id, @scope, @key, @digest, @size_bytes)
+INSERT INTO "CacheEntries" ("OrganizationId", "ProjectId", "Scope", "Key", "Digest", "SizeBytes", "HadSecrets")
+VALUES (@organization_id, @project_id, @scope, @key, @digest, @size_bytes, @had_secrets)
 ON CONFLICT ("ProjectId", "Scope", "Key") WHERE NOT "IsDeleted" DO NOTHING
 RETURNING "Id";
 

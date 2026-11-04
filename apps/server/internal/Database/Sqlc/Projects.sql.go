@@ -300,18 +300,19 @@ func (q *Queries) LockProject(ctx context.Context, arg LockProjectParams) (Proje
 
 const updateProject = `-- name: UpdateProject :one
 UPDATE "Projects"
-SET "Name" = $1, "PipelinePath" = $2, "ForkPolicy" = $3, "UpdatedAt" = $4
-WHERE "Id" = $5 AND "OrganizationId" = $6 AND "State" = 'active' AND NOT "IsDeleted"
+SET "Name" = $1, "PipelinePath" = $2, "ForkPolicy" = $3, "ForkCacheRestore" = $4, "UpdatedAt" = $5
+WHERE "Id" = $6 AND "OrganizationId" = $7 AND "State" = 'active' AND NOT "IsDeleted"
 RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId", "ForkCacheRestore"
 `
 
 type UpdateProjectParams struct {
-	Name           string
-	PipelinePath   string
-	ForkPolicy     string
-	Now            time.Time
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
+	Name             string
+	PipelinePath     string
+	ForkPolicy       string
+	ForkCacheRestore string
+	Now              time.Time
+	ID               uuid.UUID
+	OrganizationID   uuid.UUID
 }
 
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error) {
@@ -319,6 +320,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		arg.Name,
 		arg.PipelinePath,
 		arg.ForkPolicy,
+		arg.ForkCacheRestore,
 		arg.Now,
 		arg.ID,
 		arg.OrganizationID,

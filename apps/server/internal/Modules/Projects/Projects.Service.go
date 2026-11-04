@@ -71,7 +71,7 @@ func principalOf(ctx context.Context) (auth.Principal, error) {
 func projectOf(row sqlc.Project) models.Project {
 	return models.Project{
 		ID: row.Id, OrganizationID: row.OrganizationId, Slug: row.Slug, Name: row.Name, PipelinePath: row.PipelinePath,
-		ForkPolicy: row.ForkPolicy, State: row.State, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, ArchivedAt: row.ArchivedAt,
+		ForkPolicy: row.ForkPolicy, ForkCache: row.ForkCacheRestore, State: row.State, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, ArchivedAt: row.ArchivedAt,
 	}
 }
 

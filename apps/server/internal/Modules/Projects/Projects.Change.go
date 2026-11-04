@@ -41,6 +41,7 @@ type change struct {
 func planChange(row sqlc.Project, in models.UpdateInput) change {
 	c := change{params: sqlc.UpdateProjectParams{
 		ID: row.Id, OrganizationID: row.OrganizationId, Name: row.Name, PipelinePath: row.PipelinePath, ForkPolicy: row.ForkPolicy,
+		ForkCacheRestore: row.ForkCacheRestore,
 	}}
 	if in.Name != nil && *in.Name != row.Name {
 		c.params.Name = *in.Name
@@ -53,6 +54,10 @@ func planChange(row sqlc.Project, in models.UpdateInput) change {
 	if in.ForkPolicy != nil && *in.ForkPolicy != row.ForkPolicy {
 		c.params.ForkPolicy = *in.ForkPolicy
 		c.fields = append(c.fields, fieldForkPolicy)
+	}
+	if in.ForkCache != nil && *in.ForkCache != row.ForkCacheRestore {
+		c.params.ForkCacheRestore = *in.ForkCache
+		c.fields = append(c.fields, fieldForkCache)
 	}
 	return c
 }
@@ -83,6 +88,10 @@ func (s *Service) Update(ctx context.Context, org, id uuid.UUID, in models.Updat
 			!policy.AtLeast(projectRole(p, org, id), policy.RoleAdmin) {
 			return apperrors.ForkPolicyNotAllowed()
 		}
+		if c.params.ForkCacheRestore == models.ForkCacheDefault && current.ForkCacheRestore != models.ForkCacheDefault &&
+			!policy.AtLeast(projectRole(p, org, id), policy.RoleAdmin) {
+			return apperrors.ForkCacheNotAllowed()
+		}
 		c.params.Now = s.now()
 		row, err = q.UpdateProject(ctx, c.params)
 		return err
@@ -95,7 +104,7 @@ func (s *Service) Update(ctx context.Context, org, id uuid.UUID, in models.Updat
 		return project, nil
 	}
 	return project, s.audit(ctx, p, eventbus.ProjectUpdated, project, map[string]string{
-		"Fields": strings.Join(c.fields, ","), "ForkPolicy": project.ForkPolicy,
+		"Fields": strings.Join(c.fields, ","), "ForkPolicy": project.ForkPolicy, "ForkCacheRestore": project.ForkCache,
 	})
 }
 

@@ -128,19 +128,26 @@ SET "LastUsedAt" = now(), "UpdatedAt" = now()
 WHERE "Id" = (SELECT c."Id"
               FROM "CacheEntries" c
               WHERE c."ProjectId" = $1 AND c."Key" = $2 AND c."Scope" = ANY ($3::text[]) AND NOT c."IsDeleted"
+                AND (NOT $4::boolean OR NOT c."HadSecrets")
               ORDER BY array_position($3::text[], c."Scope")
               LIMIT 1)
 RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Scope", "Key", "Digest", "SizeBytes", "LastUsedAt", "HadSecrets"
 `
 
 type FindCacheEntryParams struct {
-	ProjectID uuid.UUID
-	Key       string
-	Scopes    []string
+	ProjectID      uuid.UUID
+	Key            string
+	Scopes         []string
+	WithoutSecrets bool
 }
 
 func (q *Queries) FindCacheEntry(ctx context.Context, arg FindCacheEntryParams) (CacheEntry, error) {
-	row := q.db.QueryRow(ctx, findCacheEntry, arg.ProjectID, arg.Key, arg.Scopes)
+	row := q.db.QueryRow(ctx, findCacheEntry,
+		arg.ProjectID,
+		arg.Key,
+		arg.Scopes,
+		arg.WithoutSecrets,
+	)
 	var i CacheEntry
 	err := row.Scan(
 		&i.Id,
@@ -271,8 +278,8 @@ func (q *Queries) InsertArtifact(ctx context.Context, arg InsertArtifactParams) 
 }
 
 const insertCacheEntry = `-- name: InsertCacheEntry :one
-INSERT INTO "CacheEntries" ("OrganizationId", "ProjectId", "Scope", "Key", "Digest", "SizeBytes")
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO "CacheEntries" ("OrganizationId", "ProjectId", "Scope", "Key", "Digest", "SizeBytes", "HadSecrets")
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT ("ProjectId", "Scope", "Key") WHERE NOT "IsDeleted" DO NOTHING
 RETURNING "Id"
 `
@@ -284,6 +291,7 @@ type InsertCacheEntryParams struct {
 	Key            string
 	Digest         []byte
 	SizeBytes      int64
+	HadSecrets     bool
 }
 
 func (q *Queries) InsertCacheEntry(ctx context.Context, arg InsertCacheEntryParams) (uuid.UUID, error) {
@@ -294,6 +302,7 @@ func (q *Queries) InsertCacheEntry(ctx context.Context, arg InsertCacheEntryPara
 		arg.Key,
 		arg.Digest,
 		arg.SizeBytes,
+		arg.HadSecrets,
 	)
 	var Id uuid.UUID
 	err := row.Scan(&Id)
@@ -438,6 +447,7 @@ const lockArtifactLease = `-- name: LockArtifactLease :one
 SELECT l."Id" AS "LeaseId", l."JobId", l."OrganizationId", j."Spec", j."OriginKind", j."OriginId",
        rj."Id" AS "RunJobId", rj."Key" AS "RunJobKey", r."Id" AS "RunId", r."ProjectId", r."Trigger", r."Ref", r."IsFork",
        r."PrNumber", r."Sha", r."RepositoryId", COALESCE(repo."DefaultBranch", '')::text AS "DefaultBranch",
+       COALESCE((SELECT p."ForkCacheRestore" FROM "Projects" p WHERE p."Id" = r."ProjectId"), 'none')::text AS "ForkCacheRestore",
        COALESCE((SELECT h."Sha"
                  FROM "PipelineRuns" h
                  WHERE h."RepositoryId" = r."RepositoryId" AND h."Ref" = r."Ref" AND h."Trigger" IN ('push', 'tag')
@@ -461,24 +471,25 @@ type LockArtifactLeaseParams struct {
 }
 
 type LockArtifactLeaseRow struct {
-	LeaseId        uuid.UUID
-	JobId          uuid.UUID
-	OrganizationId uuid.UUID
-	Spec           []byte
-	OriginKind     string
-	OriginId       *uuid.UUID
-	RunJobId       *uuid.UUID
-	RunJobKey      pgtype.Text
-	RunId          *uuid.UUID
-	ProjectId      *uuid.UUID
-	Trigger        pgtype.Text
-	Ref            pgtype.Text
-	IsFork         pgtype.Bool
-	PrNumber       pgtype.Int4
-	Sha            pgtype.Text
-	RepositoryId   *uuid.UUID
-	DefaultBranch  string
-	RefHead        string
+	LeaseId          uuid.UUID
+	JobId            uuid.UUID
+	OrganizationId   uuid.UUID
+	Spec             []byte
+	OriginKind       string
+	OriginId         *uuid.UUID
+	RunJobId         *uuid.UUID
+	RunJobKey        pgtype.Text
+	RunId            *uuid.UUID
+	ProjectId        *uuid.UUID
+	Trigger          pgtype.Text
+	Ref              pgtype.Text
+	IsFork           pgtype.Bool
+	PrNumber         pgtype.Int4
+	Sha              pgtype.Text
+	RepositoryId     *uuid.UUID
+	DefaultBranch    string
+	ForkCacheRestore string
+	RefHead          string
 }
 
 func (q *Queries) LockArtifactLease(ctx context.Context, arg LockArtifactLeaseParams) (LockArtifactLeaseRow, error) {
@@ -502,6 +513,7 @@ func (q *Queries) LockArtifactLease(ctx context.Context, arg LockArtifactLeasePa
 		&i.Sha,
 		&i.RepositoryId,
 		&i.DefaultBranch,
+		&i.ForkCacheRestore,
 		&i.RefHead,
 	)
 	return i, err

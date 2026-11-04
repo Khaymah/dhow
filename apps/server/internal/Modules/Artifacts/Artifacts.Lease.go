@@ -12,17 +12,19 @@ import (
 	runnerauth "github.com/Khaymah/dhow/apps/server/internal/Core/RunnerAuth"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
+	"github.com/Khaymah/dhow/internal/jobspec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
 const (
-	branchPrefix  = "refs/heads/"
-	tagPrefix     = "refs/tags/"
-	triggerPR     = "pull_request"
-	triggerTag    = "tag"
-	triggerManual = "manual"
-	triggerAPI    = "api"
-	noRepository  = "none"
+	branchPrefix     = "refs/heads/"
+	tagPrefix        = "refs/tags/"
+	triggerPR        = "pull_request"
+	forkCacheDefault = "default_branch"
+	triggerTag       = "tag"
+	triggerManual    = "manual"
+	triggerAPI       = "api"
+	noRepository     = "none"
 )
 
 type leaseRef struct {
@@ -111,7 +113,22 @@ func (l scope) defaultScope() string {
 	return l.repository() + "branch:" + l.row.DefaultBranch
 }
 
+func (l scope) hadSecrets() bool {
+	for _, ref := range l.spec.GetSecrets() {
+		if ref.GetName() != jobspec.CheckoutSecret {
+			return true
+		}
+	}
+	return len(l.spec.GetRegistryAuth()) > 0
+}
+
 func (l scope) restoreScopes() []string {
+	if l.fork() {
+		if def := l.defaultScope(); def != "" && l.row.ForkCacheRestore == forkCacheDefault {
+			return []string{def}
+		}
+		return nil
+	}
 	var out []string
 	if own, ok := l.ownScope(); ok && !l.fork() {
 		out = append(out, own)

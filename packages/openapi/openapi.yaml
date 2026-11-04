@@ -2316,7 +2316,8 @@ paths:
       description: >-
         Needs `project.manage` on the project, after its role bindings, so a Developer with a Maintainer binding may
         change that project and no other. Setting `ForkPolicy` to `automatic` needs Admin on the project and answers
-        403 `FORK_POLICY_NOT_ALLOWED` otherwise. An archived project answers 409 `PROJECT_ARCHIVED`.
+        403 `FORK_POLICY_NOT_ALLOWED` otherwise. Setting `ForkCacheRestore` to `default_branch` also needs Admin and
+        answers 403 `FORK_CACHE_NOT_ALLOWED` otherwise. An archived project answers 409 `PROJECT_ARCHIVED`.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -7117,10 +7118,16 @@ components:
       description: >-
         `approval`: a pull request from a fork waits until a Maintainer or above approves it. `automatic`: it runs at
         once, still without secrets or environments.
+    ForkCacheRestore:
+      type: string
+      enum: [none, default_branch]
+      description: >-
+        What a run from a fork may restore from the cache. `none` (the default): nothing. `default_branch`: the cache of
+        the default branch only, never an entry written by a job that got a secret.
     Project:
       type: object
       additionalProperties: false
-      required: [Id, OrganizationId, Slug, Name, PipelinePath, ForkPolicy, State, RepositoryLinked, CreatedAt, UpdatedAt]
+      required: [Id, OrganizationId, Slug, Name, PipelinePath, ForkPolicy, ForkCacheRestore, State, RepositoryLinked, CreatedAt, UpdatedAt]
       properties:
         Id:
           type: string
@@ -7137,6 +7144,8 @@ components:
           description: Where the pipeline file lives in the repository, relative to its root.
         ForkPolicy:
           $ref: "#/components/schemas/ForkPolicy"
+        ForkCacheRestore:
+          $ref: "#/components/schemas/ForkCacheRestore"
         State:
           $ref: "#/components/schemas/ProjectState"
         RepositoryLinked:
@@ -7210,6 +7219,8 @@ components:
           maxLength: 255
         ForkPolicy:
           $ref: "#/components/schemas/ForkPolicy"
+        ForkCacheRestore:
+          $ref: "#/components/schemas/ForkCacheRestore"
     EnvironmentRefKind:
       type: string
       enum: [branch, tag]

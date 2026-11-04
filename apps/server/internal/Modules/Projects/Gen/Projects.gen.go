@@ -17,6 +17,24 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ForkCacheRestore.
+const (
+	DefaultBranch ForkCacheRestore = "default_branch"
+	None          ForkCacheRestore = "none"
+)
+
+// Valid indicates whether the value is a known member of the ForkCacheRestore enum.
+func (e ForkCacheRestore) Valid() bool {
+	switch e {
+	case DefaultBranch:
+		return true
+	case None:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ForkPolicy.
 const (
 	Approval  ForkPolicy = "approval"
@@ -137,6 +155,9 @@ type ErrorResponse struct {
 	Success bool      `json:"Success"`
 }
 
+// ForkCacheRestore What a run from a fork may restore from the cache. `none` (the default): nothing. `default_branch`: the cache of the default branch only, never an entry written by a job that got a secret.
+type ForkCacheRestore string
+
 // ForkPolicy `approval`: a pull request from a fork waits until a Maintainer or above approves it. `automatic`: it runs at once, still without secrets or environments.
 type ForkPolicy string
 
@@ -152,6 +173,9 @@ type Project struct {
 	ArchivedAt *time.Time `json:"ArchivedAt,omitempty"`
 	CallerRole *Role      `json:"CallerRole,omitempty"`
 	CreatedAt  time.Time  `json:"CreatedAt"`
+
+	// ForkCacheRestore What a run from a fork may restore from the cache. `none` (the default): nothing. `default_branch`: the cache of the default branch only, never an entry written by a job that got a secret.
+	ForkCacheRestore ForkCacheRestore `json:"ForkCacheRestore"`
 
 	// ForkPolicy `approval`: a pull request from a fork waits until a Maintainer or above approves it. `automatic`: it runs at once, still without secrets or environments.
 	ForkPolicy     ForkPolicy         `json:"ForkPolicy"`
@@ -203,6 +227,9 @@ type Role string
 
 // UpdateProjectRequest defines model for UpdateProjectRequest.
 type UpdateProjectRequest struct {
+	// ForkCacheRestore What a run from a fork may restore from the cache. `none` (the default): nothing. `default_branch`: the cache of the default branch only, never an entry written by a job that got a secret.
+	ForkCacheRestore *ForkCacheRestore `json:"ForkCacheRestore,omitempty"`
+
 	// ForkPolicy `approval`: a pull request from a fork waits until a Maintainer or above approves it. `automatic`: it runs at once, still without secrets or environments.
 	ForkPolicy   *ForkPolicy `json:"ForkPolicy,omitempty"`
 	Name         *string     `json:"Name,omitempty"`

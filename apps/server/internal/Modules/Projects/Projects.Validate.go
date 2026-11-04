@@ -20,6 +20,7 @@ const (
 	fieldSlug         = "Slug"
 	fieldPipelinePath = "PipelinePath"
 	fieldForkPolicy   = "ForkPolicy"
+	fieldForkCache    = "ForkCacheRestore"
 
 	messageInvalidValue = "errors.validationFailed"
 	messageSlugTaken    = "errors.slugTaken"
@@ -89,7 +90,7 @@ func validateCreate(in models.CreateInput) (models.CreateInput, *apperrors.AppEr
 }
 
 func validateUpdate(in models.UpdateInput) *apperrors.AppError {
-	if in.Name == nil && in.PipelinePath == nil && in.ForkPolicy == nil {
+	if in.Name == nil && in.PipelinePath == nil && in.ForkPolicy == nil && in.ForkCache == nil {
 		return apperrors.BadRequest()
 	}
 	var details []apperrors.IErrorDetail
@@ -101,6 +102,9 @@ func validateUpdate(in models.UpdateInput) *apperrors.AppError {
 	}
 	if in.ForkPolicy != nil && !ValidForkPolicy(*in.ForkPolicy) {
 		details = append(details, invalid(fieldForkPolicy))
+	}
+	if in.ForkCache != nil && *in.ForkCache != models.ForkCacheNone && *in.ForkCache != models.ForkCacheDefault {
+		details = append(details, invalid(fieldForkCache))
 	}
 	if len(details) > 0 {
 		return apperrors.ValidationFailed(details...)
