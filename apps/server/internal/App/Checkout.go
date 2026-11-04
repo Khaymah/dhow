@@ -10,6 +10,7 @@ import (
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
+	environments "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
 	secretsmodule "github.com/Khaymah/dhow/apps/server/internal/Modules/Secrets"
@@ -115,6 +116,7 @@ type runServices struct {
 
 func runsFor(
 	in Infra, values *keys.Values, bus *eventbus.Bus, limiter ratelimit.Limiter, jobsService *jobs.Service, secrets *checkoutSecrets,
+	envs *environments.Service,
 ) (runServices, error) {
 	pipelinesService := pipelinesFor(in, bus, jobsService.Queue(), limiter)
 	jobsService.UseRunEvents(pipelinesService)
@@ -132,8 +134,9 @@ func runsFor(
 	}
 	pipelinesService.UseSecrets(secretsService)
 	pipelinesService.UseVariables(secretsService)
+	pipelinesService.UseGate(envs.Gate())
 	if in.Secrets == nil {
-		secrets.next = &pipelineSecrets{runs: pipelinesService, store: secretsService, logins: secretsService, bus: bus, log: in.Log}
+		secrets.next = &pipelineSecrets{runs: pipelinesService, envs: envs, store: secretsService, logins: secretsService, bus: bus, log: in.Log}
 	}
 	pipelinesService.UseStatuses(sourcesService.StatusRecorder())
 	pipelinesService.UseArtifacts(artifactsService)

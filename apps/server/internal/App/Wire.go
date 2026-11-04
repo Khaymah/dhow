@@ -163,7 +163,8 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	runs, err := runsFor(in, values, bus, limiter, jobsService, secrets)
+	envsService := environments.NewService(environments.Options{DB: in.Pool, Factors: sessionService, Bus: bus, Log: in.Log, Now: in.Now})
+	runs, err := runsFor(in, values, bus, limiter, jobsService, secrets, envsService)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +182,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Runners:   runnersService,
 		Jobs:      jobsService,
 		Projects:  projects.NewService(projects.Options{DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now}),
-		Envs:      environments.NewService(environments.Options{DB: in.Pool, Factors: sessionService, Bus: bus, Log: in.Log, Now: in.Now}),
+		Envs:      envsService,
 		Secrets:   runs.secrets,
 		Sources:   runs.sources,
 		Pipelines: runs.pipelines,

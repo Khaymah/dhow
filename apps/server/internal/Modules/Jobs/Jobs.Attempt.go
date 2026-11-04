@@ -105,10 +105,10 @@ func (s *Service) Start(ctx context.Context, ref *runnerv1.LeaseRef, proof []byt
 			return err
 		}
 		values, err := s.resolveSecrets(ctx, l, spec)
-		if errors.Is(err, ErrSecretsUnavailable) {
+		if reason, refused := secretRefusal(err); refused {
 			out.noSecrets = true
 			return s.finalize(ctx, q, l.Id, models.Outcome{
-				State: models.AttemptFailed, FailureReason: models.ReasonSecretsMissing, LeaseState: models.LeaseReleased,
+				State: models.AttemptFailed, FailureReason: reason, LeaseState: models.LeaseReleased,
 			})
 		}
 		if err != nil {
@@ -176,6 +176,17 @@ func (s *Service) resolveSecrets(ctx context.Context, l sqlc.LockActiveLeaseRow,
 		return nil, err
 	}
 	return values, nil
+}
+
+func secretRefusal(err error) (string, bool) {
+	switch {
+	case errors.Is(err, ErrEnvironmentRuleChanged):
+		return models.ReasonEnvironmentRule, true
+	case errors.Is(err, ErrSecretsUnavailable):
+		return models.ReasonSecretsMissing, true
+	default:
+		return "", false
+	}
 }
 
 func seal(p runnerauth.Principal, l sqlc.LockActiveLeaseRow, values map[string][]byte) (*runnerv1.SealedSecrets, error) {

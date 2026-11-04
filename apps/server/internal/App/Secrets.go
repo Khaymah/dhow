@@ -15,6 +15,7 @@ import (
 
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	secretstore "github.com/Khaymah/dhow/apps/server/internal/Core/SecretStore"
+	environments "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
 	"github.com/Khaymah/dhow/internal/jobspec"
@@ -24,6 +25,7 @@ const deliveredValueMax = 256
 
 type pipelineSecrets struct {
 	runs   *pipelines.Service
+	envs   *environments.Service
 	store  secretstore.Store
 	logins secretstore.RegistryLogins
 	bus    *eventbus.Bus
@@ -56,6 +58,9 @@ func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (
 		p.log.WarnContext(ctx, "a job of a fork asked for secrets at start and got none", "job_id", req.JobID.String())
 		return nil, jobs.ErrSecretsUnavailable
 	}
+	if err := p.checkEnvironment(ctx, req, scope); err != nil {
+		return nil, err
+	}
 	names, registries := splitRegistry(req)
 	list, err := p.resolveNamed(ctx, req, scope, names)
 	if errors.Is(err, secretstore.ErrMissingName) || errors.Is(err, secretstore.ErrFork) ||
@@ -79,6 +84,24 @@ func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (
 		return nil, err
 	}
 	return out, nil
+}
+
+func (p *pipelineSecrets) checkEnvironment(ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope) error {
+	if scope.EnvironmentID == nil {
+		return nil
+	}
+	if p.envs == nil {
+		return jobs.ErrSecretsUnavailable
+	}
+	env, err := p.envs.CheckStart(ctx, environments.StartCheck{
+		OrganizationID: req.OrganizationID, RunJobID: scope.RunJobID, JobID: req.JobID,
+		RefKind: scope.Target.Kind, RefName: scope.Target.Name, PullRequest: scope.Target.PullRequest,
+	})
+	if errors.Is(err, environments.ErrRuleChanged) || (err == nil && env != *scope.EnvironmentID) {
+		p.log.WarnContext(ctx, "the environment of a job changed after the gate, so it gets no secret", "job_id", req.JobID.String())
+		return jobs.ErrEnvironmentRuleChanged
+	}
+	return err
 }
 
 func wipeAll(values map[string][]byte) {
@@ -105,7 +128,8 @@ func (p *pipelineSecrets) resolveNamed(ctx context.Context, req jobs.SecretReque
 		return nil, nil
 	}
 	return p.store.Resolve(ctx, secretstore.Request{
-		OrganizationID: req.OrganizationID, ProjectID: scope.ProjectID, Names: names, PullRequest: scope.PullRequest,
+		OrganizationID: req.OrganizationID, ProjectID: scope.ProjectID, EnvironmentID: scope.EnvironmentID, Names: names,
+		PullRequest: scope.PullRequest,
 	})
 }
 
