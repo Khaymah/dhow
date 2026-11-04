@@ -90,9 +90,11 @@ func TestAWriteWaitsForAnEnvironmentBeingRemoved(t *testing.T) {
 	require.NoError(t, err)
 	done := make(chan apptest.Response, 1)
 	go func() {
-		done <- owner.Do(apptest.Request{Method: http.MethodPut,
-			Path: apptest.OrgPath(org, "/projects/"+project.String()+"/environments/production/secrets/LATE"),
-			Body: map[string]string{"Value": "written during the removal"}})
+		done <- owner.Do(apptest.Request{
+			Method: http.MethodPut,
+			Path:   apptest.OrgPath(org, "/projects/"+project.String()+"/environments/production/secrets/LATE"),
+			Body:   map[string]string{"Value": "written during the removal"},
+		})
 	}()
 	select {
 	case res := <-done:
