@@ -10,6 +10,31 @@ import (
 	"time"
 )
 
+const eraseExpiredSecretVersions = `-- name: EraseExpiredSecretVersions :execrows
+UPDATE "SecretVersions"
+SET "ValueSealed" = NULL, "ErasedAt" = now(), "UpdatedAt" = now()
+WHERE "Id" IN (
+    SELECT v."Id" FROM "SecretVersions" v
+    WHERE v."ValueSealed" IS NOT NULL AND v."SupersededAt" IS NOT NULL AND v."SupersededAt" < $1::timestamptz
+    ORDER BY v."SupersededAt"
+    LIMIT $2
+    FOR UPDATE SKIP LOCKED
+)
+`
+
+type EraseExpiredSecretVersionsParams struct {
+	Before time.Time
+	Batch  int32
+}
+
+func (q *Queries) EraseExpiredSecretVersions(ctx context.Context, arg EraseExpiredSecretVersionsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, eraseExpiredSecretVersions, arg.Before, arg.Batch)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const purgeAuthChallenges = `-- name: PurgeAuthChallenges :execrows
 DELETE FROM "AuthChallenges"
 WHERE "Id" IN (

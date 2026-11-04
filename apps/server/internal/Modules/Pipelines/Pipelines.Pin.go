@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/google/uuid"
+
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
 	"github.com/Khaymah/dhow/internal/jobspec"
 	"github.com/Khaymah/dhow/internal/pipelinespec"
@@ -17,7 +19,29 @@ type pinResult struct {
 	err    error
 }
 
-func (s *Service) resolveAll(ctx context.Context, refs []string) []pinResult {
+type pinScope struct {
+	org, project uuid.UUID
+	fork         bool
+}
+
+func (s *Service) resolveOne(ctx context.Context, ref string, scope pinScope) (string, error) {
+	withLogin, ok := s.images.(LoginImageResolver)
+	host, known := RegistryHost(ref)
+	if !ok || !known || s.logins == nil || scope.fork {
+		return s.images.Resolve(ctx, ref)
+	}
+	login, found, err := s.logins.RegistryLogin(ctx, scope.org, scope.project, host)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return s.images.Resolve(ctx, ref)
+	}
+	defer login.Password.Wipe()
+	return withLogin.ResolveWith(ctx, ref, &login)
+}
+
+func (s *Service) resolveAll(ctx context.Context, refs []string, scope pinScope) []pinResult {
 	out := make([]pinResult, len(refs))
 	if s.images == nil {
 		for i := range out {
@@ -38,14 +62,14 @@ func (s *Service) resolveAll(ctx context.Context, refs []string) []pinResult {
 				return
 			}
 			defer func() { <-slots }()
-			out[i].pinned, out[i].err = s.images.Resolve(ctx, ref)
+			out[i].pinned, out[i].err = s.resolveOne(ctx, ref, scope)
 		})
 	}
 	wg.Wait()
 	return out
 }
 
-func (s *Service) pin(ctx context.Context, spec *pipelinespec.Spec, p *prepared) bool {
+func (s *Service) pin(ctx context.Context, spec *pipelinespec.Spec, p *prepared, scope pinScope) bool {
 	byRef := map[string][]string{}
 	for _, image := range taggedImages(spec) {
 		if _, ok := p.pins[image]; ok {
@@ -60,7 +84,7 @@ func (s *Service) pin(ctx context.Context, spec *pipelinespec.Spec, p *prepared)
 	}
 	sort.Strings(refs)
 	failed := false
-	for i, res := range s.resolveAll(ctx, refs) {
+	for i, res := range s.resolveAll(ctx, refs, scope) {
 		for _, image := range byRef[refs[i]] {
 			if res.err != nil {
 				failed = true

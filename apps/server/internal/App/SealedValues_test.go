@@ -271,7 +271,7 @@ func TestEverySealedColumnIsARegisteredLocationThatFitsItsCheck(t *testing.T) {
 	for name := range notSealed {
 		assert.Contains(t, found, name, "notSealed lists a column that does not exist")
 	}
-	assert.Len(t, registered, 6)
+	assert.Len(t, registered, 8)
 
 	for name, spec := range registered {
 		require.NoError(t, spec.Valid())

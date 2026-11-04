@@ -594,6 +594,20 @@ type RecoveryCode struct {
 	UsedAt    *time.Time
 }
 
+type RegistryCredential struct {
+	Id              uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	IsDeleted       bool
+	OrganizationId  uuid.UUID
+	ProjectId       *uuid.UUID
+	Host            string
+	Username        string
+	PasswordSealed  []byte
+	CreatedByUserId uuid.UUID
+	UpdatedByUserId uuid.UUID
+}
+
 type Repository struct {
 	Id                         uuid.UUID
 	CreatedAt                  time.Time
@@ -733,6 +747,50 @@ type RunnerThrottle struct {
 	LockedUntil   *time.Time
 }
 
+type Secret struct {
+	Id                      uuid.UUID
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	IsDeleted               bool
+	OrganizationId          uuid.UUID
+	ProjectId               *uuid.UUID
+	EnvironmentId           *uuid.UUID
+	Scope                   string
+	Name                    string
+	Description             string
+	CurrentVersion          int32
+	Visibility              string
+	AvailableToPullRequests bool
+	CreatedByUserId         uuid.UUID
+	UpdatedByUserId         uuid.UUID
+	LastUsedAt              *time.Time
+}
+
+type SecretProjectAccess struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	SecretId       uuid.UUID
+	ProjectId      uuid.UUID
+}
+
+type SecretVersion struct {
+	Id              uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	IsDeleted       bool
+	OrganizationId  uuid.UUID
+	SecretId        uuid.UUID
+	Version         int32
+	ValueSealed     []byte
+	SizeBytes       int32
+	CreatedByUserId uuid.UUID
+	SupersededAt    *time.Time
+	ErasedAt        *time.Time
+}
+
 type ServerInstance struct {
 	Id            uuid.UUID
 	CreatedAt     time.Time
@@ -845,6 +903,21 @@ type UserPreference struct {
 	ThemeId        string
 	CustomThemes   []byte
 	OrganizationId *uuid.UUID
+}
+
+type Variable struct {
+	Id              uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	IsDeleted       bool
+	OrganizationId  uuid.UUID
+	ProjectId       *uuid.UUID
+	EnvironmentId   *uuid.UUID
+	Scope           string
+	Name            string
+	Value           string
+	CreatedByUserId uuid.UUID
+	UpdatedByUserId uuid.UUID
 }
 
 type WebhookDelivery struct {

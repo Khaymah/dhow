@@ -113,7 +113,7 @@ func (s *Service) prepare(ctx context.Context, run sqlc.PipelineRun, project sql
 		return p.finish(models.RunFailed, models.ReasonInputsInvalid), nil
 	}
 	p.inputs = inputs
-	if s.pin(ctx, spec, p) {
+	if s.pin(ctx, spec, p, pinScope{org: run.OrganizationId, project: run.ProjectId, fork: run.IsFork}) {
 		return p.finish(models.RunFailed, models.ReasonImagePinFailed), nil
 	}
 	c, warnings, err := compileSpec(spec, p.pins)

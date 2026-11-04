@@ -41,6 +41,9 @@ var purges = []purge{
 	{"RateLimits", config.RetentionRateLimitAfter, func(ctx context.Context, q *sqlc.Queries, before time.Time, batch int32) (int64, error) {
 		return q.PurgeRateLimits(ctx, sqlc.PurgeRateLimitsParams{Before: before, Batch: batch})
 	}},
+	{"SecretVersions", config.SecretVersionRetention, func(ctx context.Context, q *sqlc.Queries, before time.Time, batch int32) (int64, error) {
+		return q.EraseExpiredSecretVersions(ctx, sqlc.EraseExpiredSecretVersionsParams{Before: before, Batch: batch})
+	}},
 }
 
 func Tables() []string {

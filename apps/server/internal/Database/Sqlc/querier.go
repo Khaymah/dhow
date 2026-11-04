@@ -31,6 +31,7 @@ type Querier interface {
 	ClaimUpload(ctx context.Context, arg ClaimUploadParams) (uuid.UUID, error)
 	ClearDataKeyUnreadable(ctx context.Context) (int64, error)
 	ClearMfaReset(ctx context.Context, arg ClearMfaResetParams) error
+	ClearSecretProjectAccess(ctx context.Context, arg ClearSecretProjectAccessParams) error
 	CompleteInstanceSetup(ctx context.Context, completedAt time.Time) error
 	ConfirmTotpFactor(ctx context.Context, arg ConfirmTotpFactorParams) error
 	ConsumeRecoveryCode(ctx context.Context, arg ConsumeRecoveryCodeParams) (int64, error)
@@ -46,14 +47,17 @@ type Querier interface {
 	CountJobs(ctx context.Context, arg CountJobsParams) (int64, error)
 	CountLegacyInstanceSettingSecrets(ctx context.Context) (int64, error)
 	CountLegacyOidcProviderSecrets(ctx context.Context) (int64, error)
+	CountLegacyRegistryPasswords(ctx context.Context) (int64, error)
 	CountLegacyRepositoryDeployKeys(ctx context.Context) (int64, error)
 	CountLegacyRepositoryPreviousDeployKeys(ctx context.Context) (int64, error)
 	CountLegacyRepositoryWebhookSecrets(ctx context.Context) (int64, error)
+	CountLegacySecretValues(ctx context.Context) (int64, error)
 	CountLegacyTotpSecrets(ctx context.Context) (int64, error)
 	CountMatchingRunners(ctx context.Context, arg CountMatchingRunnersParams) (int64, error)
 	CountMembers(ctx context.Context, organizationID uuid.UUID) (int64, error)
 	CountOidcProviderSecretsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
 	CountOidcProviders(ctx context.Context) (int64, error)
+	CountOrganizationProjects(ctx context.Context, arg CountOrganizationProjectsParams) (int64, error)
 	CountOtherActiveOwners(ctx context.Context, arg CountOtherActiveOwnersParams) (int64, error)
 	CountOverviewInvitations(ctx context.Context, arg CountOverviewInvitationsParams) (int64, error)
 	CountOverviewJobs(ctx context.Context, arg CountOverviewJobsParams) (CountOverviewJobsRow, error)
@@ -62,16 +66,21 @@ type Querier interface {
 	CountQueuedJobs(ctx context.Context, arg CountQueuedJobsParams) (int64, error)
 	CountRecentWebhookRuns(ctx context.Context, arg CountRecentWebhookRunsParams) (CountRecentWebhookRunsRow, error)
 	CountRegistrationTokens(ctx context.Context, organizationID uuid.UUID) (int64, error)
+	CountRegistryCredentialsInScope(ctx context.Context, arg CountRegistryCredentialsInScopeParams) (int64, error)
+	CountRegistryPasswordsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
 	CountRepositoryDeployKeysUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
 	CountRepositoryPreviousDeployKeysUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
 	CountRepositoryWebhookSecretsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
 	CountRunnerSessionSwitches(ctx context.Context, arg CountRunnerSessionSwitchesParams) (int64, error)
 	CountRunners(ctx context.Context, organizationID uuid.UUID) (int64, error)
 	CountRuns(ctx context.Context, arg CountRunsParams) (int64, error)
+	CountSecretValuesUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
+	CountSecretsInScope(ctx context.Context, arg CountSecretsInScopeParams) (int64, error)
 	CountStrandedIdentities(ctx context.Context, active []string) (CountStrandedIdentitiesRow, error)
 	CountTotpSecretsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
 	CountUsersOnlyOnProvider(ctx context.Context, arg CountUsersOnlyOnProviderParams) (int64, error)
 	CountUsersOutsideDomains(ctx context.Context, arg CountUsersOutsideDomainsParams) (int64, error)
+	CountVariablesInScope(ctx context.Context, arg CountVariablesInScopeParams) (int64, error)
 	CurrentProviderIssuer(ctx context.Context, provider string) (string, error)
 	DeleteTeam(ctx context.Context, arg DeleteTeamParams) (int64, error)
 	DeleteTeamBinding(ctx context.Context, arg DeleteTeamBindingParams) (int64, error)
@@ -93,6 +102,10 @@ type Querier interface {
 	EnsureThrottle(ctx context.Context, arg EnsureThrottleParams) error
 	EnsureWebauthnHandle(ctx context.Context, arg EnsureWebauthnHandleParams) ([]byte, error)
 	EnsureWebhookPartitions(ctx context.Context, daysAhead int32) (int32, error)
+	EraseAllSecretVersions(ctx context.Context, arg EraseAllSecretVersionsParams) (int64, error)
+	EraseExpiredSecretVersions(ctx context.Context, arg EraseExpiredSecretVersionsParams) (int64, error)
+	EraseSecretVersionsBelow(ctx context.Context, arg EraseSecretVersionsBelowParams) (int64, error)
+	EraseSecretVersionsOf(ctx context.Context, arg EraseSecretVersionsOfParams) (int64, error)
 	EvictCacheEntries(ctx context.Context, ids []uuid.UUID) (int64, error)
 	ExpireArtifacts(ctx context.Context, batch int32) (int64, error)
 	ExpirePreviousDeployKeys(ctx context.Context, now time.Time) (int64, error)
@@ -146,6 +159,7 @@ type Querier interface {
 	GetProjectBindings(ctx context.Context, arg GetProjectBindingsParams) (GetProjectBindingsRow, error)
 	GetProjectState(ctx context.Context, arg GetProjectStateParams) (string, error)
 	GetRegistrationToken(ctx context.Context, arg GetRegistrationTokenParams) (RunnerRegistrationToken, error)
+	GetRegistryCredentialForUpdate(ctx context.Context, arg GetRegistryCredentialForUpdateParams) (RegistryCredential, error)
 	GetRepositoryByHook(ctx context.Context, arg GetRepositoryByHookParams) (GetRepositoryByHookRow, error)
 	GetRepositoryByProject(ctx context.Context, arg GetRepositoryByProjectParams) (Repository, error)
 	GetRun(ctx context.Context, arg GetRunParams) (PipelineRun, error)
@@ -155,6 +169,11 @@ type Querier interface {
 	GetRunnerIdentity(ctx context.Context, id uuid.UUID) (GetRunnerIdentityRow, error)
 	GetRunnerNames(ctx context.Context, arg GetRunnerNamesParams) ([]GetRunnerNamesRow, error)
 	GetSchemaFloor(ctx context.Context) (string, error)
+	GetSecretForUpdate(ctx context.Context, arg GetSecretForUpdateParams) (Secret, error)
+	GetSecretVersion(ctx context.Context, arg GetSecretVersionParams) (GetSecretVersionRow, error)
+	GetSecretVersionForUpdate(ctx context.Context, arg GetSecretVersionForUpdateParams) (GetSecretVersionForUpdateRow, error)
+	GetSecretsEnvironment(ctx context.Context, arg GetSecretsEnvironmentParams) (uuid.UUID, error)
+	GetSecretsProject(ctx context.Context, arg GetSecretsProjectParams) (string, error)
 	GetTeam(ctx context.Context, arg GetTeamParams) (GetTeamRow, error)
 	GetTokenMembership(ctx context.Context, arg GetTokenMembershipParams) (GetTokenMembershipRow, error)
 	GetUsableSetupToken(ctx context.Context, arg GetUsableSetupTokenParams) (GetUsableSetupTokenRow, error)
@@ -167,6 +186,7 @@ type Querier interface {
 	GetUserMfaState(ctx context.Context, id uuid.UUID) (GetUserMfaStateRow, error)
 	GetUserPasswordHash(ctx context.Context, id uuid.UUID) (string, error)
 	GetUserPreferences(ctx context.Context, userID uuid.UUID) (GetUserPreferencesRow, error)
+	GetVariableForUpdate(ctx context.Context, arg GetVariableForUpdateParams) (Variable, error)
 	GroupBlocked(ctx context.Context, arg GroupBlockedParams) (bool, error)
 	HasIdentityForProvider(ctx context.Context, arg HasIdentityForProviderParams) (bool, error)
 	InsertApiToken(ctx context.Context, arg InsertApiTokenParams) (InsertApiTokenRow, error)
@@ -195,11 +215,15 @@ type Querier interface {
 	InsertProject(ctx context.Context, arg InsertProjectParams) (Project, error)
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RunnerRegistrationToken, error)
+	InsertRegistryCredential(ctx context.Context, arg InsertRegistryCredentialParams) (InsertRegistryCredentialRow, error)
 	InsertRepository(ctx context.Context, arg InsertRepositoryParams) (Repository, error)
 	InsertRun(ctx context.Context, arg InsertRunParams) (PipelineRun, error)
 	InsertRunJob(ctx context.Context, arg InsertRunJobParams) (RunJob, error)
 	InsertRunner(ctx context.Context, arg InsertRunnerParams) (Runner, error)
 	InsertRunnerSession(ctx context.Context, arg InsertRunnerSessionParams) (uuid.UUID, error)
+	InsertSecret(ctx context.Context, arg InsertSecretParams) (Secret, error)
+	InsertSecretProjectAccess(ctx context.Context, arg InsertSecretProjectAccessParams) error
+	InsertSecretVersion(ctx context.Context, arg InsertSecretVersionParams) error
 	InsertSession(ctx context.Context, arg InsertSessionParams) (InsertSessionRow, error)
 	InsertSetupToken(ctx context.Context, arg InsertSetupTokenParams) error
 	InsertTeam(ctx context.Context, arg InsertTeamParams) (InsertTeamRow, error)
@@ -207,6 +231,7 @@ type Querier interface {
 	InsertTeamMember(ctx context.Context, arg InsertTeamMemberParams) error
 	InsertTotpEnrollment(ctx context.Context, arg InsertTotpEnrollmentParams) (uuid.UUID, error)
 	InsertUser(ctx context.Context, arg InsertUserParams) (InsertUserRow, error)
+	InsertVariable(ctx context.Context, arg InsertVariableParams) (Variable, error)
 	InsertWebhookDelivery(ctx context.Context, arg InsertWebhookDeliveryParams) (InsertWebhookDeliveryRow, error)
 	InterruptAttemptSteps(ctx context.Context, attemptID uuid.UUID) error
 	InvalidateSetupTokens(ctx context.Context, now time.Time) error
@@ -248,12 +273,15 @@ type Querier interface {
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error)
 	ListQueuedRuns(ctx context.Context, batch int32) ([]ListQueuedRunsRow, error)
 	ListRegistrationTokens(ctx context.Context, arg ListRegistrationTokensParams) ([]RunnerRegistrationToken, error)
+	ListRegistryCredentialsInScope(ctx context.Context, arg ListRegistryCredentialsInScopeParams) ([]ListRegistryCredentialsInScopeRow, error)
 	ListRunArtifacts(ctx context.Context, arg ListRunArtifactsParams) ([]Artifact, error)
 	ListRunCancellations(ctx context.Context, batch int32) ([]ListRunCancellationsRow, error)
 	ListRunJobArtifacts(ctx context.Context, arg ListRunJobArtifactsParams) ([]Artifact, error)
 	ListRunJobs(ctx context.Context, runID uuid.UUID) ([]RunJob, error)
 	ListRunners(ctx context.Context, arg ListRunnersParams) ([]Runner, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]PipelineRun, error)
+	ListSecretProjectAccess(ctx context.Context, secretIds []uuid.UUID) ([]ListSecretProjectAccessRow, error)
+	ListSecretsInScope(ctx context.Context, arg ListSecretsInScopeParams) ([]ListSecretsInScopeRow, error)
 	ListStalledRuns(ctx context.Context, arg ListStalledRunsParams) ([]uuid.UUID, error)
 	ListSupersededDataKeyIds(ctx context.Context) ([]uuid.UUID, error)
 	ListTeamBindings(ctx context.Context, arg ListTeamBindingsParams) ([]ListTeamBindingsRow, error)
@@ -264,6 +292,7 @@ type Querier interface {
 	ListUserMemberships(ctx context.Context, userID uuid.UUID) ([]ListUserMembershipsRow, error)
 	ListUserPasskeys(ctx context.Context, userID uuid.UUID) ([]ListUserPasskeysRow, error)
 	ListUserRoles(ctx context.Context, userID uuid.UUID) ([]ListUserRolesRow, error)
+	ListVariablesInScope(ctx context.Context, arg ListVariablesInScopeParams) ([]Variable, error)
 	ListenJobsQueued(ctx context.Context) error
 	ListenLogAppended(ctx context.Context) error
 	ListenSettingsChanged(ctx context.Context) error
@@ -299,6 +328,9 @@ type Querier interface {
 	LockRunnerLease(ctx context.Context, runnerID uuid.UUID) (uuid.UUID, error)
 	LockRunnerSlots(ctx context.Context, runnerID string) error
 	LockRunnerThrottle(ctx context.Context, key string) (LockRunnerThrottleRow, error)
+	LockSecretsEnvironment(ctx context.Context, arg LockSecretsEnvironmentParams) (uuid.UUID, error)
+	LockSecretsProject(ctx context.Context, arg LockSecretsProjectParams) (string, error)
+	LockSecretsScope(ctx context.Context, scopeKey string) error
 	LockSupersededDataKeys(ctx context.Context) ([]uuid.UUID, error)
 	LockTeam(ctx context.Context, arg LockTeamParams) (LockTeamRow, error)
 	LockTeamBinding(ctx context.Context, arg LockTeamBindingParams) (LockTeamBindingRow, error)
@@ -368,20 +400,27 @@ type Querier interface {
 	RemoveAllTeamMembers(ctx context.Context, arg RemoveAllTeamMembersParams) error
 	RemoveEnvironment(ctx context.Context, arg RemoveEnvironmentParams) (Environment, error)
 	RemoveEnvironmentReviewers(ctx context.Context, arg RemoveEnvironmentReviewersParams) error
+	RemoveEnvironmentSecrets(ctx context.Context, arg RemoveEnvironmentSecretsParams) ([]uuid.UUID, error)
+	RemoveEnvironmentVariables(ctx context.Context, arg RemoveEnvironmentVariablesParams) (int64, error)
 	RemoveMemberTeams(ctx context.Context, arg RemoveMemberTeamsParams) error
 	RemoveMembership(ctx context.Context, arg RemoveMembershipParams) (int64, error)
 	RemoveOidcProvider(ctx context.Context, arg RemoveOidcProviderParams) (int64, error)
 	RemovePasskey(ctx context.Context, arg RemovePasskeyParams) (int64, error)
+	RemoveRegistryCredential(ctx context.Context, arg RemoveRegistryCredentialParams) (RemoveRegistryCredentialRow, error)
+	RemoveSecret(ctx context.Context, arg RemoveSecretParams) (Secret, error)
 	RemoveTeamMember(ctx context.Context, arg RemoveTeamMemberParams) (int64, error)
 	RemoveUserIdentity(ctx context.Context, arg RemoveUserIdentityParams) (string, error)
+	RemoveVariable(ctx context.Context, arg RemoveVariableParams) (Variable, error)
 	RenamePasskey(ctx context.Context, arg RenamePasskeyParams) (RenamePasskeyRow, error)
 	ReopenRun(ctx context.Context, id uuid.UUID) error
 	ReplaceInstanceSettingSecrets(ctx context.Context, arg ReplaceInstanceSettingSecretsParams) (int64, error)
 	ReplaceKeyEncryptionKeyCheck(ctx context.Context, arg ReplaceKeyEncryptionKeyCheckParams) (int64, error)
 	ReplaceOidcProviderSecrets(ctx context.Context, arg ReplaceOidcProviderSecretsParams) (int64, error)
+	ReplaceRegistryPassword(ctx context.Context, arg ReplaceRegistryPasswordParams) (int64, error)
 	ReplaceRepositoryDeployKeys(ctx context.Context, arg ReplaceRepositoryDeployKeysParams) (int64, error)
 	ReplaceRepositoryPreviousDeployKeys(ctx context.Context, arg ReplaceRepositoryPreviousDeployKeysParams) (int64, error)
 	ReplaceRepositoryWebhookSecrets(ctx context.Context, arg ReplaceRepositoryWebhookSecretsParams) (int64, error)
+	ReplaceSecretValue(ctx context.Context, arg ReplaceSecretValueParams) (int64, error)
 	ReplaceTotpSecrets(ctx context.Context, arg ReplaceTotpSecretsParams) (int64, error)
 	RequestJobCancel(ctx context.Context, arg RequestJobCancelParams) (Job, error)
 	RequestRunCancel(ctx context.Context, arg RequestRunCancelParams) error
@@ -389,8 +428,11 @@ type Querier interface {
 	ResetRunJob(ctx context.Context, id uuid.UUID) error
 	ResetThrottle(ctx context.Context, arg ResetThrottleParams) error
 	ResolveApiToken(ctx context.Context, arg ResolveApiTokenParams) (ResolveApiTokenRow, error)
+	ResolveRegistryCredential(ctx context.Context, arg ResolveRegistryCredentialParams) (ResolveRegistryCredentialRow, error)
 	ResolveRunnerSession(ctx context.Context, tokenHash []byte) (ResolveRunnerSessionRow, error)
+	ResolveSecrets(ctx context.Context, arg ResolveSecretsParams) ([]ResolveSecretsRow, error)
 	ResolveSession(ctx context.Context, arg ResolveSessionParams) (ResolveSessionRow, error)
+	ResolveVariables(ctx context.Context, arg ResolveVariablesParams) ([]ResolveVariablesRow, error)
 	ResumeEnvironment(ctx context.Context, arg ResumeEnvironmentParams) (Environment, error)
 	RetentionClock(ctx context.Context) (time.Time, error)
 	RetireArtifact(ctx context.Context, arg RetireArtifactParams) error
@@ -426,9 +468,11 @@ type Querier interface {
 	RunnerSlots(ctx context.Context, runnerID uuid.UUID) (RunnerSlotsRow, error)
 	ScanInstanceSettingSecrets(ctx context.Context, arg ScanInstanceSettingSecretsParams) ([]ScanInstanceSettingSecretsRow, error)
 	ScanOidcProviderSecrets(ctx context.Context, arg ScanOidcProviderSecretsParams) ([]ScanOidcProviderSecretsRow, error)
+	ScanRegistryPasswords(ctx context.Context, arg ScanRegistryPasswordsParams) ([]ScanRegistryPasswordsRow, error)
 	ScanRepositoryDeployKeys(ctx context.Context, arg ScanRepositoryDeployKeysParams) ([]ScanRepositoryDeployKeysRow, error)
 	ScanRepositoryPreviousDeployKeys(ctx context.Context, arg ScanRepositoryPreviousDeployKeysParams) ([]ScanRepositoryPreviousDeployKeysRow, error)
 	ScanRepositoryWebhookSecrets(ctx context.Context, arg ScanRepositoryWebhookSecretsParams) ([]ScanRepositoryWebhookSecretsRow, error)
+	ScanSecretValues(ctx context.Context, arg ScanSecretValuesParams) ([]ScanSecretValuesRow, error)
 	ScanTotpSecrets(ctx context.Context, arg ScanTotpSecretsParams) ([]ScanTotpSecretsRow, error)
 	ScrubOrganizationLogs(ctx context.Context, arg ScrubOrganizationLogsParams) (int64, error)
 	SetInvitationEmailStatus(ctx context.Context, arg SetInvitationEmailStatusParams) error
@@ -449,6 +493,7 @@ type Querier interface {
 	StartAttempt(ctx context.Context, id uuid.UUID) (JobAttempt, error)
 	StartRun(ctx context.Context, id uuid.UUID) error
 	SupersedeDataKey(ctx context.Context, id uuid.UUID) (int64, error)
+	SupersedeSecretVersions(ctx context.Context, arg SupersedeSecretVersionsParams) error
 	TakeOidcFlow(ctx context.Context, arg TakeOidcFlowParams) (TakeOidcFlowRow, error)
 	TakeRateLimit(ctx context.Context, arg TakeRateLimitParams) (TakeRateLimitRow, error)
 	TakeWebauthnChallenge(ctx context.Context, arg TakeWebauthnChallengeParams) ([]byte, error)
@@ -459,6 +504,7 @@ type Querier interface {
 	TouchRepositoryDelivery(ctx context.Context, arg TouchRepositoryDeliveryParams) error
 	TouchRun(ctx context.Context, id uuid.UUID) error
 	TouchRunner(ctx context.Context, arg TouchRunnerParams) error
+	TouchSecretsUsed(ctx context.Context, arg TouchSecretsUsedParams) error
 	TouchServerInstance(ctx context.Context, id uuid.UUID) (int64, error)
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
 	TrustedShaOnRef(ctx context.Context, arg TrustedShaOnRefParams) (bool, error)
@@ -477,17 +523,22 @@ type Querier interface {
 	UpdateOidcProvider(ctx context.Context, arg UpdateOidcProviderParams) (int64, error)
 	UpdateOrganizationName(ctx context.Context, arg UpdateOrganizationNameParams) (UpdateOrganizationNameRow, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
+	UpdateRegistryCredential(ctx context.Context, arg UpdateRegistryCredentialParams) (UpdateRegistryCredentialRow, error)
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
 	UpdateRunner(ctx context.Context, arg UpdateRunnerParams) (Runner, error)
 	UpdateRunnerThrottle(ctx context.Context, arg UpdateRunnerThrottleParams) error
+	UpdateSecret(ctx context.Context, arg UpdateSecretParams) (Secret, error)
 	UpdateTeam(ctx context.Context, arg UpdateTeamParams) (UpdateTeamRow, error)
 	UpdateThrottle(ctx context.Context, arg UpdateThrottleParams) error
+	UpdateVariable(ctx context.Context, arg UpdateVariableParams) (Variable, error)
 	UpsertBlob(ctx context.Context, arg UpsertBlobParams) (Blob, error)
 	UpsertBlobOwner(ctx context.Context, arg UpsertBlobOwnerParams) error
 	UpsertCommitStatus(ctx context.Context, arg UpsertCommitStatusParams) (CommitStatusReport, error)
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (time.Time, error)
 	UseMfaChallenge(ctx context.Context, arg UseMfaChallengeParams) (int64, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)
+	VisibleSecretNames(ctx context.Context, arg VisibleSecretNamesParams) ([]VisibleSecretNamesRow, error)
+	VisibleVariableNames(ctx context.Context, arg VisibleVariableNamesParams) ([]VisibleVariableNamesRow, error)
 	WalkAuditChain(ctx context.Context, arg WalkAuditChainParams) ([]WalkAuditChainRow, error)
 	WebhookDeliverySeen(ctx context.Context, arg WebhookDeliverySeenParams) (bool, error)
 	WebhookPartitionReady(ctx context.Context) (bool, error)

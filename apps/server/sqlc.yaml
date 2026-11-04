@@ -13,6 +13,7 @@ sql:
       - internal/Modules/Jobs/Queries
       - internal/Modules/Projects/Queries
       - internal/Modules/Environments/Queries
+      - internal/Modules/Secrets/Queries
       - internal/Modules/Sources/Queries
       - internal/Modules/Pipelines/Queries
       - internal/Modules/Artifacts/Queries

@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+
+	secretstore "github.com/Khaymah/dhow/apps/server/internal/Core/SecretStore"
 )
 
 const (
@@ -52,4 +54,8 @@ func (ProviderDefinitions) Fetch(_ context.Context, r DefinitionRequest) (Fetche
 
 type ImageResolver interface {
 	Resolve(ctx context.Context, image string) (string, error)
+}
+
+type LoginImageResolver interface {
+	ResolveWith(ctx context.Context, image string, login *secretstore.RegistryLogin) (string, error)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	secretstore "github.com/Khaymah/dhow/apps/server/internal/Core/SecretStore"
 	"github.com/Khaymah/dhow/internal/jobspec"
 	"github.com/Khaymah/dhow/internal/netguard"
 )
@@ -26,6 +28,9 @@ const (
 	registryTokenBytes    = 64 << 10
 	dockerHubIndex        = "docker.io"
 	dockerHubRegistry     = "registry-1.docker.io"
+	dockerHubTokens       = "auth.docker.io" //nolint:gosec // A host name, not a credential.
+	schemeBasic           = "Basic"
+	schemeBearer          = "Bearer"
 	defaultTag            = "latest"
 )
 
@@ -75,7 +80,22 @@ func splitImage(image string) (imageRef, error) {
 	return imageRef{host: host, repo: repo, tag: tag, name: host + "/" + repo + ":" + tag}, nil
 }
 
+func RegistryHost(image string) (string, bool) {
+	ref, err := splitImage(image)
+	if err != nil {
+		return "", false
+	}
+	if ref.host == dockerHubIndex {
+		return dockerHubRegistry, true
+	}
+	return ref.host, true
+}
+
 func (r Registry) Resolve(ctx context.Context, image string) (string, error) {
+	return r.ResolveWith(ctx, image, nil)
+}
+
+func (r Registry) ResolveWith(ctx context.Context, image string, login *secretstore.RegistryLogin) (string, error) {
 	ref, err := splitImage(image)
 	if err != nil {
 		return "", err
@@ -98,6 +118,9 @@ func (r Registry) Resolve(ctx context.Context, image string) (string, error) {
 		client: dialer.HTTPClient(netguard.ClientOptions{TLS: r.TLS}), realms: public.HTTPClient(netguard.ClientOptions{TLS: r.TLS}),
 		registry: host,
 	}
+	if login != nil && login.Host == host {
+		s.login = login
+	}
 	target := url.URL{Scheme: "https", Host: host, Path: "/v2/" + ref.repo + "/manifests/" + ref.tag}
 	digest, err := s.manifestDigest(ctx, target.String())
 	if err != nil {
@@ -107,16 +130,16 @@ func (r Registry) Resolve(ctx context.Context, image string) (string, error) {
 }
 
 func (s session) manifestDigest(ctx context.Context, target string) (string, error) {
-	token := ""
+	authorization := ""
 	for range 2 {
-		res, err := request(ctx, s.client, http.MethodHead, target, token)
+		res, err := request(ctx, s.client, http.MethodHead, target, authorization)
 		if err != nil {
 			return "", err
 		}
 		_ = res.Body.Close()
 		switch {
-		case res.StatusCode == http.StatusUnauthorized && token == "":
-			if token, err = s.token(ctx, res.Header.Get("WWW-Authenticate")); err != nil {
+		case res.StatusCode == http.StatusUnauthorized && authorization == "":
+			if authorization, err = s.authorize(ctx, res.Header.Get("WWW-Authenticate")); err != nil {
 				return "", err
 			}
 			continue
@@ -128,13 +151,13 @@ func (s session) manifestDigest(ctx context.Context, target string) (string, err
 		if d := res.Header.Get("Docker-Content-Digest"); digestPattern.MatchString(d) {
 			return d, nil
 		}
-		return s.hashManifest(ctx, target, token)
+		return s.hashManifest(ctx, target, authorization)
 	}
 	return "", fmt.Errorf("%w: the registry refused the token", ErrRegistry)
 }
 
-func (s session) hashManifest(ctx context.Context, target, token string) (string, error) {
-	res, err := request(ctx, s.client, http.MethodGet, target, token)
+func (s session) hashManifest(ctx context.Context, target, authorization string) (string, error) {
+	res, err := request(ctx, s.client, http.MethodGet, target, authorization)
 	if err != nil {
 		return "", err
 	}
@@ -150,14 +173,14 @@ func (s session) hashManifest(ctx context.Context, target, token string) (string
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
 }
 
-func request(ctx context.Context, client *http.Client, method, target, token string) (*http.Response, error) {
+func request(ctx context.Context, client *http.Client, method, target, authorization string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, target, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Accept", strings.Join(manifestTypes(), ", "))
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
 	}
 	res, err := client.Do(req)
 	if err != nil {
@@ -170,6 +193,44 @@ type session struct {
 	client   *http.Client
 	realms   *http.Client
 	registry string
+	login    *secretstore.RegistryLogin
+}
+
+func (s session) basic() string {
+	raw := make([]byte, 0, len(s.login.Username)+1+len(s.login.Password))
+	raw = append(append(append(raw, s.login.Username...), ':'), s.login.Password...)
+	defer clear(raw)
+	return schemeBasic + " " + base64.StdEncoding.EncodeToString(raw)
+}
+
+func (s session) authorize(ctx context.Context, challenge string) (string, error) {
+	scheme, _, _ := strings.Cut(challenge, " ")
+	switch {
+	case strings.EqualFold(scheme, schemeBearer):
+		token, err := s.token(ctx, challenge)
+		if err != nil {
+			return "", err
+		}
+		return schemeBearer + " " + token, nil
+	case strings.EqualFold(scheme, schemeBasic) && s.login != nil:
+		return s.basic(), nil
+	default:
+		return "", fmt.Errorf("%w: the registry needs credentials", ErrRegistry)
+	}
+}
+
+func (s session) loginRealm(realm *url.URL) bool {
+	if s.login == nil || realm.Scheme != "https" || realm.User != nil {
+		return false
+	}
+	registryHost, registryPort := splitHostPort(s.registry)
+	if realm.Hostname() == registryHost {
+		if registryPort != "" {
+			return realm.Port() == registryPort
+		}
+		return realm.Port() == "" || realm.Port() == "443"
+	}
+	return s.registry == dockerHubRegistry && realm.Hostname() == dockerHubTokens && (realm.Port() == "" || realm.Port() == "443")
 }
 
 func realmHosts() []string { return []string{"auth.docker.io", "ghcr.io"} }
@@ -194,10 +255,7 @@ func splitHostPort(hostport string) (string, string) {
 }
 
 func (s session) token(ctx context.Context, challenge string) (string, error) {
-	scheme, params, _ := strings.Cut(challenge, " ")
-	if !strings.EqualFold(scheme, "Bearer") {
-		return "", fmt.Errorf("%w: the registry needs credentials", ErrRegistry)
-	}
+	_, params, _ := strings.Cut(challenge, " ")
 	fields := map[string]string{}
 	for _, m := range challengeKV.FindAllStringSubmatch(params, 8) {
 		fields[m[1]] = m[2]
@@ -216,6 +274,9 @@ func (s session) token(ctx context.Context, challenge string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, realm.String(), http.NoBody)
 	if err != nil {
 		return "", err
+	}
+	if s.loginRealm(realm) {
+		req.Header.Set("Authorization", s.basic())
 	}
 	res, err := s.realms.Do(req)
 	if err != nil {

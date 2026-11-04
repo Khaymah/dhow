@@ -14,6 +14,7 @@ import (
 	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
+	secretsmodule "github.com/Khaymah/dhow/apps/server/internal/Modules/Secrets"
 	sources "github.com/Khaymah/dhow/apps/server/internal/Modules/Sources"
 	"github.com/Khaymah/dhow/internal/buildinfo"
 	"github.com/Khaymah/dhow/internal/jobspec"
@@ -107,21 +108,32 @@ func (c *checkoutSecrets) checkoutCredential(ctx context.Context, req jobs.Secre
 	return cred.Secret, nil
 }
 
+type runServices struct {
+	pipelines *pipelines.Service
+	sources   *sources.Service
+	artifacts *artifacts.Service
+	secrets   *secretsmodule.Service
+}
+
 func runsFor(
 	in Infra, values *keys.Values, bus *eventbus.Bus, limiter ratelimit.Limiter, jobsService *jobs.Service, secrets *checkoutSecrets,
-) (*pipelines.Service, *sources.Service, *artifacts.Service, error) {
+) (runServices, error) {
 	pipelinesService := pipelinesFor(in, bus, jobsService.Queue(), limiter)
 	jobsService.UseRunEvents(pipelinesService)
 	sourcesService, err := sourcesFor(in, values, bus, limiter, pipelinesService)
 	if err != nil {
-		return nil, nil, nil, err
+		return runServices{}, err
 	}
 	artifactsService, err := artifactsFor(in)
 	if err != nil {
-		return nil, nil, nil, err
+		return runServices{}, err
+	}
+	secretsService, err := secretsFor(in, values, bus, pipelinesService)
+	if err != nil {
+		return runServices{}, err
 	}
 	pipelinesService.UseStatuses(sourcesService.StatusRecorder())
 	pipelinesService.UseArtifacts(artifactsService)
 	secrets.pipelines, secrets.sources = pipelinesService, sourcesService
-	return pipelinesService, sourcesService, artifactsService, nil
+	return runServices{pipelines: pipelinesService, sources: sourcesService, artifacts: artifactsService, secrets: secretsService}, nil
 }

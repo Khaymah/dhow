@@ -1632,6 +1632,554 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the secrets of the organization
+         * @description Needs `secret.read`. Names and metadata only: no value, hash or fingerprint is ever returned. `Overrides` lists the wider scopes whose secret of the same name this one covers.
+         */
+        get: operations["listOrganizationSecrets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/secrets/{secretName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create a secret of the organization, or write a new version
+         * @description Needs `org.secret.manage`. Creates the secret or a new version of it. The value is UTF-8 without NUL, 8 bytes (`SECRET_TOO_SHORT`) to 32 KiB (`SECRET_TOO_LARGE`), and is never returned. Names are unique in the scope whatever their case, and names that start with `DHOW_` answer `SECRET_NAME_RESERVED`. The value of a version older than the last five, or replaced more than 30 days ago, is erased. `Visibility` and `ProjectIds` choose the projects that may use it. `AvailableToPullRequests` lets runs of pull requests from the same repository use it.
+         */
+        put: operations["putOrganizationSecret"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/secrets/{secretName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a secret of the organization
+         * @description Needs `org.secret.manage`. Marks the secret deleted and erases the values of all its versions in the same transaction. The name can be used again.
+         */
+        post: operations["removeOrganizationSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/secrets/{secretName}/restore-version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an earlier version of a secret of the organization
+         * @description Needs `org.secret.manage`. Writes the value of an earlier version as a new version. A version whose value was erased answers 409 `SECRET_VERSION_ERASED`.
+         */
+        post: operations["restoreOrganizationSecretVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/variables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the variables of the organization
+         * @description Needs `project.read`. Variables are not secret: anyone who can read the project reads their values.
+         */
+        get: operations["listOrganizationVariables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/variables/{variableName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or change a variable of the organization
+         * @description Needs `org.secret.manage`. The value is UTF-8 text up to 4 KiB. Same name rules as secrets.
+         */
+        put: operations["putOrganizationVariable"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/variables/{variableName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a variable of the organization
+         * @description Needs `org.secret.manage`. The name can be used again.
+         */
+        post: operations["removeOrganizationVariable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/registry-credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the registry credentials of the organization
+         * @description Needs `secret.read`. Host and username only: the password is never returned.
+         */
+        get: operations["listOrganizationRegistryCredentials"];
+        put?: never;
+        /**
+         * Add a registry credential to the organization
+         * @description Needs `org.secret.manage`. One per host in the scope (409 `REGISTRY_CREDENTIAL_EXISTS`). The host is a DNS name with an optional port, never an IP address. The server sends it only to that host, and to a token realm on the same host over https.
+         */
+        post: operations["createOrganizationRegistryCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/registry-credentials/{credentialId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a registry credential of the organization
+         * @description Needs `org.secret.manage`. Changes the username and the password. The host never changes.
+         */
+        put: operations["updateOrganizationRegistryCredential"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/registry-credentials/{credentialId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a registry credential of the organization
+         * @description Needs `org.secret.manage`. The password is erased in the same transaction.
+         */
+        post: operations["removeOrganizationRegistryCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the secrets of a project
+         * @description Needs `secret.read`. Names and metadata only: no value, hash or fingerprint is ever returned. `Overrides` lists the wider scopes whose secret of the same name this one covers.
+         */
+        get: operations["listProjectSecrets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/secrets/{secretName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create a secret of a project, or write a new version
+         * @description Needs `secret.manage`. Creates the secret or a new version of it. The value is UTF-8 without NUL, 8 bytes (`SECRET_TOO_SHORT`) to 32 KiB (`SECRET_TOO_LARGE`), and is never returned. Names are unique in the scope whatever their case, and names that start with `DHOW_` answer `SECRET_NAME_RESERVED`. The value of a version older than the last five, or replaced more than 30 days ago, is erased. `AvailableToPullRequests` lets runs of pull requests from the same repository use it.
+         */
+        put: operations["putProjectSecret"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/secrets/{secretName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a secret of a project
+         * @description Needs `secret.manage`. Marks the secret deleted and erases the values of all its versions in the same transaction. The name can be used again.
+         */
+        post: operations["removeProjectSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/secrets/{secretName}/restore-version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an earlier version of a secret of a project
+         * @description Needs `secret.manage`. Writes the value of an earlier version as a new version. A version whose value was erased answers 409 `SECRET_VERSION_ERASED`.
+         */
+        post: operations["restoreProjectSecretVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/variables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the variables of a project
+         * @description Needs `project.read`. Variables are not secret: anyone who can read the project reads their values.
+         */
+        get: operations["listProjectVariables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/variables/{variableName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or change a variable of a project
+         * @description Needs `secret.manage`. The value is UTF-8 text up to 4 KiB. Same name rules as secrets.
+         */
+        put: operations["putProjectVariable"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/variables/{variableName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a variable of a project
+         * @description Needs `secret.manage`. The name can be used again.
+         */
+        post: operations["removeProjectVariable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/registry-credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the registry credentials of a project
+         * @description Needs `secret.read`. Host and username only: the password is never returned.
+         */
+        get: operations["listProjectRegistryCredentials"];
+        put?: never;
+        /**
+         * Add a registry credential to a project
+         * @description Needs `secret.manage`. One per host in the scope (409 `REGISTRY_CREDENTIAL_EXISTS`). The host is a DNS name with an optional port, never an IP address. The server sends it only to that host, and to a token realm on the same host over https.
+         */
+        post: operations["createProjectRegistryCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/registry-credentials/{credentialId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a registry credential of a project
+         * @description Needs `secret.manage`. Changes the username and the password. The host never changes.
+         */
+        put: operations["updateProjectRegistryCredential"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/registry-credentials/{credentialId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a registry credential of a project
+         * @description Needs `secret.manage`. The password is erased in the same transaction.
+         */
+        post: operations["removeProjectRegistryCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the secrets of an environment
+         * @description Needs `secret.read`. Names and metadata only: no value, hash or fingerprint is ever returned. `Overrides` lists the wider scopes whose secret of the same name this one covers.
+         */
+        get: operations["listEnvironmentSecrets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets/{secretName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create a secret of an environment, or write a new version
+         * @description Needs `environment.manage`. Creates the secret or a new version of it. The value is UTF-8 without NUL, 8 bytes (`SECRET_TOO_SHORT`) to 32 KiB (`SECRET_TOO_LARGE`), and is never returned. Names are unique in the scope whatever their case, and names that start with `DHOW_` answer `SECRET_NAME_RESERVED`. The value of a version older than the last five, or replaced more than 30 days ago, is erased. Only jobs that name this environment receive it, once the environment lets them deploy.
+         */
+        put: operations["putEnvironmentSecret"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets/{secretName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a secret of an environment
+         * @description Needs `environment.manage`. Marks the secret deleted and erases the values of all its versions in the same transaction. The name can be used again.
+         */
+        post: operations["removeEnvironmentSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets/{secretName}/restore-version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an earlier version of a secret of an environment
+         * @description Needs `environment.manage`. Writes the value of an earlier version as a new version. A version whose value was erased answers 409 `SECRET_VERSION_ERASED`.
+         */
+        post: operations["restoreEnvironmentSecretVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/variables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the variables of an environment
+         * @description Needs `project.read`. Variables are not secret: anyone who can read the project reads their values.
+         */
+        get: operations["listEnvironmentVariables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/variables/{variableName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or change a variable of an environment
+         * @description Needs `environment.manage`. The value is UTF-8 text up to 4 KiB. Same name rules as secrets.
+         */
+        put: operations["putEnvironmentVariable"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/variables/{variableName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a variable of an environment
+         * @description Needs `environment.manage`. The name can be used again.
+         */
+        post: operations["removeEnvironmentVariable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/projects/{projectId}/repository": {
         parameters: {
             query?: never;
@@ -3185,7 +3733,7 @@ export interface components {
             Data?: components["schemas"]["LinkedIdentityChange"];
         };
         /** @enum {string} */
-        ApiTokenScope: "org.read" | "org.update" | "member.read" | "member.manage" | "audit.read" | "runner.read" | "runner.manage" | "job.read" | "job.cancel" | "project.read" | "project.manage" | "run.read" | "run.trigger" | "run.cancel";
+        ApiTokenScope: "org.read" | "org.update" | "member.read" | "member.manage" | "audit.read" | "runner.read" | "runner.manage" | "job.read" | "job.cancel" | "project.read" | "project.manage" | "run.read" | "run.trigger" | "run.cancel" | "secret.read";
         /**
          * @description `inactive` means the creator is no longer a member of the organization, so the token does nothing until it expires or is revoked.
          * @enum {string}
@@ -3922,6 +4470,103 @@ export interface components {
         OrganizationOverviewResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["OrganizationOverview"];
         };
+        /** @enum {string} */
+        SecretScope: "organization" | "project" | "environment";
+        /**
+         * @description Organization secrets only. `selected_projects` limits it to `ProjectIds`.
+         * @enum {string}
+         */
+        SecretVisibility: "all_projects" | "selected_projects";
+        /** @description A secret without its value. No response carries a value, a hash or a fingerprint. */
+        Secret: {
+            Name: string;
+            Scope: components["schemas"]["SecretScope"];
+            Description: string;
+            Version: number;
+            SizeBytes: number;
+            AvailableToPullRequests: boolean;
+            Visibility: components["schemas"]["SecretVisibility"];
+            ProjectIds: string[];
+            /** @description The wider scopes whose secret of the same name this one covers. */
+            Overrides: components["schemas"]["SecretScope"][];
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            UpdatedAt: string;
+            /** Format: uuid */
+            UpdatedByUserId: string;
+            /** Format: date-time */
+            LastUsedAt?: string;
+        };
+        SecretResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Secret"];
+        };
+        SecretListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Secret"][];
+        };
+        PutSecretRequest: {
+            /** @description UTF-8 without NUL, 8 bytes to 32 KiB. Never returned. */
+            Value: string;
+            Description?: string;
+            /** @description Organization and project secrets. Environments decide this in their rules. */
+            AvailableToPullRequests?: boolean;
+            Visibility?: components["schemas"]["SecretVisibility"];
+            ProjectIds?: string[];
+        };
+        RestoreSecretVersionRequest: {
+            Version: number;
+        };
+        Variable: {
+            Name: string;
+            Scope: components["schemas"]["SecretScope"];
+            Value: string;
+            Overrides: components["schemas"]["SecretScope"][];
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            UpdatedAt: string;
+            /** Format: uuid */
+            UpdatedByUserId: string;
+        };
+        VariableResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Variable"];
+        };
+        VariableListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Variable"][];
+        };
+        PutVariableRequest: {
+            /** @description UTF-8 text up to 4 KiB. */
+            Value: string;
+        };
+        /** @description A registry credential without its password. */
+        RegistryCredential: {
+            /** Format: uuid */
+            Id: string;
+            Scope: components["schemas"]["SecretScope"];
+            Host: string;
+            Username: string;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            UpdatedAt: string;
+            /** Format: uuid */
+            UpdatedByUserId: string;
+        };
+        RegistryCredentialResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["RegistryCredential"];
+        };
+        RegistryCredentialListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["RegistryCredential"][];
+        };
+        CreateRegistryCredentialRequest: {
+            Host: string;
+            Username: string;
+            Password: string;
+        };
+        UpdateRegistryCredentialRequest: {
+            Username: string;
+            Password: string;
+        };
     };
     responses: {
         /** @description An error. Never contains internal details. */
@@ -3967,6 +4612,9 @@ export interface components {
         ProjectId: string;
         RunId: string;
         ArtifactId: string;
+        SecretName: string;
+        VariableName: string;
+        RegistryCredentialId: string;
         EnvironmentName: string;
         Page: number;
         Limit: number;
@@ -6444,6 +7092,793 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvironmentResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listOrganizationSecrets: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of secrets. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putOrganizationSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                secretName: components["parameters"]["SecretName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutSecretRequest"];
+            };
+        };
+        responses: {
+            /** @description The secret, without its value. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeOrganizationSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                secretName: components["parameters"]["SecretName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The removed secret, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    restoreOrganizationSecretVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                secretName: components["parameters"]["SecretName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreSecretVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description The secret with its new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listOrganizationVariables: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of variables. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putOrganizationVariable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                variableName: components["parameters"]["VariableName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutVariableRequest"];
+            };
+        };
+        responses: {
+            /** @description The variable. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeOrganizationVariable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                variableName: components["parameters"]["VariableName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The removed variable, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listOrganizationRegistryCredentials: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of registry credentials. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCredentialListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createOrganizationRegistryCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRegistryCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description The new registry credential, without its password. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCredentialResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateOrganizationRegistryCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                credentialId: components["parameters"]["RegistryCredentialId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRegistryCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description The registry credential, without its password. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCredentialResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeOrganizationRegistryCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                credentialId: components["parameters"]["RegistryCredentialId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The removed registry credential, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCredentialResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listProjectSecrets: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of secrets. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putProjectSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                secretName: components["parameters"]["SecretName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutSecretRequest"];
+            };
+        };
+        responses: {
+            /** @description The secret, without its value. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeProjectSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                secretName: components["parameters"]["SecretName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The removed secret, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    restoreProjectSecretVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                secretName: components["parameters"]["SecretName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreSecretVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description The secret with its new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listProjectVariables: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of variables. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putProjectVariable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                variableName: components["parameters"]["VariableName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutVariableRequest"];
+            };
+        };
+        responses: {
+            /** @description The variable. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeProjectVariable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                variableName: components["parameters"]["VariableName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The removed variable, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listProjectRegistryCredentials: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of registry credentials. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCredentialListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createProjectRegistryCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRegistryCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description The new registry credential, without its password. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCredentialResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateProjectRegistryCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                credentialId: components["parameters"]["RegistryCredentialId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRegistryCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description The registry credential, without its password. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCredentialResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeProjectRegistryCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                credentialId: components["parameters"]["RegistryCredentialId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The removed registry credential, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCredentialResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listEnvironmentSecrets: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of secrets. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putEnvironmentSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                secretName: components["parameters"]["SecretName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutSecretRequest"];
+            };
+        };
+        responses: {
+            /** @description The secret, without its value. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeEnvironmentSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                secretName: components["parameters"]["SecretName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The removed secret, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    restoreEnvironmentSecretVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                secretName: components["parameters"]["SecretName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreSecretVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description The secret with its new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listEnvironmentVariables: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of variables. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putEnvironmentVariable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                variableName: components["parameters"]["VariableName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutVariableRequest"];
+            };
+        };
+        responses: {
+            /** @description The variable. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeEnvironmentVariable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                variableName: components["parameters"]["VariableName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The removed variable, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableResponse"];
                 };
             };
             default: components["responses"]["Error"];

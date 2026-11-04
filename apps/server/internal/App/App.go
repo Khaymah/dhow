@@ -27,6 +27,7 @@ import (
 	preferences "github.com/Khaymah/dhow/apps/server/internal/Modules/Preferences"
 	projects "github.com/Khaymah/dhow/apps/server/internal/Modules/Projects"
 	runners "github.com/Khaymah/dhow/apps/server/internal/Modules/Runners"
+	secrets "github.com/Khaymah/dhow/apps/server/internal/Modules/Secrets"
 	session "github.com/Khaymah/dhow/apps/server/internal/Modules/Session"
 	settings "github.com/Khaymah/dhow/apps/server/internal/Modules/Settings"
 	sources "github.com/Khaymah/dhow/apps/server/internal/Modules/Sources"
@@ -45,6 +46,7 @@ type Options struct {
 	Jobs      *jobs.Service
 	Projects  *projects.Service
 	Envs      *environments.Service
+	Secrets   *secrets.Service
 	Sources   *sources.Service
 	Pipelines *pipelines.Service
 	Artifacts *artifacts.Service
@@ -72,6 +74,7 @@ func Policies() []policy.Rule {
 	rules = append(rules, jobs.Policies()...)
 	rules = append(rules, projects.Policies()...)
 	rules = append(rules, environments.Policies()...)
+	rules = append(rules, secrets.Policies()...)
 	rules = append(rules, sources.Policies()...)
 	rules = append(rules, pipelines.Policies()...)
 	rules = append(rules, artifacts.Policies()...)
@@ -177,6 +180,9 @@ func publicRouter(o Options) chi.Router {
 			}
 			if o.Envs != nil {
 				environments.Routes(timed, environments.Deps{Service: o.Envs, Guard: guard, Log: o.Log})
+			}
+			if o.Secrets != nil {
+				secrets.Routes(timed, secrets.Deps{Service: o.Secrets, Guard: guard, Log: o.Log})
 			}
 			if o.Sources != nil {
 				sources.Routes(timed, sources.Deps{Service: o.Sources, Guard: guard, Log: o.Log})
