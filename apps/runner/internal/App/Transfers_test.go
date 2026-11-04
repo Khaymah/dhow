@@ -271,3 +271,60 @@ func TestAMalformedDigestFromTheServerIsNeverUsed(t *testing.T) {
 	}
 	assert.Zero(t, srv.Calls("GET /blobs/"), "nothing is downloaded either")
 }
+
+const leakedSecret = "a-secret-value-that-must-not-leave"
+
+func withSecret(spec *runnerv1.JobSpec) *runnerv1.JobSpec {
+	spec.Secrets = []*runnerv1.SecretRef{{Name: "TOKEN", Target: &runnerv1.SecretRef_AsEnv{AsEnv: "TOKEN"}, StepIndexes: []int32{0}}}
+	return spec
+}
+
+func TestAnArtifactHoldingASecretFailsTheJobAndIsNotUploaded(t *testing.T) {
+	for name, content := range map[string]string{
+		"raw":    "token=" + leakedSecret + "\n",
+		"base64": "dG9rZW49" + "YS1zZWNyZXQtdmFsdWUtdGhhdC1tdXN0LW5vdC1sZWF2ZQ==",
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv := runnertest.NewServer(t)
+			r := checkoutRunner(t, srv)
+			spec := withSecret(transferSpec())
+			spec.Artifacts = []*runnerv1.ArtifactUpload{{Name: "web", Paths: []string{"dist"}, MaxBytes: 1 << 20}}
+			srv.Enqueue(spec, map[string][]byte{"TOKEN": []byte(leakedSecret)})
+			running := r.Start(fake.Recording{
+				Steps: []fake.Step{{Writes: map[string]string{"dist/config.txt": content}}},
+			}, runnertest.StartOptions{Workspace: t.TempDir()})
+			out := running.Next(t, finishWithin)
+			require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_FAILED, out.Result)
+			assert.Equal(t, runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_CONTAINS_SECRET, out.Reason)
+			assert.Empty(t, srv.Artifacts(), "nothing was uploaded")
+		})
+	}
+}
+
+func TestACacheHoldingASecretIsNotSaved(t *testing.T) {
+	srv := runnertest.NewServer(t)
+	r := checkoutRunner(t, srv)
+	srv.Enqueue(withSecret(cacheSpec(false)), map[string][]byte{"TOKEN": []byte(leakedSecret)})
+	rec := fake.Recording{
+		Workspace: map[string]string{"package-lock.json": `{"lockfileVersion":3}`},
+		Steps:     []fake.Step{{Writes: map[string]string{".npm/.npmrc": "//registry/:_authToken=" + leakedSecret}}},
+	}
+	running := r.Start(rec, runnertest.StartOptions{Workspace: t.TempDir()})
+	out := running.Next(t, finishWithin)
+	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, out.Result, "a cache is optional, so the job still succeeds")
+	assert.Empty(t, srv.SavedCacheKeys())
+}
+
+func TestAnArtifactWithoutSecretsIsUploadedWhenTheJobHasSecrets(t *testing.T) {
+	srv := runnertest.NewServer(t)
+	r := checkoutRunner(t, srv)
+	spec := withSecret(transferSpec())
+	spec.Artifacts = []*runnerv1.ArtifactUpload{{Name: "web", Paths: []string{"dist"}, MaxBytes: 1 << 20}}
+	srv.Enqueue(spec, map[string][]byte{"TOKEN": []byte(leakedSecret)})
+	running := r.Start(fake.Recording{
+		Steps: []fake.Step{{Writes: map[string]string{"dist/app.js": "console.log(1)\n"}}},
+	}, runnertest.StartOptions{Workspace: t.TempDir()})
+	out := running.Next(t, finishWithin)
+	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, out.Result, out.Reason.String())
+	assert.Len(t, srv.Artifacts(), 1)
+}

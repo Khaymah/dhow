@@ -193,6 +193,7 @@ export const RunsAr = {
   'runs.reason.ARTIFACT_UPLOAD_FAILED': 'لم نتمكن من رفع ملف ناتج: ربما المسار غير موجود.',
   'runs.reason.ARTIFACT_UNSAFE': 'ملف ناتج فيه مسار يخرج من مجلد العمل، فرفضناه.',
   'runs.reason.ARTIFACT_TOO_LARGE': 'ملف ناتج أكبر من الحد المسموح.',
+  'runs.reason.ARTIFACT_CONTAINS_SECRET': 'ملف ناتج يحتوي على قيمة سر، فلم نرفعه. افتح سجل التشغيل لترى اسم الملف.',
   'runs.reason.ARTIFACT_QUOTA_EXCEEDED': 'المؤسسة وصلت إلى حد مساحة الملفات الناتجة.',
   'runs.reason.ARTIFACT_NAME_TAKEN': 'اسم الملف الناتج مستخدم في هذا التنفيذ.',
   'runs.reason.ARTIFACT_UNTRUSTED': 'ملف ناتج من نسخة منفصلة لا يُستخدم في النشر.',

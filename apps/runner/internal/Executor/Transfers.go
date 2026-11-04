@@ -399,6 +399,15 @@ func (a *attempt) saveArtifact(ctx, jobCtx context.Context, api transferAPI, art
 		return failed(reason, code), false
 	}
 	defer func() { _ = os.Remove(p.path) }()
+	if file, hit, err := a.secretIn(p.path); err != nil || hit {
+		if err != nil {
+			a.pipe.Systemf(nil, "dhow: ARTIFACT_UPLOAD_FAILED: the artifact %s could not be checked for secrets", art.GetName())
+			return failed(runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_UPLOAD_FAILED, 0), false
+		}
+		a.pipe.Systemf(nil, "dhow: ARTIFACT_CONTAINS_SECRET: the artifact %s holds the value of a secret in %s, so it is not uploaded",
+			art.GetName(), a.masker.MaskString(file))
+		return failed(runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_CONTAINS_SECRET, 0), false
+	}
 	if err := a.upload(ctx, api, client.BlobKindArtifact, art.GetName(), p); err != nil {
 		reason := runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_UPLOAD_FAILED
 		if client.Code(err) == connect.CodeOutOfRange {
@@ -441,6 +450,10 @@ func (a *attempt) saveCache(ctx, jobCtx context.Context, api transferAPI) (resul
 		return result{}, true
 	}
 	defer func() { _ = os.Remove(p.path) }()
+	if _, hit, err := a.secretIn(p.path); err != nil || hit {
+		a.pipe.Systemf(nil, "dhow: warning: the cache holds the value of a secret, or could not be checked, so it is not saved")
+		return result{}, true
+	}
 	err := a.upload(ctx, api, client.BlobKindCache, "", p)
 	var stored bool
 	if err == nil {

@@ -249,7 +249,7 @@ func TestTheRunnerEnvironmentNeverReachesAJob(t *testing.T) {
 	running := r.Start(fake.Recording{}, runnertest.StartOptions{})
 	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, running.Next(t, finishWithin).Result)
 	exec := runnertest.WaitEvent(t, running.Driver, fake.EventExec, finishWithin)
-	assert.ElementsMatch(t, []string{"JOB_VALUE", "STEP_VALUE", "DHOW_FENCING_TOKEN", "DHOW_JOB_ID", "DHOW_ATTEMPT_ID", "DHOW_STEP_INDEX", "DHOW_OUTPUT"},
+	assert.ElementsMatch(t, []string{"JOB_VALUE", "STEP_VALUE", "DHOW_FENCING_TOKEN", "DHOW_JOB_ID", "DHOW_ATTEMPT_ID", "DHOW_STEP_INDEX", "DHOW_OUTPUT", "DHOW_SECRETS_DIR"},
 		exec.EnvNames, "a step sees the job's env and the DHOW_ attempt values, never the runner's own environment")
 	for name := range exec.Env {
 		assert.False(t, strings.HasPrefix(name, "DHOW_RUNNER_"), name)

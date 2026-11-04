@@ -195,6 +195,7 @@ export const RunsEn: Record<keyof typeof RunsAr, string> = {
   'runs.reason.ARTIFACT_UPLOAD_FAILED': 'An artifact could not be uploaded: its path may not exist.',
   'runs.reason.ARTIFACT_UNSAFE': 'An artifact had a path that leaves the job folder, so it was refused.',
   'runs.reason.ARTIFACT_TOO_LARGE': 'An artifact is larger than the limit.',
+  'runs.reason.ARTIFACT_CONTAINS_SECRET': 'An artifact holds the value of a secret, so it was not uploaded. Open the job log to see the file.',
   'runs.reason.ARTIFACT_QUOTA_EXCEEDED': 'The organization reached its artifact storage limit.',
   'runs.reason.ARTIFACT_NAME_TAKEN': 'The artifact name is already used in this run.',
   'runs.reason.ARTIFACT_UNTRUSTED': 'An artifact from a fork cannot feed a deploy.',

@@ -237,6 +237,7 @@ func (a *attempt) openSecrets(sealed *runnerv1.SealedSecrets) error {
 		}
 		batch = append(batch, v)
 	}
+	a.scan.AddAll(batch)
 	for i, added := range a.masker.AddAll(batch) {
 		if !added {
 			a.pipe.Systemf(nil, "dhow: warning: the secret %s is shorter than %d characters, so the log does not hide it",

@@ -59,6 +59,7 @@ type attempt struct {
 	log        *slog.Logger
 	dir        string
 	masker     *masking.Masker
+	scan       *masking.Masker
 	pipe       *logs.Pipeline
 	fence      *fence
 	shutdown   <-chan struct{}
@@ -81,7 +82,7 @@ func newAttempt(e *Executor, g *runnerv1.LeaseGrant, grantBytes []byte, leasedAt
 		e: e, grant: g, grantBytes: grantBytes, leasedAt: leasedAt,
 		ref: &runnerv1.LeaseRef{LeaseId: g.GetLeaseId(), FencingToken: g.GetFencingToken()},
 		log: e.o.Log.With("lease_id", g.GetLeaseId(), "attempt_id", g.GetAttemptId(), "job_id", g.GetJobId()),
-		dir: filepath.Join(e.o.Config.AttemptsDir(), g.GetAttemptId()), masker: masking.New(),
+		dir: filepath.Join(e.o.Config.AttemptsDir(), g.GetAttemptId()), masker: masking.New(), scan: masking.New(),
 	}
 }
 
