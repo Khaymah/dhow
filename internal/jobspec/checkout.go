@@ -46,6 +46,9 @@ func Features(spec *runnerv1.JobSpec) []string {
 	if len(spec.GetRegistryAuth()) > 0 {
 		out = append(out, FeatureRegistryAuth)
 	}
+	if len(spec.GetTargets()) > 0 {
+		out = append(out, FeatureDeployTargets)
+	}
 	return out
 }
 

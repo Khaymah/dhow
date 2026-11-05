@@ -246,12 +246,13 @@ func (FailureReason) EnumDescriptor() ([]byte, []int) {
 type RunnerFeature int32
 
 const (
-	RunnerFeature_RUNNER_FEATURE_UNSPECIFIED   RunnerFeature = 0
-	RunnerFeature_RUNNER_FEATURE_CHECKOUT      RunnerFeature = 1
-	RunnerFeature_RUNNER_FEATURE_PLUGINS       RunnerFeature = 2
-	RunnerFeature_RUNNER_FEATURE_ARTIFACTS     RunnerFeature = 3
-	RunnerFeature_RUNNER_FEATURE_CACHE         RunnerFeature = 4
-	RunnerFeature_RUNNER_FEATURE_REGISTRY_AUTH RunnerFeature = 5
+	RunnerFeature_RUNNER_FEATURE_UNSPECIFIED    RunnerFeature = 0
+	RunnerFeature_RUNNER_FEATURE_CHECKOUT       RunnerFeature = 1
+	RunnerFeature_RUNNER_FEATURE_PLUGINS        RunnerFeature = 2
+	RunnerFeature_RUNNER_FEATURE_ARTIFACTS      RunnerFeature = 3
+	RunnerFeature_RUNNER_FEATURE_CACHE          RunnerFeature = 4
+	RunnerFeature_RUNNER_FEATURE_REGISTRY_AUTH  RunnerFeature = 5
+	RunnerFeature_RUNNER_FEATURE_DEPLOY_TARGETS RunnerFeature = 6
 )
 
 // Enum value maps for RunnerFeature.
@@ -263,14 +264,16 @@ var (
 		3: "RUNNER_FEATURE_ARTIFACTS",
 		4: "RUNNER_FEATURE_CACHE",
 		5: "RUNNER_FEATURE_REGISTRY_AUTH",
+		6: "RUNNER_FEATURE_DEPLOY_TARGETS",
 	}
 	RunnerFeature_value = map[string]int32{
-		"RUNNER_FEATURE_UNSPECIFIED":   0,
-		"RUNNER_FEATURE_CHECKOUT":      1,
-		"RUNNER_FEATURE_PLUGINS":       2,
-		"RUNNER_FEATURE_ARTIFACTS":     3,
-		"RUNNER_FEATURE_CACHE":         4,
-		"RUNNER_FEATURE_REGISTRY_AUTH": 5,
+		"RUNNER_FEATURE_UNSPECIFIED":    0,
+		"RUNNER_FEATURE_CHECKOUT":       1,
+		"RUNNER_FEATURE_PLUGINS":        2,
+		"RUNNER_FEATURE_ARTIFACTS":      3,
+		"RUNNER_FEATURE_CACHE":          4,
+		"RUNNER_FEATURE_REGISTRY_AUTH":  5,
+		"RUNNER_FEATURE_DEPLOY_TARGETS": 6,
 	}
 )
 
@@ -499,14 +502,15 @@ const file_dhow_runner_v1_common_proto_rawDesc = "" +
 	"\x1eFAILURE_REASON_ARTIFACT_UNSAFE\x10\x15\x12)\n" +
 	"%FAILURE_REASON_ARTIFACT_UPLOAD_FAILED\x10\x16\x12%\n" +
 	"!FAILURE_REASON_ARTIFACT_TOO_LARGE\x10\x17\x12+\n" +
-	"'FAILURE_REASON_ARTIFACT_CONTAINS_SECRET\x10\x18*\xc2\x01\n" +
+	"'FAILURE_REASON_ARTIFACT_CONTAINS_SECRET\x10\x18*\xe5\x01\n" +
 	"\rRunnerFeature\x12\x1e\n" +
 	"\x1aRUNNER_FEATURE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17RUNNER_FEATURE_CHECKOUT\x10\x01\x12\x1a\n" +
 	"\x16RUNNER_FEATURE_PLUGINS\x10\x02\x12\x1c\n" +
 	"\x18RUNNER_FEATURE_ARTIFACTS\x10\x03\x12\x18\n" +
 	"\x14RUNNER_FEATURE_CACHE\x10\x04\x12 \n" +
-	"\x1cRUNNER_FEATURE_REGISTRY_AUTH\x10\x05B\xc2\x01\n" +
+	"\x1cRUNNER_FEATURE_REGISTRY_AUTH\x10\x05\x12!\n" +
+	"\x1dRUNNER_FEATURE_DEPLOY_TARGETS\x10\x06B\xc2\x01\n" +
 	"\x12com.dhow.runner.v1B\vCommonProtoP\x01ZEgithub.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1;runnerv1\xa2\x02\x03DRX\xaa\x02\x0eDhow.Runner.V1\xca\x02\x0eDhow\\Runner\\V1\xe2\x02\x1aDhow\\Runner\\V1\\GPBMetadata\xea\x02\x10Dhow::Runner::V1b\x06proto3"
 
 var (

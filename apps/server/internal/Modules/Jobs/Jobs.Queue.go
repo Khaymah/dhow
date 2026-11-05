@@ -28,7 +28,7 @@ var _ jobqueue.Queue = queue{}
 func (s *Service) Queue() jobqueue.Queue { return queue{service: s} }
 
 func knownFeatures() []string {
-	return []string{jobqueue.FeatureArtifacts, jobqueue.FeatureCache, jobqueue.FeatureCheckout, jobqueue.FeaturePlugins, jobqueue.FeatureRegistry}
+	return []string{jobqueue.FeatureArtifacts, jobqueue.FeatureCache, jobqueue.FeatureCheckout, jobqueue.FeaturePlugins, jobqueue.FeatureRegistry, jobqueue.FeatureDeploy}
 }
 
 func features(in []string) ([]string, bool) {

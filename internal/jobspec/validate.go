@@ -68,6 +68,7 @@ func Validate(spec *runnerv1.JobSpec) error {
 	c.labels(spec.GetLabels())
 	c.transfers(spec)
 	c.derived(spec)
+	c.targets(spec)
 	if len(c.violations) > 0 {
 		return &Error{Violations: c.violations}
 	}
@@ -171,6 +172,7 @@ func (c *checker) secrets(spec *runnerv1.JobSpec) {
 		field := at("Secrets", i)
 		switch {
 		case s.GetName() == CheckoutSecret:
+		case isTargetKey(s.GetName()):
 		case s.GetName() == "" || !secretName.MatchString(s.GetName()):
 			c.add(field+".Name", ReasonInvalid)
 		case len(s.GetName()) > MaxSecretNameLength:
