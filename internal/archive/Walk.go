@@ -92,6 +92,21 @@ func Walk(r io.Reader, limits Limits, visit Visitor) (Totals, error) {
 	}
 }
 
+func dotsOnlyLead(target string) bool {
+	leading := true
+	for _, seg := range strings.Split(target, "/") {
+		switch {
+		case seg == "..":
+			if !leading {
+				return false
+			}
+		case seg != "" && seg != ".":
+			leading = false
+		}
+	}
+	return true
+}
+
 func walkEntry(h *tar.Header, seen, links map[string]bool) (Entry, error) {
 	name, ok := validName(h.Name)
 	if !ok || hasControl(name) {
@@ -114,7 +129,7 @@ func walkEntry(h *tar.Header, seen, links map[string]bool) (Entry, error) {
 			e.Mode = execMode
 		}
 	case tar.TypeSymlink:
-		if !LinkStaysInside(name, h.Linkname) || hasControl(h.Linkname) {
+		if !LinkStaysInside(name, h.Linkname) || hasControl(h.Linkname) || !dotsOnlyLead(h.Linkname) {
 			return Entry{}, fmt.Errorf("%w: the link %s leaves the release", ErrUnsafe, name)
 		}
 		e.Kind, e.Mode, e.Link = KindSymlink, execMode, h.Linkname
