@@ -247,7 +247,7 @@
 
 - **مفتاح targets وحده يكفي لنشر تحديث (ADR-0077).** وافق Sabry على ذلك: مفتاح واحد لا يخرج أبدًا من قرصي USB مشفّرين، ولا يُفتح إلا على نظام بلا شبكة. أداة التحديث لم تُبنَ بعد، فلا يوجد اختبار لها.
 - **جهاز التشغيل في حزمة التطوير (ADR-0079)** يعمل في حاوية `privileged` بدون تقوية الـ unit. بين تشغيل يهرب إلى `dhow-runner` وبين root على جهاز Docker ثغرة رفع صلاحيات محلية واحدة. هذا للتطوير فقط.
-- **لا يوجد مخزن أسرار حتى M5.** المواصفات التي تشير إلى أسرار تفشل بـ `SECRETS_UNAVAILABLE`، لذلك نثبت مسارات الأسرار في الإضافات والخطوات باختبارات جهاز التشغيل والبدائل الوهمية، لا من البداية إلى النهاية.
+- **مخزن الأسرار أُضيف في M5.** كانت المواصفات التي تشير إلى أسرار تفشل بـ `SECRETS_UNAVAILABLE` قبل ذلك، ومراجعة المخزن والبيئات في القسم 13.
 - **GitHub وGitLab (M4.5 وM4.6) لم يُبنيا.** job `providers` في CI هيكل فقط، ويُتخطّى حتى تُجهَّز بيئته.
 - **البيئة المعزولة:** لا حد للـ I/O، و`socketcall` على 32-bit ما زال مسموحًا، وcgroup v1 وSELinux بوضع enforcing غير مدعومين (ADR-0067).
 - **الإخفاء:** السر الأقصر من 4 أحرف لا يمكن إخفاؤه، وسجل التشغيل يقول ذلك.
@@ -278,3 +278,53 @@
 - تأكد أن pull requests من الـ forks لا تحصل أبدًا على أسرار أو بيئات أو كتابة في الـ cache.
 - شغّل `deploy/m4-demo/run.sh` واقرأ نتيجة البحث عن التسريب.
 - اقرأ المخاطر المقبولة أعلاه وقل أيها لا يجب قبوله.
+
+## 13. مراجعة التهديدات للأسرار والبيئات (M5)
+
+مراجعة 2026-11-05 تغطي ما أضافته M5: سلسلة المفاتيح والتشفير المغلّف، والأسرار بنطاقاتها الثلاثة، وبيانات دخول المستودعات الخاصة، والبيئات وقواعد حمايتها، وموافقات النشر. كل صف تهديد واحد، والضابط الذي يمنعه، والاختبار الذي يثبت الضابط بمساره. مُصدِر OIDC للأحمال (M5.8) خارج المراجعة لأنه يأتي بعد النسخة الأولى.
+
+### 13.1 التهديدات والضوابط والإثبات
+
+| الجزء | STRIDE | التهديد | الضابط | الإثبات |
+|---|---|---|---|---|
+| التشفير المغلّف | I | نسخة من قاعدة البيانات تُسرق بدون سلسلة المفاتيح | كل قيمة مختومة بمفتاح بيانات خاص بصاحبها، ومفاتيح البيانات مغلّفة بمفتاح تغليف لا يدخل القاعدة أبدًا، والقاعدة تحفظ قيمة فحص فقط | `apps/server/internal/App/SealedSweep_test.go` (`TestTheDatabaseDumpHoldsNoSealedValueNoDataKeyAndNoKeyringKey`)، `apps/server/internal/Core/Keys/Envelope_test.go` (`TestSealedValueHidesThePlaintextAndIsNeverRepeated`) |
+| التشفير المغلّف | I | سلسلة المفاتيح تُسرق بدون قاعدة البيانات | الملف فيه مفاتيح التغليف فقط، بلا قيم ولا مفاتيح بيانات. السيرفر يرفض ملفًا مفتوحًا لغير مالكه أو رابطًا رمزيًا. لا يطبع أمر ولا سجل مفتاحًا. والتصدير مشفّر بمفتاح age عام | `apps/server/internal/Core/Keys/File_test.go` (`TestReadKeyringFileRefusesUnsafeFiles`)، `Keyring_test.go` (`TestKeyringNeverPrintsItsKeys`)، `Leak_test.go` (`TestNoKeyMaterialLeavesTheKeyringInLogsErrorsOrStatus`)، `Export_test.go` (`TestExportOpensWithTheAgePrivateKeyOnly`) |
+| التشفير المغلّف | I | سلسلة مسرّبة مع نسخة قاعدة قديمة تفتح القيم الحالية بعد التسريب | `keys rekey` يعطي كل صاحب مفتاح بيانات جديدًا ويعيد تشفير قيمه ثم يمسح القديم | `apps/server/internal/Core/Keys/Rekey_test.go` (`TestAnOldKeyringWithACopyFromBeforeTheRekeyOpensNoCurrentValue`، `TestRekeyGivesEveryOwnerANewDataKeyAndDestroysTheOldOnes`) |
+| التشفير المغلّف | T | قيمة تُنقل إلى صف أو عمود أو صاحب آخر | الصف والعمود والصاحب جزء من البيانات المصادَق عليها (AAD)، ولكل قيمة مفتاح فرعي جديد | `apps/server/internal/Core/Keys/Values_test.go` (`TestAColumnRefusesEveryValueThatIsNotItsOwn`)، `Envelope_test.go` (`TestSealedValueOpensForItsOwnRowOwnerAndPurposeOnly`، `FuzzOpen`)، `Format_test.go` (`TestARowContextIsRequired`) |
+| التشفير المغلّف | T | الرجوع إلى الصيغة القديمة `0x01` (ADR-0088) | قيد CHECK في القاعدة يقبل الصيغة `0x03` فقط، والسيرفر يرفض قراءة أي صيغة أخرى | `apps/server/internal/Database/Migrations/SealedContract_test.go` (`TestTheSealedFormatContractWaitsForTheBackfillAndThenRefusesTheOldFormat`)، `apps/server/internal/App/SealedValues_test.go` (`TestAnOldValueCannotBePlantedAndIsRefusedEvenWithoutTheConstraint`، `TestTheSealedFormatContractCoversEveryRegisteredColumn`) |
+| التدوير | D | فشل تدوير مفتاح التغليف في المنتصف | `keys generate` يعيد الملف كما كان عند أي فشل. `keys activate` يرفض إذا لم يحمّل كل سيرفر حيّ الإصدار. وإعادة التغليف تكمل بعد أي توقف، والقراءة لا تتوقف | `apps/server/internal/Core/Keys/File_test.go` (`TestAFailedGenerateLeavesTheKeyringAsItWas`، `TestConcurrentGenerateNeverCorruptsTheKeyring`)، `Rotation_test.go` (`TestActivationNeedsTheVersionOnEveryRunningServer`، `TestRotationReWrapsTenThousandDataKeysAcrossKillsAndRetiresTheOldVersion`)، `Rekey_test.go` (`TestAnInterruptedRekeyResumesWhereItStopped`)، `deploy/m5-demo/run.sh` |
+| الأسرار | I | سر يصل إلى pull request من fork أو إلى بيئة | الـ fork بلا أسرار ولا متغيرات ولا بيانات دخول registry ولا بيئات، ولا يكتب في الـ cache. وpull request من المستودع نفسه لا يأخذ إلا الأسرار المعلَّمة له | `apps/server/internal/Modules/Pipelines/Test/E2E/Control_test.go` (`TestAForkPullRequestWaitsForApprovalAndRunsTheBaseFile`)، `Secrets_test.go` (`TestAForkNeverGetsARegistryLogin`، `TestAPullRequestOnlyGetsSecretsMarkedForIt`)، `apps/server/internal/Modules/Artifacts/Test/E2E/Cache_test.go` (`TestAForkNeverWritesTheCache`) |
+| الأسرار | I | سر يظهر في الـ API أو السجلات أو الملفات الناتجة أو الـ cache | الـ API للكتابة فقط بلا حقل قيمة، والإخفاء في جهاز التشغيل بكل الترميزات، وفحص الملفات الناتجة والـ cache قبل الضغط (`ARTIFACT_CONTAINS_SECRET`) | `apps/server/internal/Modules/Secrets/Test/E2E/WriteOnly_test.go` (`TestASecretValueNeverComesBack`، `TestNoResponseTypeHasAValueField`)، `apps/runner/internal/App/Acceptance_test.go` (`TestSecretsInEveryEncodingNeverLeaveTheRunner`)، `apps/runner/internal/App/Transfers_test.go` (`TestAnArtifactHoldingASecretFailsTheJobAndIsNotUploaded`، `TestACacheHoldingASecretIsNotSaved`) |
+| البيئات | E | نشر بدون موافقة | الـ job ينتظر عند البوابة، ولا تُفتح الأسرار إلا عند `Start` بعد فحص الـ run والقواعد من جديد | `apps/server/internal/Modules/Pipelines/Test/E2E/Environments_test.go` (`TestAnEnvironmentWithReviewersWaitsForApproval`، `TestARuleChangeAfterTheGateGivesTheJobNoSecret`)، `Secrets_test.go` (`TestStartRechecksTheRunBeforeOpeningAnySecret`)، `deploy/m5-demo/run.sh` |
+| البيئات | E | موافقة ذاتية، أو من مستخدم ليس مراجعًا، أو بكلمة سر فقط | `SELF_REVIEW_NOT_ALLOWED` لمن شغّل الـ run أو لمن ربط حسابه بالـ push، و`REVIEWER_NOT_ELIGIBLE` لغير المراجع، وكل قرار يحتاج خطوة ثانية (`REVIEWER_NEEDS_SECOND_FACTOR`) | `apps/server/internal/Modules/Pipelines/Test/E2E/Approvals_test.go` (`TestAnApprovalNeedsASecondFactorAndAnEligibleReviewer`، `TestTheUserWhoPushedOrStartedTheRunCannotApproveIt`)، `deploy/m5-demo/run.sh` |
+| البيئات | R | موافقة على run قديم أو على إصدار قواعد قديم | الطلب مربوط بالـ run وبـ `RuleVersion`، وينتهي بعد مهلة، ويستبدله push أحدث على الـ ref نفسه، وتُفحص الموافقة من جديد عند فتح البوابة وعند `Start` | `apps/server/internal/Modules/Pipelines/Test/E2E/Approvals_test.go` (`TestARuleChangeBeforeTheDecisionNeedsANewRequest`، `TestAnApprovalStopsCountingWhenTheRulesOrTheReviewerChange`، `TestAnApprovalRequestExpires`، `TestANewerPushOnTheSameRefSupersedesTheOlderRequest`) |
+| البيئات | E | نشر من ref غير مسموح | `AllowedRefs` بقائمة فارغة تعني أن شيئًا لا يُنشر، والقاعدة بلا تخطٍّ حتى للمدير | `apps/server/internal/Modules/Pipelines/Test/E2E/Environments_test.go` (`TestABranchTheEnvironmentDoesNotAllowIsSkippedWithoutOpeningASecret`)، `apps/server/internal/Modules/Environments/Test/Unit/Gate_test.go` (`TestNoAllowedRefsMeansNothingDeploys`)، `apps/server/internal/Modules/Environments/Test/Edge/Fuzz_test.go` (`FuzzAllowedRefs`) |
+| البيئات | T | صورة غير مثبّتة بالـ digest في بيئة تشترط ذلك | `RequirePinnedImages` تفحص الـ digest المكتوب في الملف، لا ما يثبّته السيرفر وقت التشغيل | `apps/server/internal/Modules/Pipelines/Test/E2E/Environments_test.go` (`TestPinnedImagesAndPluginRulesFailTheJob`) |
+| البيئات | E | تخطٍّ إداري بلا سبب، أو يتجاوز قاعدة الـ ref | التخطّي يحتاج `AllowAdminBypass` وسببًا وخطوة ثانية ويُسجَّل بخطورة عالية، ولا يتجاوز إلا المراجعين والمؤقت | `apps/server/internal/Modules/Pipelines/Test/E2E/Approvals_test.go` (`TestAnAdminBypassSkipsTheReviewersAndTheTimerOnly`) |
+| البحث عن التسريب | I | البحث نفسه لا يرى التسريب | يفتح القيم المختومة ويبحث عنها وعن المفاتيح بكل الترميزات، ويفشل على قيمة لا يفتحها أو نطاق بلا قيمة، ويجد أولًا حالات مزروعة من كل نوع | `apps/server/internal/App/LeakSweep/LeakSweep_test.go`، `internal/leaksweep/leaksweep_test.go`، `deploy/m4-demo/leak-sweep.sh` |
+
+### 13.2 المخاطر المقبولة
+
+- **التسريب بتحويل القيمة.** من يستطيع تغيير الكود الذي يعمل بسر يستطيع إخراجه بعد تحويل لا يعرفه الإخفاء، مثل قلب الأحرف. الحماية الحقيقية أن أسرار البيئة لا تصل إلا بعد قاعدة الـ ref وموافقة المراجع.
+- **هوية من عمل الـ push في Git العام.** هي نص يأتي من الـ webhook ولا ترتبط بمستخدم في داو. لذلك لا تكتشف قاعدة منع الموافقة الذاتية من عمل الـ push إلا إذا ربط حسابه على GitHub أو GitLab بداو. والواجهة تذكر ذلك بجانب الطلب.
+- **الملفات المضغوطة داخل الملفات الناتجة.** الفحص يقرأ الملفات كما هي قبل الضغط، فملف مضغوط أو مشفّر بداخل ملف ناتج لا يُغطّى.
+- **ملفات تتبع اختبارات المتصفح المرفوعة.** مسار `e2e` في CI يرفع ملفات التتبع والصور (7 أيام). فيها كلمات سر وكوكيز وأكواد TOTP لنسخة اختبار تُبنى وتُمسح في التشغيل نفسه، ولا يوجد فيها سر حقيقي (ADR-0087). ممنوع تشغيله بأسرار حقيقية.
+- **الملف `00066` يعمل بدون transaction.** `VALIDATE CONSTRAINT` يحتاج ملفًا بلا transaction. إذا توقف في المنتصف يبقى القيد `NOT VALID`، وهو يمنع الكتابة الجديدة، ويكمل التشغيل التالي (ADR-0088).
+- **التدوير لا يحمي نسخًا قديمة.** النسخة الاحتياطية التي أُخذت قبل التدوير تحتاج السلسلة التي أُخذت معها، فالقيم التي فيها تبقى مكشوفة لمن يملك الاثنين. العلاج `keys rekey` ثم تغيير السر عند صاحبه.
+- **مُصدِر OIDC (M5.8)** لم يُبنَ بعد، وهو بعد النسخة الأولى.
+
+### 13.3 البحث عن التسريب بعد التدوير
+
+`deploy/m5-demo/run.sh` يمر بمسار كامل ثم يشغّل `deploy/m4-demo/leak-sweep.sh`: بيئة `production` بمراجع وخطوة ثانية، وأسرار في النطاقات الثلاثة تصل إلى job نُشر بعد الموافقة، وتدوير لمفتاح التغليف في المنتصف (`generate` ثم إعادة تشغيل ثم `activate` ثم إعادة التغليف)، ونشر ثانٍ بعد التدوير. يبحث الفحص عن قيمة كل سر، وكلمة سر registry، وأسرار TOTP، ومفاتيح التغليف بإصداريها، ومفاتيح البيانات بعد فتحها. ويبحث في الأماكن نفسها المذكورة في 12.3.
+
+### 13.4 إضافات لقائمة فحص المراجعة الخارجية
+
+- شغّل `deploy/m5-demo/run.sh` واقرأ نتيجة البحث عن التسريب بعد التدوير.
+- خذ نسخة القاعدة وحدها، ثم السلسلة وحدها، وحاول فتح أي قيمة. ثم جرّب سلسلة قديمة مع نسخة قاعدة من قبل `keys rekey`.
+- اكتب قيمة بالصيغة `0x01` في قاعدة البيانات مباشرة، وانقل قيمة مختومة بين صفين أو أعمدة، وتأكد أن القاعدة أو السيرفر يرفضها.
+- أوقف السيرفر في منتصف `keys generate` و`keys activate` وإعادة التغليف، وتأكد أن الأسرار تُقرأ بعد ذلك.
+- حاول الموافقة من مستخدم ليس مراجعًا، ومن الذي شغّل الـ run، وبكلمة سر بدل الخطوة الثانية، ثم أعد استخدام موافقة بعد تغيير القواعد أو بعد push جديد.
+- حاول نشرًا من ref لا تسمح به البيئة، بما فيه أسماء ملتوية، وتأكد أن القاعدة لا تُتخطى حتى بالتخطّي الإداري.
+- ضع سرًا في ملف ناتج أو cache، وفي ملف مضغوط داخل ملف ناتج، واقرأ ما يُغطّى وما لا يُغطّى.
+- حاول إخراج سر بتحويله (قلب الأحرف مثلًا) من job في بيئة محمية، وقل إن كانت حماية البيئة كافية.
+- تأكد أن pull requests من الـ forks لا تأخذ أي سر أو بيانات دخول registry، وأن أسرار المؤسسة والمشروع لا تصل إلى pull request من المستودع نفسه إلا إذا عُلّم السر لذلك.
