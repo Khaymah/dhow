@@ -41,7 +41,7 @@ func (d *run) preflight(ctx context.Context) *Failure {
 	if err != nil {
 		return fail(ExitFailed, CauseOther, "cannot read the free space of the server", err)
 	}
-	if need := uint64(max(d.totals.Bytes, 0)) * 2; free < need { //nolint:gosec // Bytes is never negative.
+	if need := uint64(max(d.totals.Bytes, 0)) * 2; free < need {
 		return fail(ExitFailed, CauseOther, "not enough disk space on the server", ErrNoSpace)
 	}
 	if f := d.inspectCurrent(); f != nil {

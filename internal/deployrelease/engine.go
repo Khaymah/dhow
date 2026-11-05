@@ -128,8 +128,6 @@ func (d *run) cleanStage() {
 	}
 }
 
-func (d *run) fresh() context.Context { return context.WithoutCancel(context.Background()) }
-
 func (d *run) now() time.Time { return d.e.Clock.Now() }
 
 func releaseOfLink(base, link string) (string, bool) {

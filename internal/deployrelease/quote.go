@@ -4,8 +4,6 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-
-	"github.com/Khaymah/dhow/internal/jobspec"
 )
 
 const (
@@ -42,19 +40,4 @@ func Command(argv ...string) (string, error) {
 		return "", ErrCommand
 	}
 	return line, nil
-}
-
-func ValidPath(p string) bool { return jobspec.ValidDeployPath(p) }
-
-var segment = regexp.MustCompile(`^[A-Za-z0-9._-]{1,200}$`)
-
-func joinPath(base string, parts ...string) (string, error) {
-	out := base
-	for _, p := range parts {
-		if !segment.MatchString(p) || p == "." || p == ".." {
-			return "", ErrCommand
-		}
-		out += "/" + p
-	}
-	return out, nil
 }
