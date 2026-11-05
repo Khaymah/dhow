@@ -8354,10 +8354,22 @@ components:
           type: integer
           minimum: 0
           description: Invitations that are not accepted, revoked or expired.
+    OverviewApprovals:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required: [Pending]
+      properties:
+        Pending:
+          type: integer
+          minimum: 0
+          description: >-
+            Deploy approval requests waiting on an environment where you are a reviewer, directly or through a team. The
+            exact list of the ones you may decide is `GET /organizations/{id}/deployment-approvals?Mine=true`.
     OrganizationOverview:
       type: object
       additionalProperties: false
-      required: [Jobs, Runners, Invitations]
+      required: [Jobs, Runners, Invitations, Approvals]
       properties:
         Jobs:
           $ref: "#/components/schemas/OverviewJobs"
@@ -8365,6 +8377,8 @@ components:
           $ref: "#/components/schemas/OverviewRunners"
         Invitations:
           $ref: "#/components/schemas/OverviewInvitations"
+        Approvals:
+          $ref: "#/components/schemas/OverviewApprovals"
     OrganizationOverviewResponse:
       allOf:
         - $ref: "#/components/schemas/Envelope"

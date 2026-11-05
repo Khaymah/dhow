@@ -1652,6 +1652,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/runs/{runId}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the approval requests of a run
+         * @description Needs `run.read` on the project. One request per environment and round of the run, oldest first, with its decision. A comment or bypass reason is shown as written.
+         */
+        get: operations["listRunApprovals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a deploy
+         * @description Needs `deployment.approve` on the project, a reviewer of the environment with the Developer role or above, and a second factor in `CurrentFactor` (an app code, a recovery code or a passkey; a password answers 403 `REVIEWER_NEEDS_SECOND_FACTOR`). Unless the environment allows self-approval, the user who started the run, or whose linked GitHub or GitLab login pushed it, answers 403 `SELF_REVIEW_NOT_ALLOWED`. A request that is not pending, has expired or was made under older rules answers 409 `APPROVAL_NOT_PENDING`.
+         */
+        post: operations["approveDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject a deploy
+         * @description The same rules as approving. The jobs of the run waiting on this environment fail with `DEPLOYMENT_REJECTED`, and the jobs after them are skipped.
+         */
+        post: operations["rejectDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/bypass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bypass the reviewers and the wait timer
+         * @description Needs `environment.bypass` on the project (Admin and Owner), an environment with `AllowAdminBypass` (403 `BYPASS_NOT_ALLOWED` otherwise), a `Reason` and a second factor. Skips the reviewers and the wait timer only: the ref rule, the pinned images and plugins, and the pause still apply.
+         */
+        post: operations["bypassDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/deployment-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the deploys waiting for approval
+         * @description Pending requests of the projects whose runs you can read (`run.read`), oldest first. With `Mine=true`, only the requests you may decide: you are a reviewer of the environment, and not the one who started the run when the environment refuses self-approval.
+         */
+        get: operations["listPendingApprovals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/secrets": {
         parameters: {
             query?: never;
@@ -4212,6 +4312,55 @@ export interface components {
             Data?: components["schemas"]["Environment"][];
         };
         /** @enum {string} */
+        DeploymentApprovalState: "pending" | "approved" | "rejected" | "expired" | "superseded" | "canceled" | "bypassed";
+        DeploymentApproval: {
+            /** Format: uuid */
+            Id: string;
+            /** Format: uuid */
+            ProjectId: string;
+            /** Format: uuid */
+            EnvironmentId: string;
+            Environment: string;
+            /** Format: uuid */
+            RunId: string;
+            /** Format: int64 */
+            RunNumber: number;
+            Ref: string;
+            /** @description A rerun of the failed jobs starts a new round, which needs a new approval. */
+            Round: number;
+            /** Format: int64 */
+            RuleVersion: number;
+            State: components["schemas"]["DeploymentApprovalState"];
+            /** Format: date-time */
+            ExpiresAt: string;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: uuid */
+            DecidedByUserId?: string;
+            /** Format: date-time */
+            DecidedAt?: string;
+            /** @description The kind of second factor used for the decision (`totp`, `recovery_code` or `passkey`), never its value. */
+            FactorKind?: string;
+            Comment?: string;
+            BypassReason?: string;
+            /** Format: uuid */
+            SupersededByRunId?: string;
+        };
+        DeploymentApprovalResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DeploymentApproval"];
+        };
+        DeploymentApprovalListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DeploymentApproval"][];
+        };
+        DecideDeploymentRequest: {
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+            Comment?: string;
+        };
+        BypassDeploymentRequest: {
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+            Reason: string;
+        };
+        /** @enum {string} */
         DeploymentState: "queued" | "running" | "succeeded" | "failed" | "canceled";
         Deployment: {
             /** Format: uuid */
@@ -4352,7 +4501,7 @@ export interface components {
             };
             Needs: string[];
             State: components["schemas"]["RunJobState"];
-            /** @description For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`, `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`, `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`. */
+            /** @description For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`, `DEPLOYMENT_REJECTED`, `APPROVAL_EXPIRED`, `SUPERSEDED`, `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`, `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`. */
             FailureReason?: string;
             /** @description With `SECRET_NOT_FOUND` or `SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS`, the names of the secrets. Never a value. */
             FailureNames?: string[];
@@ -4542,10 +4691,15 @@ export interface components {
             /** @description Invitations that are not accepted, revoked or expired. */
             Pending: number;
         } | null;
+        OverviewApprovals: {
+            /** @description Deploy approval requests waiting on an environment where you are a reviewer, directly or through a team. The exact list of the ones you may decide is `GET /organizations/{id}/deployment-approvals?Mine=true`. */
+            Pending: number;
+        } | null;
         OrganizationOverview: {
             Jobs: components["schemas"]["OverviewJobs"];
             Runners: components["schemas"]["OverviewRunners"];
             Invitations: components["schemas"]["OverviewInvitations"];
+            Approvals: components["schemas"]["OverviewApprovals"];
         };
         OrganizationOverviewResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["OrganizationOverview"];
@@ -4695,6 +4849,7 @@ export interface components {
         SecretName: string;
         VariableName: string;
         RegistryCredentialId: string;
+        ApprovalId: string;
         EnvironmentName: string;
         Page: number;
         Limit: number;
@@ -7200,6 +7355,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeploymentListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRunApprovals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The approval requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentApprovalListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    approveDeployment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                runId: components["parameters"]["RunId"];
+                approvalId: components["parameters"]["ApprovalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideDeploymentRequest"];
+            };
+        };
+        responses: {
+            /** @description The decided request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentApprovalResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    rejectDeployment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                runId: components["parameters"]["RunId"];
+                approvalId: components["parameters"]["ApprovalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideDeploymentRequest"];
+            };
+        };
+        responses: {
+            /** @description The decided request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentApprovalResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    bypassDeployment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                runId: components["parameters"]["RunId"];
+                approvalId: components["parameters"]["ApprovalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BypassDeploymentRequest"];
+            };
+        };
+        responses: {
+            /** @description The decided request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentApprovalResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listPendingApprovals: {
+        parameters: {
+            query?: {
+                Mine?: boolean;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pending requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentApprovalListResponse"];
                 };
             };
             default: components["responses"]["Error"];

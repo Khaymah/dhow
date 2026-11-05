@@ -37,6 +37,9 @@ func toGen(o models.Overview) *gen.OrganizationOverview {
 	if o.Runners != nil {
 		out.Runners = &gen.OverviewRunners{Online: o.Runners.Online, Offline: o.Runners.Offline, Paused: o.Runners.Paused}
 	}
+	if o.Approvals != nil {
+		out.Approvals = &gen.OverviewApprovals{Pending: o.Approvals.Pending}
+	}
 	if o.Invitations != nil {
 		out.Invitations = &gen.OverviewInvitations{Pending: o.Invitations.Pending}
 	}

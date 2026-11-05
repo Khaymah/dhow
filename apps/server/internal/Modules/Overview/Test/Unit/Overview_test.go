@@ -49,6 +49,10 @@ func (f *fakeCounter) CountOverviewRunners(_ context.Context, arg sqlc.CountOver
 	return f.runnerRow, f.fail("runners")
 }
 
+func (f *fakeCounter) CountOverviewApprovals(_ context.Context, _ sqlc.CountOverviewApprovalsParams) (int64, error) {
+	return 0, f.fail("approvals")
+}
+
 func (f *fakeCounter) CountOverviewInvitations(_ context.Context, arg sqlc.CountOverviewInvitationsParams) (int64, error) {
 	f.invites = arg
 	return f.pendingRow, f.fail("invitations")
@@ -74,11 +78,11 @@ func TestEachBlockFollowsThePermissionOfItsList(t *testing.T) {
 		role  policy.Role
 		calls []string
 	}{
-		{policy.RoleOwner, []string{"jobs", "runners", "invitations"}},
-		{policy.RoleAdmin, []string{"jobs", "runners", "invitations"}},
-		{policy.RoleMaintainer, []string{"jobs", "runners"}},
-		{policy.RoleDeveloper, []string{"jobs", "runners"}},
-		{policy.RoleViewer, []string{"jobs"}},
+		{policy.RoleOwner, []string{"jobs", "runners", "invitations", "approvals"}},
+		{policy.RoleAdmin, []string{"jobs", "runners", "invitations", "approvals"}},
+		{policy.RoleMaintainer, []string{"jobs", "runners", "approvals"}},
+		{policy.RoleDeveloper, []string{"jobs", "runners", "approvals"}},
+		{policy.RoleViewer, []string{"jobs", "approvals"}},
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.role), func(t *testing.T) {

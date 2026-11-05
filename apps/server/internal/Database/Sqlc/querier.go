@@ -63,6 +63,7 @@ type Querier interface {
 	CountOidcProviders(ctx context.Context) (int64, error)
 	CountOrganizationProjects(ctx context.Context, arg CountOrganizationProjectsParams) (int64, error)
 	CountOtherActiveOwners(ctx context.Context, arg CountOtherActiveOwnersParams) (int64, error)
+	CountOverviewApprovals(ctx context.Context, arg CountOverviewApprovalsParams) (int64, error)
 	CountOverviewInvitations(ctx context.Context, arg CountOverviewInvitationsParams) (int64, error)
 	CountOverviewJobs(ctx context.Context, arg CountOverviewJobsParams) (CountOverviewJobsRow, error)
 	CountOverviewRunners(ctx context.Context, arg CountOverviewRunnersParams) (CountOverviewRunnersRow, error)

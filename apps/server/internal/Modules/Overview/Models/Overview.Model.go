@@ -21,4 +21,9 @@ type Overview struct {
 	Jobs        *Jobs
 	Runners     *Runners
 	Invitations *Invitations
+	Approvals   *Approvals
+}
+
+type Approvals struct {
+	Pending int
 }

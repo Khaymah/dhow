@@ -258,4 +258,14 @@ func TestThePendingListShowsWhatIMayDecide(t *testing.T) {
 		res.Decode(t, &list)
 		assert.Len(t, list, c.want, c.query)
 	}
+	for _, c := range []struct {
+		client *apptest.Client
+		want   int
+	}{{rev.c, 1}, {other.c, 0}} {
+		res := c.client.Get(apptest.OrgPath(w.org, "/overview"))
+		require.Equal(t, http.StatusOK, res.Status, string(res.Raw))
+		var o struct{ Approvals struct{ Pending int } }
+		res.Decode(t, &o)
+		assert.Equal(t, c.want, o.Approvals.Pending)
+	}
 }

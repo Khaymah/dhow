@@ -23,6 +23,20 @@ SELECT count(*) FILTER (WHERE "State" = 'active' AND "LastSeenAt" > @online_sinc
 FROM "Runners"
 WHERE "OrganizationId" = @organization_id AND NOT "IsDeleted";
 
+-- name: CountOverviewApprovals :one
+SELECT count(*)::bigint
+FROM "DeploymentApprovals" a
+WHERE a."OrganizationId" = @organization_id AND a."State" = 'pending' AND a."ExpiresAt" > @now::timestamptz AND NOT a."IsDeleted"
+  AND EXISTS (SELECT 1
+              FROM "EnvironmentReviewers" r
+              WHERE r."EnvironmentId" = a."EnvironmentId" AND r."OrganizationId" = a."OrganizationId" AND NOT r."IsDeleted"
+                AND (r."UserId" = @user_id
+                     OR EXISTS (SELECT 1
+                                FROM "TeamMembers" tm
+                                JOIN "Teams" t ON t."Id" = tm."TeamId" AND t."OrganizationId" = tm."OrganizationId" AND NOT t."IsDeleted"
+                                WHERE tm."TeamId" = r."TeamId" AND tm."OrganizationId" = r."OrganizationId"
+                                  AND tm."UserId" = @user_id AND NOT tm."IsDeleted")));
+
 -- name: CountOverviewInvitations :one
 SELECT count(*) FILTER (WHERE "ExpiresAt" > @now::timestamptz)::bigint AS pending
 FROM "Invitations"

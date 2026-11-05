@@ -20,10 +20,13 @@ type runners struct{ Online, Offline, Paused int }
 
 type invitations struct{ Pending int }
 
+type approvals struct{ Pending int }
+
 type overview struct {
 	Jobs        *jobs
 	Runners     *runners
 	Invitations *invitations
+	Approvals   *approvals
 }
 
 type world struct {
@@ -74,6 +77,7 @@ func TestEveryRoleSeesTheBlocksItsListsAllow(t *testing.T) {
 		Jobs:        &jobs{Running: 1, Queued: 4, QueuedNoRunner: 2, FailedLast24h: 1},
 		Runners:     &runners{Online: 1, Offline: 1, Paused: 1},
 		Invitations: &invitations{Pending: 1},
+		Approvals:   &approvals{Pending: 0},
 	}
 	for _, role := range policy.Roles() {
 		t.Run(string(role), func(t *testing.T) {
@@ -84,8 +88,10 @@ func TestEveryRoleSeesTheBlocksItsListsAllow(t *testing.T) {
 
 			var raw map[string]json.RawMessage
 			res.Decode(t, &raw)
-			assert.Len(t, raw, 3)
-			blocks := map[string]policy.Action{"Jobs": policy.JobRead, "Runners": policy.RunnerRead, "Invitations": policy.MemberManage}
+			assert.Len(t, raw, 4)
+			blocks := map[string]policy.Action{
+				"Jobs": policy.JobRead, "Runners": policy.RunnerRead, "Invitations": policy.MemberManage, "Approvals": policy.RunRead,
+			}
 			for name, action := range blocks {
 				require.Contains(t, raw, name)
 				if !policy.Allows(role, action) {
@@ -112,7 +118,7 @@ func TestAFreshOrganizationCountsZeroNotNull(t *testing.T) {
 	res := w.get(w.owner)
 	require.Equal(t, http.StatusOK, res.Status, string(res.Raw))
 	assert.JSONEq(t, `{"Jobs":{"Running":0,"Queued":0,"QueuedNoRunner":0,"FailedLast24h":0},
-		"Runners":{"Online":0,"Offline":0,"Paused":0},"Invitations":{"Pending":0}}`, string(res.Data))
+		"Runners":{"Online":0,"Offline":0,"Paused":0},"Invitations":{"Pending":0},"Approvals":{"Pending":0}}`, string(res.Data))
 }
 
 func TestQueuedNoRunnerMatchesTheReasonTheJobListShows(t *testing.T) {
@@ -185,7 +191,7 @@ func TestATokenSeesOnlyTheBlocksOfItsScopes(t *testing.T) {
 	require.Equal(t, http.StatusOK, bare.Status, string(bare.Raw))
 	var none map[string]json.RawMessage
 	bare.Decode(t, &none)
-	for _, block := range []string{"Jobs", "Runners", "Invitations"} {
+	for _, block := range []string{"Jobs", "Runners", "Invitations", "Approvals"} {
 		assert.JSONEq(t, "null", string(none[block]), block)
 	}
 
