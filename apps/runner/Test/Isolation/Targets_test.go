@@ -86,7 +86,8 @@ func TestTheKeyFileStaysInTheDeploySandboxAwayFromALiveNeighbourAndTheNextStep(t
 	time.Sleep(2 * time.Second)
 
 	hunt := strings.Join([]string{
-		"for f in /proc/[0-9]*/environ /proc/[0-9]*/cmdline /proc/[0-9]*/mountinfo; do cat \"$f\" 2>/dev/null; done > /tmp/proc-dump",
+		"cat /proc/[0-9]*/environ /proc/[0-9]*/cmdline /proc/[0-9]*/mountinfo > /tmp/proc-dump 2>/dev/null || true",
+		"test -s /tmp/proc-dump && echo dumped",
 		"grep -c " + keyLine1 + " /tmp/proc-dump || true",
 		"grep -c DHOW_TARGET_KEY_FILE /tmp/proc-dump || true",
 		"ls /proc | grep -c '^[0-9]'",
