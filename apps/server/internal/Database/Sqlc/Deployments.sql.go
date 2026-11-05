@@ -97,10 +97,11 @@ func (q *Queries) HoldEnvironment(ctx context.Context, arg HoldEnvironmentParams
 const insertDeployment = `-- name: InsertDeployment :exec
 INSERT INTO "Deployments" (
     "OrganizationId", "EnvironmentId", "RunId", "RunNumber", "RunJobId", "JobId", "JobKey", "Ref", "Sha", "RuleVersion",
-    "CreatedAt", "UpdatedAt"
+    "ApprovalId", "CreatedAt", "UpdatedAt"
 )
 VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+    $11::uuid, $12, $12
 )
 `
 
@@ -115,6 +116,7 @@ type InsertDeploymentParams struct {
 	Ref            string
 	Sha            pgtype.Text
 	RuleVersion    int64
+	ApprovalID     *uuid.UUID
 	Now            time.Time
 }
 
@@ -130,6 +132,7 @@ func (q *Queries) InsertDeployment(ctx context.Context, arg InsertDeploymentPara
 		arg.Ref,
 		arg.Sha,
 		arg.RuleVersion,
+		arg.ApprovalID,
 		arg.Now,
 	)
 	return err
@@ -195,7 +198,8 @@ func (q *Queries) ListDeployments(ctx context.Context, arg ListDeploymentsParams
 
 const lockGateEnvironment = `-- name: LockGateEnvironment :one
 SELECT e."Id", e."Name", e."RuleVersion", e."AllowedRefs", e."AllowPullRequests", e."WaitMinutes", e."RequirePinnedImages",
-       e."AllowedPlugins", (e."PausedAt" IS NOT NULL)::boolean AS "Paused", e."LockedByRunId",
+       e."AllowedPlugins", (e."PausedAt" IS NOT NULL)::boolean AS "Paused", e."LockedByRunId", e."ApprovalTimeoutHours",
+       e."SupersedePending",
        EXISTS (SELECT 1
                FROM "EnvironmentReviewers" r
                WHERE r."EnvironmentId" = e."Id" AND r."OrganizationId" = e."OrganizationId" AND NOT r."IsDeleted")::boolean
@@ -212,17 +216,19 @@ type LockGateEnvironmentParams struct {
 }
 
 type LockGateEnvironmentRow struct {
-	Id                  uuid.UUID
-	Name                string
-	RuleVersion         int64
-	AllowedRefs         []byte
-	AllowPullRequests   bool
-	WaitMinutes         int32
-	RequirePinnedImages bool
-	AllowedPlugins      []string
-	Paused              bool
-	LockedByRunId       *uuid.UUID
-	HasReviewers        bool
+	Id                   uuid.UUID
+	Name                 string
+	RuleVersion          int64
+	AllowedRefs          []byte
+	AllowPullRequests    bool
+	WaitMinutes          int32
+	RequirePinnedImages  bool
+	AllowedPlugins       []string
+	Paused               bool
+	LockedByRunId        *uuid.UUID
+	ApprovalTimeoutHours int32
+	SupersedePending     bool
+	HasReviewers         bool
 }
 
 func (q *Queries) LockGateEnvironment(ctx context.Context, arg LockGateEnvironmentParams) (LockGateEnvironmentRow, error) {
@@ -239,6 +245,8 @@ func (q *Queries) LockGateEnvironment(ctx context.Context, arg LockGateEnvironme
 		&i.AllowedPlugins,
 		&i.Paused,
 		&i.LockedByRunId,
+		&i.ApprovalTimeoutHours,
+		&i.SupersedePending,
 		&i.HasReviewers,
 	)
 	return i, err
@@ -295,7 +303,7 @@ func (q *Queries) ReleaseStaleEnvironments(ctx context.Context) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
-const settleDeployments = `-- name: SettleDeployments :exec
+const settleDeployments = `-- name: SettleDeployments :many
 UPDATE "Deployments" d
 SET "State" = CASE rj."State" WHEN 'succeeded' THEN 'succeeded' WHEN 'failed' THEN 'failed' ELSE 'canceled' END,
     "FinishedAt" = $1, "UpdatedAt" = $1
@@ -303,6 +311,7 @@ FROM "RunJobs" rj
 WHERE d."RunId" = $2 AND d."OrganizationId" = $3 AND d."State" IN ('queued', 'running')
   AND rj."Id" = d."RunJobId" AND rj."OrganizationId" = d."OrganizationId"
   AND rj."State" IN ('succeeded', 'failed', 'canceled', 'skipped')
+RETURNING d."Id", d."EnvironmentId", d."RunJobId", d."State"
 `
 
 type SettleDeploymentsParams struct {
@@ -311,7 +320,34 @@ type SettleDeploymentsParams struct {
 	OrganizationID uuid.UUID
 }
 
-func (q *Queries) SettleDeployments(ctx context.Context, arg SettleDeploymentsParams) error {
-	_, err := q.db.Exec(ctx, settleDeployments, arg.Now, arg.RunID, arg.OrganizationID)
-	return err
+type SettleDeploymentsRow struct {
+	Id            uuid.UUID
+	EnvironmentId uuid.UUID
+	RunJobId      uuid.UUID
+	State         string
+}
+
+func (q *Queries) SettleDeployments(ctx context.Context, arg SettleDeploymentsParams) ([]SettleDeploymentsRow, error) {
+	rows, err := q.db.Query(ctx, settleDeployments, arg.Now, arg.RunID, arg.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SettleDeploymentsRow{}
+	for rows.Next() {
+		var i SettleDeploymentsRow
+		if err := rows.Scan(
+			&i.Id,
+			&i.EnvironmentId,
+			&i.RunJobId,
+			&i.State,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

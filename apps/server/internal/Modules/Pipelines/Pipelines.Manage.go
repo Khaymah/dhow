@@ -100,6 +100,11 @@ func (s *Service) cancelLocked(ctx context.Context, q *sqlc.Queries, id uuid.UUI
 	if err := q.RequestRunCancel(ctx, sqlc.RequestRunCancelParams{ID: id, UserID: user, Reason: reason}); err != nil {
 		return err
 	}
+	if s.gate != nil {
+		if err := s.gate.CancelApprovals(ctx, q, run.OrganizationId, id); err != nil {
+			return err
+		}
+	}
 	rows, err := q.ListRunJobs(ctx, id)
 	if err != nil {
 		return err

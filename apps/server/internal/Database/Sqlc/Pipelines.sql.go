@@ -1320,7 +1320,7 @@ func (q *Queries) ReleaseRunClaim(ctx context.Context, id uuid.UUID) error {
 const reopenRun = `-- name: ReopenRun :exec
 UPDATE "PipelineRuns"
 SET "State" = 'running', "FailureReason" = '', "FinishedAt" = NULL, "CancelRequestedAt" = NULL, "CancelRequestedBy" = NULL,
-    "UpdatedAt" = now()
+    "Round" = "Round" + 1, "UpdatedAt" = now()
 WHERE "Id" = $1 AND "State" IN ('failed', 'canceled')
 `
 
