@@ -16,9 +16,14 @@ import (
 var ErrSecretScope = errors.New("a step holds a secret that was not declared on it")
 
 func (r *RunJob) Build(ctx context.Context, c Context) (*runnerv1.JobSpec, error) {
+	spec, _, err := r.BuildWithOrigins(ctx, c)
+	return spec, err
+}
+
+func (r *RunJob) BuildWithOrigins(ctx context.Context, c Context) (*runnerv1.JobSpec, []int, error) {
 	spec, ok := proto.Clone(r.Spec).(*runnerv1.JobSpec)
 	if !ok {
-		return nil, ErrExpression
+		return nil, nil, ErrExpression
 	}
 	if spec.Env == nil {
 		spec.Env = map[string]string{}
@@ -27,7 +32,7 @@ func (r *RunJob) Build(ctx context.Context, c Context) (*runnerv1.JobSpec, error
 	for ref := range r.Expressions {
 		v, err := r.EvalValue(ctx, ref, c)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if d, ok := placeValue(spec, ref, v); ok {
 			derived = append(derived, d)
@@ -41,7 +46,7 @@ func (r *RunJob) Build(ctx context.Context, c Context) (*runnerv1.JobSpec, error
 	for i := int32(0); int(i) < len(spec.GetSteps()); i++ {
 		keep, err := r.EvalStepIf(ctx, int(i), c)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if keep {
 			moved[i] = next
@@ -54,9 +59,9 @@ func (r *RunJob) Build(ctx context.Context, c Context) (*runnerv1.JobSpec, error
 	spec.Secrets = remapSecrets(spec.GetSecrets(), moved)
 	spec.DerivedValues = remapDerived(derived, moved)
 	if err := r.checkStepSecrets(spec, origin); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return spec, nil
+	return spec, origin, nil
 }
 
 func remapSecrets(refs []*runnerv1.SecretRef, moved map[int32]int32) []*runnerv1.SecretRef {

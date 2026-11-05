@@ -24,9 +24,9 @@ const (
 	TargetKindCompose    = "compose"
 	DeploySSHImage       = "ghcr.io/khaymah/dhow-deploy-ssh"
 	DeployComposeImage   = "ghcr.io/khaymah/dhow-deploy-compose"
-	TargetKeyPrefix      = "dhow.target." //nolint:gosec // The reserved prefix of the target key names, not a credential.
-	targetKeySuffix      = ".key"         //nolint:gosec // The reserved suffix of the target key names, not a credential.
-	TargetKeyFileBase    = "target-key"   //nolint:gosec // The file name the target key gets, not its value.
+	TargetKeyPrefix      = "dhow.target."
+	targetKeySuffix      = ".key"
+	TargetKeyFileBase    = "target-key"
 
 	MaxTargets         = 4
 	MaxTargetHosts     = 10

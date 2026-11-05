@@ -146,6 +146,7 @@ func runsFor(
 	pipelinesService.UseSecrets(secretsService)
 	pipelinesService.UseVariables(secretsService)
 	pipelinesService.UseGate(envs.Gate())
+	pipelinesService.UseTargets(envs.Targets())
 	envs.UseReopen(pipelinesService.Reopen)
 	envs.UseSecretWriter(secretsService)
 	if in.Secrets == nil {

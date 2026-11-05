@@ -15,7 +15,7 @@ import (
 )
 
 func hostKey(keyType string) string {
-	blob := binary.BigEndian.AppendUint32(nil, uint32(len(keyType))) //nolint:gosec // A short constant.
+	blob := binary.BigEndian.AppendUint32(nil, uint32(len(keyType)))
 	blob = append(blob, keyType...)
 	blob = append(blob, "key-material"...)
 	return keyType + " " + base64.StdEncoding.EncodeToString(blob)

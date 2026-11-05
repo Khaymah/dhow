@@ -117,6 +117,44 @@ func (q *Queries) GetDeployTarget(ctx context.Context, arg GetDeployTargetParams
 	return i, err
 }
 
+const getDeployTargetByID = `-- name: GetDeployTargetByID :one
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "EnvironmentId", "Name", "Kind", "Username", "KeySecretName", "PublicKey", "DeployPath", "KeepReleases", "Settings", "AllowedImages", "Version", "CreatedByUserId"
+FROM "DeployTargets"
+WHERE "Id" = $1 AND "OrganizationId" = $2 AND "EnvironmentId" = $3 AND NOT "IsDeleted"
+`
+
+type GetDeployTargetByIDParams struct {
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	EnvironmentID  uuid.UUID
+}
+
+func (q *Queries) GetDeployTargetByID(ctx context.Context, arg GetDeployTargetByIDParams) (DeployTarget, error) {
+	row := q.db.QueryRow(ctx, getDeployTargetByID, arg.ID, arg.OrganizationID, arg.EnvironmentID)
+	var i DeployTarget
+	err := row.Scan(
+		&i.Id,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.OrganizationId,
+		&i.ProjectId,
+		&i.EnvironmentId,
+		&i.Name,
+		&i.Kind,
+		&i.Username,
+		&i.KeySecretName,
+		&i.PublicKey,
+		&i.DeployPath,
+		&i.KeepReleases,
+		&i.Settings,
+		&i.AllowedImages,
+		&i.Version,
+		&i.CreatedByUserId,
+	)
+	return i, err
+}
+
 const insertDeployTarget = `-- name: InsertDeployTarget :one
 INSERT INTO "DeployTargets" (
     "OrganizationId", "ProjectId", "EnvironmentId", "Name", "Kind", "Username", "KeySecretName", "DeployPath", "KeepReleases",

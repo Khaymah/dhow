@@ -384,10 +384,10 @@ type RunJob struct {
 	// EnvironmentId The environment the job waits on or deployed to, once it reached the gate.
 	EnvironmentId *openapi_types.UUID `json:"EnvironmentId,omitempty"`
 
-	// FailureNames With `SECRET_NOT_FOUND` or `SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS`, the names of the secrets. Never a value.
+	// FailureNames With `SECRET_NOT_FOUND` or `SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS`, the names of the secrets. With `TARGET_NOT_FOUND`, `TARGET_PLUGIN_NOT_ALLOWED` or `TARGET_KEY_NOT_FOUND`, the name of the target or of its key secret, and with `TARGET_HOST_KEY_UNCONFIRMED` the addresses of the hosts without a pinned key. Never a value.
 	FailureNames *[]string `json:"FailureNames,omitempty"`
 
-	// FailureReason For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`, `DEPLOYMENT_REJECTED`, `APPROVAL_EXPIRED`, `SUPERSEDED`, `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`, `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
+	// FailureReason For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`, `DEPLOYMENT_REJECTED`, `APPROVAL_EXPIRED`, `SUPERSEDED`, `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`, `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, a deploy target refusal such as `TARGET_NOT_FOUND`, `TARGET_NOT_LITERAL`, `TARGET_REQUIRES_ENVIRONMENT`, `TARGET_HOST_KEY_UNCONFIRMED`, `TARGET_KEY_NOT_FOUND`, `TARGET_PLUGIN_NOT_ALLOWED`, `TARGET_ARTIFACT_REQUIRED`, `TARGET_JOB_EGRESS_NOT_ALLOWED`, `TARGET_CHANGED`, `HEALTH_URL_INVALID`, `HEALTH_BUDGET_EXCEEDED` or `ROLLING_BUDGET_EXCEEDED`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
 	FailureReason *string    `json:"FailureReason,omitempty"`
 	FinishedAt    *time.Time `json:"FinishedAt,omitempty"`
 

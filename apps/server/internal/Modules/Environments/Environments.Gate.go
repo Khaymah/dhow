@@ -67,6 +67,7 @@ func (g *Gate) Lock(ctx context.Context, q *sqlc.Queries, t deployments.Target) 
 		HasReviewers: row.HasReviewers, WaitMinutes: int(row.WaitMinutes), RequirePinnedImages: row.RequirePinnedImages,
 		AllowedPlugins: row.AllowedPlugins, Paused: row.Paused, LockedByRunID: row.LockedByRunId,
 		ApprovalTimeoutHours: int(row.ApprovalTimeoutHours), SupersedePending: row.SupersedePending,
+		AllowExtraDeployEgress: row.AllowExtraDeployEgress,
 	}, true, nil
 }
 

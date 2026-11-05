@@ -20,6 +20,11 @@ SELECT *
 FROM "DeployTargets"
 WHERE "EnvironmentId" = @environment_id AND "OrganizationId" = @organization_id AND "Name" = @name AND NOT "IsDeleted";
 
+-- name: GetDeployTargetByID :one
+SELECT *
+FROM "DeployTargets"
+WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "EnvironmentId" = @environment_id AND NOT "IsDeleted";
+
 -- name: LockDeployTarget :one
 SELECT *
 FROM "DeployTargets"

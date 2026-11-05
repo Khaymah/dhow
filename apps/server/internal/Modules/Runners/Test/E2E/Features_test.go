@@ -48,6 +48,16 @@ func TestRegistrationStoresTheRunnerFeatures(t *testing.T) {
 	assert.Equal(t, connect.CodeInvalidArgument, connectErr(t, err).Code())
 }
 
+func TestARunnerCanDeclareTheDeployTargetsFeature(t *testing.T) {
+	w := newWorld(t)
+	token, _ := w.env.CreateRegistrationToken(w.owner, w.org, apptest.RegistrationTokenSpec{})
+	req := apptest.NewRunnerIdentity(t).RegisterRequest(token)
+	req.Features = []runnerv1.RunnerFeature{runnerv1.RunnerFeature_RUNNER_FEATURE_DEPLOY_TARGETS, runnerv1.RunnerFeature_RUNNER_FEATURE_PLUGINS}
+	out, err := w.env.RunnerClient(apptest.RunnerClientOptions{}).Registration.Register(context.Background(), connect.NewRequest(req))
+	require.NoError(t, err)
+	assert.Equal(t, []string{runnersig.FeatureDeploy, runnersig.FeaturePlugins}, w.features(t, out.Msg.GetRunnerId()))
+}
+
 func TestSignedAuthenticationSetsTheFeaturesAndNothingElseCan(t *testing.T) {
 	w := newWorld(t)
 	id, reg := w.registerOK(t, apptest.RegistrationTokenSpec{})

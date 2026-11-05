@@ -49,12 +49,19 @@ func (p *pipelineSecrets) Accepts(_ context.Context, origin jobs.Origin, _ []str
 func (p *pipelineSecrets) Admit(ctx context.Context, req jobs.SecretRequest) error {
 	scope, err := p.runs.SecretScopeOfJob(ctx, req.OrganizationID, req.JobID)
 	if errors.Is(err, pipelines.ErrNoSecretScope) {
+		if len(req.Targets) > 0 {
+			return jobs.ErrTargetChanged
+		}
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	return p.checkEnvironment(ctx, req, scope)
+	if err := p.checkEnvironment(ctx, req, scope); err != nil {
+		return err
+	}
+	_, err = p.checkTargets(ctx, req, scope)
+	return err
 }
 
 func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (map[string][]byte, error) {
@@ -72,7 +79,12 @@ func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (
 	if err := p.checkEnvironment(ctx, req, scope); err != nil {
 		return nil, err
 	}
+	keys, err := p.checkTargets(ctx, req, scope)
+	if err != nil {
+		return nil, err
+	}
 	names, registries := splitRegistry(req)
+	names, reserved := splitTargetKeys(names)
 	list, err := p.resolveNamed(ctx, req, scope, names)
 	if errors.Is(err, secretstore.ErrMissingName) || errors.Is(err, secretstore.ErrFork) ||
 		errors.Is(err, secretstore.ErrTooMany) || errors.Is(err, secretstore.ErrTooLarge) {
@@ -90,6 +102,13 @@ func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (
 		wipeAll(out)
 		return nil, err
 	}
+	keyed, err := p.resolveTargetKeys(ctx, req, scope, reserved, keys, out)
+	if err != nil {
+		secretstore.Wipe(keyed)
+		wipeAll(out)
+		return nil, err
+	}
+	list = append(list, keyed...)
 	if err := p.audit(ctx, req, scope, list, hosts); err != nil {
 		wipeAll(out)
 		return nil, err

@@ -48,6 +48,8 @@ const (
 	ReasonStartTimeout      = "START_TIMEOUT"
 	ReasonSecretsMissing    = "SECRETS_UNAVAILABLE"
 	ReasonEnvironmentRule   = "ENVIRONMENT_RULE_CHANGED"
+	ReasonTargetChanged     = "TARGET_CHANGED"
+	ReasonTargetKeyMissing  = "TARGET_KEY_NOT_FOUND"
 	ReasonNoMatchingRunner  = "NO_MATCHING_RUNNER"
 )
 

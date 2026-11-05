@@ -184,6 +184,25 @@ The image declares its inputs, outputs and entrypoint in the label `io.dhow.plug
 - Each input reaches the plugin as an environment variable `DHOW_INPUT_<NAME>`, with the name in upper case (`DHOW_INPUT_CHANNEL`). The value is never parsed by a shell.
 - **A plugin gets only what is given to it:** its inputs, `DHOW_OUTPUT`, the proxy variables of the job's egress, the `env` of its own step, and the secrets given to that step. A secret in `with:` (`token: ${{ secrets.CHAT_TOKEN }}`) arrives as `DHOW_INPUT_TOKEN` and only in that step. A step skipped by its `if:` takes its secrets with it, and no step ever gets a secret declared on another one: the server checks it before the job is queued and fails the job with `JOB_SPEC_INVALID` otherwise. The job's `env`, secrets given to the whole job, and `DHOW_FENCING_TOKEN`, `DHOW_JOB_ID`, `DHOW_ATTEMPT_ID` and `DHOW_STEP_INDEX` never reach a plugin.
 
+### Plugins that deploy to a target
+
+A `uses:` step with `with.target` deploys to a [target](guides/environments.md#deploy-targets) defined on the environment of the job. The server checks the rules below when it queues the job. If the job breaks one, it fails with the reason named and no secret is opened:
+
+- The job writes `environment:`, or `TARGET_REQUIRES_ENVIRONMENT`.
+- The target name is fixed text in the file, not an expression and not a secret, or `TARGET_NOT_LITERAL`.
+- The target exists on the environment of the job, or `TARGET_NOT_FOUND`.
+- Only the official deploy plugins receive a target, or images the target allows in `AllowedImages`, or `TARGET_PLUGIN_NOT_ALLOWED`.
+- Every server of the target has a pinned key, or `TARGET_HOST_KEY_UNCONFIRMED` with the addresses of the servers.
+- The secret of the access key exists on the environment, or `TARGET_KEY_NOT_FOUND`.
+- `with.artifact` names an artifact that a job in `needs` uploads, or `TARGET_ARTIFACT_REQUIRED`.
+- `with.health_check_url` is an `http` or `https` address without a user name. It may hold `{host}` in place of the whole server name, so each server is checked on its own address. Otherwise `HEALTH_URL_INVALID`.
+- A health check does not run longer than 10 minutes for each server (`HEALTH_BUDGET_EXCEEDED`), and a rolling deploy does not run longer than 60 minutes (`ROLLING_BUDGET_EXCEEDED`).
+- A job that deploys reaches the servers of its target and the health check address only. The server computes these endpoints from the target, so the file cannot change them. Any other `network.egress` in the job is refused with `TARGET_JOB_EGRESS_NOT_ALLOWED`, unless an Admin turns on `AllowExtraDeployEgress` on the environment.
+
+The server marks the deploy step as one that changes something (`mutating`), so the job is not retried automatically once it starts. The access key is delivered as a file to this step only, and neither a `run:` step nor another plugin sees it.
+
+When the job starts on the runner, the server checks again before it opens the key: if the target, its servers, their order or the key of one of them changed after the job was queued, it fails with `TARGET_CHANGED`. If the secret of the key was removed, it fails with `TARGET_KEY_NOT_FOUND`. A runner that does not declare the `deploy_targets` feature never receives this job.
+
 ### Step outputs
 
 Every step, `run:` or `uses:`, gets the variable `DHOW_OUTPUT`, a file where it may write `key=value` lines. Jobs that list this job in `needs` read the values as `needs.<job>.outputs.<key>`.

@@ -139,6 +139,7 @@ type Querier interface {
 	GetConfirmedTotp(ctx context.Context, userID uuid.UUID) (GetConfirmedTotpRow, error)
 	GetDataKey(ctx context.Context, id uuid.UUID) (GetDataKeyRow, error)
 	GetDeployTarget(ctx context.Context, arg GetDeployTargetParams) (DeployTarget, error)
+	GetDeployTargetByID(ctx context.Context, arg GetDeployTargetByIDParams) (DeployTarget, error)
 	GetEnvironment(ctx context.Context, arg GetEnvironmentParams) (Environment, error)
 	GetEnvironmentProject(ctx context.Context, arg GetEnvironmentProjectParams) (GetEnvironmentProjectRow, error)
 	GetInstance(ctx context.Context) (Instance, error)
