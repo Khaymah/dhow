@@ -17,6 +17,33 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for DeploymentState.
+const (
+	Canceled  DeploymentState = "canceled"
+	Failed    DeploymentState = "failed"
+	Queued    DeploymentState = "queued"
+	Running   DeploymentState = "running"
+	Succeeded DeploymentState = "succeeded"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentState enum.
+func (e DeploymentState) Valid() bool {
+	switch e {
+	case Canceled:
+		return true
+	case Failed:
+		return true
+	case Queued:
+		return true
+	case Running:
+		return true
+	case Succeeded:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EnvironmentIsolation.
 const (
 	Container EnvironmentIsolation = "container"
@@ -104,6 +131,42 @@ type CurrentFactorRequest struct {
 	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
 	CurrentFactor CurrentFactor `json:"CurrentFactor"`
 }
+
+// Deployment defines model for Deployment.
+type Deployment struct {
+	CreatedAt  time.Time          `json:"CreatedAt"`
+	FinishedAt *time.Time         `json:"FinishedAt,omitempty"`
+	Id         openapi_types.UUID `json:"Id"`
+
+	// JobId The job that ran the deploy. Its logs are under `/jobs/{jobId}`.
+	JobId  openapi_types.UUID `json:"JobId"`
+	JobKey string             `json:"JobKey"`
+	Ref    string             `json:"Ref"`
+
+	// RuleVersion The `RuleVersion` of the environment when the job passed the gate.
+	RuleVersion int64              `json:"RuleVersion"`
+	RunId       openapi_types.UUID `json:"RunId"`
+	RunJobId    openapi_types.UUID `json:"RunJobId"`
+	RunNumber   int64              `json:"RunNumber"`
+	Sha         *string            `json:"Sha,omitempty"`
+	State       DeploymentState    `json:"State"`
+}
+
+// DeploymentListResponse defines model for DeploymentListResponse.
+type DeploymentListResponse struct {
+	Data  *[]Deployment `json:"Data,omitempty"`
+	Error *ErrorDetail  `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// DeploymentState defines model for DeploymentState.
+type DeploymentState string
 
 // Envelope defines model for Envelope.
 type Envelope struct {
@@ -329,6 +392,12 @@ type ListEnvironmentsParams struct {
 	Limit *Limit `form:"Limit,omitempty" json:"Limit,omitempty"`
 }
 
+// ListDeploymentsParams defines parameters for ListDeployments.
+type ListDeploymentsParams struct {
+	Page  *Page  `form:"Page,omitempty" json:"Page,omitempty"`
+	Limit *Limit `form:"Limit,omitempty" json:"Limit,omitempty"`
+}
+
 // CreateEnvironmentJSONRequestBody defines body for CreateEnvironment for application/json ContentType.
 type CreateEnvironmentJSONRequestBody = CreateEnvironmentRequest
 
@@ -358,6 +427,9 @@ type ServerInterface interface {
 	// UpdateEnvironment Change the description or the protection rules of an environment
 	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName})
 	UpdateEnvironment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName)
+	// ListDeployments List the deployments to an environment
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/deployments)
+	ListDeployments(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, params ListDeploymentsParams)
 	// PauseEnvironment Stop new deploys to an environment
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/pause)
 	PauseEnvironment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName)
@@ -394,6 +466,12 @@ func (_ Unimplemented) GetEnvironment(w http.ResponseWriter, r *http.Request, id
 // UpdateEnvironment Change the description or the protection rules of an environment
 // (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName})
 func (_ Unimplemented) UpdateEnvironment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListDeployments List the deployments to an environment
+// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/deployments)
+func (_ Unimplemented) ListDeployments(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, params ListDeploymentsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -602,6 +680,79 @@ func (siw *ServerInterfaceWrapper) UpdateEnvironment(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateEnvironment(w, r, id, projectId, environmentName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDeployments operation middleware
+func (siw *ServerInterfaceWrapper) ListDeployments(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDeploymentsParams
+
+	// ------------- Optional query parameter "Page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "Page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "Page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "Limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "Limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "Limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeployments(w, r, id, projectId, environmentName, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -877,6 +1028,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/resume", wrapper.ResumeEnvironment)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/deployments", wrapper.ListDeployments)
+	})
 
 	return r
 }
@@ -1048,6 +1202,48 @@ func (response UpdateEnvironmentdefaultJSONResponse) VisitUpdateEnvironmentRespo
 	return err
 }
 
+type ListDeploymentsRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	Params          ListDeploymentsParams
+}
+
+type ListDeploymentsResponseObject interface {
+	VisitListDeploymentsResponse(w http.ResponseWriter) error
+}
+
+type ListDeployments200JSONResponse DeploymentListResponse
+
+func (response ListDeployments200JSONResponse) VisitListDeploymentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeploymentsdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response ListDeploymentsdefaultJSONResponse) VisitListDeploymentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PauseEnvironmentRequestObject struct {
 	Id              Id              `json:"id"`
 	ProjectId       ProjectId       `json:"projectId"`
@@ -1188,6 +1384,9 @@ type StrictServerInterface interface {
 	// UpdateEnvironment Change the description or the protection rules of an environment
 	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName})
 	UpdateEnvironment(ctx context.Context, request UpdateEnvironmentRequestObject) (UpdateEnvironmentResponseObject, error)
+	// ListDeployments List the deployments to an environment
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/deployments)
+	ListDeployments(ctx context.Context, request ListDeploymentsRequestObject) (ListDeploymentsResponseObject, error)
 	// PauseEnvironment Stop new deploys to an environment
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/pause)
 	PauseEnvironment(ctx context.Context, request PauseEnvironmentRequestObject) (PauseEnvironmentResponseObject, error)
@@ -1356,6 +1555,35 @@ func (sh *strictHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateEnvironmentResponseObject); ok {
 		if err := validResponse.VisitUpdateEnvironmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeployments operation middleware
+func (sh *strictHandler) ListDeployments(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, params ListDeploymentsParams) {
+	var request ListDeploymentsRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDeployments(ctx, request.(ListDeploymentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeployments")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeploymentsResponseObject); ok {
+		if err := validResponse.VisitListDeploymentsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

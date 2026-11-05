@@ -56,6 +56,30 @@ func (e RunIssueSeverity) Valid() bool {
 	}
 }
 
+// Defines values for RunJobGate.
+const (
+	Approval        RunJobGate = "approval"
+	EnvironmentBusy RunJobGate = "environment_busy"
+	Paused          RunJobGate = "paused"
+	Timer           RunJobGate = "timer"
+)
+
+// Valid indicates whether the value is a known member of the RunJobGate enum.
+func (e RunJobGate) Valid() bool {
+	switch e {
+	case Approval:
+		return true
+	case EnvironmentBusy:
+		return true
+	case Paused:
+		return true
+	case Timer:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunJobKind.
 const (
 	Discovery RunJobKind = "discovery"
@@ -354,13 +378,25 @@ type RunJob struct {
 	// CurrentJobId The job that runs this entry now, or ran it last. Its logs are under `/jobs/{jobId}`.
 	CurrentJobId *openapi_types.UUID `json:"CurrentJobId,omitempty"`
 
+	// Environment The environment the job names in `environment:`, if any.
+	Environment *string `json:"Environment,omitempty"`
+
+	// EnvironmentId The environment the job waits on or deployed to, once it reached the gate.
+	EnvironmentId *openapi_types.UUID `json:"EnvironmentId,omitempty"`
+
 	// FailureNames With `SECRET_NOT_FOUND` or `SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS`, the names of the secrets. Never a value.
 	FailureNames *[]string `json:"FailureNames,omitempty"`
 
-	// FailureReason For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
-	FailureReason *string            `json:"FailureReason,omitempty"`
-	FinishedAt    *time.Time         `json:"FinishedAt,omitempty"`
-	Id            openapi_types.UUID `json:"Id"`
+	// FailureReason For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`, `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`, `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
+	FailureReason *string    `json:"FailureReason,omitempty"`
+	FinishedAt    *time.Time `json:"FinishedAt,omitempty"`
+
+	// Gate Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the environment to be resumed, or for another run that holds the environment.
+	Gate *RunJobGate `json:"Gate,omitempty"`
+
+	// GateOpensAt With the `timer` gate, or after it, when the wait timer of the environment ends.
+	GateOpensAt *time.Time         `json:"GateOpensAt,omitempty"`
+	Id          openapi_types.UUID `json:"Id"`
 
 	// JobId The id of the job in the pipeline file.
 	JobId string `json:"JobId"`
@@ -376,6 +412,9 @@ type RunJob struct {
 	StartedAt *time.Time        `json:"StartedAt,omitempty"`
 	State     RunJobState       `json:"State"`
 }
+
+// RunJobGate Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the environment to be resumed, or for another run that holds the environment.
+type RunJobGate string
 
 // RunJobKind `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a client names it from the kind.
 type RunJobKind string

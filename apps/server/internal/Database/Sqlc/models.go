@@ -193,6 +193,25 @@ type DataKey struct {
 	SupersededAt   *time.Time
 }
 
+type Deployment struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	EnvironmentId  uuid.UUID
+	RunId          uuid.UUID
+	RunNumber      int64
+	RunJobId       uuid.UUID
+	JobId          uuid.UUID
+	JobKey         string
+	Ref            string
+	Sha            pgtype.Text
+	RuleVersion    int64
+	State          string
+	FinishedAt     *time.Time
+}
+
 type Environment struct {
 	Id                   uuid.UUID
 	CreatedAt            time.Time
@@ -219,6 +238,8 @@ type Environment struct {
 	PausedByUserId       *uuid.UUID
 	PausedReason         pgtype.Text
 	CreatedByUserId      uuid.UUID
+	LockedByRunId        *uuid.UUID
+	LockedAt             *time.Time
 }
 
 type EnvironmentReviewer struct {
@@ -677,6 +698,9 @@ type RunJob struct {
 	StartedAt      *time.Time
 	FinishedAt     *time.Time
 	FailureDetail  []byte
+	EnvironmentId  *uuid.UUID
+	Gate           pgtype.Text
+	GateOpensAt    *time.Time
 }
 
 type Runner struct {

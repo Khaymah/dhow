@@ -25,7 +25,7 @@ func runJobOf(rj sqlc.RunJob) (models.RunJob, error) {
 	return models.RunJob{
 		ID: rj.Id, Key: rj.Key, Kind: rj.Kind, JobID: rj.JobId, Name: rj.JobName, Matrix: matrix, Needs: rj.Needs, State: rj.State,
 		FailureReason: rj.FailureReason, FailureNames: failureNamesOf(rj.FailureDetail), CurrentJobID: rj.CurrentJobId, Attempts: int(rj.Attempts), StartedAt: rj.StartedAt,
-		FinishedAt: rj.FinishedAt,
+		FinishedAt: rj.FinishedAt, EnvironmentID: rj.EnvironmentId, Gate: rj.Gate.String, GateOpensAt: rj.GateOpensAt,
 	}, nil
 }
 
@@ -43,11 +43,13 @@ func (s *Service) detail(ctx context.Context, q *sqlc.Queries, run sqlc.Pipeline
 		return models.Detail{}, err
 	}
 	out := models.Detail{Run: runOf(run), Jobs: make([]models.RunJob, 0, len(rows)), Issues: issues, ImagePins: pinList(pins)}
+	envs := s.environmentNames(run)
 	for _, rj := range rows {
 		j, err := runJobOf(rj)
 		if err != nil {
 			return models.Detail{}, err
 		}
+		j.Environment = envs[rj.Key]
 		out.Jobs = append(out.Jobs, j)
 	}
 	return out, nil
@@ -119,6 +121,9 @@ func (s *Service) cancelLocked(ctx context.Context, q *sqlc.Queries, id uuid.UUI
 		return nil
 	}
 	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: id, State: models.RunCanceled, FailureReason: reason}); err != nil {
+		return err
+	}
+	if err := s.releaseRun(ctx, q, run); err != nil {
 		return err
 	}
 	return s.recordStatus(ctx, q, run, commitstatus.StateCanceled)

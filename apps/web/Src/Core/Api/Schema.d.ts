@@ -1632,6 +1632,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/deployments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the deployments to an environment
+         * @description Needs `run.read` on the project. Every job that passed the gate of the environment, newest first, with its run, ref, commit and state. The environment deployed now is the newest `succeeded` entry.
+         */
+        get: operations["listDeployments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/secrets": {
         parameters: {
             query?: never;
@@ -4191,6 +4211,39 @@ export interface components {
         EnvironmentListResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["Environment"][];
         };
+        /** @enum {string} */
+        DeploymentState: "queued" | "running" | "succeeded" | "failed" | "canceled";
+        Deployment: {
+            /** Format: uuid */
+            Id: string;
+            /** Format: uuid */
+            RunId: string;
+            /** Format: int64 */
+            RunNumber: number;
+            /** Format: uuid */
+            RunJobId: string;
+            /**
+             * Format: uuid
+             * @description The job that ran the deploy. Its logs are under `/jobs/{jobId}`.
+             */
+            JobId: string;
+            JobKey: string;
+            Ref: string;
+            Sha?: string;
+            /**
+             * Format: int64
+             * @description The `RuleVersion` of the environment when the job passed the gate.
+             */
+            RuleVersion: number;
+            State: components["schemas"]["DeploymentState"];
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            FinishedAt?: string;
+        };
+        DeploymentListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["Deployment"][];
+        };
         CreateEnvironmentRequest: {
             CurrentFactor: components["schemas"]["CurrentFactor"];
             /** @description The name a job writes in `environment:`. Lowercase letters, digits, `_` and `-`. */
@@ -4223,6 +4276,11 @@ export interface components {
         RunJobKind: "job" | "discovery";
         /** @enum {string} */
         RunJobState: "waiting" | "active" | "succeeded" | "failed" | "canceled" | "skipped";
+        /**
+         * @description Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the environment to be resumed, or for another run that holds the environment.
+         * @enum {string}
+         */
+        RunJobGate: "approval" | "timer" | "paused" | "environment_busy";
         RunIssue: {
             /** @description A stable code such as `UNKNOWN_KEY` or `IMAGE_NOT_PINNED`, the same that `dhow lint` prints. */
             Code: string;
@@ -4294,10 +4352,23 @@ export interface components {
             };
             Needs: string[];
             State: components["schemas"]["RunJobState"];
-            /** @description For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`. */
+            /** @description For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`, `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`, `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`. */
             FailureReason?: string;
             /** @description With `SECRET_NOT_FOUND` or `SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS`, the names of the secrets. Never a value. */
             FailureNames?: string[];
+            /** @description The environment the job names in `environment:`, if any. */
+            Environment?: string;
+            /**
+             * Format: uuid
+             * @description The environment the job waits on or deployed to, once it reached the gate.
+             */
+            EnvironmentId?: string;
+            Gate?: components["schemas"]["RunJobGate"];
+            /**
+             * Format: date-time
+             * @description With the `timer` gate, or after it, when the wait timer of the environment ends.
+             */
+            GateOpensAt?: string;
             /**
              * Format: uuid
              * @description The job that runs this entry now, or ran it last. Its logs are under `/jobs/{jobId}`.
@@ -7101,6 +7172,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvironmentResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listDeployments: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of deployments. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentListResponse"];
                 };
             };
             default: components["responses"]["Error"];

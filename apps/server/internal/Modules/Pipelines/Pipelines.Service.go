@@ -15,6 +15,7 @@ import (
 	artifactindex "github.com/Khaymah/dhow/apps/server/internal/Core/ArtifactIndex"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	commitstatus "github.com/Khaymah/dhow/apps/server/internal/Core/CommitStatus"
+	deployments "github.com/Khaymah/dhow/apps/server/internal/Core/Deployments"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	jobqueue "github.com/Khaymah/dhow/apps/server/internal/Core/JobQueue"
@@ -66,6 +67,7 @@ type Service struct {
 	logins        secretstore.RegistryLogins
 	secrets       secretstore.Store
 	vars          secretstore.VariableStore
+	gate          deployments.Gate
 	checkoutImage string
 	publicURL     string
 	limiter       ratelimit.Limiter

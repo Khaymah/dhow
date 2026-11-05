@@ -28,11 +28,13 @@ const (
 var ErrNoSecretScope = errors.New("the job is not the current job of an active pipeline run")
 
 type SecretScope struct {
-	ProjectID   uuid.UUID
-	RunID       uuid.UUID
-	RunJobID    uuid.UUID
-	IsFork      bool
-	PullRequest bool
+	ProjectID     uuid.UUID
+	RunID         uuid.UUID
+	RunJobID      uuid.UUID
+	IsFork        bool
+	PullRequest   bool
+	EnvironmentID *uuid.UUID
+	Target        RefTarget
 }
 
 func (s *Service) UseSecrets(store secretstore.Store) { s.secrets = store }
@@ -57,7 +59,14 @@ func (s *Service) SecretScopeOfJob(ctx context.Context, org, job uuid.UUID) (Sec
 	if err != nil {
 		return SecretScope{}, err
 	}
-	return SecretScope{ProjectID: row.ProjectId, RunID: row.RunId, RunJobID: row.RunJobId, IsFork: row.IsFork, PullRequest: row.PullRequest}, nil
+	trigger := ""
+	if row.PullRequest {
+		trigger = triggerPullRequest
+	}
+	return SecretScope{
+		ProjectID: row.ProjectId, RunID: row.RunId, RunJobID: row.RunJobId, IsFork: row.IsFork, PullRequest: row.PullRequest,
+		EnvironmentID: row.EnvironmentId, Target: TargetOf(trigger, row.Ref, row.BaseRef.String),
+	}, nil
 }
 
 func userSecretNames(spec *runnerv1.JobSpec) []string {
@@ -81,13 +90,15 @@ func failureDetail(names []string) []byte {
 	return []byte("{}")
 }
 
-func (s *Service) checkSecrets(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, spec *runnerv1.JobSpec) (string, []byte, error) {
+func (s *Service) checkSecrets(
+	ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, spec *runnerv1.JobSpec, env *uuid.UUID,
+) (string, []byte, error) {
 	names := userSecretNames(spec)
 	if len(names) == 0 || s.secrets == nil {
 		return "", nil, nil
 	}
 	res, err := s.secrets.Check(ctx, q, secretstore.Request{
-		OrganizationID: run.OrganizationId, ProjectID: run.ProjectId, Names: names,
+		OrganizationID: run.OrganizationId, ProjectID: run.ProjectId, EnvironmentID: env, Names: names,
 		PullRequest: run.Trigger == triggerPullRequest, Fork: run.IsFork,
 	})
 	switch {

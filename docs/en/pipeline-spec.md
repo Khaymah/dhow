@@ -131,7 +131,7 @@ jobs:
 | `jobs.<id>.image` | string | Required when the job has a `run:` step. Should be digest-pinned: a tag-only image is a warning, and the server pins the tag to a digest when the run starts (§12.5). A name without a registry host is completed the way Docker does it: `node:22-bookworm@sha256:…` runs as `docker.io/library/node:22-bookworm@sha256:…`. The runner never searches other registries. |
 | `jobs.<id>.runner` | map | Same keys as `defaults.runner`; its `labels` replace the defaults |
 | `jobs.<id>.timeout` | duration | From `1s` to `24h`, for example `90s`, `20m` or `1h30m` (units `d`, `h`, `m`, `s`, largest first) |
-| `jobs.<id>.environment` | string | Binds protection rules, secrets and targets. Until the deploy gate arrives (M5.6) the job is skipped with `ENVIRONMENTS_UNAVAILABLE` |
+| `jobs.<id>.environment` | string | Binds protection rules, secrets and targets. The job passes the environment gate before it starts (§9) |
 | `jobs.<id>.network.egress` | list | Host allowlist; empty means deny-all, at most 64 entries. Each entry is one of `host`, `host:port` or `*.domain`. (1) **Hosts:** lowercase ASCII, with punycode (`xn--…`) for other scripts. IP literals, all-numeric names and single-label names (`localhost`, `*.com`) are refused. `*.domain` matches any subdomain but not `domain` itself. (2) **Ports:** without a port, an entry opens 443 through `CONNECT` and 80 for plain `http://`. (3) **Proxy:** traffic goes through the runner's proxy on `127.0.0.1:3128` (`HTTPS_PROXY`, `HTTP_PROXY` and `ALL_PROXY` are set for every step and override the job's own values), so clients must be proxy-aware. SSH and other TCP clients can use `ProxyCommand=/run/dhow/bin/connect %h %p`. (4) **Not supported:** UDP, QUIC and programs that ignore proxies. (5) **Always denied:** private, loopback, link-local and metadata addresses (ADR-0044, ADR-0057) |
 | `jobs.<id>.resources` | map | `cpu` (cores like `2` or `1.5`, or millicores like `1500m`; 0.1 to 64), `memory` and `disk` (`Ki`, `Mi`, `Gi` or `Ti`, for example `4Gi`; memory 64Mi to 64Gi, disk 64Mi to 100Gi) and `pids` (32 to 32768). What is not set uses the server default (1 CPU, 2Gi memory, 4Gi disk, 1024 pids) |
 | `jobs.<id>.env` | map | At most 100 variables. Names are letters, digits and `_`, and names that start with `DHOW_` are reserved. Each value is text or one whole CEL `string` expression |
@@ -277,7 +277,7 @@ jobs:
 
 - **The `schedule` trigger** comes after the first release, and **the `artifact` trigger** (a build from external CI) comes with M6. Both are refused with `TRIGGER_NOT_SUPPORTED_YET`, not ignored.
 - **`isolation: gvisor`** is refused with `ISOLATION_NOT_SUPPORTED_YET` until gVisor returns after the first release.
-- **The environment gate** arrives with M5.6. Until then a job with `environment:` is skipped (`ENVIRONMENTS_UNAVAILABLE`), so environment secrets and variables reach no job yet. **`id_token:`** (an OIDC token for cloud services) arrives after the first release and is refused with `ID_TOKEN_NOT_SUPPORTED_YET`.
+- **Environment approvals** arrive in a coming update. Until then a job on an environment with reviewers waits and does not start. **`id_token:`** (an OIDC token for cloud services) arrives after the first release and is refused with `ID_TOKEN_NOT_SUPPORTED_YET`.
 - **`services:`** (containers that live for the whole job) and the visual editor come after the first release.
 
 ## 9. Environment protection (server-side, not in YAML)
@@ -288,6 +288,8 @@ Protection rules are configured on the environment in the UI or API, so a commit
 - a wait timer and deployment windows, including freeze periods;
 - the required isolation level, and a requirement for digest-pinned images and verified plugins;
 - an admin bypass, which is recorded in the audit log.
+
+Before a job with `environment:` starts, it passes the **environment gate**: the environment exists, the branch or tag is allowed, the images and plugins follow the rules, the secrets exist, then the pause, the reviewers, the timer, and one run on the environment at a time. The details are in the [environments guide](guides/environments.md#the-gate).
 
 ## 10. Visual editor
 

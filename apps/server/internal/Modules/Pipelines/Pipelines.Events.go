@@ -103,7 +103,7 @@ func (s *Service) JobFinished(ctx context.Context, q *sqlc.Queries, f runevents.
 		return s.discovered(ctx, q, run, f)
 	}
 	if models.RunFinished(run.State) {
-		return nil
+		return s.releaseRun(ctx, q, run)
 	}
 	return s.resume(ctx, q, run)
 }
@@ -143,6 +143,9 @@ func (s *Service) abandon(ctx context.Context, q *sqlc.Queries, run sqlc.Pipelin
 		}
 	}
 	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: run.Id, State: models.RunFailed, FailureReason: reason}); err != nil {
+		return err
+	}
+	if err := s.releaseRun(ctx, q, run); err != nil {
 		return err
 	}
 	return s.recordStatus(ctx, q, run, commitstatus.StateFailed)

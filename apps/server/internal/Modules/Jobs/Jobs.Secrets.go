@@ -9,7 +9,10 @@ import (
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
-var ErrSecretsUnavailable = errors.New("no secret store is configured")
+var (
+	ErrSecretsUnavailable     = errors.New("no secret store is configured")
+	ErrEnvironmentRuleChanged = errors.New("the environment of the job or its rules changed after the gate")
+)
 
 type SecretRequest struct {
 	OrganizationID uuid.UUID
@@ -34,6 +37,10 @@ type Origin struct {
 type SecretResolver interface {
 	Accepts(ctx context.Context, origin Origin, names []string) error
 	Resolve(ctx context.Context, req SecretRequest) (map[string][]byte, error)
+}
+
+type StartGuard interface {
+	Admit(ctx context.Context, req SecretRequest) error
 }
 
 type NoSecrets struct{}

@@ -29,10 +29,12 @@ type ReconcileResult struct {
 	Stalled   int
 	Unsettled int
 	Failed    int
+	Released  int
+	Gated     int
 }
 
 func (r ReconcileResult) Total() int {
-	return r.Unqueued + r.Drifted + r.Stalled + r.Unsettled + r.Failed
+	return r.Unqueued + r.Drifted + r.Stalled + r.Unsettled + r.Failed + r.Released
 }
 
 func poisoned(err error) bool {
@@ -74,7 +76,10 @@ func (s *Service) isolate(ctx context.Context, run uuid.UUID, step string, cause
 
 func (s *Service) Reconcile(ctx context.Context) (ReconcileResult, error) {
 	var out ReconcileResult
-	errs := []error{s.repairDrift(ctx, &out), s.failStalled(ctx, &out), s.resumeUnsettled(ctx, &out), s.startQueued(ctx, &out)}
+	errs := []error{
+		s.repairDrift(ctx, &out), s.failStalled(ctx, &out), s.resumeUnsettled(ctx, &out), s.reopenGates(ctx, &out),
+		s.releaseStale(ctx, &out), s.startQueued(ctx, &out),
+	}
 	if err := s.afterCancel(ctx); err != nil {
 		errs = append(errs, err)
 	}
@@ -152,6 +157,44 @@ func (s *Service) resumeUnsettled(ctx context.Context, out *ReconcileResult) err
 		out.Unsettled++
 	}
 	return nil
+}
+
+func (s *Service) reopenGates(ctx context.Context, out *ReconcileResult) error {
+	ids, err := s.queries().ListGatedRuns(ctx, sqlc.ListGatedRunsParams{
+		UpdatedBefore: s.now().Add(-config.PipelineGateInterval), Batch: config.PipelineBatch,
+	})
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		err := s.inTx(ctx, func(q *sqlc.Queries) error {
+			run, err := q.LockRun(ctx, id)
+			if err != nil || run.State != models.RunRunning {
+				return err
+			}
+			if err := s.resume(ctx, q, run); err != nil {
+				return err
+			}
+			return q.TouchRun(ctx, id)
+		})
+		if err != nil {
+			s.isolate(ctx, id, "gated", err, out)
+			continue
+		}
+		out.Gated++
+	}
+	return nil
+}
+
+func (s *Service) releaseStale(ctx context.Context, out *ReconcileResult) error {
+	if s.gate == nil {
+		return nil
+	}
+	return s.inTx(ctx, func(q *sqlc.Queries) error {
+		n, err := s.gate.ReleaseStale(ctx, q)
+		out.Released += int(n)
+		return err
+	})
 }
 
 func (s *Service) StartQueued(ctx context.Context) (int, error) {
@@ -238,7 +281,7 @@ func (s *Service) RunReconciler(ctx context.Context) {
 			s.log.ErrorContext(ctx, "the run reconciler pass had errors; it goes on next pass", "error", err)
 		case res.Total() > 0:
 			s.log.InfoContext(ctx, "run reconciler pass", "unqueued", res.Unqueued, "drifted", res.Drifted,
-				"stalled", res.Stalled, "unsettled", res.Unsettled, "failed", res.Failed)
+				"stalled", res.Stalled, "unsettled", res.Unsettled, "failed", res.Failed, "released", res.Released)
 		}
 	}
 }

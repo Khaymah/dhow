@@ -34,6 +34,7 @@ func Policies() []policy.Rule {
 		policy.Project(http.MethodPost, environmentPath+"/remove", policy.EnvironmentManage, orgParam, projectParam),
 		policy.Project(http.MethodPost, environmentPath+"/pause", policy.EnvironmentPause, orgParam, projectParam),
 		policy.Project(http.MethodPost, environmentPath+"/resume", policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodGet, environmentPath+"/deployments", policy.RunRead, orgParam, projectParam).AllowTokens(),
 	}
 }
 
