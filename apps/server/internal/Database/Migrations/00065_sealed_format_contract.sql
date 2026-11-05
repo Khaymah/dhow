@@ -1,6 +1,8 @@
 -- dhow:phase contract
 -- dhow:floor 0.0.0
 -- +goose Up
+SET LOCAL lock_timeout = '5s';
+
 -- +goose StatementBegin
 DO $$
 DECLARE
@@ -44,8 +46,11 @@ ALTER TABLE "SecretVersions" ADD CONSTRAINT "CK_SecretVersions_ValueSealed_Envel
     CHECK ("ValueSealed" IS NULL OR (octet_length("ValueSealed") >= 1 AND get_byte("ValueSealed", 0) = 3)) NOT VALID;
 ALTER TABLE "RegistryCredentials" ADD CONSTRAINT "CK_RegistryCredentials_PasswordSealed_Envelope"
     CHECK ("PasswordSealed" IS NULL OR (octet_length("PasswordSealed") >= 1 AND get_byte("PasswordSealed", 0) = 3)) NOT VALID;
+ALTER TABLE "GitConnections" ADD CONSTRAINT "CK_GitConnections_TokenSealed_Envelope"
+    CHECK ("TokenSealed" IS NULL OR (octet_length("TokenSealed") >= 1 AND get_byte("TokenSealed", 0) = 3)) NOT VALID;
 
 -- +goose Down
+ALTER TABLE "GitConnections" DROP CONSTRAINT "CK_GitConnections_TokenSealed_Envelope";
 ALTER TABLE "RegistryCredentials" DROP CONSTRAINT "CK_RegistryCredentials_PasswordSealed_Envelope";
 ALTER TABLE "SecretVersions" DROP CONSTRAINT "CK_SecretVersions_ValueSealed_Envelope";
 ALTER TABLE "Repositories" DROP CONSTRAINT "CK_Repositories_WebhookSecretSealed_Envelope";

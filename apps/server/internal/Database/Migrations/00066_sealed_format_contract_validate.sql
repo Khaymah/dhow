@@ -9,5 +9,6 @@ ALTER TABLE "Repositories" VALIDATE CONSTRAINT "CK_Repositories_PreviousDeployKe
 ALTER TABLE "Repositories" VALIDATE CONSTRAINT "CK_Repositories_WebhookSecretSealed_Envelope";
 ALTER TABLE "SecretVersions" VALIDATE CONSTRAINT "CK_SecretVersions_ValueSealed_Envelope";
 ALTER TABLE "RegistryCredentials" VALIDATE CONSTRAINT "CK_RegistryCredentials_PasswordSealed_Envelope";
+ALTER TABLE "GitConnections" VALIDATE CONSTRAINT "CK_GitConnections_TokenSealed_Envelope";
 
 -- +goose Down

@@ -158,7 +158,7 @@ var notSealed = map[string]string{
 	"Runners.EncryptionPublicKey": "public key", "Runners.SigningPublicKey": "public key", "RunnerSessions.ChallengeNonce": "public nonce",
 	"LogChunks.Data":   "job logs, masked by the runner",
 	"DataKeys.Wrapped": "the keyring wraps it", "KeyEncryptionKeys.CheckValue": "an HMAC of the KEK",
-	"GitConnections.TokenSealed": "nothing writes it until M4.6, which must register it",
+	"GitConnections.TokenSealed": "nothing writes it until M4.6, which must register it; 00065 already accepts only the 0x03 format",
 }
 
 var maxCheck = regexp.MustCompile(`octet_length\("([A-Za-z]+)"\) <= (\d+)`)
@@ -278,7 +278,9 @@ func TestTheSealedFormatContractCoversEveryRegisteredColumn(t *testing.T) {
 		assert.Contains(t, string(contract), "ADD CONSTRAINT "+constraint, "%s: the contract adds the CHECK", spec.Name())
 		assert.Contains(t, string(validate), "VALIDATE CONSTRAINT "+constraint, "%s: the next migration validates it", spec.Name())
 	}
-	assert.Equal(t, len(reg.Locations()), strings.Count(string(contract), "ADD CONSTRAINT"))
+	assert.Contains(t, string(contract), `ADD CONSTRAINT "CK_GitConnections_TokenSealed_Envelope"`, "the column M4.6 will write already accepts only 0x03")
+	assert.Contains(t, string(validate), `VALIDATE CONSTRAINT "CK_GitConnections_TokenSealed_Envelope"`)
+	assert.Equal(t, len(reg.Locations())+1, strings.Count(string(contract), "ADD CONSTRAINT"))
 }
 
 func (w sealedWorld) userID(t *testing.T) string {
