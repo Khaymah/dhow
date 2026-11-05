@@ -91,7 +91,7 @@ func TestTheKeyFileStaysInTheDeploySandboxAwayFromALiveNeighbourAndTheNextStep(t
 		"grep -c " + keyLine1 + " /tmp/proc-dump || true",
 		"grep -c DHOW_TARGET_KEY_FILE /tmp/proc-dump || true",
 		"ls /proc | grep -c '^[0-9]'",
-		"cat " + keyPath + " 2>&1 || true",
+		"cat " + keyPath + " 2>/dev/null || echo no-key-file",
 		"ls /run/dhow/secrets 2>&1 || true",
 		"find / -xdev -name 'target-key*' 2>/dev/null || true",
 		"echo done",
@@ -102,6 +102,7 @@ func TestTheKeyFileStaysInTheDeploySandboxAwayFromALiveNeighbourAndTheNextStep(t
 	assert.NotContains(t, out.stdout, "BEGIN OPENSSH")
 	assert.NotContains(t, out.stdout, "DHOW_TARGET_KEY_FILE", "the environment of the deploy step is not visible from the other sandbox")
 	assert.NotContains(t, out.stdout, "target-key")
+	assert.Contains(t, out.stdout, "no-key-file")
 	assert.Contains(t, out.stdout, "done")
 
 	cancel()
@@ -115,6 +116,7 @@ func TestTheKeyFileStaysInTheDeploySandboxAwayFromALiveNeighbourAndTheNextStep(t
 	after := run(t, next, hunt, nil)
 	assert.NotContains(t, after.stdout, keyLine1, "the next step of the same job finds no key in the workspace or under /run/dhow")
 	assert.NotContains(t, after.stdout, "target-key")
+	assert.Contains(t, after.stdout, "no-key-file")
 	assert.Contains(t, after.stdout, "done")
 }
 
