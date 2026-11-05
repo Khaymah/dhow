@@ -2,7 +2,6 @@ package jobspec
 
 import (
 	"encoding/base64"
-	"net"
 	"net/netip"
 	"regexp"
 	"slices"
@@ -10,8 +9,6 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/google/uuid"
 
 	"github.com/Khaymah/dhow/internal/hostname"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
@@ -146,11 +143,32 @@ func oneLine(v string, limit int) bool {
 	return !strings.ContainsFunc(v, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) })
 }
 
-func Endpoint(host string, port int) string { return net.JoinHostPort(host, strconv.Itoa(port)) }
+func Endpoint(host string, port int) string {
+	if strings.Contains(host, ":") {
+		return "[" + host + "]:" + strconv.Itoa(port)
+	}
+	return host + ":" + strconv.Itoa(port)
+}
+
+func splitEndpoint(entry string) (string, string, bool) {
+	if rest, ok := strings.CutPrefix(entry, "["); ok {
+		host, port, found := strings.Cut(rest, "]:")
+		return host, port, found
+	}
+	i := strings.LastIndexByte(entry, ':')
+	if i < 0 || strings.Contains(entry[:i], ":") {
+		return "", "", false
+	}
+	return entry[:i], entry[i+1:], true
+}
+
+var canonicalID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+func validID(id string) bool { return canonicalID.MatchString(id) }
 
 func ParseEndpoint(entry string) (string, int, bool) {
-	host, portText, err := net.SplitHostPort(entry)
-	if err != nil || len(entry) > MaxEgressEntryLength {
+	host, portText, split := splitEndpoint(entry)
+	if !split || len(entry) > MaxEgressEntryLength {
 		return "", 0, false
 	}
 	port, ok := parsePort(portText)
@@ -195,7 +213,7 @@ func (c *checker) targetStep(field string, t *runnerv1.StepTarget, spec *runnerv
 }
 
 func (c *checker) targetIdentity(field string, t *runnerv1.StepTarget) {
-	if _, err := uuid.Parse(t.GetTargetId()); err != nil {
+	if !validID(t.GetTargetId()) {
 		c.add(field+".TargetId", ReasonInvalid)
 	}
 	if t.GetVersion() < 1 {
@@ -235,7 +253,7 @@ func (c *checker) targetHosts(field string, t *runnerv1.StepTarget) {
 	addresses := map[string]bool{}
 	for i, h := range hosts {
 		hf := at(field+".Hosts", i)
-		if _, err := uuid.Parse(h.GetHostId()); err != nil || ids[h.GetHostId()] {
+		if !validID(h.GetHostId()) || ids[h.GetHostId()] {
 			c.add(hf+".HostId", ReasonInvalid)
 		}
 		ids[h.GetHostId()] = true

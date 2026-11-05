@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
 	"github.com/Khaymah/dhow/internal/jobspec"
+	"github.com/Khaymah/dhow/internal/netguard"
 	"github.com/Khaymah/dhow/internal/pipelinespec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
@@ -208,7 +210,7 @@ func healthOf(inputs map[string]string, t deployments.DeployTarget, extra bool) 
 		return nil, denial{reason: models.ReasonHealthURLInvalid}
 	}
 	for _, e := range endpoints {
-		if host, _, ok := jobspec.ParseEndpoint(e); !ok || !jobspec.HealthHostAllowed(host, hosts, extra) {
+		if host, _, ok := jobspec.ParseEndpoint(e); !ok || !jobspec.HealthHostAllowed(host, hosts, extra, deniedHealthAddr) {
 			return nil, denial{reason: models.ReasonHealthURLNotAllowed}
 		}
 	}
@@ -332,3 +334,5 @@ func (s *Service) keysNotReferenced(ctx context.Context, q *sqlc.Queries, st *st
 	}
 	return denial{reason: models.ReasonTargetKeyReferenced, names: hit}, nil
 }
+
+func deniedHealthAddr(addr netip.Addr) bool { return netguard.Policy{}.Denial(addr) != "" }
