@@ -15,6 +15,7 @@ on:
       - deploy/dhow-git/**
       - deploy/m3-demo/**
       - deploy/m4-demo/**
+      - deploy/m5-demo/**
       - deploy/e2e/**
       - deploy/ci/demo-areas.sh
       - apps/web/**
@@ -58,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        demo: [m3-demo, m4-demo]
+        demo: [m3-demo, m4-demo, m5-demo]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

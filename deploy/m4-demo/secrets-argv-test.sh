@@ -46,7 +46,7 @@ check "the bearer token reaches curl on stdin" grep -qF 'header = "Authorization
 check "the body reaches curl from a file" grep -qF '"Password":"password-value-0123456789"' "$work/body"
 check "the body file is removed after the call" test ! -e "$work/call.req"
 check "a quote in a header cannot break out of the curl config" test "$(curl_quote 'a"b\c')" = 'a\"b\\c'
-for script in deploy/m4-demo/run.sh deploy/m4-demo/project.sh deploy/e2e/run.sh deploy/e2e/push.sh; do
+for script in deploy/m4-demo/run.sh deploy/m4-demo/project.sh deploy/e2e/run.sh deploy/e2e/push.sh deploy/m5-demo/run.sh deploy/m5-demo/lib.sh; do
   for pattern in '--user ' 'extraHeader' '-hmac ' '--password '; do
     check "$script passes no secret with $pattern" absent "$pattern" "$root/$script"
   done
