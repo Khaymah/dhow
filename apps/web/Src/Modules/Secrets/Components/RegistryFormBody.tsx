@@ -158,7 +158,7 @@ const ExistingCredential = ({ scope, credentialId, onDone }: { scope: ISecretSco
   const query = useRegistryCredentials(scope);
   return (
     <FormLookup query={query} find={(items) => items.find((item) => item.Id === credentialId)} missing={t('registry.form.notFound')}>
-      {(credential) => <RegistryForm key={credential.Id} scope={scope} existing={credential} onDone={onDone} />}
+      {(credential) => <RegistryForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}:${credential.Id}`} scope={scope} existing={credential} onDone={onDone} />}
     </FormLookup>
   );
 };
@@ -167,7 +167,7 @@ export const RegistryFormBody = ({ projectId, credentialId, onDone }: IRegistryF
   <FormGate projectId={projectId}>
     {(scope) =>
       credentialId === undefined ? (
-        <RegistryForm key={scope.OrganizationId} scope={scope} existing={undefined} onDone={onDone} />
+        <RegistryForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}`} scope={scope} existing={undefined} onDone={onDone} />
       ) : (
         <ExistingCredential scope={scope} credentialId={credentialId} onDone={onDone} />
       )

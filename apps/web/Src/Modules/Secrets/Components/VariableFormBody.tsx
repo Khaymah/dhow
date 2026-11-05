@@ -88,7 +88,7 @@ const ExistingVariable = ({ scope, name, onDone }: { scope: ISecretScope; name: 
   const query = useVariables(scope);
   return (
     <FormLookup query={query} find={(items) => items.find((item) => item.Name === name)} missing={t('variables.form.notFound')}>
-      {(variable) => <VariableForm key={variable.Name} scope={scope} existing={variable} onDone={onDone} />}
+      {(variable) => <VariableForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}:${variable.Name}`} scope={scope} existing={variable} onDone={onDone} />}
     </FormLookup>
   );
 };
@@ -97,7 +97,7 @@ export const VariableFormBody = ({ projectId, environmentName, name, onDone }: I
   <FormGate projectId={projectId} environmentName={environmentName}>
     {(scope) =>
       name === undefined ? (
-        <VariableForm key={scope.OrganizationId} scope={scope} existing={undefined} onDone={onDone} />
+        <VariableForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}`} scope={scope} existing={undefined} onDone={onDone} />
       ) : (
         <ExistingVariable scope={scope} name={name} onDone={onDone} />
       )
