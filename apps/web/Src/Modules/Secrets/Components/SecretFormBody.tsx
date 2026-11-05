@@ -88,7 +88,7 @@ const ExistingSecret = ({ scope, name, onDone }: { scope: ISecretScope; name: st
   const query = useSecrets(scope);
   return (
     <FormLookup query={query} find={(items) => items.find((item) => item.Name === name)} missing={t('secrets.form.notFound')}>
-      {(secret) => <SecretForm key={secret.Name} scope={scope} existing={secret} onDone={onDone} />}
+      {(secret) => <SecretForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}:${secret.Name}`} scope={scope} existing={secret} onDone={onDone} />}
     </FormLookup>
   );
 };
@@ -97,7 +97,7 @@ export const SecretFormBody = ({ projectId, name, onDone }: ISecretFormBodyProps
   <FormGate projectId={projectId}>
     {(scope) =>
       name === undefined ? (
-        <SecretForm key={scope.OrganizationId} scope={scope} existing={undefined} onDone={onDone} />
+        <SecretForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}`} scope={scope} existing={undefined} onDone={onDone} />
       ) : (
         <ExistingSecret scope={scope} name={name} onDone={onDone} />
       )
