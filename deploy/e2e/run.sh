@@ -61,7 +61,7 @@ first_push() {
 }
 
 browser_tests() {
-  DHOW_E2E_URL=$public_url DHOW_E2E_EMAIL=$owner_email DHOW_E2E_PASSWORD=$password DHOW_E2E_ORG_ID=$org_id \
+  DHOW_E2E_SECRET_VALUE=$secret_value DHOW_E2E_URL=$public_url DHOW_E2E_EMAIL=$owner_email DHOW_E2E_PASSWORD=$password DHOW_E2E_ORG_ID=$org_id \
     DHOW_E2E_PROJECT_ID=$project_id DHOW_E2E_PUSH="$root/deploy/e2e/push.sh" \
     pnpm -C "$root/apps/web" exec playwright test "$@"
 }
@@ -72,13 +72,20 @@ web_built || exit 2
 prepare_work
 trap teardown EXIT
 clean_start
+: >"$work/needles"
+secret_value="e2e-$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
+needle "environment secret" "$secret_value"
 say "The checkout image and a registry for it"
 need "the dhow-git image is built and pushed to a TLS registry" checkout_image
 say "Postgres, the server, Forgejo and the Podman runner (the first build takes a few minutes)"
 docker compose up --detach --build db server forgejo runner tools >/dev/null
 need "the server starts and prints its setup link" server_ready
 need "the owner and the organization are set up" setup_owner
+needle "session cookie" "${session_cookie#*=}"
+needle "CSRF token" "$csrf_token"
+needle "owner password" "$password"
 need "the Podman runner registers and comes online" runner_up
+needle "runner registration token" "$registration_token"
 need "an API token is made" api_token
 need "Forgejo has a user and an empty repository" forgejo_repo
 need "the pipeline reaches Forgejo before the project is linked" first_push
@@ -87,5 +94,7 @@ need "the repository is linked and its host key is pinned after a fingerprint ch
 need "Forgejo has the read-only deploy key and the webhook" forgejo_hooks
 say "The browser tests"
 check "the browser tests pass" browser_tests "$@"
+say "The credential leak sweep"
+check "no credential and no secret value is stored in clear anywhere" bash "$demo_dir/leak-sweep.sh"
 summary
 ((failed == 0))

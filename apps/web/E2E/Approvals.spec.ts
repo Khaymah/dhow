@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 import { DESKTOP, expectClean, expectNowhere, open, PHONE, shot, signInPage, type IView } from './Guard';
-import { freshCode, invite, push, runOn, signIn, stack, turnOnTotp, waitGate, waitRun, type ISession, type IUser } from './Stack';
+import { freshCode, invite, push, runOn, setting, signIn, stack, turnOnTotp, waitGate, waitRun, type ISession, type IUser } from './Stack';
 
 test.describe.configure({ mode: 'serial' });
 
 const ENVIRONMENT = 'production';
 const SECRET_NAME = 'DEPLOY_TOKEN';
-const SECRET_VALUE = `e2e-secret-${Date.now().toString(36)}-value`;
+const SECRET_VALUE = setting('DHOW_E2E_SECRET_VALUE');
 const FEATURE = `feature/e2e-${Date.now().toString(36)}`;
 
 let owner: ISession;
