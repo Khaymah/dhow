@@ -60,6 +60,7 @@ const jobsRoute = createRoute({
   validateSearch: parseJobsSearch,
 });
 const jobRoute = page('jobs/$jobId', SHELL_PAGES.job);
+const approvalsRoute = page('approvals', SHELL_PAGES.approvals);
 const runnersRoute = page('runners', SHELL_PAGES.runners);
 const runnerTokensRoute = page('runners/tokens', SHELL_PAGES.runnerTokens);
 const runnerRoute = createRoute({ getParentRoute: () => runnersRoute, path: '$runnerId', component: SHELL_PAGES.runner });
@@ -136,6 +137,7 @@ const routeTree = rootRoute.addChildren([
     runRoute,
     jobsRoute,
     jobRoute,
+    approvalsRoute,
     runnersRoute.addChildren([runnerRoute]),
     runnerTokensRoute,
     membersRoute,

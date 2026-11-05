@@ -12,6 +12,7 @@ const FULL: TOverview = {
   Jobs: { Running: 1, Queued: 3, QueuedNoRunner: 2, FailedLast24h: 4 },
   Runners: { Online: 2, Offline: 1, Paused: 0 },
   Invitations: { Pending: 2 },
+  Approvals: { Pending: 0 },
 };
 
 const mount = (overview: TOverview) => {
@@ -37,7 +38,7 @@ describe('OverviewStats', () => {
   });
 
   it('shows zeros as zeros, without notes', () => {
-    mount({ Jobs: { Running: 0, Queued: 0, QueuedNoRunner: 0, FailedLast24h: 0 }, Runners: { Online: 0, Offline: 0, Paused: 0 }, Invitations: null });
+    mount({ Jobs: { Running: 0, Queued: 0, QueuedNoRunner: 0, FailedLast24h: 0 }, Runners: { Online: 0, Offline: 0, Paused: 0 }, Invitations: null, Approvals: null });
     expect(screen.getAllByRole('link').map((tile) => tile.querySelector('b')?.textContent)).toEqual(['0', '0', '0', '0']);
     expect(screen.queryByText(/بلا جهاز مناسب|غير متصل/)).not.toBeInTheDocument();
   });

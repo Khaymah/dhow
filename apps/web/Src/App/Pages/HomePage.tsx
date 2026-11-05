@@ -23,7 +23,7 @@ import { RunnersSummaryCard } from '@/Modules/Runners/Components/RunnersSummaryC
 import { ServerStatusCard } from '@/Modules/System/Components/ServerStatusCard';
 import { useReadiness } from '@/Modules/System/Hooks/useReadiness';
 
-type TTargetPath = '/jobs' | '/runners' | '/runners/tokens' | '/org/invitations' | '/system';
+type TTargetPath = '/approvals' | '/jobs' | '/runners' | '/runners/tokens' | '/org/invitations' | '/system';
 
 const TARGETS: Record<TOverviewTarget, { to: TTargetPath; states?: readonly TJobState[] }> = {
   running: { to: '/jobs', states: ['running'] },
@@ -33,6 +33,7 @@ const TARGETS: Record<TOverviewTarget, { to: TTargetPath; states?: readonly TJob
   runners: { to: '/runners' },
   offline: { to: '/runners' },
   invitations: { to: '/org/invitations' },
+  approvals: { to: '/approvals' },
   checks: { to: '/system' },
   addRunner: { to: '/runners/tokens' },
 };

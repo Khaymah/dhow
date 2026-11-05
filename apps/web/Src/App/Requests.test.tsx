@@ -7,10 +7,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '@/App/App';
 import { createAppRouter } from '@/App/Router';
 import { createQueryClient } from '@/Core/Api/QueryClient';
+import { approvalsRoute, gatedJob, newApprovalsState } from '@/Core/Testing/ApprovalsBackend';
 import { auditFixture, startBackend } from '@/Core/Testing/Backend';
 import { ENVIRONMENT_NAME, environmentsRoute, newEnvironmentsState } from '@/Core/Testing/EnvironmentsBackend';
-import { ok, PROJECT_ID, projectFixture, projectsRoute } from '@/Core/Testing/ProjectsBackend';
+import { detailFixture, ok, PROJECT_ID, projectFixture, projectsRoute, RUN_ID, runFixture } from '@/Core/Testing/ProjectsBackend';
 import { settingsFixture, settingsRoute } from '@/Core/Testing/SettingsBackend';
+import { arText } from '@/Core/Testing/Text';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Ar } from '@/I18n/Locales/Ar';
 import { isolate } from '@/I18n/Translate';
@@ -66,6 +68,7 @@ const mount = (url: string, role = 'owner') => {
 const ROUTES: readonly [string, string, readonly string[]][] = [
   ['/', Ar['home.title'], [JOBS, RUNNERS, AUDIT, MEMBERS]],
   ['/jobs', Ar['jobs.title'], ['GET /api/v1/organizations/{id}/jobs']],
+  ['/approvals', Ar['approvals.page.title'], ['GET /api/v1/organizations/{id}/deployment-approvals']],
   ['/runners', Ar['runners.title'], ['GET /api/v1/organizations/{id}/runners']],
   ['/runners/tokens', Ar['runners.tokens.title'], ['GET /api/v1/organizations/{id}/runner-registration-tokens']],
   ['/org/members', Ar['shell.nav.members'], [ORG, 'GET /api/v1/organizations/{id}/members']],
@@ -242,6 +245,50 @@ describe('API requests of the environment pages', () => {
   ] as const)('opens %s cold as a %s with only what the page shows, each once', async (url, role, own) => {
     const view = mountEnvironments(url, role);
     await screen.findByRole('heading', { level: 1, name: url.endsWith('environments') ? 'Web app' : ENVIRONMENT_NAME });
+    const expected = [...SHELL, ...own];
+    await settle(view.client, view.calls, expected);
+
+    expect(repeated(view.calls)).toEqual([]);
+    expect([...new Set(view.calls.map(endpointOf))].sort()).toEqual([...expected].sort());
+  });
+});
+
+describe('API requests of the run page with a deploy waiting for approval', () => {
+  const PROJECT = 'GET /api/v1/organizations/{id}/projects/{id}';
+  const RUN = `${PROJECT}/runs/{id}`;
+  const OWN = [
+    PROJECT,
+    RUN,
+    `${RUN}/approvals`,
+    `${RUN}/artifacts`,
+    'GET /api/v1/organizations/{id}/deployment-approvals',
+  ];
+
+  const mountRun = (role: string) => {
+    const backend = startBackend({
+      role,
+      routes: [
+        approvalsRoute(newApprovalsState()),
+        environmentsRoute(newEnvironmentsState()),
+        projectsRoute({
+          project: () => ok(projectFixture({ CallerRole: role })),
+          run: () => ok(detailFixture(runFixture({ State: 'running', FinishedAt: undefined }), [gatedJob('approval')])),
+        }),
+      ],
+    });
+    const router = createAppRouter(createMemoryHistory({ initialEntries: [`/projects/${PROJECT_ID}/runs/${RUN_ID}`] }));
+    const client = createQueryClient({ retry: false });
+    render(<App router={router} queryClient={client} />);
+    return { ...backend, client };
+  };
+
+  it.each([
+    ['developer', OWN],
+    ['owner', [...OWN, `${PROJECT}/environments/${ENVIRONMENT_NAME}`]],
+    ['viewer', OWN.filter((endpoint) => !endpoint.endsWith('deployment-approvals') && !endpoint.endsWith('artifacts'))],
+  ] as const)('opens the run cold as a %s with each request once', async (role, own) => {
+    const view = mountRun(role);
+    await screen.findByRole('heading', { level: 1, name: arText('runs.row.number', { number: 7 }) });
     const expected = [...SHELL, ...own];
     await settle(view.client, view.calls, expected);
 

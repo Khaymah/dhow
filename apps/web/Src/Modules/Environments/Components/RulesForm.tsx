@@ -9,7 +9,7 @@ import { Card } from '@/Core/Ui/Card';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { useT } from '@/I18n/useT';
 import { updateEnvironment, type IUpdateEnvironment, type TEnvironment } from '@/Modules/Environments/Api/EnvironmentsApi';
-import { FactorGate } from '@/Modules/Environments/Components/FactorGate';
+import { FactorGate } from '@/Core/Ui/FactorGate';
 import { FactorSubmit } from '@/Modules/Environments/Components/FactorSubmit';
 import { RuleFields } from '@/Modules/Environments/Components/RuleFields';
 import { useEnvironmentRefresh } from '@/Modules/Environments/Hooks/useEnvironmentRefresh';

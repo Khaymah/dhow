@@ -19,6 +19,7 @@ export const useCounters = (): ICounters => {
   const jobs = overview?.Jobs;
   const runners = overview?.Runners;
   const invitations = overview?.Invitations;
+  const approvals = overview?.Approvals;
 
   if (jobs && jobs.Queued > 0) {
     const stuck = jobs.QueuedNoRunner > 0;
@@ -29,6 +30,9 @@ export const useCounters = (): ICounters => {
         : t('shell.count.jobs', { count: jobs.Queued }),
       countTone: stuck ? 'warn' : undefined,
     };
+  }
+  if (approvals && approvals.Pending > 0) {
+    menu.approvals = { count: approvals.Pending, countLabel: t('shell.count.approvals', { count: approvals.Pending }) };
   }
   if (runners && runners.Offline > 0) {
     menu.runners = { count: runners.Offline, countLabel: t('shell.count.runners', { count: runners.Offline }) };

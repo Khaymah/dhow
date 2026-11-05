@@ -13,7 +13,7 @@ import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Skeleton } from '@/Core/Ui/Skeleton';
 import { StatusDot } from '@/Core/Ui/StatusDot';
 import { useT } from '@/I18n/useT';
-import type { TRunDetail } from '@/Modules/Projects/Api/RunsApi';
+import type { TRunDetail, TRunJob } from '@/Modules/Projects/Api/RunsApi';
 import { ArtifactsCard } from '@/Modules/Projects/Components/ArtifactsCard';
 import { RunActions } from '@/Modules/Projects/Components/RunActions';
 import { RunStages } from '@/Modules/Projects/Components/RunStages';
@@ -34,6 +34,8 @@ export interface IRunBodyProps {
   jobHref: (jobId: string) => string;
   onOpenJob: (jobId: string) => void;
   onSecondFactor: () => void;
+  jobExtra?: (job: TRunJob) => ReactNode;
+  extra?: ReactNode;
 }
 
 const Fact = ({ label, children }: { label: string; children: ReactNode }) => (
@@ -122,7 +124,8 @@ const RunDetailView = ({ detail, props }: { detail: TRunDetail; props: IRunBodyP
         </div>
       </Card>
       <Issues detail={detail} />
-      <RunStages jobs={detail.Jobs} now={now} jobHref={props.jobHref} onOpenJob={props.onOpenJob} />
+      <RunStages jobs={detail.Jobs} now={now} jobHref={props.jobHref} onOpenJob={props.onOpenJob} jobExtra={props.jobExtra} />
+      {props.extra}
       {canOnProject(props.role, 'artifact.read') ? (
         <ArtifactsCard organizationId={props.organizationId} projectId={props.projectId} runId={run.Id} final={final} />
       ) : null}

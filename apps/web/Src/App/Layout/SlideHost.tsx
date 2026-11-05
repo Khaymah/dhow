@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { useEffect, useEffectEvent, useState } from 'react';
 
@@ -11,6 +12,8 @@ import { useThemeStore } from '@/Core/Theme/useThemeStore';
 import { useSlideGuardStore } from '@/Core/Store/useSlideGuardStore';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { SlideStack } from '@/Core/Ui/SlideStack';
+import { OVERVIEW_QUERY_KEY } from '@/Modules/Overview/Hooks/useOverview';
+import { runsKey } from '@/Modules/Projects/Api/RunsApi';
 import { useT } from '@/I18n/useT';
 
 const themeMissing = (slide: TSlideId | null, themes: readonly ICustomTheme[]): boolean => {
@@ -22,8 +25,10 @@ export const SlideHost = () => {
   const t = useT();
   const navigate = useNavigate();
   const { slide, invalid, close, discard } = useSlide();
-  const { memberId, projectId, environmentName } = useParams({ strict: false });
-  const role = useCurrentMembership()?.Role;
+  const { memberId, projectId, environmentName, runId } = useParams({ strict: false });
+  const membership = useCurrentMembership();
+  const role = membership?.Role;
+  const client = useQueryClient();
   const draftName = useThemeStore((state) => state.Draft?.Name);
   const customThemes = useThemeStore((state) => state.CustomThemes);
   const DiscardDraft = useThemeStore((state) => state.DiscardDraft);
@@ -88,8 +93,17 @@ export const SlideHost = () => {
             openEnvironment: (id, name) => {
               void navigate({ to: '/projects/$projectId/environments/$environmentName', params: { projectId: id, environmentName: name } });
             },
-            openRun: (id, runId) => {
-              void navigate({ to: '/projects/$projectId/runs/$runId', params: { projectId: id, runId } });
+            openRun: (id, openedRunId) => {
+              void navigate({ to: '/projects/$projectId/runs/$runId', params: { projectId: id, runId: openedRunId } });
+            },
+            runId: isUuid(runId) ? runId : undefined,
+            decided: () => {
+              if (membership === undefined || !isUuid(projectId)) return;
+              void client.invalidateQueries({ queryKey: runsKey(membership.OrganizationId, projectId) });
+              void client.invalidateQueries({ queryKey: OVERVIEW_QUERY_KEY });
+            },
+            openSecurity: () => {
+              void navigate({ to: '/account/security' });
             },
           }),
         ];

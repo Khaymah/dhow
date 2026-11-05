@@ -32,6 +32,10 @@ interface IAttention {
 const attentionOf = (overview: TOverview | undefined, failingChecks: number): IAttention[] => {
   const all: IAttention[] = [
     {
+      target: 'approvals', icon: 'shield', tone: 'warn', count: overview?.Approvals?.Pending ?? 0,
+      title: 'home.attention.approvals.title', sub: 'home.attention.approvals.sub',
+    },
+    {
       target: 'stuck', icon: 'queue', tone: 'warn', count: overview?.Jobs?.QueuedNoRunner ?? 0,
       title: 'home.attention.stuck.title', sub: 'home.attention.stuck.sub',
     },

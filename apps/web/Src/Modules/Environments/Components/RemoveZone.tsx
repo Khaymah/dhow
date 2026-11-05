@@ -7,7 +7,7 @@ import { Button } from '@/Core/Ui/Button';
 import { ConfirmPanel } from '@/Core/Ui/ConfirmPanel';
 import { useT } from '@/I18n/useT';
 import { removeEnvironment, type TEnvironment } from '@/Modules/Environments/Api/EnvironmentsApi';
-import { FactorGate } from '@/Modules/Environments/Components/FactorGate';
+import { FactorGate } from '@/Core/Ui/FactorGate';
 import { useEnvironmentRefresh } from '@/Modules/Environments/Hooks/useEnvironmentRefresh';
 
 export interface IRemoveZoneProps {

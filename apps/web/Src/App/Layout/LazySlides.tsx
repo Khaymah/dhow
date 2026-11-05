@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 
-import { isThemeEditSlide, oidcOf, secretsTargetOf, type TSlideId } from '@/App/Panels';
+import { decisionTargetOf, isThemeEditSlide, oidcOf, secretsTargetOf, type TSlideId } from '@/App/Panels';
 import { lazyComponent, type IPreloadable, type TLazyComponent } from '@/Core/Ui/LazyComponent';
 import { Skeleton } from '@/Core/Ui/Skeleton';
 import { useT } from '@/I18n/useT';
@@ -68,10 +68,21 @@ const EnvironmentNewBody = lazyComponent(() =>
   import('@/Modules/Environments/Components/EnvironmentNewBody').then((module) => module.EnvironmentNewBody),
 );
 
-type TSlidePart = Exclude<
-  TSlideId,
-  `theme-edit-${string}` | `oidc-edit-${string}` | `secret-edit-${string}` | `variable-edit-${string}` | `registry-edit-${string}`
->;
+const DecisionBody = lazyComponent(() =>
+  import('@/Modules/Approvals/Components/DecisionBody').then((module) => module.DecisionBody),
+);
+
+type TSlidePart =
+  | 'deployment-decision'
+  | Exclude<
+      TSlideId,
+      | `theme-edit-${string}`
+      | `oidc-edit-${string}`
+      | `secret-edit-${string}`
+      | `variable-edit-${string}`
+      | `registry-edit-${string}`
+      | `deployment-${string}`
+    >;
 
 const PARTS: Record<TSlidePart, readonly IPreloadable[]> = {
   'theme-edit': [ThemeEditorBody, ThemeEditorFooter],
@@ -94,11 +105,13 @@ const PARTS: Record<TSlidePart, readonly IPreloadable[]> = {
   'variable-new': [VariableFormBody],
   'registry-new': [RegistryFormBody],
   'environment-new': [EnvironmentNewBody],
+  'deployment-decision': [DecisionBody],
 };
 
 const partOf = (id: TSlideId): TSlidePart => {
   if (isThemeEditSlide(id)) return 'theme-edit';
   if (oidcOf(id) !== null) return 'oidc-new';
+  if (decisionTargetOf(id) !== null) return 'deployment-decision';
   const target = secretsTargetOf(id);
   if (target !== null) return `${target.Kind}-new` as TSlidePart;
   return id as TSlidePart;
@@ -158,3 +171,4 @@ export const LazySecretFormBody = withSkeleton(SecretFormBody);
 export const LazyVariableFormBody = withSkeleton(VariableFormBody);
 export const LazyRegistryFormBody = withSkeleton(RegistryFormBody);
 export const LazyEnvironmentNewBody = withSkeleton(EnvironmentNewBody);
+export const LazyDecisionBody = withSkeleton(DecisionBody);

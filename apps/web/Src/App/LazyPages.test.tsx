@@ -2,6 +2,7 @@ import { createMemoryHistory } from '@tanstack/react-router';
 import { configure, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { approvalsRoute, newApprovalsState } from '@/Core/Testing/ApprovalsBackend';
 import { auditFixture, startBackend, type TRouteHandler } from '@/Core/Testing/Backend';
 import { ENVIRONMENT_NAME, environmentsRoute, newEnvironmentsState } from '@/Core/Testing/EnvironmentsBackend';
 import { apiUp } from '@/Core/Testing/Fetch';
@@ -20,6 +21,8 @@ const environmentRoutes = (): TRouteHandler[] => [
   projectsRoute({ project: () => ok(projectFixture({ CallerRole: 'owner' })) }),
 ];
 
+const approvalRoutes = (): TRouteHandler[] => [approvalsRoute(newApprovalsState())];
+
 configure({ asyncUtilTimeout: 5000 });
 
 const CASES: IPageCase[] = [
@@ -35,6 +38,12 @@ const CASES: IPageCase[] = [
   { url: '/audit', title: Ar['audit.title'], body: (main) => within(main).findByRole('list', { name: Ar['audit.list.title'] }) },
   { url: '/org/members', title: Ar['shell.nav.members'], body: (main) => within(main).findByRole('list', { name: Ar['members.title'] }) },
   { url: '/notifications', title: Ar['notifications.title'], body: (main) => within(main).findByText(Ar['notifications.empty']) },
+  {
+    url: '/approvals',
+    title: Ar['approvals.page.title'],
+    body: (main) => within(main).findByRole('list', { name: Ar['approvals.page.list'] }),
+    routes: approvalRoutes,
+  },
   {
     url: `/projects/${PROJECT_ID}/environments`,
     title: 'Web app',
