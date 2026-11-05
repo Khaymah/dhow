@@ -198,7 +198,7 @@ decide() {
   code=$(totp_code "$who" "$secret") || return 1
   decision_status=$(api "$work/decision" POST "$(project_path)/runs/$run/approvals/$approval_id/$action" \
     "$(printf '{"CurrentFactor":{"Method":"totp","Code":"%s"},"Comment":"demo"}' "$code")" "${headers[@]}")
-  error_code=$(json_field "$work/decision.body" Code)
+  error_code=$(json_field "$work/decision.body" Code) || true
 }
 
 refused_with() {
@@ -242,8 +242,11 @@ artifact_kept() {
 }
 
 deployment_recorded() {
-  api "$work/deployments" GET "$(project_path)/environments/production/deployments" '' --header "$(bearer)" >/dev/null || return 1
-  grep -qF "\"RunId\":\"$1\"" "$work/deployments.body" && grep -qF '"State":"succeeded"' "$work/deployments.body" && return 0
+  for _ in $(seq 30); do
+    api "$work/deployments" GET "$(project_path)/environments/production/deployments" '' --header "$(bearer)" >/dev/null || return 1
+    grep -qF "\"RunId\":\"$1\"" "$work/deployments.body" && grep -qF '"State":"succeeded"' "$work/deployments.body" && return 0
+    sleep 1
+  done
   why "the deployments: $(head -c 600 "$work/deployments.body")"
   return 1
 }
@@ -288,7 +291,7 @@ server_restarted() {
 kek_pending() {
   for _ in $(seq 60); do
     keys_exec status >"$work/keys-status.out" 2>&1 || true
-    grep -Eq '^2[[:space:]]+pending' "$work/keys-status.out" && return 0
+    grep -Eq '^[[:space:]]*2[[:space:]]+pending' "$work/keys-status.out" && return 0
     sleep 2
   done
   why "keys status: $(tr '\n' '|' <"$work/keys-status.out")"
@@ -307,8 +310,8 @@ kek_activated() {
 data_keys_rewrapped() {
   for _ in $(seq 120); do
     keys_exec status >"$work/keys-status.out" 2>&1 || true
-    if grep -Eq '^Data keys to re-wrap:[[:space:]]+0[[:space:]]*$' "$work/keys-status.out" &&
-      grep -Eq '^2[[:space:]]+active[[:space:]]+[1-9]' "$work/keys-status.out" && grep -Eq '^1[[:space:]]+retired[[:space:]]+0' "$work/keys-status.out"; then
+    if grep -Eq '^[[:space:]]*Data keys to re-wrap:[[:space:]]+0[[:space:]]*$' "$work/keys-status.out" &&
+      grep -Eq '^[[:space:]]*2[[:space:]]+active[[:space:]]+[1-9]' "$work/keys-status.out" && grep -Eq '^[[:space:]]*1[[:space:]]+retired[[:space:]]+0' "$work/keys-status.out"; then
       return 0
     fi
     sleep 5
