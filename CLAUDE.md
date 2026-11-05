@@ -18,9 +18,10 @@
 | `apps/runner` | الـ runner (Go) |
 | `apps/web` | الواجهة (React + TypeScript + Tailwind، pnpm) |
 | `apps/cli` | الـ CLI `dhow` (Go) |
+| `apps/plugins` | الإضافات الرسمية، كل واحدة binary بصورتها (`deploy-ssh`: النشر بـ SSH، ومعاها اختبار الـ E2E على sshd حقيقي) |
 | `packages/openapi` | `openapi.yaml`، عقد الـ REST API (spec-first) |
 | `packages/proto` | بروتوكول الـ runner مع الـ control plane (Connect/gRPC) |
-| `internal/` | packages Go مشتركة بين التطبيقات |
+| `internal/` | packages Go مشتركة بين التطبيقات (منها `archive`: تعبئة الأرشيف وفكه وبثه بقواعد آمنة، و`deployrelease`: محرك الإصدارات الذرية والفحص والرجوع على سيرفر بعيد، وفرعه `sshremote` للنقل بـ SSH وSFTP) |
 | `ee/` | المميزات التجارية (Dhow Enterprise License)، وكل الباقي AGPL-3.0 |
 | `deploy/` | Dockerfiles وCompose وHelm |
 | `docs/` | وثائق عامة بالعربي المبسّط، ونسختها الإنجليزي في `docs/en/` بنفس المسارات (ADR-0064) |

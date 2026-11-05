@@ -201,6 +201,8 @@ A `uses:` step with `with.target` deploys to a [target](guides/environments.md#d
 - A health check does not run longer than 10 minutes for each server (`HEALTH_BUDGET_EXCEEDED`), and a rolling deploy does not run longer than 60 minutes (`ROLLING_BUDGET_EXCEEDED`).
 - A job that deploys reaches the servers of its target and the health check address only. The server computes these endpoints from the target, so the file cannot change them. Any other `network.egress` in the job is refused with `TARGET_JOB_EGRESS_NOT_ALLOWED`, unless an Admin turns on `AllowExtraDeployEgress` on the environment.
 
+The inputs of the official SSH plugin and what it does on the server are described in [Deploy to a server over SSH](guides/deploy-ssh.md).
+
 The server marks the deploy step as one that changes something (`mutating`), so the job is not retried automatically once it starts. The access key is delivered as a file to this step only, and neither a `run:` step nor another plugin sees it.
 
 When the job starts on the runner, the server checks again before it opens the key: if the target, its servers, their order or the key of one of them changed after the job was queued, it fails with `TARGET_CHANGED`. If the secret of the key was removed, it fails with `TARGET_KEY_NOT_FOUND`. A runner that does not declare the `deploy_targets` feature never receives this job.
