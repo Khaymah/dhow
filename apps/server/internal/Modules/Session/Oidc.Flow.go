@@ -7,11 +7,11 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
-	"github.com/jackc/pgx/v5/pgtype"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
