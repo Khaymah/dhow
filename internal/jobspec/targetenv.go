@@ -29,14 +29,14 @@ const (
 
 var ErrHealthURL = errors.New("the health check address must be an http or https address without a user name, and {host} may only stand for the whole host name")
 
-type targetHostEnv struct {
+type TargetHost struct {
 	HostID         string `json:"HostId"`
 	Host           string `json:"Host"`
 	Port           int    `json:"Port"`
 	KnownHostsLine string `json:"KnownHostsLine"`
 }
 
-type targetSettingsEnv struct {
+type TargetSettings struct {
 	BatchSize         int      `json:"BatchSize"`
 	BatchPauseSeconds int      `json:"BatchPauseSeconds"`
 	ReloadCommand     string   `json:"ReloadCommand"`
@@ -49,9 +49,9 @@ type targetSettingsEnv struct {
 }
 
 func TargetEnv(t *runnerv1.StepTarget, index int, secretsDir string) (map[string]string, error) {
-	hosts := make([]targetHostEnv, 0, len(t.GetHosts()))
+	hosts := make([]TargetHost, 0, len(t.GetHosts()))
 	for _, h := range t.GetHosts() {
-		hosts = append(hosts, targetHostEnv{HostID: h.GetHostId(), Host: h.GetHost(), Port: int(h.GetPort()), KnownHostsLine: h.GetKnownHostsLine()})
+		hosts = append(hosts, TargetHost{HostID: h.GetHostId(), Host: h.GetHost(), Port: int(h.GetPort()), KnownHostsLine: h.GetKnownHostsLine()})
 	}
 	rawHosts, err := json.Marshal(hosts)
 	if err != nil {
@@ -62,7 +62,7 @@ func TargetEnv(t *runnerv1.StepTarget, index int, secretsDir string) (map[string
 	if shared == nil {
 		shared = []string{}
 	}
-	rawSettings, err := json.Marshal(targetSettingsEnv{
+	rawSettings, err := json.Marshal(TargetSettings{
 		BatchSize: int(s.GetBatchSize()), BatchPauseSeconds: int(s.GetBatchPauseSeconds()), ReloadCommand: s.GetReloadCommand(),
 		PreSwitchCommand: s.GetPreSwitchCommand(), PostSwitchCommand: s.GetPostSwitchCommand(), Shared: shared,
 		ComposeProject: s.GetComposeProject(), ComposeFile: s.GetComposeFile(), AllowUnsafe: s.GetAllowUnsafeCompose(),
@@ -109,32 +109,44 @@ func HealthEndpoints(raw string, hosts []string) ([]string, error) {
 }
 
 func healthEndpoint(raw, host string) (string, error) {
-	if strings.Contains(raw, HealthHostPlaceholder) {
-		if !placeholderIsHost(raw) {
-			return "", ErrHealthURL
-		}
-		raw = strings.ReplaceAll(raw, HealthHostPlaceholder, hostLiteral(host))
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.User != nil || u.Opaque != "" || (u.Scheme != "http" && u.Scheme != "https") {
-		return "", ErrHealthURL
-	}
-	name := strings.ToLower(u.Hostname())
-	if !validTargetHost(name) {
-		return "", ErrHealthURL
+	u, err := ResolveHealthURL(raw, host)
+	if err != nil {
+		return "", err
 	}
 	port := DefaultHTTPPort
 	if u.Scheme == "https" {
 		port = DefaultTLSPort
 	}
 	if text := u.Port(); text != "" {
-		p, ok := parsePort(text)
-		if !ok {
-			return "", ErrHealthURL
-		}
+		p, _ := parsePort(text)
 		port = p
 	}
-	return Endpoint(name, port), nil
+	return Endpoint(strings.ToLower(u.Hostname()), port), nil
+}
+
+func ResolveHealthURL(raw, host string) (*url.URL, error) {
+	if raw == "" || len(raw) > MaxHealthURLLength || strings.ContainsFunc(raw, func(r rune) bool { return r <= ' ' || r == 0x7f }) {
+		return nil, ErrHealthURL
+	}
+	if strings.Contains(raw, HealthHostPlaceholder) {
+		if !placeholderIsHost(raw) {
+			return nil, ErrHealthURL
+		}
+		raw = strings.ReplaceAll(raw, HealthHostPlaceholder, hostLiteral(host))
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.User != nil || u.Opaque != "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil, ErrHealthURL
+	}
+	if !validTargetHost(strings.ToLower(u.Hostname())) {
+		return nil, ErrHealthURL
+	}
+	if text := u.Port(); text != "" {
+		if _, ok := parsePort(text); !ok {
+			return nil, ErrHealthURL
+		}
+	}
+	return u, nil
 }
 
 func placeholderIsHost(raw string) bool {
