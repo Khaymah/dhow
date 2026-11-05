@@ -33,7 +33,7 @@
 - **تشغيل الـ demo على Debian 13 ويدوي:** شرط الخلاص بيطلب VM نضيفة بـ Debian 13 وUbuntu 26.04 (`demo.yml` على `ubuntu-26.04`). VM الـ Debian بتتعمل من الحزمة اللي في `deploy/test-vm`، وخارج الـ PR ده.
 
 ## النتايج
-- كل PR بيلمس السيرفر أو الـ runner أو ملفات الـ demos بيشغّل `m5-demo` كمان (حوالي 25 دقيقة)، والليلي برضه.
+- كل PR بيلمس السيرفر أو الـ runner أو ملفات الـ demos بيشغّل `m5-demo` كمان (حوالي 6 دقايق على `ubuntu-26.04`، 49 فحص)، والليلي برضه.
 - `sealed_values` بقت بتاخد `sealed_environment` و`sealed_creates_environment` (الافتراضي القديم: `staging` وبيتعمل).
 - أي تغيير في أوامر `keys` أو في رسالة `keys status` بيتصلّح مع `lib.sh` (`data_keys_rewrapped` بتقرا نص الجدول).
 
