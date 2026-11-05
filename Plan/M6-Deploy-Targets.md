@@ -1,6 +1,6 @@
 # خطة M6: أهداف النشر (Deploy Targets)
 
-**الحالة:** مسودة للمراجعة. مستنية إجابة Sabry على [الأسئلة الـ 8](#أسئلة-لـ-sabry). الخطة مكتوبة كلها على التوصية، وأي إجابة مختلفة بتعدّل المرحلة اللي متعلّمة جنب كل سؤال. القرارات التقنية مفوَّضة ومكتوبة بالتوصية، وكل واحد منها بيبقى ADR في أول المرحلة بتاعته (الأرقام من `0090`، والرقم الفعلي وقت الكتابة) · **التاريخ:** 2026-11-05
+**الحالة:** مسودة للمراجعة. Sabry جاوب الأسئلة الـ 8 يوم 2026-11-05 ([قراراته](#قرارات-sabry-2026-11-05-ملزمة))، سبعة بالتوصية والسابع (مجموعة سيرفرات) **بغير التوصية**، فالخطة اتعدّلت على نشر متدرّج عبر أكتر من سيرفر في الهدف الواحد. القرارات التقنية مفوَّضة ومكتوبة بالتوصية، وكل واحد منها بيبقى ADR في أول المرحلة بتاعته (الأرقام من `0090`، والرقم الفعلي وقت الكتابة) · **التاريخ:** 2026-11-05
 
 ## الهدف
 شرط خلاص M6 في `docs/roadmap.md` (الصف M6، بعد [ADR-0068](ADR/0068-first-production-release-scope.md)): **كل هدف بينشر، وبيفشل في فحص الصحة، وبيرجع لوحده، في اختبار E2E.** ده معناه:
@@ -32,8 +32,18 @@
 7. **أسرار الهدف write-only وللجلسة بس:** كتابتها من جلسة، والتوكن بياخد قراية الأسماء بس (قرار Sabry 6 في M5).
 8. **الموافقات بالخطوة التانية** (قرار Sabry 5 في M5)، وقاعدة الـ ref على السيرفر مالهاش تخطّي.
 
+## قرارات Sabry 2026-11-05 (ملزمة)
+1. <a id="قرار-1"></a>**النشر كإضافة في الـ runner sandbox** (مش من السيرفر، ومش agent على الهدف). الـ agent ممكن يبقى نوع هدف تالت بعد أول نسخة.
+2. <a id="قرار-2"></a>**الرجوع التلقائي** بيتشغّل من فشل جوه خطوة النشر بس: فحص صحة HTTP (`health_check_stable` = 3 افتراضيًا)، أو فشل reload، أو فشل hook، وسقف 10 دقايق. مفيش نافذة مراقبة بعد النجاح.
+3. <a id="قرار-3"></a>**الرجوع اليدوي** بيتخطى المراجعين والمؤقت بس: Maintainer أو أعلى وخطوة تانية، ولإصدار نجح على نفس الهدف قبل كده بس، ويفضل خاضع للإيقاف وقفل البيئة، وبيتسجّل `Kind = rollback`. على الهدف المتعدّد السيرفرات بيرجّع المجموعة كلها لإصدار مجموعة نجح قبل كده.
+4. <a id="قرار-4"></a>**الرفع من CI خارجي بتوكن استقبال محدود.** تحقق GitHub OIDC بعد أول نسخة.
+5. <a id="قرار-5"></a>**Compose بـ `docker compose` على السيرفر عبر SSH exec**، ونفس التدرّج عبر السيرفرات.
+6. <a id="قرار-6"></a>**الـ hooks معرّفة على الهدف من الأدمن بس.** مفيش `AllowArtifactHooks` في أول نسخة.
+7. <a id="قرار-7"></a>**(مش التوصية) الهدف بقايمة سيرفرات (`Hosts`) ونشر متدرّج (rolling):** لو سيرفر فشل، كل سيرفر اتبدّل في النشر ده بيترجّع بترتيب عكسي. التصميم في [النشر المتدرّج](#النشر-المتدرّج-على-أكتر-من-سيرفر). ده بيزوّد M6 (المرحلة M6.3ب).
+8. <a id="قرار-8"></a>**الـ host key:** جلب من السيرفر للعناوين العامة، ولصق لأي عنوان، والتأكيد بالبصمة دايمًا. لكل سيرفر في الهدف مفتاحه.
+
 ## النطاق
-1. **الأهداف (`"DeployTargets"`):** نموذج وAPI على البيئة: النوع (`ssh` أو `compose`)، والعنوان، والمستخدم، ومسار النشر، ومفتاح الدخول (سر في البيئة)، والـ host key المتثبّت بالتأكيد، وإعدادات النوع.
+1. **الأهداف (`"DeployTargets"` وسيرفراتها `"DeployTargetHosts"`):** نموذج وAPI على البيئة: النوع (`ssh` أو `compose`)، وقايمة سيرفرات (1 لـ 10) لكل واحد عنوانه ومفتاحه المثبّت، والمستخدم، ومسار النشر، ومفتاح الدخول (سر في البيئة)، والـ host key المتثبّت بالتأكيد، وإعدادات النوع.
 2. **توصيل الهدف للـ runner:** رسالة `StepTarget` في الـ `JobSpec`، والـ egress للهدف بس، والمفتاح كملف لخطوة الإضافة دي بس، وعلامة `Mutating` من الـ manifest، وقناة تقارير للإصدار.
 3. **إضافة `dhow-deploy-ssh`:** رفع لـ `releases/<id>`، وروابط `shared/`، وتبديل symlink ذرّي، وhooks، وفحص صحة HTTP، ورجوع تلقائي، وتنضيف `keep_releases`.
 4. **إضافة `dhow-deploy-compose`:** نشر Compose على سيرفر بعيد بـ SSH، والصور بالـ digest، وانتظار الصحة، ورجوع تلقائي.
@@ -47,9 +57,9 @@
 ## مش في M6
 - **Kubernetes وStatic/CDN/SFTP:** بعد أول نسخة على نفس الـ `Kind` والـ interface (ADR-0011 وADR-0068).
 - **مكوّن GitLab CI:** بعد أول نسخة. الـ API بتاعة الاستقبال عامة (curl من أي CI)، والـ Action بتاعة GitHub بس هي الرسمية.
-- **مُصدِر OIDC للأحمال** (M5.8): بعد أول نسخة. الهدف بيستخدم مفتاح SSH سر عادي. وتحقق توكن GitHub OIDC عند الاستقبال [سؤال 4](#4-توثيق-الرفع-من-ci-خارجي) متأجّل كمان.
-- **Canary وblue/green والنشر على أكتر من سيرفر في هدف واحد:** [سؤال 7](#7-مجموعة-سيرفرات). في M6 الهدف = سيرفر واحد، والمجموعة بـ matrix على أهداف.
-- **agent على سيرفر الهدف:** [سؤال 1](#1-فين-النشر-بيشتغل) و[سؤال 5](#5-docker-compose-عن-بعد).
+- **مُصدِر OIDC للأحمال** (M5.8): بعد أول نسخة. الهدف بيستخدم مفتاح SSH سر عادي. وتحقق توكن GitHub OIDC عند الاستقبال ([قرار 4](#قرار-4)) متأجّل كمان.
+- **Canary وblue/green:** بعد أول نسخة. النشر المتدرّج في M6 دفعات متتالية بفحص صحة لكل دفعة ([قرار 7](#قرار-7))، مش توزيع نسبة حركة.
+- **agent على سيرفر الهدف:** [قرار 1](#قرار-1) و[قرار 5](#قرار-5).
 - **الإشعارات** (إيميل وSlack عند الفشل أو الرجوع): M7. الحدث `deployment.finished` بيتنشر على الـ EventBus وجاهز لها.
 - **أسرار الخدمات على سيرفر الهدف:** Compose بيقرا `.env` من `shared/` على السيرفر نفسه. كتابة أسرار داو على قرص السيرفر البعيد مش في M6 (edge case).
 - **تسجيل الدخول لـ registry على سيرفر الهدف:** `docker login` بيتعمل على السيرفر نفسه. الإضافة عمرها ما بتبعت بيانات registry لسيرفر بعيد.
@@ -64,7 +74,7 @@
                               PUT artifact ─► Core/Blob ─► "IngestedArtifacts" ─► Core/Triggers.Deliver(Event=artifact)
 
  dhow-runner ─► /runner-api  Start(lease, fencing) ─► SecretResolver: env secret ──HPKE──► dhow.target.<n>.key (as_file, this step only)
-                                    JobSpec.targets[]: kind host port user known_hosts_line deploy_path release_id (no secret)
+                                    JobSpec.targets[]: kind user deploy_path release_id hosts[{host_id host port known_hosts_line}] rolling (no secret)
                                     ReleaseService.Report(lease, event) ──► "DeploymentReleases"   (fenced, progress + result)
    runner sandbox (egress = exact target endpoints + health host only):
      plugin container: dhow-deploy-ssh / dhow-deploy-compose
@@ -86,29 +96,31 @@
 | الحقل | الوصف |
 |---|---|
 | `Kind` | `ssh` أو `compose` |
-| `Host` و`Port` | اسم host أو IP (public)، والبورت الافتراضي 22. لازم يعدّي `netguard` وقت الحفظ إلا لو الـ host خاص (الـ runner لازم يكون عنده `ALLOW_PRIVATE_CIDRS` للنطاق ده، [سؤال 8](#8-أول-تثبيت-لـ-host-key-وهدف-في-شبكة-خاصة)) |
+| `Hosts` | قايمة من 1 لـ 10 سيرفرات في جدول `"DeployTargetHosts"` (تحت). الترتيب فيها هو ترتيب النشر. كل سيرفر `Host` (اسم أو IP) و`Port` (الافتراضي 22). لازم يعدّي `netguard` وقت الحفظ إلا لو الـ host خاص (الـ runner لازم يكون عنده `ALLOW_PRIVATE_CIDRS` للنطاق ده، [قرار 8](#قرار-8)) |
+| `Rolling` (جوه `Settings`) | `BatchSize` (عدد السيرفرات في الدفعة، الافتراضي 1، من 1 لـ عدد السيرفرات)، و`BatchPauseSeconds` (0 لـ 600، الافتراضي 0). لسيرفر واحد مالهاش معنى |
 | `Username` | حساب نشر مخصوص (مش root). `root` مرفوض إلا بـ `AllowRoot` صريح من الأدمن بتحذير |
 | `KeySecretName` | اسم سر **على نفس البيئة** فيه المفتاح الخاص (ed25519). نطاق المؤسسة والمشروع مرفوض هنا (قرار Sabry 2026-11-02: مفاتيح السيرفرات أسرار البيئة) |
 | `PublicKey` | المفتاح العام (مش سر)، بيتعرض عشان يتحط في `authorized_keys` |
-| `HostKey` و`HostKeyFingerprint` | المفتاح المتثبّت (نوع واحد، ed25519 مفضّل) وبصمته `SHA256:`، بتتأكد بإيد إنسان بس |
-| `PendingHostKey` و`PendingFingerprint` | مفتاح اتجاب أو اتلصق وماتأكدش لسه، أو مفتاح جديد ظهر والقديم لسه شغّال |
-| `DeployPath` | مسار مطلق على السيرفر، `^/[A-Za-z0-9._/-]{1,200}$` من غير `..` وغير `/` ولا مسارات النظام (`/etc` و`/usr` و`/bin` و`/var/lib/docker`...) |
+| `DeployPath` | (واحد لكل الهدف، نفسه على كل سيرفراته) مسار مطلق على السيرفر، `^/[A-Za-z0-9._/-]{1,200}$` من غير `..` وغير `/` ولا مسارات النظام (`/etc` و`/usr` و`/bin` و`/var/lib/docker`...) |
 | `KeepReleases` | عدد الإصدارات المحفوظة، من 2 لـ 50، الافتراضي 5 |
-| `Settings` (jsonb، 4 KiB) | حسب النوع: `ssh`: `ReloadCommand` و`PreSwitchCommand` و`PostSwitchCommand` ([سؤال 6](#6-الـ-hooks)) و`Shared` (قايمة أسماء ملفات ومجلدات). `compose`: `ProjectName` و`ComposeFile` والسياسة (`AllowUnsafeCompose`) |
+| `Settings` (jsonb، 4 KiB) | حسب النوع: `ssh`: `ReloadCommand` و`PreSwitchCommand` و`PostSwitchCommand` ([قرار 6](#قرار-6)) و`Shared` (قايمة أسماء ملفات ومجلدات). `compose`: `ProjectName` و`ComposeFile` والسياسة (`AllowUnsafeCompose`) |
 | `AllowedImages` | بادئات صور إضافة مخصوصة (فاضية = الرسميتين بس) |
 | `Version` | optimistic زي البيئة |
 
-- **التفرّد:** (`Host`, `Port`, `DeployPath`) فريد في المؤسسة (`TARGET_DUPLICATE`)، عشان بيئتين مايشاوروش على نفس المجلد ويتعاركوا على `current`.
+- **سيرفرات الهدف (`"DeployTargetHosts"`):** صف لكل سيرفر بالأعمدة الأربعة و`"TargetId"` و`"Position"` (unique مع الهدف) و`"Host"` و`"Port"` و`"HostKey"` و`"HostKeyFingerprint"` (النوع الواحد المتثبّت، ed25519 مفضّل، وبصمته `SHA256:`، بتتأكد بإيد إنسان بس) و`"HostKeyConfirmedAt"` و`"HostKeyConfirmedBy"` و`"PendingHostKey"` و`"PendingFingerprint"` (مفتاح اتجاب أو اتلصق وماتأكدش، أو جديد ظهر والقديم لسه شغّال). لكل سيرفر مفتاحه المتثبّت وسجل إصداراته (`"DeploymentReleases"` بـ `"HostId"`). المفتاح الخاص للدخول (`KeySecretName`) واحد للهدف، ولو الأدمن عايز مفاتيح مختلفة يعمل أهداف.
+- **التفرّد:** (`Host`, `Port`, `DeployPath`) فريد في المؤسسة على مستوى السيرفرات (`TARGET_DUPLICATE`)، عشان بيئتين مايشاوروش على نفس المجلد ويتعاركوا على `current`. عمود `"DeployPath"` منسوخ في صف السيرفر (الـ service بيحدّثه) علشان الـ unique index.
+- **الحدود:** 10 سيرفرات للهدف بالكتير، والحد في الـ CHECK والـ service. إضافة سيرفر أو شيله أو تغيير ترتيبه أثناء نشر شغّال: `TARGET_IN_USE`.
 - **المسح:** soft، ومرفوض لو فيه إصدار `running` (`TARGET_IN_USE`). المسح بيسيب سجل الإصدارات. الـ `KeySecretName` سر البيئة بيفضل (بيتمسح مع البيئة).
 - **توليد المفتاح:** `POST .../targets/{t}/generate-key` بيعمل ed25519 جديد، وبيحط الخاص سر في البيئة باسم `<TARGET>_SSH_KEY` (مش `DHOW_`)، وبيعرض العام مرة ويتخزّن. نفس فلسفة ADR-0071: داو بيعمل المفتاح، المستخدم مابيلمسش خاص. واللصق (مفتاح موجود) متاح. تدوير = توليد جديد + تأكيد + شيل القديم من `authorized_keys` (الواجهة بتفكّر).
 
 ### الـ host key (على نمط ADR-0072)
-- **الجلب:** `POST .../targets/{t}/fetch-host-key`: السيرفر بيعمل handshake بس (`ssh.NewClientConn` و`HostKeyCallback` بيوقف بعد المفتاح، من غير مصادقة) فوق `netguard`، مهلة 10 ثواني، من غير lock في القاعدة. النتيجة `PendingHostKey`.
-- **اللصق:** `PUT .../targets/{t}/pending-host-key` بسطر `ssh-keyscan` أو محتوى `.pub` (الأأمن: المفتاح اتجاب من السيرفر نفسه، من غير TOFU).
-- **التثبيت:** `POST .../targets/{t}/confirm-host-key` بنفس البصمة `SHA256:` + `CurrentFactor`. عمرنا ما بنقبل مفتاح لوحده. لو الـ `Host` أو `Port` اتغيّر، المفتاح المثبّت بيتشال.
+- **الجلب:** `POST .../targets/{t}/hosts/{h}/fetch-host-key`: السيرفر بيعمل handshake بس (`ssh.NewClientConn` و`HostKeyCallback` بيوقف بعد المفتاح، من غير مصادقة) فوق `netguard`، مهلة 10 ثواني، من غير lock في القاعدة. النتيجة `PendingHostKey`.
+- **اللصق:** `PUT .../targets/{t}/hosts/{h}/pending-host-key` بسطر `ssh-keyscan` أو محتوى `.pub` (الأأمن: المفتاح اتجاب من السيرفر نفسه، من غير TOFU).
+- **التثبيت:** `POST .../targets/{t}/hosts/{h}/confirm-host-key` بنفس البصمة `SHA256:` + `CurrentFactor`. عمرنا ما بنقبل مفتاح لوحده. لو الـ `Host` أو `Port` اتغيّر، المفتاح المثبّت بيتشال.
 - **التغيير:** لو المفتاح اتغيّر على السيرفر، الإضافة بتفشل `HOST_KEY_MISMATCH` من غير ما ترفع حاجة. الأدمن بيجيب المفتاح من جديد ويأكد بصمته (والـ audit فيه القديمة والجديدة).
 - **وقت النشر:** الإضافة بتستخدم `ssh.FixedHostKey` وبتحدد `HostKeyAlgorithms` على نوع المفتاح المثبّت بس. مفيش `known_hosts` ولا `ssh_config` ولا `StrictHostKeyChecking`.
-- **من غير مفتاح مثبّت:** `TARGET_HOST_KEY_UNCONFIRMED` وقت الإدراج، والـ job `failed` بسبب واضح.
+- **من غير مفتاح مثبّت:** لو **أي** سيرفر في الهدف مفتاحه مش مثبّت: `TARGET_HOST_KEY_UNCONFIRMED` (باسم السيرفر) وقت الإدراج، والـ job `failed` بسبب واضح. مفيش نشر على جزء من المجموعة.
+- **لكل سيرفر لوحده:** الجلب واللصق والتأكيد والتغيير، والـ audit فيه رقم السيرفر وعنوانه.
 
 ### الـ API (للإضافة على M5)
 | Route | الإجراء | ملاحظة |
@@ -118,14 +130,15 @@
 | `PUT .../targets/{t}` | `environment.manage` | `Version` و`CurrentFactor` |
 | `POST .../targets/{t}/remove` | `environment.manage` | `CurrentFactor` |
 | `POST .../targets/{t}/generate-key` | `environment.manage` | `CurrentFactor`، العام بس في الرد |
-| `POST .../targets/{t}/fetch-host-key` و`PUT .../pending-host-key` و`POST .../confirm-host-key` | `environment.manage` | `CurrentFactor` على التأكيد |
-| `GET .../targets/{t}/releases` | `run.read` | سجل إصدارات الهدف، صفحات |
-| `POST .../targets/{t}/rollback` | `deployment.rollback` | [سؤال 3](#3-الرجوع-اليدوي)، `ReleaseId` اختياري و`CurrentFactor` |
+| `POST .../targets/{t}/hosts/{h}/fetch-host-key` و`PUT .../hosts/{h}/pending-host-key` و`POST .../hosts/{h}/confirm-host-key` | `environment.manage` | `CurrentFactor` على التأكيد |
+| `POST .../targets/{t}/hosts` و`PUT .../hosts/{h}` و`POST .../hosts/{h}/remove` و`PUT .../targets/{t}/hosts-order` | `environment.manage` | `CurrentFactor` و`Version` الهدف. مرفوض أثناء نشر شغّال (`TARGET_IN_USE`) |
+| `GET .../targets/{t}/releases` | `run.read` | سجل إصدارات المجموعة (إصدار مجموعة = نشر واحد على كل السيرفرات) ونتيجة كل سيرفر، صفحات |
+| `POST .../targets/{t}/rollback` | `deployment.rollback` | [قرار 3](#قرار-3)، `ReleaseId` اختياري و`CurrentFactor` |
 | `POST .../targets/{t}/check` | `environment.manage` | فحص الهدف (تشغيل اصطناعي، تحت) |
 
 - **الأدوار:** `deployment.rollback`: Owner وAdmin وMaintainer (حساس، ADR-0054). باقي الصفوف زي M5. التوكنات مافيهاش أي إجراء كتابة جديد، وتقرا الأهداف بـ `project.read` الموجود. كل route ليه صف في اختبار الـ route-table لكل دور.
 - **الأخطاء الجديدة (`UPPER_SNAKE`، مترجمة):** `TARGET_EXISTS` و`TARGET_DUPLICATE` و`TARGET_IN_USE` و`TARGET_VERSION_CONFLICT` و`TARGET_HOST_BLOCKED` و`TARGET_HOST_UNREACHABLE` و`HOST_KEY_NOT_PENDING` و`HOST_KEY_FINGERPRINT_MISMATCH` و`TARGET_KEY_NOT_FOUND` و`DEPLOY_PATH_INVALID`.
-- **الـ audit** (بعد الـ commit، أسماء وبصمات وأرقام بس): `target.created` و`target.updated` و`target.removed` و`target.key_generated` و`target.host_key_fetched` و`target.host_key_confirmed` (بالقديمة والجديدة) و`target.checked`.
+- **الـ audit** (بعد الـ commit، أسماء وبصمات وأرقام بس): `target.created` و`target.updated` و`target.removed` و`target.key_generated` و`target.host_key_fetched` و`target.host_key_confirmed` (بالقديمة والجديدة ورقم السيرفر) و`target.host_added` و`target.host_removed` و`target.checked`.
 
 ## توصيل الهدف للـ runner (M6.2)
 
@@ -134,26 +147,26 @@
 1. **حل الهدف:** لكل خطوة `uses:` بـ `with.target`: الهدف من بيئة الـ job. الأخطاء فوق.
 2. **المفتاح موجود:** سر `KeySecretName` على البيئة، وإلا `TARGET_KEY_NOT_FOUND` قبل ما حد يستنى موافقة.
 3. **الـ artifact:** الإضافة بتعلن في الـ manifest إن `artifact` مطلوب. الاسم لازم يطابق artifact من `needs` أو `ingested:`، وإلا `TARGET_ARTIFACT_REQUIRED`. وartifact `Untrusted` بيترفض زي ما هو (`ARTIFACT_UNTRUSTED`).
-4. **الـ egress** (القاعدة اللي في الطلب «egress للهدف بس»): الـ job اللي فيه خطوة هدف بياخد egress = **نقط الهدف بالظبط** (`host:port`، أو `ip:port` لو العنوان IP) + host الـ `health_check_url` (نص ثابت، `HEALTH_URL_INVALID` لو مش `https`/`http` صح). وأي `network.egress` تاني كاتبه المستخدم في الـ job ده مرفوض `TARGET_JOB_EGRESS_NOT_ALLOWED` إلا لو البيئة فتحت `"AllowExtraDeployEgress"` (افتراضيًا لأ). يعني job النشر لوحده، وإشعار Slack في job تاني. النقط دي بيحسبها السيرفر من الهدف، فالـ commit مايقدرش يوجّه النشر لـ host تاني.
-5. **قاعدة IP:** قايمة الـ egress في الـ spec بترفض IP literal (ADR-0057). الهدف بـ IP بيتوصّل في حقل جديد `JobSpec.network.exact_endpoints[]` بيبنيه السيرفر بس (الـ `jobspec` بيرفضه لو جاي من YAML). الـ runner بيثبّت الاتصال على الـ IP والبورت بالظبط، ولسه بيرفض private/loopback/metadata إلا نطاق المشغّل (`ALLOW_PRIVATE_CIDRS`).
+4. **الـ egress** (القاعدة اللي في الطلب «egress للهدف بس»): الـ job اللي فيه خطوة هدف بياخد egress = **اتحاد نقط كل سيرفرات الهدف بالظبط** (`host:port`، أو `ip:port` لو العنوان IP) + host الـ `health_check_url` (نص ثابت، وبيدعم placeholder `{host}` لفحص كل سيرفر على عنوانه، فكل الـ hosts الناتجة بتتحسب مع الاتحاد؛ `HEALTH_URL_INVALID` لو مش `https`/`http` صح، `HEALTH_URL_INVALID` لو مش `https`/`http` صح). وأي `network.egress` تاني كاتبه المستخدم في الـ job ده مرفوض `TARGET_JOB_EGRESS_NOT_ALLOWED` إلا لو البيئة فتحت `"AllowExtraDeployEgress"` (افتراضيًا لأ). يعني job النشر لوحده، وإشعار Slack في job تاني. النقط دي بيحسبها السيرفر من الهدف، فالـ commit مايقدرش يوجّه النشر لـ host تاني.
+5. **قاعدة IP:** قايمة الـ egress في الـ spec بترفض IP literal (ADR-0057). سيرفرات الهدف اللي بـ IP (أو كلها) بتتوصّل في حقل جديد `JobSpec.network.exact_endpoints[]` فيه نقطة لكل سيرفر، بيبنيه السيرفر بس (الـ `jobspec` بيرفضه لو جاي من YAML). الـ runner بيثبّت الاتصال على الـ IP والبورت بالظبط، ولسه بيرفض private/loopback/metadata إلا نطاق المشغّل (`ALLOW_PRIVATE_CIDRS`).
 
 ### وقت `Start` (SecretResolver في `App`)
-- زيادة على فحوص M5 (fork، وبيئة، و`"RuleVersion"`، وإيقاف): الهدف لسه موجود، والـ host key لسه هو المثبّت، و`Version` الهدف مطابق لوقت الإدراج. غير كده `TARGET_CHANGED` من غير ما المفتاح يتفك.
+- زيادة على فحوص M5 (fork، وبيئة، و`"RuleVersion"`، وإيقاف): الهدف لسه موجود، وقايمة سيرفراته وترتيبها هي هي، والـ host key لكل سيرفر لسه هو المثبّت، و`Version` الهدف مطابق لوقت الإدراج. غير كده `TARGET_CHANGED` من غير ما المفتاح يتفك.
 - المفتاح بيتوصل كسر محجوز `dhow.target.<n>.key` من نوع `as_file` بـ `step_indexes` خطوة الإضافة دي بس، ومالوش وجود في الـ spec (زي `dhow.git.checkout`): `jobspec` بيرفضه لو جاي من YAML أو لو مفيش `targets` في الـ job.
-- **`JobSpec.targets[]`** (غير سري): `step_index` و`kind` و`host` و`port` و`user` و`known_hosts_line` و`deploy_path` و`release_id` (بيولّده السيرفر: `<رقم الـ run>-<أول 8 من الـ sha>-<رقم الجولة>`، فريد للهدف بـ unique index) و`keep_releases` و`settings` (الـ hooks والسياسة، من الهدف مش من YAML).
-- **الـ runner** بيدّي الإضافة: متغيّرات `DHOW_TARGET_*` (host وport وuser وknown_hosts وdeploy_path وrelease_id)، وملف المفتاح `DHOW_TARGET_KEY_FILE` (`0400` في tmpfs)، وarchive الـ artifact كملف `DHOW_INPUT_ARTIFACT_FILE` وdigest بتاعه `DHOW_INPUT_ARTIFACT_DIGEST` (الـ runner اتأكد منه). الإضافة مابتاخدش حاجة تانية (ADR-0075). والمفتاح بيتضاف للـ masker.
+- **`JobSpec.targets[]`** (غير سري): `step_index` و`kind` و`user` و`deploy_path` و`release_id` (بيولّده السيرفر: `<رقم الـ run>-<أول 8 من الـ sha>-<رقم الجولة>`، وهو **نفسه** لكل سيرفرات الهدف في النشر ده، وفريد لكل (سيرفر، إصدار) بـ unique index) و`keep_releases` و`settings` (الـ hooks والسياسة والـ `Rolling`، من الهدف مش من YAML) و`hosts[]` مرتبة: لكل سيرفر `host_id` و`host` و`port` و`known_hosts_line`.
+- **الـ runner** بيدّي الإضافة: متغيّرات `DHOW_TARGET_*` (user وdeploy_path وrelease_id وقايمة السيرفرات JSON بالترتيب)، وملف المفتاح `DHOW_TARGET_KEY_FILE` (`0400` في tmpfs)، وarchive الـ artifact كملف `DHOW_INPUT_ARTIFACT_FILE` وdigest بتاعه `DHOW_INPUT_ARTIFACT_DIGEST` (الـ runner اتأكد منه). الإضافة مابتاخدش حاجة تانية (ADR-0075). والمفتاح بيتضاف للـ masker.
 
 ### علامة `Mutating` وقناة التقارير
 - **`mutating`:** حقل `Mutating` في الـ manifest (Version 1، حقل اختياري جديد). الـ runner بيبعت `BeginStep(mutating=true)` للخطوة دي، فالسيرفر يكتب `"MutationStartedAt"` ومفيش إعادة بنية تحتية بعدها (ADR-0047). ده اللي `pipeline-spec` وM4 سابوه لـ M6.
-- **`ReleaseService.Report(LeaseRef, DeployEvent)`** (Connect، مربوط بالـ fencing زي `ArtifactService.Commit`): الإضافة بتكتب سطور JSON في `DHOW_DEPLOY_REPORT` (64 KiB و100 حدث بالكتير)، والـ agent بيقراها ويبعتها وقت حدوثها: `release_started` و`uploaded` و`switched` و`health` (نتيجة كل محاولة، مدمجة) و`verified` و`rolled_back` (بالسبب) و`rollback_failed` و`pruned`. السيرفر بيتحقق من الشكل والحدود وأن الحدث لنفس الـ lease والهدف، ومابيصدّقش أي نص حر في الرسائل (اللي بيتخزّن enum وأرقام ورسالة 256 حرف بعد الإخفاء).
+- **`ReleaseService.Report(LeaseRef, DeployEvent)`** (Connect، مربوط بالـ fencing زي `ArtifactService.Commit`): الإضافة بتكتب سطور JSON في `DHOW_DEPLOY_REPORT` (64 KiB و100 حدث بالكتير)، والـ agent بيقراها ويبعتها وقت حدوثها: `release_started` و`uploaded` و`switched` و`health` (نتيجة كل محاولة، مدمجة) و`verified` و`rolled_back` (بالسبب) و`rollback_failed` و`pruned` و`batch_passed`، وكل حدث فيه `host_id` (رقم سيرفر من `JobSpec.targets[].hosts`). السيرفر بيتحقق من الشكل والحدود وأن الحدث لنفس الـ lease والهدف وسيرفر من قايمته، ومابيصدّقش أي نص حر في الرسائل (اللي بيتخزّن enum وأرقام ورسالة 256 حرف بعد الإخفاء).
 - **الإضافة بتبلّغ ومابتقررش:** نتيجة الـ job من exit code، والتقرير للسجل والواجهة. إضافة بتكدّب في تقريرها بتأثر على سجل بيئتها بس، وهي أصلًا معاها مفتاح الهدف.
 - **الـ features:** `deploy_targets` في التسجيل والدخول الموقّع (زي `checkout` و`plugins`). job فيه هدف مابياخدوش runner قديم.
-- **أسباب فشل جديدة** (`"RunJobs"."FailureReason"`) و`AttemptFailureReason`: `TARGET_NOT_FOUND` و`TARGET_NOT_LITERAL` و`TARGET_REQUIRES_ENVIRONMENT` و`TARGET_HOST_KEY_UNCONFIRMED` و`TARGET_KEY_NOT_FOUND` و`TARGET_PLUGIN_NOT_ALLOWED` و`TARGET_ARTIFACT_REQUIRED` و`TARGET_JOB_EGRESS_NOT_ALLOWED` و`TARGET_CHANGED` و`HEALTH_URL_INVALID` (إدراج/بدء)، و`HOST_KEY_MISMATCH` (موجود) و`DEPLOY_FAILED` و`DEPLOY_HEALTH_FAILED` و`DEPLOY_ROLLED_BACK` و`DEPLOY_ROLLBACK_FAILED` و`DEPLOY_INTERRUPTED` (الإضافة).
+- **أسباب فشل جديدة** (`"RunJobs"."FailureReason"`) و`AttemptFailureReason`: `TARGET_NOT_FOUND` و`TARGET_NOT_LITERAL` و`TARGET_REQUIRES_ENVIRONMENT` و`TARGET_HOST_KEY_UNCONFIRMED` و`TARGET_KEY_NOT_FOUND` و`TARGET_PLUGIN_NOT_ALLOWED` و`TARGET_ARTIFACT_REQUIRED` و`TARGET_JOB_EGRESS_NOT_ALLOWED` و`TARGET_CHANGED` و`HEALTH_URL_INVALID` و`ROLLING_BUDGET_EXCEEDED` (إدراج/بدء)، و`HOST_KEY_MISMATCH` (موجود) و`DEPLOY_FAILED` و`DEPLOY_HEALTH_FAILED` و`DEPLOY_ROLLED_BACK` و`DEPLOY_ROLLBACK_FAILED` و`DEPLOY_INTERRUPTED` (الإضافة).
 
 ## إضافة SSH/VPS (`dhow-deploy-ssh`)
 
 ### فين بتشتغل
-جوه الـ runner sandbox زي أي إضافة (ADR-0075)، مش على السيرفر ولا على سيرفر الهدف. أسبابها: كود النشر بيشتغل في نفس العزل (حدود الموارد والـ egress والـ masker وإلغاء الـ job)، والسيرفر مابيحتاجش يوصّل شبكيًا لحد، والمفتاح بيوصل لـ sandbox واحدة لفترة الخطوة بس. ([سؤال 1](#1-فين-النشر-بيشتغل).) الإضافة Go binary في صورة `FROM scratch` أو Alpine متثبّتة، موقّعة بـ cosign ومعاها provenance من `release.yml`، والـ digest بتاعها بيتكتب في أمثلة الوثائق عند كل release.
+جوه الـ runner sandbox زي أي إضافة (ADR-0075)، مش على السيرفر ولا على سيرفر الهدف. أسبابها: كود النشر بيشتغل في نفس العزل (حدود الموارد والـ egress والـ masker وإلغاء الـ job)، والسيرفر مابيحتاجش يوصّل شبكيًا لحد، والمفتاح بيوصل لـ sandbox واحدة لفترة الخطوة بس. ([قرار 1](#قرار-1).) الإضافة Go binary في صورة `FROM scratch` أو Alpine متثبّتة، موقّعة بـ cosign ومعاها provenance من `release.yml`، والـ digest بتاعها بيتكتب في أمثلة الوثائق عند كل release.
 
 ### المدخلات (`with:`، معلنة في الـ manifest)
 | الاسم | مطلوب | الوصف |
@@ -182,7 +195,7 @@
 2. **فحوص مسبقة:** `DeployPath` موجود ومالكه المستخدم (`test -d`)، ومساحة فاضية ≥ ضعف حجم الأرشيف، و`current` symlink أو مش موجود (لو مجلد حقيقي: `CURRENT_NOT_A_SYMLINK` ومانلمسوش، والوثائق بتشرح التحويل). **القفل البعيد:** `mkdir .dhow/lock` ذري ومعاه `owner` فيه رقم الـ run ووقت الانتهاء. قفل منتهي بيتاخد بتحذير، وقفل شغّال `TARGET_LOCKED`. (القفل الحقيقي قفل البيئة في السيرفر، ده دفاع تاني.)
 3. **الرفع:** بـ SFTP (`github.com/pkg/sftp`) على `releases/.incoming-<id>/` من stream الأرشيف **من غير فك على القرص**: كل عنصر بيعدّي نفس قواعد الفك الآمن (`..` والمسارات المطلقة والـ links اللي بتخرج والـ devices والـ hard links مرفوضة، `ARTIFACT_UNSAFE`)، والصلاحيات `0755` أو `0644` بس، وحد الحجم والعدد. وبعد الرفع manifest `sha256` للملفات بيتأكد على السيرفر (`sha256sum -c`).
 4. **المشاركة (`shared`):** روابط نسبية من الإصدار لـ `../../shared/<name>`، والأسماء من `Settings.Shared` بحروف آمنة وبدون `..`. لو الإصدار فيه ملف حقيقي بالاسم ده: `SHARED_PATH_CONFLICT`.
-5. **hook قبل التبديل** ([سؤال 6](#6-الـ-hooks)): من الهدف، جوه مجلد الإصدار الجديد، بمهلة (افتراضيًا 120s، أقصى 600s) ومتغيّرات `DHOW_RELEASE_PATH` و`DHOW_RELEASE_ID` و`DHOW_PREVIOUS_RELEASE`. فشله = الإصدار مايتبدّلش، `failed`، من غير رجوع (لسه ماحصلش تغيير).
+5. **hook قبل التبديل** ([قرار 6](#قرار-6)): من الهدف، جوه مجلد الإصدار الجديد، بمهلة (افتراضيًا 120s، أقصى 600s) ومتغيّرات `DHOW_RELEASE_PATH` و`DHOW_RELEASE_ID` و`DHOW_PREVIOUS_RELEASE`. فشله = الإصدار مايتبدّلش، `failed`، من غير رجوع (لسه ماحصلش تغيير).
 6. **التسمية الذرية:** `PosixRename` من `.incoming-<id>` لـ `<id>`.
 7. **التبديل الذري:** `previous = readlink current`، `state.json = switching`، وبعدين symlink مؤقت `current.tmp-<id>` بيتعمل `PosixRename` فوق `current`. (rename فوق symlink ذري على POSIX، فمفيش لحظة من غير `current`.)
 8. **إعادة التحميل:** `ReloadCommand` ثم hook بعد التبديل (من الهدف). فشل أي واحد = رجوع.
@@ -193,7 +206,7 @@
 13. **الانقطاع (الـ runner وقع):** مفيش حاجة تقدر ترجّع. الـ lease بيتحول `lost` والـ reconciler بيعلّم الإصدار `unknown` (تحت)، و`state.json` على السيرفر بيفضل `switching`. النشر الجاي بيكتشف ده (`.dhow/verified != readlink current`)، وبيطلّع تحذير، وبيستخدم `verified` كـ `previous` للرجوع.
 
 - **الـ `Mutating`:** تحت مسؤولية الـ manifest، وأول عملية كتابة على السيرفر (خطوة 2 بعد القفل) بتبعت `BeginStep` اللي فيه `mutating`. ملحوظة: الرفع على `.incoming` مش بيغيّر حاجة شغّالة، بس بنعتبره `mutating` للبساطة.
-- **ممنوع:** أي shell محلي. كل أوامر السيرفر البعيد قوالب ثابتة، وأجزاؤها المتغيّرة (`DeployPath` والـ release id وأسماء `shared`) بتعدّي على regex `[A-Za-z0-9._/-]` قبل ما تدخل أمر، فمفيش علامة بتاعة shell بتوصل لـ shell السيرفر البعيد. الاستثناء الوحيد الـ hooks اللي الأدمن كاتبها ([سؤال 6](#6-الـ-hooks)). ده الاستثناء الوحيد لقاعدة «ممنوع تشغيل نص بـ shell»، ومكتوب في ADR (shell الـ login على سيرفر العميل نفسه بقيم متحقق منها، وfuzz target عليه).
+- **ممنوع:** أي shell محلي. كل أوامر السيرفر البعيد قوالب ثابتة، وأجزاؤها المتغيّرة (`DeployPath` والـ release id وأسماء `shared`) بتعدّي على regex `[A-Za-z0-9._/-]` قبل ما تدخل أمر، فمفيش علامة بتاعة shell بتوصل لـ shell السيرفر البعيد. الاستثناء الوحيد الـ hooks اللي الأدمن كاتبها ([قرار 6](#قرار-6)). ده الاستثناء الوحيد لقاعدة «ممنوع تشغيل نص بـ shell»، ومكتوب في ADR (shell الـ login على سيرفر العميل نفسه بقيم متحقق منها، وfuzz target عليه).
 
 ### أقل صلاحيات على السيرفر (في `docs/guides/deploy-ssh.md`)
 - مستخدم نشر مخصوص (`dhow-deploy`) بكتابة على `DeployPath` بس، من غير `sudo` عام. لو الخدمة محتاجة reload: سطر `sudoers` لأمر واحد (`systemctl reload myapp`)، و`ReloadCommand` بنفس الأمر.
@@ -201,13 +214,48 @@
 - مفيش Docker group للمستخدم ده (SSH target). وCompose له وثيقة لوحده (تحت).
 - تدوير المفتاح: توليد جديد، تأكيد، شيل القديم.
 
+## النشر المتدرّج على أكتر من سيرفر ([قرار 7](#قرار-7))
+الخوارزمية اللي فوق (خطوات 1 لـ 13) بتشتغل **على كل سيرفر**. لما الهدف فيه أكتر من سيرفر، نفس الإضافة (من runner واحد وخطوة واحدة) بتنسّق المجموعة بالشكل ده. المثال `target: prod-fleet` في `pipeline-spec.md` بيفضل صالح كما هو: `prod-fleet` هدف بقايمة سيرفرات.
+
+### الوحدة: إصدار المجموعة
+- النشر على هدف = **إصدار مجموعة** واحد: نفس `release_id` ونفس الـ digest على كل السيرفرات. كل سيرفر له سجل نتيجته الخاص.
+- حالات المجموعة: `running` ثم `succeeded` أو `failed` (فشل قبل أي تبديل، مفيش تغيير) أو `rolled_back` (كل اللي اتبدّل رجع) أو `rollback_failed` (سيرفر واحد على الأقل فضل على الإصدار الجديد أو مجهول) أو `unknown` (الـ runner وقع). حالات السيرفر: `pending` و`uploaded` و`switched` و`verified` و`failed` و`rolled_back` و`rollback_failed` و`unknown` و`skipped` (ماتلمسش).
+- **`partial` حالة معروضة مش مخزّنة:** الهدف اللي سيرفراته على إصدارات مختلفة (بسبب `rollback_failed` أو `unknown`) بتظهر له شارة «المجموعة على إصدارات مختلفة» بالأحمر لحد نشر ناجح أو رجوع ناجح أو «افحص الهدف».
+
+### المراحل
+1. **فحص مسبق على كل السيرفرات قبل أي تغيير:** اتصال، و`FixedHostKey` بمفتاح كل سيرفر، و`DeployPath` والمساحة، وقراية `current` و`verified` لكل سيرفر، وأخذ القفل البعيد `mkdir` على كلهم بترتيب `Position`. أي سيرفر فشل: المجموعة `failed` ومفيش حاجة اتغيّرت، والأقفال بتتفك.
+2. **الرفع على كل السيرفرات** (بالتوازي لحد 4 اتصالات): `.incoming` والتأكد من الـ manifest والروابط وhook قبل التبديل، من غير تغيير في الشغّال. بنرفع للكل الأول عشان فشل الشبكة أو القرص يطلع قبل أول تبديل.
+3. **التبديل على دفعات:** السيرفرات بترتيب `Position` في دفعات حجمها `BatchSize` (الافتراضي 1). في كل دفعة: تبديل ذري وreload لكل سيرفر في الدفعة بالتوازي، ثم **بوابة صحة للدفعة**: كل سيرفر فيها لازم يعدّي `health_check_stable` نجاحات. `health_check_url` فيه `{host}` بيتفحص على عنوان كل سيرفر، ومن غيره الـ URL (load balancer مثلًا) بيتفحص مرة للدفعة، والوثائق بتقول إن ده مايفرّقش سيرفر عن التاني. بعد البوابة `BatchPauseSeconds` وبعدها الدفعة اللي بعدها. سقف الصحة 10 دقايق للدفعة و60 دقيقة للنشر كله (`ROLLING_BUDGET_EXCEEDED` وقت الإدراج).
+4. **النجاح:** بعد آخر دفعة: `verified` على كل سيرفر، وتنضيف `keep_releases`، وفك الأقفال.
+
+### الفشل والرجوع الجماعي
+- أي سيرفر فشل (الرفع بعد البدء، أو التبديل، أو reload، أو hook، أو بوابة صحة الدفعة، أو إلغاء الـ job): **بنوقف فورًا** (مفيش دفعات جديدة، والسيرفرات اللي لسه ماتبدّلتش بتتعلّم `skipped` وبتتنضّف `.incoming` بتاعتها).
+- **الرجوع:** كل سيرفر `switched` أو `verified` في النشر ده بيرجع للإصدار اللي كان عليه (`verified` بتاعه) بنفس خطوات الرجوع (تبديل ذري وreload وفحص قصير)، **بترتيب عكسي للتبديل**: الدفعة الأحدث الأول، وجواها بالتوازي. الرجوع **بيكمّل على باقي السيرفرات حتى لو واحد فشل**، مش بيقف عند أول فشل.
+- **لو الرجوع نفسه فشل على سيرفر:** المجموعة بتبقى `rollback_failed` والسيرفر `rollback_failed` بسببه، والـ job بيفشل `DEPLOY_ROLLBACK_FAILED`. اللي بيحصل بعدها بالظبط: `audit` فوري `deployment.release_rollback_failed` لكل سيرفر وللمجموعة، وحدث `deployment.finished` فيه `Partial = true` للإشعارات (M7)، وشارة حمرا ثابتة على الهدف في الواجهة، وسجل بنتيجة كل سيرفر ومسار الإصلاح (`افحص الهدف` ثم نشر أو رجوع). مفيش أي حاجة بتتسكت، ومفيش محاولة تالتة أوتوماتيك.
+- **النشر الجاي على هدف غير متّسق:** مسموح (هو اللي بيوصّل المجموعة لحالة واحدة)، بيبدأ بفحص مسبق يقرا إصدار كل سيرفر، وبتحذير في السجل. وأي رجوع تلقائي بعده بيرجّع كل سيرفر لـ`verified` بتاعه هو.
+- **الإلغاء** (`SIGTERM`) بيمشي نفس المسار بسبب `canceled`. لو مهلة الإلغاء خلصت قبل ما الرجوع يخلص، السيرفرات اللي لسه `switched` من غير نتيجة بتتعلّم `unknown` من الـ reconciler (مش `verified` أبدًا).
+- **الـ runner وقع:** كل سيرفر `uploaded` أو `switched` من غير نهاية بيبقى `unknown`، والمجموعة `unknown`. «افحص الهدف» بيقرا كل سيرفر ويصحّح.
+
+### التزامن
+- **قفل البيئة (M5.6أ) هو الأساس:** run واحد في البيئة في المرة، فنشرين على نفس الهدف مستحيلين من runs مختلفة.
+- **جوه الـ run الواحد:** index جزئي unique على (`"TargetId"`) للمجموعة `running`، فـ jobين في نفس الـ run على نفس الهدف مايتداخلوش (`TARGET_IN_USE` وقت الإدراج، والتاني بيستنى مش بيفشل). أهداف مختلفة في نفس البيئة (matrix) بتشتغل مع بعض عادي.
+- **القفل البعيد** على كل سيرفر دفاع تاني، بترتيب `Position` ثابت علشان مفيش deadlock.
+- بيئتين مايشاوروش على نفس السيرفر والمسار (`TARGET_DUPLICATE`).
+
+### حدود التصميم (مقبولة ومكتوبة)
+- فترة قصيرة بين الدفعات بيبقى فيها سيرفرات على إصدارين (طبيعة rolling). التطبيق لازم يتحمّل ده، والوثائق بتقول.
+- الرجوع بيرجّع الملفات والـ reload، مش تغييرات خارجية (migrations قاعدة البيانات مثلًا). مكتوب في الوثائق.
+- لو الـ load balancer هو اللي فحصنا، فحص الدفعة مش بيثبت إن السيرفر ده بالذات سليم؛ `{host}` أدق.
+- ترتيب الدفعات بيحدده الأدمن بـ `Position`، فمفيش «canary» بنسبة حركة (بعد أول نسخة).
+
 ## إضافة Docker Compose (`dhow-deploy-compose`)
 - **نفس المحرك** (`internal/deployrelease`): الاتصال والـ host key والأرشيف والقفل والإصدارات والتقارير والرجوع والـ health HTTP. اللي بيتغيّر التبديل والانتظار: بدل `current` symlink بس، الإصدار مجلد فيه `compose.yaml` وملف `compose.dhow.yaml` الإضافة بتولّده، و`current` symlink برضه (علشان الرجوع يعرف الإصدار السابق ويقدر ينفّذه).
+- **التدرّج عبر السيرفرات:** نفس [المراحل والرجوع الجماعي](#النشر-المتدرّج-على-أكتر-من-سيرفر) بالظبط. كل سيرفر `up -d --wait` لوحده في دفعته، وبوابة صحة الدفعة، ولو واحد فشل بيرجع كل سيرفر اتبدّل بملفات إصداره السابق. ([قرار 5](#قرار-5) و[قرار 7](#قرار-7).)
 - **الصور بالـ digest:** كل خدمة لازم صورتها `@sha256:` بعد دمج الـ override (من الملف أو من `with.images: "web=ghcr.io/acme/web@sha256:..."`)، وغير كده `COMPOSE_IMAGE_NOT_PINNED`. `build:` مرفوض (`COMPOSE_BUILD_NOT_ALLOWED`): النشر بيسحب مش بيبني (ADR-0010).
 - **سياسة آمنة افتراضيًا:** الإضافة بتفحص الملف قبل ما تلمس السيرفر وبترفض `privileged` و`pid: host` و`network_mode: host` و`cap_add` و`devices` و`security_opt` اللي بتقفل seccomp أو apparmor، وbind mounts بره `DeployPath`، و`docker.sock` (`COMPOSE_UNSAFE_<RULE>`). الأدمن يقدر يفتح `AllowUnsafeCompose` على الهدف بتحذير وخطوة تانية. السبب: مستخدم Docker على السيرفر يساوي root عليه، فالملف اللي جاي من commit مايتنفّذش بحدود أوسع من المقصود. (والوثائق بتنصح بـ rootless Docker على الهدف.)
 - **الأوامر:** `docker compose --project-name <p> -f <path>/compose.yaml -f <path>/compose.dhow.yaml pull --quiet` ثم `up -d --wait --wait-timeout <N> --remove-orphans=false`. اسم المشروع من الهدف. `--wait` بيستنى healthchecks الحاويات، وفحص HTTP الخارجي فوقه (نفس المدخلات).
 - **الرجوع:** نفس خوارزمية SSH: إعادة `up -d --wait` بملفات الإصدار السابق (الـ digests محفوظة فيه)، ثم `current` للقديم. الصور السابقة بتتسحب بالـ digest لو اتمسحت. الإضافة مابتمسحش صور (الوثائق: `docker image prune` مجدول على السيرفر).
-- **الاتصال بـ Docker:** [سؤال 5](#5-docker-compose-عن-بعد): أوامر `docker compose` على السيرفر بـ SSH exec، من غير agent ومن غير تعريض Docker API على الشبكة.
+- **الاتصال بـ Docker:** [قرار 5](#قرار-5): أوامر `docker compose` على السيرفر بـ SSH exec، من غير agent ومن غير تعريض Docker API على الشبكة.
 - **بيانات الـ registry:** السيرفر نفسه عمل `docker login` قبل كده. مفيش بيانات registry بتتبعت من داو للسيرفر البعيد.
 
 ## استقبال الـ artifacts من CI خارجي (`Modules/Ingest`)
@@ -234,7 +282,7 @@
 ### المنشأ (provenance) والتحقق
 - **اللي السيرفر بيتحقق منه:** الـ digest (حسبه بنفسه)، وشكل الأرشيف، والـ ref ضد `RefPatterns` التوكن، و`sha` شكل صح. **اللي بيتسجّل كمُعلَن (مش مُتحقَّق):** المزوّد والمستودع والـ workflow ورقم التشغيل ورابطه والـ actor من `Dhow-Ingest-Provenance`. الواجهة بتكتب «مُعلَن من CI» جنبها، ولو الـ run محتاج موافقة المراجع بيشوفها (والموافقة على الـ digest مش على الادعاء).
 - **أن الـ sha فعلًا من المستودع:** الـ trigger بيتعامل معاه زي webhook Git العام: تلميح. الـ checkout (لو الـ pipeline عمله) بيتأكد من تاريخ الـ ref وغير كده `CHECKOUT_REF_MOVED`. والبوابة بتطبّق `AllowedRefs` على الـ ref المُعلَن، فتوكن CI مسروق مقيّد بـ `RefPatterns` ومحتاج موافقة لو البيئة فيها مراجعين.
-- **توكن GitHub OIDC (منشأ متحقق):** مش في M6 ([سؤال 4](#4-توثيق-الرفع-من-ci-خارجي))، والجدول فيه عمود `"ProvenanceVerified"` (boolean، false) جاهز له بـ expand.
+- **توكن GitHub OIDC (منشأ متحقق):** مش في M6 ([قرار 4](#قرار-4))، والجدول فيه عمود `"ProvenanceVerified"` (boolean، false) جاهز له بـ expand.
 
 ### من الرفع للنشر
 1. **تعريف الـ pipeline:** للـ event `artifact`، التعريف بيتقرا من **الفرع الافتراضي** (زي الأحداث المميّزة في `pipeline-spec.md` §1: PR مايعدّلش صلاحياته، وصاحب توكن CI مايكتبش pipeline)، مش من الـ sha المُعلَن.
@@ -251,17 +299,18 @@
 ## سجل النشر
 
 ### `"DeploymentReleases"` (جديد، expand)
-صف لكل (نشر، خطوة هدف): `"DeploymentId"` و`"RunJobId"` و`"TargetId"` و`"StepIndex"` و`"Kind"` (`deploy` أو `rollback`) و`"ReleaseId"` (فريد مع الهدف) و`"PreviousReleaseId"` و`"ArtifactDigest"` (bytea 32) و`"State"` IN (`running`, `succeeded`, `failed`, `rolled_back`, `rollback_failed`, `unknown`) و`"Health"` (jsonb صغير: `Attempts` و`Passed` و`LastStatus` و`LastError` (نوع بس) و`DurationMs` و`StableChecks`) و`"RollbackReason"` و`"RollbackAt"` و`"StartedAt"` و`"FinishedAt"` و`"SwitchedAt"`.
+جدولين: **مستوى المجموعة** `"DeploymentReleases"` (صف لكل نشر وخطوة هدف): `"DeploymentId"` و`"RunJobId"` و`"TargetId"` و`"StepIndex"` و`"Kind"` (`deploy` أو `rollback`) و`"ReleaseId"` و`"PreviousReleaseId"` (إصدار المجموعة السابق الناجح) و`"ArtifactDigest"` (bytea 32) و`"BatchSize"` و`"State"` IN (`running`, `succeeded`, `failed`, `rolled_back`, `rollback_failed`, `unknown`) و`"FailedHostId"` و`"RollbackReason"` و`"StartedAt"` و`"FinishedAt"`، وindex جزئي unique على (`"TargetId"`) WHERE `"State"` = `running`. و**مستوى السيرفر** `"DeploymentReleaseHosts"` (صف لكل سيرفر في الإصدار): `"ReleaseRowId"` و`"HostId"` و`"Position"` و`"Batch"` و`"State"` IN (`pending`, `uploaded`, `switched`, `verified`, `failed`, `rolled_back`, `rollback_failed`, `unknown`, `skipped`) و`"PreviousReleaseId"` (اللي كان عليه السيرفر) و`"Health"` (jsonb صغير: `Attempts` و`Passed` و`LastStatus` و`LastError` (نوع بس) و`DurationMs` و`StableChecks`) و`"RollbackReason"` و`"SwitchedAt"` و`"RolledBackAt"` و`"FinishedAt"`، وunique (`"ReleaseRowId"`, `"HostId"`) وunique (`"HostId"`, `"ReleaseId"` عبر الأب).
 - **`"Deployments"."State"`:** بتدخل قيمة `running` (محجوزة في الـ CHECK من M5.6أ) أول `release_started`. نتيجة الـ job من exit code زي ما هي: `rolled_back` يعني الـ job `failed`.
-- **«المنشور دلوقتي» للهدف:** آخر إصدار `succeeded` على الهدف. بعد `rolled_back` المنشور هو السابق (لسه `succeeded` من نشر قبله). بعد `unknown`: الواجهة بتقول «الحالة مجهولة» وبتعرض زرار «افحص الهدف».
-- **الـ reconciler:** إصدار `running` وlease اتحوّل `lost`/`expired`: بيبقى `unknown` وaudit `deployment.release_unknown`. وإصدار `running` وlease حي بس مفيش تقرير من 15 دقيقة: ما بنعملش حاجة (الـ lease هو الحكم).
+- **«المنشور دلوقتي» للهدف:** آخر إصدار مجموعة `succeeded`. بعد `rolled_back` المنشور هو السابق. بعد `rollback_failed` أو `unknown`: الواجهة بتعرض إصدار كل سيرفر وشارة «المجموعة على إصدارات مختلفة» وزرار «افحص الهدف».
+- **الـ reconciler:** إصدار `running` وlease اتحوّل `lost`/`expired`: بيبقى `unknown` وكل سيرفر `uploaded` أو `switched` من غير نهاية فيه بيبقى `unknown` وaudit `deployment.release_unknown`. وإصدار `running` وlease حي بس مفيش تقرير من 15 دقيقة: ما بنعملش حاجة (الـ lease هو الحكم).
 - **الـ API:** تفاصيل الـ `RunJob` والنشر بيزيد عليها `Releases[]` (الهدف، والنوع، والإصدار، والسابق، وhex الـ digest، والحالة، والفحص، والسبب). والـ DTOs من غير أي حقل سر (اختبار انعكاس زي M5).
 - **الـ audit** (بعد الـ commit): `deployment.release_started` و`deployment.release_switched` و`deployment.release_succeeded` و`deployment.release_rolled_back` (بالسبب) و`deployment.release_rollback_failed` و`deployment.release_unknown` و`artifact.ingested` و`ingest_token.created` و`ingest_token.revoked` و`ingest.rejected` (مرة كل دقيقة لكل توكن، لحد التسريب).
 - **حدث الـ bus:** `deployment.finished` (الهدف والحالة والسبب) للإشعارات في M7.
 
 ### التشغيلات الاصطناعية (رجوع يدوي وفحص الهدف)
 - **الفكرة:** `Pipelines` بيستقبل event جديد `rollback` أو `check` ويبني run من job واحد بإضافة رسمية بالـ digest الثابت في الـ binary (زي `CHECKOUT_IMAGE`)، من غير `.dhow.yml`. بيمر على نفس البوابة والقفل والموافقات والأسرار والـ egress، فمفيش مسار نشر تاني ليه قواعد تانية.
-- **`rollback`:** الإدخال (هدف، `ReleaseId` اختياري: الافتراضي `verified` السابق). الإضافة بتتأكد إن `releases/<id>` لسه موجود وتبدّل `current` وتعيد التحميل وتفحص الصحة (بنفس إعدادات آخر نشر ناجح مخزّنة في صف الإصدار)، ولو الدليل اتنضّف وفيه artifact مثبّت (`PinnedUntil`)، بتعيد رفعه من الـ digest (`mode: redeploy`). عمره ما بيعيد البناء. [سؤال 3](#3-الرجوع-اليدوي) بيحدد الموافقة.
+- **`rollback`:** الإدخال (هدف، `ReleaseId` اختياري: الافتراضي `verified` السابق). الإضافة بتتأكد إن `releases/<id>` لسه موجود وتبدّل `current` وتعيد التحميل وتفحص الصحة (بنفس إعدادات آخر نشر ناجح مخزّنة في صف الإصدار)، ولو الدليل اتنضّف وفيه artifact مثبّت (`PinnedUntil`)، بتعيد رفعه من الـ digest (`mode: redeploy`). عمره ما بيعيد البناء. [قرار 3](#قرار-3) بيحدد الموافقة.
+- **رجوع المجموعة ([قرار 3](#قرار-3) و[قرار 7](#قرار-7)):** الرجوع اليدوي على هدف متعدّد السيرفرات بيرجّع **المجموعة كلها** لإصدار مجموعة `succeeded` قبل كده على نفس الهدف (الافتراضي الإصدار السابق)، بنفس الدفعات والترتيب العكسي وبوابة الصحة لكل دفعة. سيرفر ناقصه الدليل بيتعمله `mode: redeploy` من الـ artifact المثبّت. لو الرجوع اليدوي نفسه فشل على سيرفر: بيوقف، والمجموعة `rollback_failed` بنفس التنبيه، ومفيش «رجوع عن الرجوع» أوتوماتيك.
 - **`check`:** الإضافة بتتصل وتتأكد من الـ host key والمستخدم و`DeployPath` والكتابة والمساحة (و`docker compose version` للـ Compose) وبتقرا `current` و`verified` وتبلّغ بالنتيجة، ولا بتغيّر حاجة. وبتصلّح `unknown` لو اللي على السيرفر واضح. الزرار «افحص الهدف» في الواجهة.
 
 ## الأمان
@@ -298,24 +347,29 @@
 | 6 | `Mutating` في الـ manifest، وقناة `ReleaseService.Report` مربوطة بالـ fencing | ADR-0047، والتقرير حي مش بعد النهاية | M6.2 |
 | 7 | الـ artifact بيوصل الإضافة أرشيف متحقق من الـ digest مش مفكوك، وفكه ستريم بقواعد الفك الآمن | مفيش فك على القرص، ونفس قواعد M4.9 | M6.2 |
 | 8 | مكان الكود الجديد: `apps/plugins/deploy-ssh` و`apps/plugins/deploy-compose` و`apps/github-action` و`internal/deployrelease` و`internal/archive` | ADR-0004 بيتعدّل، والمحرك مشترك بين الإضافتين | M6.3 |
-| 9 | الإصدار `releases/<id>` والتبديل بـ `PosixRename` فوق symlink، والقفل `mkdir` | ذري على POSIX، وSFTP بيدعمه | M6.3 |
-| 10 | الرجوع التلقائي وفحص الصحة (أرقام ومهلة 10 دقايق) | [سؤال 2](#2-الرجوع-التلقائي-وإيه-اللي-يشغّله) | M6.3 |
-| 11 | shell السيرفر البعيد: قوالب ثابتة وregex، والـ hooks من الهدف | الاستثناء الوحيد لقاعدة الـ shell | M6.3 وM6.4 |
+| 9 | الإصدار `releases/<id>` والتبديل بـ `PosixRename` فوق symlink، والقفل `mkdir` | ذري على POSIX، وSFTP بيدعمه | M6.3أ |
+| 10 | الرجوع التلقائي وفحص الصحة (أرقام ومهلة 10 دقايق) | [قرار 2](#قرار-2) | M6.3أ |
+| 11 | shell السيرفر البعيد: قوالب ثابتة وregex، والـ hooks من الهدف | الاستثناء الوحيد لقاعدة الـ shell | M6.3أ وM6.4 |
 | 12 | الإصدار `unknown` والـ reconciler والانقطاع | الصدق في السجل أهم من التخمين | M6.4 |
 | 13 | التشغيلات الاصطناعية (`rollback` و`check`) بتعدّي على نفس البوابة | مفيش مسار تاني للنشر | M6.4 |
 | 14 | سياسة Compose الآمنة والصور بالـ digest | docker group = root | M6.5 |
-| 15 | `Modules/Ingest` منفصل، وتوكنات محدودة، و`/ingest/v1` بـ `policy.Ingest` | [سؤال 4](#4-توثيق-الرفع-من-ci-خارجي)، ومش API token | M6.6 |
+| 15 | `Modules/Ingest` منفصل، وتوكنات محدودة، و`/ingest/v1` بـ `policy.Ingest` | [قرار 4](#قرار-4)، ومش API token | M6.6 |
 | 16 | `on.artifact` و`ingested:` والتعريف من الفرع الافتراضي | صاحب توكن CI مايكتبش pipeline | M6.6 |
 | 17 | الـ artifact المنشور بيتثبّت لحد ما يخرج من `keep_releases` | الرجوع من غير إعادة بناء | M6.6 |
 | 18 | الـ Action composite بنسخة وSHA مثبّتين، ومنشورة من الـ monorepo | سلسلة توريد، وتتختبر في الـ CI | M6.7 |
+| 19 | الهدف بقايمة سيرفرات (`"DeployTargetHosts"`)، ولكل سيرفر مفتاحه المتثبّت وسجله، وإصدار مجموعة واحد بـ `release_id` واحد | [قرار 7](#قرار-7)، `prod-fleet` في الـ spec | M6.1 وM6.3ب |
+| 20 | التدرّج: فحص مسبق ورفع للكل، ثم دفعات `BatchSize` بوابة صحة لكل دفعة، وسقف 10 دقايق للدفعة و60 للنشر | تفشل بدري من غير تغيير، وتحدد أثر الفشل | M6.3ب |
+| 21 | الرجوع الجماعي: كل سيرفر اتبدّل بترتيب عكسي، ويكمّل لو واحد فشل، وفشله `rollback_failed` بتنبيه وaudit وشارة، ومفيش محاولة تالتة أوتوماتيك | مفيش حالة صامتة، ومفيش حلقة رجوع | M6.3ب |
+| 22 | جوه الـ run: index جزئي unique لإصدار مجموعة `running` لكل هدف، وفوقه قفل البيئة | التزامن بين jobs نفس الـ run | M6.3ب |
 
 ## قاعدة البيانات
 كل الجداول بالأعمدة الأربعة، والوقت `timestamptz`، والنص `TEXT`، والحذف soft، ومفيش `DELETE FROM` في `Queries/`، وكل ملف أوله `-- dhow:phase expand`، والـ indexes على جداول موجودة `CONCURRENTLY` في ملف `NO TRANSACTION` لوحده. الأرقام وقت الـ merge (آخر رقم حاليًا `00066`).
 
 | الجدول | الموديول | أهم الأعمدة والقيود |
 |---|---|---|
-| `"DeployTargets"` | Environments | `"OrganizationId"` و`"ProjectId"` و`"EnvironmentId"` (FK مركّب) و`"Name"` (unique مع البيئة WHERE NOT deleted) و`"Kind"` IN (`ssh`, `compose`) و`"Host"` و`"Port"` (1..65535) و`"Username"` و`"KeySecretName"` و`"PublicKey"` و`"HostKey"` و`"HostKeyFingerprint"` و`"HostKeyConfirmedAt"` و`"HostKeyConfirmedBy"` و`"PendingHostKey"` و`"PendingFingerprint"` و`"DeployPath"` (CHECK regex) و`"KeepReleases"` (2..50) و`"Settings"` (jsonb 4 KiB) و`"AllowedImages"` (`TEXT[]`) و`"Version"`، وunique (`"OrganizationId"`, `"Host"`, `"Port"`, `"DeployPath"`) |
-| `"DeploymentReleases"` | Environments | الأعمدة اللي فوق، وunique (`"TargetId"`, `"ReleaseId"`)، وindex (`"TargetId"`, `"CreatedAt"` DESC) |
+| `"DeployTargets"` | Environments | `"OrganizationId"` و`"ProjectId"` و`"EnvironmentId"` (FK مركّب) و`"Name"` (unique مع البيئة WHERE NOT deleted) و`"Kind"` IN (`ssh`, `compose`) و`"Username"` و`"KeySecretName"` و`"PublicKey"` و`"DeployPath"` (CHECK regex) و`"KeepReleases"` (2..50) و`"Settings"` (jsonb 4 KiB، فيه `Rolling`) و`"AllowedImages"` (`TEXT[]`) و`"Version"` |
+| `"DeployTargetHosts"` | Environments | `"TargetId"` (FK) و`"Position"` (unique مع الهدف، 1..10) و`"Host"` و`"Port"` (1..65535) و`"DeployPath"` (منسوخ للـ unique) و`"HostKey"` و`"HostKeyFingerprint"` و`"HostKeyConfirmedAt"` و`"HostKeyConfirmedBy"` و`"PendingHostKey"` و`"PendingFingerprint"`، وunique (`"TargetId"`, `"Host"`, `"Port"`) WHERE NOT deleted، وunique (`"OrganizationId"`, `"Host"`, `"Port"`, `"DeployPath"`) WHERE NOT deleted، وCHECK عدد السيرفرات النشطة في الـ service |
+| `"DeploymentReleases"` و`"DeploymentReleaseHosts"` | Environments | مستوى المجموعة ومستوى السيرفر (الأعمدة في [سجل النشر](#سجل-النشر))، وunique (`"TargetId"`, `"ReleaseId"`)، وindex جزئي unique على (`"TargetId"`) WHERE `"State"` = `running`، وindex (`"TargetId"`, `"CreatedAt"` DESC) |
 | `"IngestTokens"` | Ingest | `"OrganizationId"` و`"ProjectId"` و`"Name"` و`"TokenHash"` (bytea 32، unique) و`"Prefix"` و`"RefPatterns"` (jsonb، 20) و`"ExpiresAt"` و`"LastUsedAt"` و`"RevokedAt"` و`"CreatedByUserId"` |
 | `"IngestedArtifacts"` | Ingest | `"OrganizationId"` و`"ProjectId"` و`"TokenId"` و`"Name"` و`"Digest"` (bytea 32) و`"SizeBytes"` و`"Ref"` و`"RefKind"` و`"Sha"` و`"Provenance"` (jsonb 4 KiB) و`"ProvenanceVerified"` (false) و`"ExpiresAt"` و`"PinnedUntil"`، وunique (`"ProjectId"`, `"Digest"`, `"Name"`, `"Ref"`, `"Sha"`) |
 | `"RunIngestedArtifacts"` | Pipelines | `"RunId"` و`"Name"` و`"IngestedArtifactId"`، unique (`"RunId"`, `"Name"`) |
@@ -328,7 +382,7 @@
 - **الـ `Core`:** `Core/Deployments` بيزيد `Targets` و`Releases` (interfaces وأنواع بس). `Core/Triggers` بيزيد `EventArtifact` و`EventRollback` و`EventCheck`. و`Core/ArtifactIndex` بيزيد `PrepareIngested`.
 - **الـ proto (إضافات بس، و`buf breaking` أخضر):**
   ```
-  JobSpec          += targets[] StepTarget { step_index, kind, host, port, user, known_hosts_line, deploy_path, release_id, keep_releases, settings }
+  JobSpec          += targets[] StepTarget { step_index, kind, user, deploy_path, release_id, keep_releases, settings, hosts[] { host_id, host, port, known_hosts_line } }
                    += network.exact_endpoints[] { host_or_ip, port }       (server-built only)
   ArtifactInput    += kind = file_for_plugin (the archive mounted, not unpacked)
   ReleaseService.Report(LeaseRef, DeployEvent) → ack                      (fenced)
@@ -347,17 +401,17 @@
 ## الوثائق (بالنسختين، و`make docs-check`)
 | الملف | المرحلة | المحتوى |
 |---|---|---|
-| `docs/guides/deploy-ssh.md` (جديد) | M6.3 | تجهيز السيرفر بأقل صلاحيات، والهدف، والـ host key، والمدخلات، والرجوع، وأخطاء شائعة |
+| `docs/guides/deploy-ssh.md` (جديد) | M6.3أ وM6.3ب | (التدرّج والرجوع الجماعي في ب) تجهيز السيرفر بأقل صلاحيات، والهدف، والـ host key، والمدخلات، والرجوع، وأخطاء شائعة |
 | `docs/guides/deploy-compose.md` (جديد) | M6.5 | السياسة الآمنة، والصور بالـ digest، والـ registry على السيرفر، ورجوع |
 | `docs/guides/ingest.md` (جديد) | M6.6 | التوكن، وAPI الرفع بـ curl، والـ Action، و`on.artifact` و`ingested:`، وأمان التوكن |
 | `docs/guides/environments.md` | M6.1 | قسم الأهداف، وقاعدة egress النشر |
-| `docs/pipeline-spec.md` | M6.2 وM6.6 | مثال §2 (استبدال `prod-fleet` بـ matrix على أهداف [سؤال 7](#7-مجموعة-سيرفرات))، وقسم «إضافات النشر الرسمية»، و§8 (شيل `artifact` من «مش مدعوم»)، و`ingested:`، و§9 (الأهداف) |
-| `docs/architecture.md` | M6.3 | §8 و§9 (Compose بـ SSH exec، والاستقبال) و§4 (حالة `unknown`) |
+| `docs/pipeline-spec.md` | M6.2 وM6.6 | مثال §2 (`prod-fleet` بيفضل هدف بقايمة سيرفرات، [قرار 7](#قرار-7)، ومعاه شرح `{host}` في الـ health URL)، وقسم «إضافات النشر الرسمية»، و§8 (شيل `artifact` من «مش مدعوم»)، و`ingested:`، و§9 (الأهداف) |
+| `docs/architecture.md` | M6.3ب | §8 و§9 (Compose بـ SSH exec، والاستقبال) و§4 (حالة `unknown`) |
 | `docs/security-model.md` | M6.9 | §14 مراجعة تهديدات M6 (الجدول والمخاطر المقبولة)، وإضافات لقايمة المراجعة الخارجية |
 | `docs/install/configuration.md` وأدلة الـ reverse proxy | M6.6 | `DHOW_INGEST_MAX_BYTES`، وحد الجسم والمهلة لـ `/ingest/` |
 | `docs/runner/*` | M6.2 | نطاقات المشغّل للأهداف الخاصة (`ALLOW_PRIVATE_CIDRS`) |
 | `docs/roadmap.md` | M6.9 | M6 خلص |
-| `CLAUDE.md` (في PR M6.3) | M6.3 | `apps/plugins` و`apps/github-action` و`internal/deployrelease` و`internal/archive` في جدول الهيكل |
+| `CLAUDE.md` (في PR M6.3أ) | M6.3أ | `apps/plugins` و`apps/github-action` و`internal/deployrelease` و`internal/archive` في جدول الهيكل |
 
 ## Edge cases
 - **أول نشر والسيرفر مفيهوش `current`:** بيتعمل أول `current`، ومفيش رجوع (`on_first_failure`).
@@ -370,7 +424,13 @@
 - **تنضيف إصدار هو `previous` أو `verified`:** مستحيل بالتصميم (مستثنى).
 - **نشرين على نفس الهدف من بيئتين:** مستحيل (`TARGET_DUPLICATE` على host وport والمسار).
 - **نشرين على نفس البيئة:** قفل البيئة بتاع M5 بيسلسلهم، وقفل `mkdir` البعيد دفاع تاني.
-- **matrix على أهداف:** كل هدف إصدار لوحده ورجوع لوحده. هدف 2 فشل وهدف 1 نجح: هدف 1 يفضل على الجديد (مكتوب)، والـ job اللي فشل `failed`، و`max_parallel: 1` بيوقف الباقي. مفيش رجوع عابر للأهداف في M6 ([سؤال 7](#7-مجموعة-سيرفرات)).
+- **matrix على أهداف:** ممكن، بس مش آلية الـ fleet (الـ fleet = هدف بقايمة سيرفرات). كل هدف في الـ matrix مجموعة لوحدها بإصدارها ورجوعها، ومفيش رجوع عابر للأهداف: هدف 2 فشل وهدف 1 نجح، هدف 1 يفضل على الجديد (مكتوب)، و`strategy.max_parallel` بيحكم الأهداف مش السيرفرات جوه الهدف.
+- **سيرفر اتضاف للهدف أو اتشال وفيه نشر شغّال:** `TARGET_IN_USE`. بعد النشر السيرفر الجديد ما عندوش `current`، وأول نشر عليه من غير رجوع (`on_first_failure`)، وفي المجموعة بيرجع لحالته الفاضية.
+- **سيرفر في المجموعة على إصدار تاني من إخوانه (بعد `rollback_failed`):** الفحص المسبق بيقرا إصدار كل واحد، والنشر الجاي بيوحّدهم، والواجهة بتعرض الاختلاف.
+- **`BatchSize` أكبر من عدد السيرفرات:** مرفوض وقت الحفظ. وسيرفر واحد في الهدف: التدرّج مالوش معنى والدفعة هي السيرفر.
+- **الرجوع الجماعي طلع أبطأ من مهلة الإلغاء:** السيرفرات اللي لسه ماخلصتش بتبقى `unknown`، والتنبيه نفسه، و«افحص الهدف» بيصلّح.
+- **`health_check_url` من غير `{host}` على أكتر من سيرفر:** مسموح (load balancer)، والوثائق بتحذّر إنه مايفرّقش سيرفر عن التاني، وبيتفحص مرة لكل دفعة.
+- **سيرفر واحد في الدفعة فشل والباقي في الدفعة نجحوا:** الدفعة كلها بتفشل، وكلهم بيرجعوا (النجحوا كمان).
 - **الهدف اتمسح أو اتغيّر والـ job مستني:** `TARGET_NOT_FOUND` أو `TARGET_CHANGED` من غير ما المفتاح يتفك.
 - **الـ host key اتغيّر بعد الإدراج:** نفس الشيء، والإضافة بتفشل `HOST_KEY_MISMATCH` برضه.
 - **السر `KeySecretName` اتمسح أو اتغيّر:** `TARGET_KEY_NOT_FOUND` في `Start`. التغيير بين الموافقة والبدء: القيمة الجديدة هي اللي بتوصل (زي M5: الموافقة على الكود مش على القيم).
@@ -380,7 +440,7 @@
 - **توكن الاستقبال اتسرّب:** الإلغاء فوري. اللي ممكن يعمله بس رفع بـ ref من الـ patterns، وبيعدّي البوابة والموافقة. وارفع artifact مش هيتنشر لو البيئة محتاجة موافقة والمراجع رفض.
 - **الأرشيف المرفوع كبير ومضغوط (zip bomb):** حدود الحجم بعد الفك والعدد والعمق بتتطبّق على الستريم، و`ARCHIVE_UNSAFE`.
 - **IPv6 للهدف:** مدعوم لو المشغّل سمح. العنوان IPv6 literal بيتوصّل في `exact_endpoints` زي IPv4.
-- **سيرفر الهدف في شبكة خاصة:** لازم `ALLOW_PRIVATE_CIDRS` على الـ runner، وجلب الـ host key من السيرفر مش هيشتغل (`TARGET_HOST_BLOCKED`)، فاللصق. ([سؤال 8](#8-أول-تثبيت-لـ-host-key-وهدف-في-شبكة-خاصة).)
+- **سيرفر الهدف في شبكة خاصة:** لازم `ALLOW_PRIVATE_CIDRS` على الـ runner، وجلب الـ host key من السيرفر مش هيشتغل (`TARGET_HOST_BLOCKED`)، فاللصق. ([قرار 8](#قرار-8).)
 - **runner قديم (M5):** job فيه هدف بيستنى `NO_MATCHING_RUNNER` ظاهر (feature `deploy_targets`).
 - **الرجوع وإصدار الدليل اتنضّف:** `mode: redeploy` من الـ artifact المثبّت، وغير كده `ROLLBACK_RELEASE_GONE` والواجهة بتقول «انشر artifact قديم تاني».
 - **Compose: خدمة من غير healthcheck:** `--wait` بيعتبرها شغّالة لما تقوم، والفحص الخارجي هو الحماية. الوثائق بتنصح بـ healthcheck.
@@ -391,13 +451,14 @@
 كل PR بيعدّي `make check` وCI أخضر، وفيه اختبارات سلبية لكل مسار أمني، وبيحدّث `Plan/Progress/` في يومه، وبيكتب الـ ADR بتاع قراراته في أوله، وعليه مراجعة أمنية مستقلة قبل الـ merge. وبيتفتح كـ draft PR من أول commit.
 
 ### M6.1: الأهداف: النموذج والـ API وتثبيت الـ host key
-- **الحجم:** M. **الاعتماد:** M5 كله (خلص ما عدا M5.9ب).
+- **الحجم:** M (بتكبر شوية بسبب قايمة السيرفرات و`"DeployTargetHosts"`). **الاعتماد:** M5 كله (خلص ما عدا M5.9ب).
 - **المحتوى:**
-  - `Modules/Environments`: الـ migrations (`"DeployTargets"` و`"AllowExtraDeployEgress"`)، والـ queries، والـ service والـ controller وملفات جديدة (`Environments.Targets*.go`) تحت 500 سطر، والـ routes في `openapi.yaml` (tag `targets`)، والإجراء `deployment.rollback` في `Core/Policy`، وصفوف الـ route-table.
+  - `Modules/Environments`: الـ migrations (`"DeployTargets"` و`"DeployTargetHosts"` و`"AllowExtraDeployEgress"`)، والـ queries، والـ service والـ controller وملفات جديدة (`Environments.Targets*.go`) تحت 500 سطر، والـ routes في `openapi.yaml` (tag `targets`)، والإجراء `deployment.rollback` في `Core/Policy`، وصفوف الـ route-table.
   - الـ host key: الجلب فوق `netguard` والصق والتأكيد بالبصمة (نفس كود `Sources` المشترك، بيتنقل لـ `internal/sshhostkey` لو لسه)، والتوليد (`crypto/ed25519` وصيغة OpenSSH بـ `x/crypto/ssh`) وكتابة السر في البيئة عبر `Core/SecretStore`.
   - الـ audit، والتحقق (المسار، والعنوان، والـ egress rules، والتفرّد).
   - ADR للقرارات 1 لـ 3.
 - **قبول:**
+  - هدف بـ 3 سيرفرات، لكل واحد مفتاحه المتثبّت بتأكيد لوحده، والترتيب محفوظ، و11 سيرفر مرفوض، وسيرفر بيتشال أو بيتغيّر عنوانه فمفتاحه بيتشال، وهدف فيه سيرفر مفتاحه مش مثبّت يتعلّم «مش جاهز».
   - هدف بحقل غلط أو مسار ممنوع أو كتابة من Developer: مرفوض. بيئة بتتمسح: أهدافها وأسرارها معاها.
   - جلب مفتاح من sshd الاختبار، ولصقه، وتأكيده ببصمة غلط: `HOST_KEY_FINGERPRINT_MISMATCH`. تغيير المفتاح: الجديد pending والقديم لسه شغّال.
   - host خاص أو metadata: `TARGET_HOST_BLOCKED`.
@@ -420,13 +481,13 @@
   - قتل الـ runner وإصدار `running`: `unknown`.
 - **التحقق:** `go test -race -count=1 ./apps/server/internal/Modules/... ./apps/runner/... ./internal/jobspec/... ./internal/archive/...` و`make runner-isolation` و`buf breaking` و`make gen && git diff --exit-code` و`make check`.
 
-### M6.3: محرك الإصدارات وإضافة SSH والـ E2E على sshd
-- **الحجم:** L. **الاعتماد:** M6.2.
+### M6.3أ: محرك الإصدارات وإضافة SSH على سيرفر واحد والـ E2E على sshd
+- **الحجم:** L. **الاعتماد:** M6.2. (بعد [قرار 7](#قرار-7) M6.3 اتقسمت: (أ) المحرك على سيرفر واحد، و(ب) التدرّج عبر السيرفرات. المحرك بيتكتب من الأول بحيث السيرفر وحدة منفصلة تتكرر في (ب).)
 - **المحتوى:**
   - `internal/deployrelease` (الاتصال والرفع والقفل والتبديل والصحة والرجوع والتقارير) و`apps/plugins/deploy-ssh` (الـ binary والـ Dockerfile والـ manifest) وبناؤه وتوقيعه في `release.yml`.
   - `deploy/e2e-targets/sshd` (صورة Alpine بـ `openssh 10.0_p1-r11` وservice بسيط يخدم `current/`) و`make deploy-e2e`.
   - `docs/guides/deploy-ssh.md`، وCLAUDE.md (الهيكل).
-  - ADR للقرارات 8 لـ 11.
+  - ADR للقرارات 8 لـ 11 (القرار 19 في M6.1 والباقي في ب).
 - **قبول (جزء من شرط الخلاص):**
   - نشر v1 صحي، ثم v2 صحي: `current` v2، وv1 لسه موجود.
   - نشر v3 `healthz` بيفشل: رجوع تلقائي لـ v2 (الـ symlink والخدمة بترد بـ v2)، والـ job `DEPLOY_ROLLED_BACK`، وصف الإصدار `rolled_back` بنتيجة الفحص.
@@ -436,30 +497,51 @@
   - لا سر في أي log أو DTO أو audit.
 - **التحقق:** `go test -race -count=1 ./internal/deployrelease/... ./apps/plugins/deploy-ssh/...` و`make deploy-e2e` و`go test -run '^$' -fuzz FuzzRemoteCommand -fuzztime 60s ./internal/deployrelease` و`make check`.
 
-### M6.4: تقوية SSH: الـ hooks والإلغاء والانقطاع والرجوع اليدوي وفحص الهدف
-- **الحجم:** M. **الاعتماد:** M6.3.
+### M6.3ب: النشر المتدرّج عبر السيرفرات والرجوع الجماعي
+- **الحجم:** L. **الاعتماد:** M6.3أ.
 - **المحتوى:**
-  - الـ hooks (حسب [سؤال 6](#6-الـ-hooks)) بمهلة وتنضيف، و`SIGTERM` (رجوع لو بين التبديل والنجاح)، واكتشاف `state.json` بايظ في النشر الجاي.
+  - `Modules/Environments`: `"DeployTargetHosts"` كان في M6.1، وهنا `"DeploymentReleaseHosts"` وتسجيل نتيجة كل سيرفر وحالة المجموعة والـ index الجزئي، وشارة «إصدارات مختلفة» في الـ API.
+  - `internal/deployrelease`: منسّق المجموعة: الفحص المسبق على الكل، والرفع للكل، والدفعات (`BatchSize` و`BatchPauseSeconds`)، وبوابة صحة الدفعة و`{host}`، والرجوع الجماعي بترتيب عكسي اللي بيكمّل لو واحد فشل، والسقف 10 دقايق للدفعة و60 للنشر، وتنسيق `SIGTERM`.
+  - تقارير `host_id` و`batch_passed` في `ReleaseService.Report`، والـ reconciler (`unknown` لكل سيرفر).
+  - `deploy/e2e-targets/sshd` بـ 3 حاويات sshd (`sshd-1` و`sshd-2` و`sshd-3`) و`make deploy-e2e`.
+  - الوثائق: قسم التدرّج في `deploy-ssh.md`. ADR للقرارات 19 و20 و21.
+- **قبول:**
+  - نشر v1 ثم v2 على 3 سيرفرات بـ `BatchSize` 1 وبعدها 2: كلها على v2، وبترتيب `Position`، وفحص الصحة على عنوان كل سيرفر.
+  - **فشل في النص:** v3 على 3 سيرفرات، والسيرفر التاني `healthz` بتاعه بيفشل: السيرفر الأول (اتبدّل) بيرجع لـ v2 والتالت ماتلمسش (`skipped`)، والمجموعة `rolled_back`، والـ job `DEPLOY_ROLLED_BACK`، وسجل كل سيرفر بحالته.
+  - **فشل داخل دفعة بحجم 2:** السيرفرين بيرجعوا بالتوازي بعد دفعات سابقة بالترتيب العكسي.
+  - **فشل الرجوع:** (محاكاة بقطع sshd-1 أو بمنع الكتابة على `current` فيه بعد التبديل) المجموعة `rollback_failed`، والسيرفرات التانية رجعت فعلًا (الرجوع ماوقفش)، وaudit لكل سيرفر وللمجموعة، وحدث `deployment.finished` بـ `Partial = true`، والشارة ظاهرة. ثم نشر لاحق على الهدف غير المتّسق بيوصّله لحالة واحدة.
+  - فحص مسبق بيفشل على السيرفر التالت (مفتاح متبدّل): مفيش تغيير على أي سيرفر، والأقفال اتفكّت.
+  - إلغاء الـ run بين دفعتين: رجوع جماعي بسبب `canceled`.
+  - قتل الـ runner بعد تبديل سيرفر واحد: السيرفر ده `unknown` والمجموعة `unknown`، وباقي السيرفرات `skipped` أو `pending`.
+  - jobين على نفس الهدف في نفس الـ run: التاني بيستنى (`TARGET_IN_USE`).
+- **التحقق:** `go test -race -count=1 ./internal/deployrelease/... ./apps/server/internal/Modules/Environments/...` و`make deploy-e2e` (الجزء المتدرّج) و`go test -run '^$' -fuzz FuzzRollingPlan -fuzztime 60s ./internal/deployrelease` و`make runner-chaos` و`make check`.
+
+### M6.4: تقوية SSH: الـ hooks والإلغاء والانقطاع والرجوع اليدوي (للمجموعة) وفحص الهدف
+- **الحجم:** L (كانت M: الرجوع اليدوي والفحص بقوا على مجموعة سيرفرات). **الاعتماد:** M6.3ب.
+- **المحتوى:**
+  - الـ hooks (حسب [قرار 6](#قرار-6)) بمهلة وتنضيف، و`SIGTERM` (رجوع لو بين التبديل والنجاح)، واكتشاف `state.json` بايظ في النشر الجاي.
   - التشغيلات الاصطناعية `rollback` و`check` في `Pipelines` وروابطها في API الهدف، و`mode: redeploy`.
   - ADR للقرارات 12 و13.
 - **قبول:**
   - hook فشل: رجوع. `ReloadCommand` فشل: رجوع. إلغاء الـ run بعد التبديل: رجوع، والـ job `canceled`.
   - قتل (`SIGKILL`) الـ runner بعد التبديل: `unknown`، ثم «افحص الهدف» أو نشر جديد بيصلّح ويكتب المنشور الصح.
-  - رجوع يدوي لإصدار موجود وآخر اتنضّف (redeploy من artifact مثبّت)، وبالموافقة حسب [سؤال 3](#3-الرجوع-اليدوي).
-  - فحص الهدف: مفتاح غلط ومسار مش موجود ومساحة ناقصة بيرجّعوا سبب واضح.
-- **التحقق:** نفس M6.3 + `make runner-chaos` (سيناريو قتل وقت التبديل) و`make check`.
+  - رجوع يدوي للمجموعة كلها لإصدار مجموعة ناجح (على 3 سيرفرات)، منهم سيرفر دليله اتنضّف (redeploy من artifact مثبّت)، وبالشروط حسب [قرار 3](#قرار-3): Maintainer وخطوة تانية، ومرفوض لإصدار ماعدّاش على الهدف ده، ومرفوض لو الهدف متوقف، ومتسجّل `Kind = rollback`.
+  - رجوع يدوي بيفشل في سيرفر: المجموعة `rollback_failed` ومفيش محاولة أوتوماتيك تانية.
+  - فحص الهدف على 3 سيرفرات (واحد مفتاحه غلط، وواحد مساحته ناقصة): بيرجّع سبب كل سيرفر، وبيصلّح حالة `unknown`.
+- **التحقق:** نفس M6.3ب + `make runner-chaos` (سيناريو قتل وقت التبديل) و`make check`.
 
 ### M6.5: إضافة Docker Compose
-- **الحجم:** M. **الاعتماد:** M6.3.
+- **الحجم:** M. **الاعتماد:** M6.3ب (نفس المحرك والتدرّج).
 - **المحتوى:** `apps/plugins/deploy-compose` فوق نفس المحرك، وسياسة الملف الآمنة، والـ override بالـ digest، و`pull` ثم `up --wait`، والرجوع، و`deploy/e2e-targets/compose-host` (dind + openssh + registry محلي) و`docs/guides/deploy-compose.md`، وADR للقرار 14.
 - **قبول (جزء من شرط الخلاص):**
   - نشر خدمة بـ digest صحي، ثم تحديث صحي، ثم تحديث بـ healthcheck فاشل: رجوع تلقائي للصور السابقة، والحاويات القديمة شغّالة، والـ job `DEPLOY_ROLLED_BACK`.
   - خدمة بـ tag بس: `COMPOSE_IMAGE_NOT_PINNED`. `privileged` وbind على `/` و`docker.sock`: `COMPOSE_UNSAFE_*` وقبل ما نلمس السيرفر.
   - صورة مش موجودة في registry: `pull` يفشل والخدمات القديمة ماتتغيّرتش.
+  - **تدرّج Compose:** `compose-host-1` و`compose-host-2`، والتاني healthcheck بتاعه بيفشل في الدفعة التانية: الأول بيرجع بصور إصداره السابق، والمجموعة `rolled_back`.
 - **التحقق:** `make deploy-e2e` (الجزء compose) و`go test -race -count=1 ./apps/plugins/deploy-compose/...` و`go test -run '^$' -fuzz FuzzComposePolicy -fuzztime 60s ./apps/plugins/deploy-compose` و`make check`.
 
 ### M6.6: استقبال الـ artifacts: الموديول والـ spec
-- **الحجم:** L. **الاعتماد:** M4.8 وM4.9 وM5.6 (لا يعتمد على M6.3، يمشي بالتوازي معاه بعد M6.2).
+- **الحجم:** L. **الاعتماد:** M4.8 وM4.9 وM5.6 (لا يعتمد على M6.3أ ولا M6.3ب، يمشي بالتوازي معاهم بعد M6.2).
 - **المحتوى:**
   - `Modules/Ingest`: التوكنات والـ API والفحص والتخزين على `Core/Blob`، و`policy.Ingest`، وصفوف الـ route-table، والـ rate limit، والـ audit.
   - `pipelinespec`: `on.artifact` و`jobs.<id>.ingested`، والـ JSON Schema، و`dhow lint`. `Pipelines`: الـ trigger والتعريف من الفرع الافتراضي و`"RunIngestedArtifacts"` والـ `ArtifactInput`. التثبيت `PinnedUntil` وتعديل الـ sweeper.
@@ -500,12 +582,13 @@
 
 ### الترتيب
 ```
-M5.9ب ─► M6.1 ─► M6.2 ─┬─► M6.3 ─┬─► M6.4 ─► M6.8 (أ) ─┐
-                       │         └─► M6.5              │
-                       └─► M6.6 ─► M6.7 ──► M6.8 (ب) ───┴─► M6.9
+M5.9ب ─► M6.1 ─► M6.2 ─┬─► M6.3أ ─► M6.3ب ─┬─► M6.4 ─► M6.8 (أ) ─┐
+                       │                   └─► M6.5              │
+                       └─► M6.6 ─► M6.7 ──────► M6.8 (ب) ─────────┴─► M6.9
 ```
-- M6.6 بيبدأ بعد M6.2 (محتاج `ArtifactInput` من نوع الملف) وبيمشي بالتوازي مع M6.3.
-- M6.5 بعد M6.3 (نفس المحرك)، وبالتوازي مع M6.4.
+- M6.6 بيبدأ بعد M6.2 (محتاج `ArtifactInput` من نوع الملف) وبيمشي بالتوازي مع M6.3أ وM6.3ب.
+- M6.5 بعد M6.3ب (نفس المحرك والتدرّج)، وبالتوازي مع M6.4.
+- **الأحجام بعد [قرار 7](#قرار-7):** M6.1 (M+) وM6.2 (L) وM6.3أ (L) وM6.3ب (L، جديدة) وM6.4 (L، كبرت من M) وM6.5 (M) وM6.6 (L) وM6.7 (S) وM6.8 (M) وM6.9 (M). يعني M6 أطول بحوالي مرحلة L كاملة من النسخة الأولى من الخطة.
 - M6.8 (أ) بعد M6.4، و(ب) بعد M6.6.
 
 ### الترتيب مع الشغل الباقي
@@ -521,7 +604,7 @@ M5.9ب ─► M6.1 ─► M6.2 ─┬─► M6.3 ─┬─► M6.4 ─► M6.8 (
 | وحدات `Environments` (الأهداف، والبوابة، والرجوع)، و`Ingest`، و`internal/deployrelease` | ✅ | — | — |
 | route-table للـ routes الجديدة لكل دور | ✅ | — | — |
 | الـ runner: المفتاح للخطوة دي بس، والـ egress الدقيق، والـ probes على Podman rootless (`ubuntu-26.04`) | ✅ لو الـ PR بيلمس `apps/runner` أو `packages/proto` | ✅ | ✅ VM بـ Debian 13 وUbuntu 26.04 |
-| `make deploy-e2e`: SSH على sshd حقيقي (نشر، وفحص فاشل ورجوع، وتنضيف، وhost key متبدّل، وأرشيف عدائي) | ✅ لو الـ PR بيلمس الأهداف أو الإضافات | ✅ | ✅ |
+| `make deploy-e2e`: SSH على 3 sshd حقيقية (نشر متدرّج، وفحص فاشل في النص ورجوع جماعي، وفشل رجوع محاكى، وتنضيف، وhost key متبدّل، وأرشيف عدائي) | ✅ لو الـ PR بيلمس الأهداف أو الإضافات | ✅ | ✅ |
 | `make deploy-e2e`: Compose على dind + registry (نشر بـ digest، وفحص فاشل ورجوع، وسياسة، وصورة ناقصة) | ✅ لو الـ PR بيلمس Compose | ✅ | ✅ |
 | الاستقبال: `curl` و`dhow artifact push` (رفع صح، وكل الرفض) | ✅ لو الـ PR بيلمس `Ingest` | — | ✅ |
 | `ingest-e2e`: الـ Action الحقيقية على سيرفر dev | ✅ لو الـ PR بيلمس `apps/github-action` أو الـ CLI | ✅ | ✅ |
@@ -533,11 +616,11 @@ M5.9ب ─► M6.1 ─► M6.2 ─┬─► M6.3 ─┬─► M6.4 ─► M6.8 (
 
 ### `deploy/m6-demo/run.sh`
 فوق M5 demo (Forgejo وPostgres والسيرفر وrunner بـ Podman rootless في Docker)، ومعاهم `sshd-target` و`compose-host` و`registry`. السيناريو من أول لآخر:
-1. بيئة `staging` فيها هدفين (`ssh-1` و`compose-1`)، ومفتاح اتولّد وhost key اتجاب واتأكدت بصمته بالـ API.
-2. pipeline بنشر SSH: build ← artifact ← deploy: v1 صحي، v2 صحي (v1 محفوظ)، v3 بـ `healthz` فاشل: رجوع تلقائي لـ v2. الاتنين بالـ digest، والسجل بيقول الإصدار والسابق ونتيجة الفحص.
-3. نفس الحاجة على Compose: صورتين صحيتين، وتالتة بـ healthcheck فاشل: رجوع تلقائي.
+1. بيئة `staging` فيها هدفين: `ssh-fleet` (3 سيرفرات sshd) و`compose-fleet` (سيرفرين)،  ومفتاح اتولّد وhost key اتجاب واتأكدت بصمته بالـ API.
+2. pipeline بنشر SSH: build ← artifact ← deploy: v1 صحي، v2 صحي (v1 محفوظ)، v3 بـ `healthz` فاشل على السيرفر التاني: السيرفر الأول بيرجع لـ v2 والتالت ماتلمسش (رجوع جماعي). الاتنين بالـ digest، والسجل بيقول الإصدار والسابق ونتيجة الفحص.
+3. نفس الحاجة على Compose: صورتين صحيتين، وتالتة بـ healthcheck فاشل على السيرفر التاني: رجوع تلقائي لكل اللي اتبدّل.
 4. استقبال: `dhow artifact push` من «CI» (بتوكن محدود) ← run ← نشر بنفس الـ digest ← رفض رفع على ref بره الـ patterns ← إلغاء التوكن.
-5. رجوع يدوي لـ v1 بخطوة تانية، وفحص الهدف.
+5. رجوع يدوي للمجموعة لـ v1 بخطوة تانية، وفحص الهدف. وحالة فشل رجوع محاكاة بقطع سيرفر: `rollback_failed` وتنبيه، ثم نشر بيوحّد المجموعة.
 6. تغيير host key على sshd: النشر بيفشل `HOST_KEY_MISMATCH` ومفيش تغيير.
 7. فحص التسريب على كل شيء (المفتاح الخاص، والتوكنات، وأسرار البيئة).
 
@@ -547,7 +630,8 @@ M5.9ب ─► M6.1 ─► M6.2 ─┬─► M6.3 ─┬─► M6.4 ─► M6.8 (
 | الإضافة الرسمية معاها مفتاح الإنتاج، وسلسلة التوريد ليها | build موقّع بـ cosign وprovenance وبالـ digest في الملف، وSBOM، وفحص الاعتماديات في الـ CI، وصورة صغيرة |
 | الـ shell البعيد بيفتح باب حقن | قوالب ثابتة وregex وfuzz، والـ hooks للأدمن بس، ومكتوب كاستثناء في ADR |
 | فحص الصحة بيعدّي للإصدار القديم بالغلط | `stable` والوثائق بتنصح برقم الإصدار في الرد، ومكتوب كخطر مقبول |
-| أكتر من سيرفر في «fleet» ممكن يتسيب نصه جديد ونصه قديم | matrix بـ `max_parallel: 1` و`fail-fast` والوثائق صريحة، والمجموعة الحقيقية بعد أول نسخة ([سؤال 7](#7-مجموعة-سيرفرات)) |
+| رجوع جماعي فشل على سيرفر فبقت المجموعة نصها جديد ونصها قديم | الرجوع بيكمّل على الباقي، وحالة `rollback_failed` صريحة، وaudit وحدث وشارة حمرا ثابتة، ونشر لاحق أو «افحص الهدف» يوحّد، وE2E بيحاكيه ([قرار 7](#قرار-7)) |
+| التدرّج بيزوّد تعقيد المحرك ووقت M6 | انقسام M6.3 لـ أ وب، والمحرك بيتكتب سيرفر-واحد-أولًا، وfuzz للخطة (`FuzzRollingPlan`) |
 | Compose = root على السيرفر | سياسة افتراضية، ووثائق rootless، وبوابة البيئة والموافقة |
 | الـ E2E بيحتاج Docker وdind privileged في الـ CI | job لوحده على label ومسارات، في حاويات اختبار بس، وmakes منفصلة |
 | الإضافة بتتغير وتكسر نشر المستخدمين | الـ digest مثبّت في الملف، والإصدارات القديمة بتفضل منشورة، و`buf breaking` والـ manifest بـ `Version` |
@@ -574,60 +658,6 @@ M5.9ب ─► M6.1 ─► M6.2 ─┬─► M6.3 ─┬─► M6.4 ─► M6.8 (
 - SDK بتاع Docker (`docker/docker`): الأوامر `docker compose` على السيرفر عبر SSH، فمفيش client لـ Docker API.
 - مكتبة glob: `internal/pathglob`.
 - مكتبة rsync أو `golang.org/x/crypto/ssh/knownhosts`: بنثبّت مفتاح واحد بالتأكيد، فمش محتاجينها.
-
-## أسئلة لـ Sabry
-8 قرارات مفتوحة. كل واحد ليه الاختيارات مع trade-offs كل اختيار، والتوصية. الخطة اتكتبت على التوصية.
-
-### 1. فين النشر بيشتغل
-الكود اللي بيتصل بسيرفر الإنتاج بمفتاحه لازم يكون محصور، ومراقب، وبيتلغي.
-- **أ. إضافة في الـ runner sandbox (الخطة):** نفس عزل أي job (حدود موارد، وegress للهدف بس، وmasker، وإلغاء)، والسيرفر مابيتصلش بحد، والمفتاح بيوصل لـ sandbox لفترة الخطوة. العيب: الـ runner لازم يوصل لشبكة الهدف، وصورة الإضافة جزء من سلسلة التوريد.
-- **ب. النشر من السيرفر نفسه:** مفيش runner في الطريق ومفيش sandbox، بس المفتاح بيتفك في الـ control plane، وكود SSH بيشتغل بصلاحيات السيرفر (أخطر مكان)، وبيخالف ADR-0007 (كود المستخدم والنشر في عزل).
-- **ج. agent صغير على سيرفر الهدف** بيستلم أمر نشر موقّع: مفيش مفتاح SSH أصلًا ولا فتح SSH، والرجوع محلي (حتى لو الشبكة وقعت في نص النشر). العيب: تنصيب وتحديث وأمان برنامج على كل سيرفر، وبيبعد عن «SSH/VPS» اللي ADR-0011 وعد بيه، ومحتاج M6 أطول.
-- **التوصية: (أ).** وـ(ج) ممكن بعد أول نسخة كنوع هدف تالت (`agent`) على نفس المحرك، خصوصًا للسيرفرات اللي مش بتفتح SSH.
-
-### 2. الرجوع التلقائي وإيه اللي يشغّله
-- **أ. فحص صحة HTTP فاشل أو reload فاشل أو hook فاشل، جوه خطوة النشر (الخطة):** أساسي ومحدد، والمهلة 10 دقايق كحد أقصى. مفيش مراقبة بعد ما الـ job يخلص.
-- **ب. أ + نافذة مراقبة بعد النجاح** (`observe_for: 10m`): الـ job بيفضل مفتوح بيفحص، ولو فشل بيرجع. أأمن، بس بيحجز الـ runner والقفل البيئة أطول، ومعناه الرجوع بعد ما الـ job كان «نجح».
-- **ج. أ + رجوع من خارج:** أداة المراقبة بتاعتك بتستدعي API الرجوع (توكن بـ `deployment.rollback`): مرن، بس محتاج scope كتابة بتوكن (قرار Sabry 6 في M5 كان ضده) فبيتأجّل.
-- **التوصية: (أ)** بـ `health_check_stable` (3 نجاحات متتالية افتراضيًا) علشان نقلل إن الفحص يعدّي بالغلط. والمراقبة بعد النجاح (ب) بعد أول نسخة لو طلبها حد. ولو مفيش إصدار سابق (أول نشر)، الإصدار بيتساب والـ job بيفشل، ومانمسحش `current`.
-
-### 3. الرجوع اليدوي
-زرار «رجّع لإصدار سابق» وقت حادثة لازم يبقى سريع، وفي نفس الوقت مايبقاش باب بيعدّي الموافقات.
-- **أ. بيعدّي على نفس البوابة زي أي نشر** (مراجع وخطوة تانية ومؤقت): أبسط وأأمن من ناحية المبدأ، بس وقت الحادثة المراجع ممكن مايبقاش موجود.
-- **ب. بيتخطى المراجعين والمؤقت بس، ومحتاج Maintainer أو أعلى وخطوة تانية** (الخطة): لإصدار نجح على نفس الهدف قبل كده بس (كود اشتغل في الإنتاج بالفعل)، وبيفضل خاضع للإيقاف (`Paused`) وقفل البيئة، وبيتسجّل `Kind = rollback` في السجل والـ audit. وقاعدة الـ ref مابتتفحصش على الـ ref القديم (الكود ده اتنشر تحت قواعد وقتها).
-- **ج. رجوع تلقائي بس، ومفيش يدوي:** أبسط، بس لو نشر نجح وطلع فيه مشكلة بعدين مفيش حل غير نشر جديد.
-- **التوصية: (ب)**، على نفس فلسفة M5 في إن الإيقاف سريع (Maintainer) والاستكمال أبطأ. لو التخطّي ده مش مقبول فـ(أ).
-
-### 4. توثيق الرفع من CI خارجي
-- **أ. توكن استقبال محدود (الخطة):** مشروع واحد، patterns للـ refs، إجراء واحد (الرفع)، وانتهاء، وإلغاء فوري. بيشتغل مع أي CI (GitLab وJenkins وcurl) وفي التنصيبات المقفولة. العيب: سر طويل العمر في GitHub Secrets ممكن يتسرّب، والمنشأ «مُعلَن» مش «متحقَّق».
-- **ب. توكن + تحقق من توكن GitHub OIDC اختياري:** بيدّي منشأ متحقق (المستودع والـ ref والـ workflow من GitHub نفسه) وبيستغنى عن السر في GitHub. العيب: السيرفر لازم يوصل لـ JWKS بتاع GitHub (egress)، وكود تحقق JWT/JWKS (من غير مكتبة)، وبيخص GitHub بس (GHES بعدين)، وأعمق مراجعة أمنية.
-- **ج. OIDC بس:** بنلغي السر الطويل، بس مفيش GitLab ولا curl ولا تنصيب مقفول.
-- **التوصية: (أ) في M6**، وـ(ب) بعد أول نسخة (العمود `"ProvenanceVerified"` جاهز له). لأن (أ) بيغطي كل CI، وبنفس فلسفة «OIDC بعد أول نسخة» (قرار Sabry 3 في M5).
-
-### 5. Docker Compose عن بعد
-- **أ. `docker compose` على السيرفر عبر SSH exec (الخطة):** مفيش Docker API على الشبكة ولا agent، والمفتاح SSH هو الوحيد، ونفس محرك SSH (host key والإصدارات والرجوع). العيب: الـ Docker CLI والـ Compose plugin لازم يكونوا على السيرفر، ومستخدم النشر في مجموعة `docker` (= root معنى).
-- **ب. `DOCKER_HOST=ssh://` من جوه الإضافة:** مفيش حاجة ننصبها على السيرفر غير Docker نفسه، بس لازم docker CLI وssh client جوه الإضافة (صورة أكبر وسطح أكبر)، والـ host key وknown_hosts بيتعاملوا بـ OpenSSH مش بالكود بتاعنا (تعقيد في تثبيت المفتاح).
-- **ج. agent على السيرفر:** [سؤال 1](#1-فين-النشر-بيشتغل).
-- **التوصية: (أ)**، ومعاها سياسة الملف الآمنة، ووثيقة تنصح بـ rootless Docker لمستخدم النشر.
-
-### 6. الـ hooks
-- **أ. مفيش hooks في أول نسخة غير `ReloadCommand` من الهدف:** أبسط وأأمن، بس مشاريع محتاجة migrations أو warm-up قبل التبديل مش هتلاقي مكان.
-- **ب. hooks معرّفة على الهدف من الأدمن (`PreSwitchCommand` و`PostSwitchCommand` و`ReloadCommand`)، وهوك من داخل الـ artifact مقفول (الخطة):** الـ commit مايقدرش يضيف أمر على سيرفر الإنتاج، والأدمن عارف بالظبط إيه بيتنفّذ. ومعاها اختيار `AllowArtifactHooks` على الهدف (افتراضيًا لأ) يشغّل سكربت ثابت المسار `.dhow/hooks/pre-switch` من الأرشيف.
-- **ج. أوامر حرة في `with:` (زي `pre_switch: "..."`):** أمرن، بس أي commit يشغّل أمر عشوائي على الإنتاج (بعد البوابة طبعًا) ومعناه تشغيل نص جاي من المستخدم في shell السيرفر.
-- **التوصية: (ب)** من غير `AllowArtifactHooks` في أول نسخة (يتضاف لو اتطلب)، يعني hooks من الهدف بس.
-
-### 7. مجموعة سيرفرات
-spec الوثائق فيه `target: prod-fleet`.
-- **أ. هدف = سيرفر واحد، والمجموعة matrix على أهداف بـ `max_parallel: 1` (الخطة):** أبسط بكتير، والرجوع لكل هدف لوحده، والـ fail-fast بيوقف الباقي. العيب: لو الهدف التاني فشل، الأول يفضل على الجديد (نص المجموعة جديد ونصها قديم)، والمستخدم لازم يعرف.
-- **ب. هدف بقايمة سيرفرات (`Hosts`) ونشر متدرّج (rolling)** مع رجوع كل السيرفرات اللي اتبدّلت لو واحد فشل: تجربة أقرب لـ fleet حقيقي، بس تعقيد كبير (حالات جزئية، والرجوع الجماعي نفسه ممكن يفشل، وقفل لكل سيرفر) ووقت M6 أطول.
-- **التوصية: (أ)** في أول نسخة، ومثال الـ spec يتعدّل لـ matrix. (ب) بعد أول نسخة بـ ADR مخصوص.
-
-### 8. أول تثبيت لـ host key وهدف في شبكة خاصة
-السيرفر بيجيب المفتاح من برّه بـ `netguard` (public فقط)، فهدف على IP خاص (شبكة المكتب، VPN) مايتجابش.
-- **أ. جلب من السيرفر للعناوين العامة + لصق المفتاح (من `ssh-keyscan` أو `.pub` من السيرفر نفسه) لأي عنوان، والتأكيد بالبصمة دايمًا (الخطة):** اللصق أأمن من الجلب (مفيش TOFU)، ومفتوح للشبكات الخاصة. العيب: خطوة يدوية للشبكات الخاصة، والـ runner لازم عنده `ALLOW_PRIVATE_CIDRS` للنطاق ده.
-- **ب. الجلب من الـ runner** (تشغيل اصطناعي بوضع `scan-host-key`): بيشتغل للشبكات الخاصة من غير يدوي، بس محتاج runner أونلاين ومساره في البوابة، وأول اتصال بدون مصادقة من جوه sandbox (TOFU بنفس درجة السيرفر).
-- **ج. لصق بس، ومن غير جلب:** أأمن وأبسط كود، بس أصعب على المستخدم العادي.
-- **التوصية: (أ)**، و(ب) بعد أول نسخة لو الشبكات الخاصة طلعت حالة شائعة.
 
 ## قرارات تانية اتاخدت بالتوصية (Sabry يقدر يرجع فيها)
 1. **من يدير الأهداف:** Admin وOwner بس، بخطوة تانية (زي البيئة).
