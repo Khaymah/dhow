@@ -180,3 +180,13 @@ export const waitRun = async (session: ISession, id: string, states: string[]): 
   }
   throw new Error(`run ${id} is ${last}, not one of ${states.join(', ')}`);
 };
+
+export const waitGate = async (session: ISession, id: string, gate: string): Promise<void> => {
+  const { OrgId, ProjectId } = stack();
+  for (let attempt = 0; attempt < 600; attempt += 1) {
+    const reply = await call('GET', `/organizations/${OrgId}/projects/${ProjectId}/runs/${id}`, undefined, session);
+    if (list(reply.Data, 'Jobs').some((job) => field(job, 'Gate') === gate)) return;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  throw new Error(`no job of run ${id} reached the ${gate} gate`);
+};

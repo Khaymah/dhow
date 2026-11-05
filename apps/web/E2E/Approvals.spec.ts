@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { DESKTOP, expectClean, expectNowhere, open, PHONE, shot, signInPage, type IView } from './Guard';
-import { freshCode, invite, push, runOn, signIn, stack, turnOnTotp, waitRun, type ISession, type IUser } from './Stack';
+import { freshCode, invite, push, runOn, signIn, stack, turnOnTotp, waitGate, waitRun, type ISession, type IUser } from './Stack';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -79,7 +79,7 @@ test('a push on a branch the environment refuses is skipped with the reason', as
 test('a push on main waits for approval and the owner, who is no reviewer, cannot approve it', async ({ browser }) => {
   await push('main');
   waitingRun = await runOn(owner, 'main', skippedRun.Number);
-  await waitRun(owner, waitingRun.Id, ['awaiting_approval']);
+  await waitGate(owner, waitingRun.Id, 'approval');
   const view = await open(browser, 'ar', DESKTOP);
   const { Page: page, T } = view;
   await signInPage(view, stack().Owner, owner);
