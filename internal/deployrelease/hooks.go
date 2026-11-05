@@ -3,20 +3,39 @@ package deployrelease
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 )
 
 const hookScript = `cd "$DHOW_RELEASE_PATH" && eval "$1"`
 
-func HookArgv(hook, base, releasePath, releaseID, previous string) []string {
-	return []string{
+const killGrace = 5 * time.Second
+
+func HookArgv(hook, base, releasePath, releaseID, previous string, limit time.Duration) []string {
+	argv := []string{
 		"env",
 		"DHOW_DEPLOY_PATH=" + base,
 		"DHOW_RELEASE_PATH=" + releasePath,
 		"DHOW_RELEASE_ID=" + releaseID,
 		"DHOW_PREVIOUS_RELEASE=" + previous,
-		"sh", "-c", hookScript, "dhow-hook", hook,
 	}
+	if limit > 0 {
+		argv = append(argv, "timeout", "-s", "KILL", strconv.Itoa(int(limit.Seconds())))
+	}
+	return append(argv, "sh", "-c", hookScript, "dhow-hook", hook)
+}
+
+func (d *run) remoteTimeout(ctx context.Context) bool {
+	if d.timeoutKnown {
+		return d.hasTimeout
+	}
+	d.timeoutKnown = true
+	res, err := d.r.Exec(ctx, []string{"command", "-v", "timeout"})
+	d.hasTimeout = err == nil && res.ExitCode == 0
+	if !d.hasTimeout {
+		d.e.Log.Warn("the server has no timeout command, so a hook is limited from this side only")
+	}
+	return d.hasTimeout
 }
 
 func (d *run) hook(ctx context.Context, name, command, releasePath, releaseID, previous string) *Failure {
@@ -24,10 +43,14 @@ func (d *run) hook(ctx context.Context, name, command, releasePath, releaseID, p
 	if name == "reload" {
 		reason = CauseReload
 	}
-	hctx, cancel := context.WithTimeout(ctx, d.cfg.HookTimeout)
+	var remoteLimit time.Duration
+	if d.remoteTimeout(ctx) {
+		remoteLimit = d.cfg.HookTimeout
+	}
+	hctx, cancel := context.WithTimeout(ctx, d.cfg.HookTimeout+killGrace)
 	defer cancel()
 	start := time.Now()
-	res, err := d.r.Exec(hctx, HookArgv(command, d.base, releasePath, releaseID, previous))
+	res, err := d.r.Exec(hctx, HookArgv(command, d.base, releasePath, releaseID, previous, remoteLimit))
 	if err != nil {
 		if ctx.Err() != nil {
 			return fail(ExitFailed, CauseCanceled, "the deployment was canceled", ctx.Err())

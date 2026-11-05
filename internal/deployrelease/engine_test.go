@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -476,4 +477,27 @@ func TestALockThatAnotherDeploymentTookOverIsNotRemovedByUs(t *testing.T) {
 	require.Nil(t, out.failure)
 	owner, _ := ownerOf(t, r)
 	assert.Equal(t, "9-zzzzzzzz-1", owner, "the lock and its owner are untouched")
+}
+
+func TestAHookIsLimitedOnTheServerWhenItHasTimeoutAndOnlyFromHereWhenNot(t *testing.T) {
+	for name, noTimeout := range map[string]bool{"with timeout": false, "without timeout": true} {
+		t.Run(name, func(t *testing.T) {
+			r := newLocalRemote(t)
+			r.noTimeout = noTimeout
+			out := release(t, r, "1-aaaaaaaa-1", "v1", &probe{status: healthy}, func(c *deployrelease.Config) {
+				c.PostSwitch = "./warm.sh"
+				c.HookTimeout = 90 * time.Second
+			})
+			require.Nil(t, out.failure)
+			argvs := r.hookArgvs()
+			require.Len(t, argvs, 1)
+			if noTimeout {
+				assert.NotContains(t, argvs[0], "timeout")
+				return
+			}
+			i := slices.Index(argvs[0], "timeout")
+			require.GreaterOrEqual(t, i, 0)
+			assert.Equal(t, []string{"timeout", "-s", "KILL", "90", "sh", "-c"}, argvs[0][i:i+6], "the server kills the hook at the limit")
+		})
+	}
 }

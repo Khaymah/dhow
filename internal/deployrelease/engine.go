@@ -44,10 +44,13 @@ type run struct {
 	known      string
 	resumed    bool
 	hasFiles   bool
-	started    bool
-	locked     bool
-	stopRenew  func()
-	totals     scan
+
+	timeoutKnown bool
+	hasTimeout   bool
+	started      bool
+	locked       bool
+	stopRenew    func()
+	totals       scan
 }
 
 func (e *Engine) Run(ctx context.Context) *Failure {

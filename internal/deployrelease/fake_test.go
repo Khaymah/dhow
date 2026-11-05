@@ -32,6 +32,8 @@ type localRemote struct {
 	hook   func(argv []string) deployrelease.ExecResult
 	free   uint64
 	closed bool
+
+	noTimeout bool
 }
 
 func newLocalRemote(t *testing.T) *localRemote {
@@ -103,6 +105,12 @@ func (l *localRemote) Exec(_ context.Context, argv []string) (deployrelease.Exec
 	l.mu.Unlock()
 	if _, err := deployrelease.Command(argv...); err != nil {
 		return deployrelease.ExecResult{}, err
+	}
+	if argv[0] == "command" {
+		if l.noTimeout {
+			return deployrelease.ExecResult{ExitCode: 1}, nil
+		}
+		return deployrelease.ExecResult{}, nil
 	}
 	if argv[0] == "sha256sum" {
 		return l.checksums(argv[len(argv)-1]), nil
