@@ -70,8 +70,9 @@ const (
 	RunnerRegistrationTokenCreated = "runner.registration_token_created"
 	RunnerRegistrationTokenRevoked = "runner.registration_token_revoked"
 
-	JobCreated         = "job.created"
-	JobCancelRequested = "job.cancel_requested"
+	JobCreated          = "job.created"
+	JobCancelRequested  = "job.cancel_requested"
+	JobSecretsDelivered = "job.secrets_delivered"
 
 	ProjectCreated  = "project.created"
 	ProjectUpdated  = "project.updated"
@@ -199,6 +200,7 @@ func AuditedEvents() []string {
 		RegistryCredentialCreated,
 		RegistryCredentialUpdated,
 		RegistryCredentialRemoved,
+		JobSecretsDelivered,
 	}
 }
 

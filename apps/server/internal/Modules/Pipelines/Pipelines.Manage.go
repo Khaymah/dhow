@@ -24,7 +24,7 @@ func runJobOf(rj sqlc.RunJob) (models.RunJob, error) {
 	}
 	return models.RunJob{
 		ID: rj.Id, Key: rj.Key, Kind: rj.Kind, JobID: rj.JobId, Name: rj.JobName, Matrix: matrix, Needs: rj.Needs, State: rj.State,
-		FailureReason: rj.FailureReason, CurrentJobID: rj.CurrentJobId, Attempts: int(rj.Attempts), StartedAt: rj.StartedAt,
+		FailureReason: rj.FailureReason, FailureNames: failureNamesOf(rj.FailureDetail), CurrentJobID: rj.CurrentJobId, Attempts: int(rj.Attempts), StartedAt: rj.StartedAt,
 		FinishedAt: rj.FinishedAt,
 	}, nil
 }

@@ -121,6 +121,9 @@ func SecretNames(spec *runnerv1.JobSpec) []string {
 	for _, s := range spec.GetSecrets() {
 		names = append(names, s.GetName())
 	}
+	for _, r := range spec.GetRegistryAuth() {
+		names = append(names, r.GetSecretName())
+	}
 	return sortedUnique(names)
 }
 

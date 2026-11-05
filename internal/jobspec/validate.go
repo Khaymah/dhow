@@ -1,8 +1,10 @@
 package jobspec
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -54,6 +56,7 @@ func Validate(spec *runnerv1.JobSpec) error {
 	c.checkout(spec)
 	c.env("Env", spec.GetEnv())
 	c.secrets(spec)
+	c.registryAuth(spec)
 	c.resources(spec.GetResources())
 	if t := spec.GetTimeoutSeconds(); t < MinTimeoutSeconds || t > MaxTimeoutSeconds {
 		c.add("TimeoutSeconds", ReasonOutOfRange)
@@ -214,6 +217,10 @@ func (c *checker) secretTarget(field string, s *runnerv1.SecretRef, spec *runner
 	}
 }
 
+func ValidSecretFile(name string) bool {
+	return name != "." && name != ".." && secretFile.MatchString(name) && len(name) <= MaxSecretFileLength
+}
+
 func usesEnv(spec *runnerv1.JobSpec, name string) bool {
 	if _, ok := spec.GetEnv()[name]; ok {
 		return true
@@ -275,4 +282,35 @@ func (c *checker) labels(labels []string) {
 
 func ValidLabel(l string) bool {
 	return len(l) <= MaxLabelLength && labelPattern.MatchString(l)
+}
+
+func (c *checker) registryAuth(spec *runnerv1.JobSpec) {
+	auths := spec.GetRegistryAuth()
+	if len(auths) > MaxRegistryAuth {
+		c.add("RegistryAuth", ReasonTooMany)
+		return
+	}
+	hosts := map[string]bool{}
+	for i, r := range auths {
+		field := at("RegistryAuth", i)
+		host, err := NormalizeHost(r.GetHost())
+		if name, port, ok := strings.Cut(r.GetHost(), ":"); ok {
+			host, err = NormalizeHost(name)
+			if p, perr := strconv.Atoi(port); perr != nil || p < 1 || p > 65535 || strconv.Itoa(p) != port {
+				err = errors.New("bad port")
+			}
+			host += ":" + port
+		}
+		switch {
+		case err != nil || host != r.GetHost():
+			c.add(field+".Host", ReasonInvalid)
+		case hosts[host]:
+			c.add(field+".Host", ReasonDuplicate)
+		}
+		hosts[host] = true
+		suffix, ok := strings.CutPrefix(r.GetSecretName(), RegistrySecretPrefix)
+		if n, perr := strconv.Atoi(suffix); !ok || perr != nil || n < 0 || strconv.Itoa(n) != suffix {
+			c.add(field+".SecretName", ReasonInvalid)
+		}
+	}
 }

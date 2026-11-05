@@ -252,14 +252,14 @@ func TestARunnerWithoutTheCheckoutImageNeitherClaimsNorRunsACheckout(t *testing.
 	srv := runnertest.NewServer(t)
 	r := runnertest.Register(t, srv, srv.URL)
 	registered, _ := srv.RunnerFeatures()
-	assert.Equal(t, []string{runnersig.FeaturePlugins}, registered, "a test build has no baked checkout image")
+	assert.Equal(t, []string{runnersig.FeaturePlugins, runnersig.FeatureRegistry}, registered, "a test build has no baked checkout image")
 	srv.Enqueue(checkoutSpec(), map[string][]byte{jobspec.CheckoutSecret: []byte(deployKey)})
 	running := r.Start(fake.Recording{Images: images()}, runnertest.StartOptions{})
 	out := running.Next(t, finishWithin)
 	assert.Equal(t, runnerv1.FailureReason_FAILURE_REASON_SPEC_REJECTED, out.Reason)
 	assert.Empty(t, execs(running.Driver.Events()))
 	_, signed := srv.RunnerFeatures()
-	assert.Equal(t, []string{runnersig.FeaturePlugins}, signed)
+	assert.Equal(t, []string{runnersig.FeaturePlugins, runnersig.FeatureRegistry}, signed)
 
 	srv2 := runnertest.NewServer(t)
 	r2 := checkoutRunner(t, srv2)
@@ -267,7 +267,7 @@ func TestARunnerWithoutTheCheckoutImageNeitherClaimsNorRunsACheckout(t *testing.
 	srv2.Enqueue(runnertest.Spec(), nil)
 	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, running2.Next(t, finishWithin).Result)
 	_, signed = srv2.RunnerFeatures()
-	assert.True(t, slices.Equal([]string{runnersig.FeatureArtifacts, runnersig.FeatureCache, runnersig.FeatureCheckout, runnersig.FeaturePlugins}, signed),
+	assert.True(t, slices.Equal([]string{runnersig.FeatureArtifacts, runnersig.FeatureCache, runnersig.FeatureCheckout, runnersig.FeaturePlugins, runnersig.FeatureRegistry}, signed),
 		"%v", signed)
 }
 

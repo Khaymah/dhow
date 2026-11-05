@@ -170,3 +170,52 @@ func (s *Service) RegistryLogin(ctx context.Context, org, project uuid.UUID, hos
 	}
 	return secretstore.RegistryLogin{Host: row.Host, Username: row.Username, Password: plain}, true, nil
 }
+
+var _ secretstore.VariableStore = (*Service)(nil)
+
+func (s *Service) Variables(ctx context.Context, q *sqlc.Queries, org, project uuid.UUID, environment *uuid.UUID) (map[string]string, error) {
+	if q == nil {
+		q = sqlc.New(s.db)
+	}
+	rows, err := q.ResolveVariables(ctx, sqlc.ResolveVariablesParams{OrganizationID: org, ProjectID: &project, EnvironmentID: environment})
+	if err != nil {
+		return nil, err
+	}
+	type pick struct {
+		value string
+		rank  int
+	}
+	best := map[string]pick{}
+	spellings := map[string][]string{}
+	for _, r := range rows {
+		key := strings.ToLower(r.Name)
+		if !slices.Contains(spellings[key], r.Name) {
+			spellings[key] = append(spellings[key], r.Name)
+		}
+		if b, ok := best[key]; !ok || scopeRank(r.Scope) > b.rank {
+			best[key] = pick{value: r.Value, rank: scopeRank(r.Scope)}
+		}
+	}
+	out := make(map[string]string, len(rows))
+	for key, names := range spellings {
+		for _, n := range names {
+			out[n] = best[key].value
+		}
+	}
+	return out, nil
+}
+
+func (s *Service) HasRegistryLogin(ctx context.Context, q *sqlc.Queries, org, project uuid.UUID, host string) (bool, error) {
+	normalized, ok := NormalizeHost(host)
+	if !ok {
+		return false, nil
+	}
+	if q == nil {
+		q = sqlc.New(s.db)
+	}
+	_, err := q.ResolveRegistryCredential(ctx, sqlc.ResolveRegistryCredentialParams{OrganizationID: org, Host: normalized, ProjectID: &project})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}

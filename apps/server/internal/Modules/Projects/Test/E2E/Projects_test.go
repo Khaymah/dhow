@@ -22,8 +22,8 @@ type world struct {
 }
 
 type projectView struct {
-	Id, OrganizationId, Slug, Name, PipelinePath, ForkPolicy, State string
-	ArchivedAt                                                      *string
+	Id, OrganizationId, Slug, Name, PipelinePath, ForkPolicy, ForkCacheRestore, State string
+	ArchivedAt                                                                        *string
 }
 
 func newWorld(t *testing.T) world {
@@ -240,4 +240,20 @@ func TestAPITokensRespectTheProjectScopes(t *testing.T) {
 
 	jobsOnly := maintainer.MustCreateAPIToken(w.org, []string{"job.read"}, memberPassword)
 	requireError(t, w.env.Bearer(jobsOnly.Value, get), http.StatusForbidden, "FORBIDDEN")
+}
+
+func TestOnlyAnAdminLetsForksRestoreTheCache(t *testing.T) {
+	w := newWorld(t)
+	maintainer, _ := w.member(t, "maintainer")
+	p := decode(t, create(maintainer, w, map[string]any{"Name": "C", "Slug": "c"}), http.StatusCreated)
+	path := w.path("/" + p.Id)
+	patch := func(c *apptest.Client, v string) apptest.Response {
+		return c.Do(apptest.Request{Method: http.MethodPatch, Path: path, Body: map[string]any{"ForkCacheRestore": v}})
+	}
+	requireError(t, patch(maintainer, "default_branch"), http.StatusForbidden, "FORK_CACHE_NOT_ALLOWED")
+	requireError(t, patch(w.owner, "everything"), http.StatusUnprocessableEntity, "VALIDATION_FAILED")
+	opened := decode(t, patch(w.owner, "default_branch"), http.StatusOK)
+	assert.Equal(t, "default_branch", opened.ForkCacheRestore)
+	closed := decode(t, patch(maintainer, "none"), http.StatusOK)
+	assert.Equal(t, "none", closed.ForkCacheRestore, "anyone who manages the project may close it again")
 }

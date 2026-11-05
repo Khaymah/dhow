@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"slices"
 
-	"github.com/google/uuid"
-
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
@@ -50,12 +48,12 @@ func withoutCheckout(names []string) []string {
 	return slices.DeleteFunc(slices.Clone(names), func(n string) bool { return n == jobspec.CheckoutSecret })
 }
 
-func (c *checkoutSecrets) Accepts(ctx context.Context, org uuid.UUID, names []string) error {
+func (c *checkoutSecrets) Accepts(ctx context.Context, origin jobs.Origin, names []string) error {
 	rest := withoutCheckout(names)
 	if len(rest) == 0 {
 		return nil
 	}
-	return c.next.Accepts(ctx, org, rest)
+	return c.next.Accepts(ctx, origin, rest)
 }
 
 func (c *checkoutSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (map[string][]byte, error) {
@@ -131,6 +129,11 @@ func runsFor(
 	secretsService, err := secretsFor(in, values, bus, pipelinesService)
 	if err != nil {
 		return runServices{}, err
+	}
+	pipelinesService.UseSecrets(secretsService)
+	pipelinesService.UseVariables(secretsService)
+	if in.Secrets == nil {
+		secrets.next = &pipelineSecrets{runs: pipelinesService, store: secretsService, logins: secretsService, bus: bus, log: in.Log}
 	}
 	pipelinesService.UseStatuses(sourcesService.StatusRecorder())
 	pipelinesService.UseArtifacts(artifactsService)

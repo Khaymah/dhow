@@ -33,7 +33,7 @@ func ptrOf[T any](v T) *T { return &v }
 func toGen(p models.Project, linked bool) gen.Project {
 	return gen.Project{
 		Id: p.ID, OrganizationId: p.OrganizationID, Slug: p.Slug, Name: p.Name, PipelinePath: p.PipelinePath,
-		ForkPolicy: gen.ForkPolicy(p.ForkPolicy), State: gen.ProjectState(p.State), RepositoryLinked: linked,
+		ForkPolicy: gen.ForkPolicy(p.ForkPolicy), ForkCacheRestore: gen.ForkCacheRestore(forkCacheOf(p.ForkCache)), State: gen.ProjectState(p.State), RepositoryLinked: linked,
 		CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt, ArchivedAt: p.ArchivedAt,
 	}
 }
@@ -126,6 +126,7 @@ func (c *Controller) UpdateProject(ctx context.Context, req gen.UpdateProjectReq
 	}
 	p, err := c.service.Update(ctx, req.Id, req.ProjectId, models.UpdateInput{
 		Name: req.Body.Name, PipelinePath: req.Body.PipelinePath, ForkPolicy: policyOf(req.Body.ForkPolicy),
+		ForkCache: forkCacheInput(req.Body.ForkCacheRestore),
 	})
 	if err != nil {
 		return nil, err
@@ -147,4 +148,19 @@ func (c *Controller) ArchiveProject(ctx context.Context, req gen.ArchiveProjectR
 		return nil, err
 	}
 	return gen.ArchiveProject200JSONResponse{Success: true, Message: ptrOf(messageArchived), Data: &data}, nil
+}
+
+func forkCacheOf(v string) string {
+	if v == "" {
+		return models.ForkCacheNone
+	}
+	return v
+}
+
+func forkCacheInput(v *gen.ForkCacheRestore) *string {
+	if v == nil {
+		return nil
+	}
+	out := string(*v)
+	return &out
 }

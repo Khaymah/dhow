@@ -23,6 +23,9 @@ const (
 	MaxSecrets            = 50
 	MaxSecretNameLength   = 64
 	MaxSecretFileLength   = 128
+	MaxSecretFiles        = 20
+	MaxRegistryAuth       = 8
+	RegistrySecretPrefix  = "dhow.registry."
 	MaxEgressEntries      = 64
 	MaxEgressEntryLength  = 260
 	MaxLabels             = 32

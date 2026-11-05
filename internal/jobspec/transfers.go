@@ -13,6 +13,7 @@ import (
 const (
 	FeatureArtifacts      = "artifacts"
 	FeatureCache          = "cache"
+	FeatureRegistryAuth   = "registry_auth"
 	MaxArtifacts          = 16
 	MaxInputs             = 256
 	MaxTransferPaths      = 32

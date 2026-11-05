@@ -4,16 +4,8 @@
   "Lang": "ar",
   "Valid": true,
   "Errors": 0,
-  "Warnings": 3,
+  "Warnings": 1,
   "Issues": [
-    {
-      "Code": "SECRETS_UNAVAILABLE",
-      "Severity": "warning",
-      "Path": "jobs.deploy",
-      "Line": 5,
-      "Column": 3,
-      "Message": "الأسرار تأتي مع M5: حتى ذلك الوقت يفشل التشغيل الذي يطلب سرًا عند إدخاله في الطابور"
-    },
     {
       "Code": "IMAGE_NOT_PINNED",
       "Severity": "warning",
@@ -21,14 +13,6 @@
       "Line": 6,
       "Column": 5,
       "Message": "الصورة غير مثبّتة بالـ digest: يرفضها جهاز التشغيل إلا إذا سُمح بالصور غير المثبّتة"
-    },
-    {
-      "Code": "ENVIRONMENTS_UNAVAILABLE",
-      "Severity": "warning",
-      "Path": "jobs.deploy.environment",
-      "Line": 7,
-      "Column": 5,
-      "Message": "البيئات تأتي مع M5: حتى ذلك الوقت نتخطى هذا التشغيل"
     }
   ]
 }

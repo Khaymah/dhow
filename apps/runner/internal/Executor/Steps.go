@@ -21,6 +21,7 @@ const (
 	EnvJobID        = "DHOW_JOB_ID"
 	EnvAttemptID    = "DHOW_ATTEMPT_ID"
 	EnvStepIndex    = "DHOW_STEP_INDEX"
+	EnvSecretsDir   = "DHOW_SECRETS_DIR" //nolint:gosec // An environment variable name, not a credential.
 )
 
 type stepEnd struct {
@@ -298,6 +299,7 @@ func (a *attempt) stepEnv(idx int32) (map[string]string, map[string][]byte) {
 	env[EnvAttemptID] = a.grant.GetAttemptId()
 	env[EnvStepIndex] = strconv.Itoa(int(idx))
 	env[plugin.EnvOutput] = sandbox.OutputPath
+	env[EnvSecretsDir] = sandbox.SecretsPath
 	files := map[string][]byte{}
 	for _, ref := range spec.GetSecrets() {
 		if ref.GetName() == jobspec.CheckoutSecret {

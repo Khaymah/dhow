@@ -16,7 +16,7 @@ const archiveProject = `-- name: ArchiveProject :one
 UPDATE "Projects"
 SET "State" = 'archived', "ArchivedAt" = $1::timestamptz, "UpdatedAt" = $1::timestamptz
 WHERE "Id" = $2 AND "OrganizationId" = $3 AND "State" = 'active' AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId", "ForkCacheRestore"
 `
 
 type ArchiveProjectParams struct {
@@ -41,6 +41,7 @@ func (q *Queries) ArchiveProject(ctx context.Context, arg ArchiveProjectParams) 
 		&i.State,
 		&i.ArchivedAt,
 		&i.CreatedByUserId,
+		&i.ForkCacheRestore,
 	)
 	return i, err
 }
@@ -65,7 +66,7 @@ func (q *Queries) CountProjects(ctx context.Context, arg CountProjectsParams) (i
 }
 
 const getProject = `-- name: GetProject :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId", "ForkCacheRestore"
 FROM "Projects"
 WHERE "Id" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
 `
@@ -91,6 +92,7 @@ func (q *Queries) GetProject(ctx context.Context, arg GetProjectParams) (Project
 		&i.State,
 		&i.ArchivedAt,
 		&i.CreatedByUserId,
+		&i.ForkCacheRestore,
 	)
 	return i, err
 }
@@ -135,7 +137,7 @@ func (q *Queries) GetProjectBindings(ctx context.Context, arg GetProjectBindings
 const insertProject = `-- name: InsertProject :one
 INSERT INTO "Projects" ("OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "CreatedByUserId", "CreatedAt", "UpdatedAt")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId", "ForkCacheRestore"
 `
 
 type InsertProjectParams struct {
@@ -172,6 +174,7 @@ func (q *Queries) InsertProject(ctx context.Context, arg InsertProjectParams) (P
 		&i.State,
 		&i.ArchivedAt,
 		&i.CreatedByUserId,
+		&i.ForkCacheRestore,
 	)
 	return i, err
 }
@@ -208,7 +211,7 @@ func (q *Queries) LinkedProjects(ctx context.Context, arg LinkedProjectsParams) 
 }
 
 const listProjects = `-- name: ListProjects :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId", "ForkCacheRestore"
 FROM "Projects"
 WHERE "OrganizationId" = $1 AND NOT "IsDeleted"
   AND ($2::text = '' OR "State" = $2::text)
@@ -250,6 +253,7 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]P
 			&i.State,
 			&i.ArchivedAt,
 			&i.CreatedByUserId,
+			&i.ForkCacheRestore,
 		); err != nil {
 			return nil, err
 		}
@@ -262,7 +266,7 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]P
 }
 
 const lockProject = `-- name: LockProject :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId", "ForkCacheRestore"
 FROM "Projects"
 WHERE "Id" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
 FOR UPDATE
@@ -289,24 +293,26 @@ func (q *Queries) LockProject(ctx context.Context, arg LockProjectParams) (Proje
 		&i.State,
 		&i.ArchivedAt,
 		&i.CreatedByUserId,
+		&i.ForkCacheRestore,
 	)
 	return i, err
 }
 
 const updateProject = `-- name: UpdateProject :one
 UPDATE "Projects"
-SET "Name" = $1, "PipelinePath" = $2, "ForkPolicy" = $3, "UpdatedAt" = $4
-WHERE "Id" = $5 AND "OrganizationId" = $6 AND "State" = 'active' AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId"
+SET "Name" = $1, "PipelinePath" = $2, "ForkPolicy" = $3, "ForkCacheRestore" = $4, "UpdatedAt" = $5
+WHERE "Id" = $6 AND "OrganizationId" = $7 AND "State" = 'active' AND NOT "IsDeleted"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "Slug", "Name", "PipelinePath", "ForkPolicy", "State", "ArchivedAt", "CreatedByUserId", "ForkCacheRestore"
 `
 
 type UpdateProjectParams struct {
-	Name           string
-	PipelinePath   string
-	ForkPolicy     string
-	Now            time.Time
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
+	Name             string
+	PipelinePath     string
+	ForkPolicy       string
+	ForkCacheRestore string
+	Now              time.Time
+	ID               uuid.UUID
+	OrganizationID   uuid.UUID
 }
 
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error) {
@@ -314,6 +320,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		arg.Name,
 		arg.PipelinePath,
 		arg.ForkPolicy,
+		arg.ForkCacheRestore,
 		arg.Now,
 		arg.ID,
 		arg.OrganizationID,
@@ -332,6 +339,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.State,
 		&i.ArchivedAt,
 		&i.CreatedByUserId,
+		&i.ForkCacheRestore,
 	)
 	return i, err
 }

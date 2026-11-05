@@ -354,6 +354,9 @@ type RunJob struct {
 	// CurrentJobId The job that runs this entry now, or ran it last. Its logs are under `/jobs/{jobId}`.
 	CurrentJobId *openapi_types.UUID `json:"CurrentJobId,omitempty"`
 
+	// FailureNames With `SECRET_NOT_FOUND` or `SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS`, the names of the secrets. Never a value.
+	FailureNames *[]string `json:"FailureNames,omitempty"`
+
 	// FailureReason For example `NEEDS_FAILED`, `CONDITION_FALSE`, `ENVIRONMENTS_UNAVAILABLE`, `FORK_PR_NO_ENVIRONMENT`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
 	FailureReason *string            `json:"FailureReason,omitempty"`
 	FinishedAt    *time.Time         `json:"FinishedAt,omitempty"`

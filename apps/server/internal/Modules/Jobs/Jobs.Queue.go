@@ -28,7 +28,7 @@ var _ jobqueue.Queue = queue{}
 func (s *Service) Queue() jobqueue.Queue { return queue{service: s} }
 
 func knownFeatures() []string {
-	return []string{jobqueue.FeatureArtifacts, jobqueue.FeatureCache, jobqueue.FeatureCheckout, jobqueue.FeaturePlugins}
+	return []string{jobqueue.FeatureArtifacts, jobqueue.FeatureCache, jobqueue.FeatureCheckout, jobqueue.FeaturePlugins, jobqueue.FeatureRegistry}
 }
 
 func features(in []string) ([]string, bool) {
@@ -104,7 +104,7 @@ func (qu queue) Enqueue(ctx context.Context, tx *sqlc.Queries, r jobqueue.Reques
 		return jobqueue.Enqueued{}, apperrors.ValidationFailed(invalid("RequiredFeatures"))
 	}
 	if names := userSecrets(spec); len(names) > 0 {
-		if err := qu.service.secrets.Accepts(ctx, r.OrganizationID, names); err != nil {
+		if err := qu.service.secrets.Accepts(ctx, Origin{OrganizationID: r.OrganizationID, Kind: r.OriginKind, ID: r.OriginID}, names); err != nil {
 			if errors.Is(err, ErrSecretsUnavailable) {
 				return jobqueue.Enqueued{}, apperrors.SecretsUnavailable()
 			}

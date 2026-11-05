@@ -307,3 +307,16 @@ SELECT count(*)::bigint AS "Runs",
 FROM "PipelineRuns"
 WHERE "ProjectId" = @project_id AND "DeliveryId" IS NOT NULL
   AND "CreatedAt" > now() - make_interval(secs => @window_seconds::double precision);
+
+-- name: SecretScopeOfJob :one
+SELECT r."ProjectId", r."Id" AS "RunId", rj."Id" AS "RunJobId", r."IsFork", (r."Trigger" = 'pull_request')::boolean AS "PullRequest"
+FROM "Jobs" j
+JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
+    AND rj."CurrentJobId" = j."Id" AND rj."State" = 'active' AND NOT rj."IsDeleted"
+JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+    AND r."State" IN ('pending', 'running') AND NOT r."IsDeleted"
+WHERE j."Id" = @job_id AND j."OrganizationId" = @organization_id AND j."OriginKind" = 'pipeline' AND NOT j."IsDeleted";
+
+-- name: SetRunJobFailureDetail :exec
+UPDATE "RunJobs" SET "FailureDetail" = @failure_detail::jsonb, "UpdatedAt" = now()
+WHERE "Id" = @id AND "OrganizationId" = @organization_id;

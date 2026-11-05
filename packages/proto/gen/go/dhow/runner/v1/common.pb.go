@@ -155,6 +155,7 @@ const (
 	FailureReason_FAILURE_REASON_ARTIFACT_UNSAFE                 FailureReason = 21
 	FailureReason_FAILURE_REASON_ARTIFACT_UPLOAD_FAILED          FailureReason = 22
 	FailureReason_FAILURE_REASON_ARTIFACT_TOO_LARGE              FailureReason = 23
+	FailureReason_FAILURE_REASON_ARTIFACT_CONTAINS_SECRET        FailureReason = 24
 )
 
 // Enum value maps for FailureReason.
@@ -184,6 +185,7 @@ var (
 		21: "FAILURE_REASON_ARTIFACT_UNSAFE",
 		22: "FAILURE_REASON_ARTIFACT_UPLOAD_FAILED",
 		23: "FAILURE_REASON_ARTIFACT_TOO_LARGE",
+		24: "FAILURE_REASON_ARTIFACT_CONTAINS_SECRET",
 	}
 	FailureReason_value = map[string]int32{
 		"FAILURE_REASON_UNSPECIFIED":                     0,
@@ -210,6 +212,7 @@ var (
 		"FAILURE_REASON_ARTIFACT_UNSAFE":                 21,
 		"FAILURE_REASON_ARTIFACT_UPLOAD_FAILED":          22,
 		"FAILURE_REASON_ARTIFACT_TOO_LARGE":              23,
+		"FAILURE_REASON_ARTIFACT_CONTAINS_SECRET":        24,
 	}
 )
 
@@ -243,11 +246,12 @@ func (FailureReason) EnumDescriptor() ([]byte, []int) {
 type RunnerFeature int32
 
 const (
-	RunnerFeature_RUNNER_FEATURE_UNSPECIFIED RunnerFeature = 0
-	RunnerFeature_RUNNER_FEATURE_CHECKOUT    RunnerFeature = 1
-	RunnerFeature_RUNNER_FEATURE_PLUGINS     RunnerFeature = 2
-	RunnerFeature_RUNNER_FEATURE_ARTIFACTS   RunnerFeature = 3
-	RunnerFeature_RUNNER_FEATURE_CACHE       RunnerFeature = 4
+	RunnerFeature_RUNNER_FEATURE_UNSPECIFIED   RunnerFeature = 0
+	RunnerFeature_RUNNER_FEATURE_CHECKOUT      RunnerFeature = 1
+	RunnerFeature_RUNNER_FEATURE_PLUGINS       RunnerFeature = 2
+	RunnerFeature_RUNNER_FEATURE_ARTIFACTS     RunnerFeature = 3
+	RunnerFeature_RUNNER_FEATURE_CACHE         RunnerFeature = 4
+	RunnerFeature_RUNNER_FEATURE_REGISTRY_AUTH RunnerFeature = 5
 )
 
 // Enum value maps for RunnerFeature.
@@ -258,13 +262,15 @@ var (
 		2: "RUNNER_FEATURE_PLUGINS",
 		3: "RUNNER_FEATURE_ARTIFACTS",
 		4: "RUNNER_FEATURE_CACHE",
+		5: "RUNNER_FEATURE_REGISTRY_AUTH",
 	}
 	RunnerFeature_value = map[string]int32{
-		"RUNNER_FEATURE_UNSPECIFIED": 0,
-		"RUNNER_FEATURE_CHECKOUT":    1,
-		"RUNNER_FEATURE_PLUGINS":     2,
-		"RUNNER_FEATURE_ARTIFACTS":   3,
-		"RUNNER_FEATURE_CACHE":       4,
+		"RUNNER_FEATURE_UNSPECIFIED":   0,
+		"RUNNER_FEATURE_CHECKOUT":      1,
+		"RUNNER_FEATURE_PLUGINS":       2,
+		"RUNNER_FEATURE_ARTIFACTS":     3,
+		"RUNNER_FEATURE_CACHE":         4,
+		"RUNNER_FEATURE_REGISTRY_AUTH": 5,
 	}
 )
 
@@ -466,7 +472,7 @@ const file_dhow_runner_v1_common_proto_rawDesc = "" +
 	"\x15ATTEMPT_RESULT_FAILED\x10\x02\x12\x1b\n" +
 	"\x17ATTEMPT_RESULT_CANCELED\x10\x03\x12\x1c\n" +
 	"\x18ATTEMPT_RESULT_TIMED_OUT\x10\x04\x12\x17\n" +
-	"\x13ATTEMPT_RESULT_LOST\x10\x05*\x8c\a\n" +
+	"\x13ATTEMPT_RESULT_LOST\x10\x05*\xb9\a\n" +
 	"\rFailureReason\x12\x1e\n" +
 	"\x1aFAILURE_REASON_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFAILURE_REASON_STEP_FAILED\x10\x01\x12\x1d\n" +
@@ -492,13 +498,15 @@ const file_dhow_runner_v1_common_proto_rawDesc = "" +
 	"'FAILURE_REASON_ARTIFACT_DOWNLOAD_FAILED\x10\x14\x12\"\n" +
 	"\x1eFAILURE_REASON_ARTIFACT_UNSAFE\x10\x15\x12)\n" +
 	"%FAILURE_REASON_ARTIFACT_UPLOAD_FAILED\x10\x16\x12%\n" +
-	"!FAILURE_REASON_ARTIFACT_TOO_LARGE\x10\x17*\xa0\x01\n" +
+	"!FAILURE_REASON_ARTIFACT_TOO_LARGE\x10\x17\x12+\n" +
+	"'FAILURE_REASON_ARTIFACT_CONTAINS_SECRET\x10\x18*\xc2\x01\n" +
 	"\rRunnerFeature\x12\x1e\n" +
 	"\x1aRUNNER_FEATURE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17RUNNER_FEATURE_CHECKOUT\x10\x01\x12\x1a\n" +
 	"\x16RUNNER_FEATURE_PLUGINS\x10\x02\x12\x1c\n" +
 	"\x18RUNNER_FEATURE_ARTIFACTS\x10\x03\x12\x18\n" +
-	"\x14RUNNER_FEATURE_CACHE\x10\x04B\xc2\x01\n" +
+	"\x14RUNNER_FEATURE_CACHE\x10\x04\x12 \n" +
+	"\x1cRUNNER_FEATURE_REGISTRY_AUTH\x10\x05B\xc2\x01\n" +
 	"\x12com.dhow.runner.v1B\vCommonProtoP\x01ZEgithub.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1;runnerv1\xa2\x02\x03DRX\xaa\x02\x0eDhow.Runner.V1\xca\x02\x0eDhow\\Runner\\V1\xe2\x02\x1aDhow\\Runner\\V1\\GPBMetadata\xea\x02\x10Dhow::Runner::V1b\x06proto3"
 
 var (

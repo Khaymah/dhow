@@ -6,7 +6,7 @@ A secret is a value nobody should see, like an SSH key or an API token. A variab
 
 Dhow stores a secret encrypted and never shows it again once it is saved. Neither the web app nor the API has any way to read a secret value, not even for the organization owner. If you forget the value, write a new one.
 
-Until delivery to jobs arrives (M5.5), secrets are only stored and do not reach jobs yet.
+Organization and project secrets reach a job only when it starts, sealed for the runner that took it. Environment secrets arrive with the deploy gate (M5.6). A job that asks for a missing secret fails before it is queued with `SECRET_NOT_FOUND`, and `FailureNames` lists the missing names (never values).
 
 ## Where a secret lives
 
@@ -80,7 +80,7 @@ POST /api/v1/organizations/{id}/projects/{projectId}/registry-credentials
 - **Place:** the organization for all its projects, or a project. A project credential wins over an organization one for the same registry. One credential per registry, and 20 in each place.
 - **Password:** never shown after it is saved. An update (`PUT .../registry-credentials/{credentialId}`) changes the username and the password together.
 
-The server uses the credential when it pins an image to its digest. It sends it to the registry itself only, and to the token service when it is on the same registry over `https` (or `auth.docker.io` for Docker Hub). Runs from forks pin images without any credential.
+The server uses the credential when it pins an image to its digest. It sends it to the registry itself only, and to the token service when it is on the same registry over `https` (or `auth.docker.io` for Docker Hub). Runs of pull requests (from the same repository or a fork) use no credential, neither to pin nor to pull.
 
 ## The audit log
 

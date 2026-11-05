@@ -76,6 +76,8 @@ type Job struct {
 	Network     *Network          `yaml:"network"`
 	Resources   *Resources        `yaml:"resources"`
 	Env         map[string]Scalar `yaml:"env"`
+	Files       map[string]Scalar `yaml:"files"`
+	IDToken     *IDToken          `yaml:"id_token"`
 	Steps       []*Step           `yaml:"steps"`
 	Artifacts   []*Artifact       `yaml:"artifacts"`
 	Cache       *Cache            `yaml:"cache"`
@@ -105,7 +107,12 @@ type Step struct {
 	Uses    string            `yaml:"uses"`
 	With    map[string]Scalar `yaml:"with"`
 	Env     map[string]Scalar `yaml:"env"`
+	Files   map[string]Scalar `yaml:"files"`
 	Timeout string            `yaml:"timeout"`
+}
+
+type IDToken struct {
+	Audiences []string `yaml:"audiences"`
 }
 
 type Artifact struct {

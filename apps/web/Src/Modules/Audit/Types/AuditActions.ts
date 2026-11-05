@@ -88,6 +88,7 @@ export const AUDIT_ACTIONS: Readonly<Record<string, IAuditAction>> = {
   'registry_credential.created': { Icon: 'key', Bad: false },
   'registry_credential.updated': { Icon: 'key', Bad: false },
   'registry_credential.removed': { Icon: 'trash', Bad: true },
+  'job.secrets_delivered': { Icon: 'key', Bad: false },
   'system.instance.setupCompleted': { Icon: 'shield', Bad: false },
   'system.settings.changed': { Icon: 'settings', Bad: false },
   'system.keys.activated': { Icon: 'key', Bad: false },

@@ -131,24 +131,26 @@ jobs:
 | `jobs.<id>.image` | string | Required when the job has a `run:` step. Should be digest-pinned: a tag-only image is a warning, and the server pins the tag to a digest when the run starts (§12.5). A name without a registry host is completed the way Docker does it: `node:22-bookworm@sha256:…` runs as `docker.io/library/node:22-bookworm@sha256:…`. The runner never searches other registries. |
 | `jobs.<id>.runner` | map | Same keys as `defaults.runner`; its `labels` replace the defaults |
 | `jobs.<id>.timeout` | duration | From `1s` to `24h`, for example `90s`, `20m` or `1h30m` (units `d`, `h`, `m`, `s`, largest first) |
-| `jobs.<id>.environment` | string | Binds protection rules, secrets and targets. Accepted now with a warning; until M5 the job is skipped |
+| `jobs.<id>.environment` | string | Binds protection rules, secrets and targets. Until the deploy gate arrives (M5.6) the job is skipped with `ENVIRONMENTS_UNAVAILABLE` |
 | `jobs.<id>.network.egress` | list | Host allowlist; empty means deny-all, at most 64 entries. Each entry is one of `host`, `host:port` or `*.domain`. (1) **Hosts:** lowercase ASCII, with punycode (`xn--…`) for other scripts. IP literals, all-numeric names and single-label names (`localhost`, `*.com`) are refused. `*.domain` matches any subdomain but not `domain` itself. (2) **Ports:** without a port, an entry opens 443 through `CONNECT` and 80 for plain `http://`. (3) **Proxy:** traffic goes through the runner's proxy on `127.0.0.1:3128` (`HTTPS_PROXY`, `HTTP_PROXY` and `ALL_PROXY` are set for every step and override the job's own values), so clients must be proxy-aware. SSH and other TCP clients can use `ProxyCommand=/run/dhow/bin/connect %h %p`. (4) **Not supported:** UDP, QUIC and programs that ignore proxies. (5) **Always denied:** private, loopback, link-local and metadata addresses (ADR-0044, ADR-0057) |
 | `jobs.<id>.resources` | map | `cpu` (cores like `2` or `1.5`, or millicores like `1500m`; 0.1 to 64), `memory` and `disk` (`Ki`, `Mi`, `Gi` or `Ti`, for example `4Gi`; memory 64Mi to 64Gi, disk 64Mi to 100Gi) and `pids` (32 to 32768). What is not set uses the server default (1 CPU, 2Gi memory, 4Gi disk, 1024 pids) |
 | `jobs.<id>.env` | map | At most 100 variables. Names are letters, digits and `_`, and names that start with `DHOW_` are reserved. Each value is text or one whole CEL `string` expression |
+| `jobs.<id>.files` | map | Secret files for every `run:` step of the job (never for plugins). The key is the file name (letters, digits, `.`, `_` and `-`, up to 128, starting with a letter or a digit), the value a whole `${{ secrets.NAME }}`. The file is written to `$DHOW_SECRETS_DIR/<name>` with mode `0400`, at most 20 per job |
 | `steps[].id` | string | Optional, unique in the job, same rules as a job id |
 | `steps[].if` | CEL bool | Evaluated before the job is queued; `false` leaves the step out |
 | `steps[].run` | string | Executed by `/bin/sh -e` **inside the sandbox**; the script is passed on stdin, and the image must provide the shell. At most 64 KiB, and `${{ }}` is refused (§5) |
 | `steps[].uses` | image ref | Plugin; must be pinned by digest (`name@sha256:…`), or the file is refused |
 | `steps[].with` | map | Plugin inputs, only on a `uses:` step: at most 32, names in lowercase `a-z`, `0-9` and `_`, values up to 32 KiB (text or CEL `string`). The plugin manifest declares the inputs, and the runner checks them before the plugin starts ([Plugins](#plugins)) |
 | `steps[].env` | map | Same rules as `jobs.<id>.env`; values may reference `secrets.*` and `vars.*` |
+| `steps[].files` | map | Same rules as `jobs.<id>.files`, for this step only. A `uses:` step takes no `files:`; it gets its secrets through `with:` (`SECRET_FILES_ON_PLUGIN`) |
 | `steps[].timeout` | duration | Not longer than the job timeout |
 | `artifacts` | list | At most 16 per job. `name` (letters, digits, `.`, `_`, `-`, up to 64, unique in the pipeline: in a matrix job, join text and `matrix.*` values with `+`, like `${{ "web-" + matrix.os }}`), `paths` (1 to 32, relative to the workspace, without `..`, `~` or a leading `/`) and `retention` (`1d` to `30d`, default 30 days) |
-| `cache` | map | `key` (text or CEL `string`, may call `hash_files()`), `paths` (same rules as artifact paths); scoped per project and branch, read-only for fork PRs |
+| `cache` | map | `key` (text or CEL `string`, may call `hash_files()`), `paths` (same rules as artifact paths); scoped per project and branch. Runs from forks never write it, and read it only when the project allows (section 12.4) |
 
 **CEL context.** These variables are available:
 - `git.{sha, ref, branch, tag, is_tag, message, author, event}` and `git.pr.{number, base_ref, head_ref, is_fork}`
 - `project.{id, name}` and `env.*` (the job's `env`, in step fields and the cache key)
-- `vars.*` (non-secret)
+- `vars.*` (non-secret: the variables of the organization, then the project; the closest wins, and names match whatever their case. Runs from forks get them empty)
 - `inputs.*` (the declared `manual` inputs, with their types)
 - `secrets.*` (only as a whole `env`/`with` value; it can never appear in an `if`)
 - `matrix.*` and `needs.<job>.outputs.*` (only for jobs listed in `needs`, and only when the job id has no `-`)
@@ -202,10 +204,11 @@ An artifact keeps files of one job for the jobs that need it, and for people to 
 - **`needs`:** before the first step, the artifacts of the jobs in `needs` are downloaded, their SHA-256 is checked on the runner, and only then they are unpacked into `/workspace`. A digest that does not match fails the job with `ARTIFACT_DOWNLOAD_FAILED` and nothing is unpacked. The unpacker refuses `..`, absolute paths, links that leave the workspace, devices, FIFOs and hard links to files outside the archive (`ARTIFACT_UNSAFE`).
 - **Retention:** artifacts are kept for `retention` (1 to 30 days, and never longer than `DHOW_ARTIFACT_RETENTION_DAYS`), then removed. A Developer and above can list a run's artifacts and download them (`GET .../runs/{runId}/artifacts`, `GET .../artifacts/{artifactId}/download`).
 - **Cache key:** the server evaluates `cache.key`; each `hash_files()` call is left for the runner, which fills it with a SHA-256 of the matching files (sorted by path, each with its own SHA-256) at the start of the job. `hash_files()` takes glob patterns (`*`, `**`, `?`) relative to the workspace; a key may use its result only as text, so `size(hash_files(...))` or a condition on it is refused. The final key is 1 to 512 characters.
-- **Cache scope:** a scope belongs to the linked repository, so linking the project to another repository starts with an empty cache. A push or a manual run of a branch writes into the scope of that branch, a tag into its tag, and a pull request from the same repository into the scope of that pull request. A lookup tries the run's own scope, then the default branch. A pull request from a fork reads the default branch and never writes. A pull request can never write into the scope of `main`. A manual or API run whose commit is not the latest one pushed to its branch only reads the cache, so only the head of a branch writes it.
+- **Cache scope:** a scope belongs to the linked repository, so linking the project to another repository starts with an empty cache. A push or a manual run of a branch writes into the scope of that branch, a tag into its tag, and a pull request from the same repository into the scope of that pull request. A lookup tries the run's own scope, then the default branch. A pull request from a fork never writes, and reads nothing unless the project allows the default branch (section 12.4). A pull request can never write into the scope of `main`. A manual or API run whose commit is not the latest one pushed to its branch only reads the cache, so only the head of a branch writes it.
 - **Saving:** the cache is saved only when the job succeeded and the key was not found at the start. An existing key is never replaced. When a project's entries pass `DHOW_CACHE_MAX_BYTES_PER_PROJECT`, the least recently used entries of other scopes go first; the default branch's entries are never removed to make room for another branch, a tag or a pull request, and an entry that still does not fit is not kept. A cache that cannot be read or saved is a warning in the job log, not a failure.
 - **One upload each:** a job uploads each declared artifact and its cache once. The artifacts of an organization share `DHOW_ARTIFACT_MAX_BYTES_PER_ORG` (`ARTIFACT_QUOTA_EXCEEDED` past it). The artifacts of fork runs of one project together get at most a tenth of it, so forks, also under the `automatic` fork policy, cannot fill the quota of the project's own runs.
 - **Forks:** the artifacts of a run from a fork's pull request are marked `Untrusted` and can never feed a deploy.
+- **Secrets:** before an upload, the runner looks in every file for the values of the job's secrets in all their forms (the value itself, base64 and others). An artifact that holds a secret value fails the job with `ARTIFACT_CONTAINS_SECRET`, and the log names the file only. A cache that holds one is not saved, with a warning in the log. The check reads files as they are, so a compressed or encrypted file inside the archive is not covered. A cache written by a job that got a secret never reaches a fork.
 
 ## 4. Expressions
 
@@ -274,7 +277,7 @@ jobs:
 
 - **The `schedule` trigger** comes after the first release, and **the `artifact` trigger** (a build from external CI) comes with M6. Both are refused with `TRIGGER_NOT_SUPPORTED_YET`, not ignored.
 - **`isolation: gvisor`** is refused with `ISOLATION_NOT_SUPPORTED_YET` until gVisor returns after the first release.
-- **Environments and secrets** arrive with M5. The file is accepted with a warning (`ENVIRONMENTS_UNAVAILABLE`, `SECRETS_UNAVAILABLE`). Until then a job with `environment:` is skipped, and a job that asks for a secret fails when it is queued.
+- **The environment gate** arrives with M5.6. Until then a job with `environment:` is skipped (`ENVIRONMENTS_UNAVAILABLE`), so environment secrets and variables reach no job yet. **`id_token:`** (an OIDC token for cloud services) arrives after the first release and is refused with `ID_TOKEN_NOT_SUPPORTED_YET`.
 - **`services:`** (containers that live for the whole job) and the visual editor come after the first release.
 
 ## 9. Environment protection (server-side, not in YAML)
@@ -358,14 +361,15 @@ jobs:
 - The run reads the file from the base commit, never from the fork, so a pull request cannot add jobs, open egress or change images.
 - The fork's head commit is checked out as data, and none of its settings are read.
 - By default the run waits until a Maintainer or above approves it (`POST .../runs/{runId}/approve`). An Admin can set the project's fork policy to `automatic`.
-- A job with `environment:` is skipped (`FORK_PR_NO_ENVIRONMENT`), a job that asks for a secret fails (`FORK_PR_NO_SECRETS`), and the cache is read-only.
+- A job with `environment:` is skipped (`FORK_PR_NO_ENVIRONMENT`), a job that asks for a secret fails (`FORK_PR_NO_SECRETS`), and it gets no variables and no registry credentials.
+- The cache: by default the run reads nothing from it. An Admin can set the project's `ForkCacheRestore` to `default_branch`, and the run then reads the cache of the default branch only, except what a job that got a secret wrote. It never writes the cache.
 
 ### 12.5 Images given by tag
 
 - When a run starts, the server asks the registry for the digest of every `image:` given by tag. Every job and every rerun of the run then pulls `name:tag@sha256:…`, even if the tag moves later. The run lists these pins under `ImagePins`.
 - The server reaches the registry through the same guard as Git: no loopback, link-local, metadata or private address unless `DHOW_GIT_ALLOW_PRIVATE_CIDRS` allows the range. It waits 15 seconds at most per image and 30 seconds for the whole run, asks for four images at a time and for each image once, follows no redirect and reads at most 4 MiB.
 - A token address from the registry must be `https` on the registry's own host, or on `auth.docker.io` or `ghcr.io`, on port 443 (or the registry's own port). The private ranges in `DHOW_GIT_ALLOW_PRIVATE_CIDRS` never apply to it.
-- Anonymous pull tokens (like Docker Hub's) work. A registry that needs a password does not work yet (M5), so pin those images by digest in the file.
+- Anonymous pull tokens (like Docker Hub's) work. A registry that needs a password works once you add its credential to the project or the organization ([Secrets and variables](guides/secrets.md)). The server uses it here, and the runner uses it to pull the image through a temporary file outside the sandbox that it removes after the pull, so the job never sees it. A runner that does not declare `registry_auth` does not take such a job. Runs of pull requests (from the same repository or a fork) use no credential.
 - A tag the registry does not know fails the run with `IMAGE_PIN_FAILED` at `jobs.<id>.image`.
 - `dhow lint` still warns about a tag (`IMAGE_NOT_PINNED`), because a digest in the file is still the best way.
 

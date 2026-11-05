@@ -112,6 +112,9 @@ func (r *RunJob) checkStepSecrets(spec *runnerv1.JobSpec, origin []int) error {
 }
 
 func (p StepPlan) declares(ref *runnerv1.SecretRef) bool {
+	if file, ok := ref.GetTarget().(*runnerv1.SecretRef_AsFile); ok {
+		return ref.GetName() != "" && p.Files[file.AsFile] == ref.GetName()
+	}
 	target, ok := ref.GetTarget().(*runnerv1.SecretRef_AsEnv)
 	if !ok || ref.GetName() == "" {
 		return false

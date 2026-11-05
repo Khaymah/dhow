@@ -475,6 +475,7 @@ type Querier interface {
 	ScanSecretValues(ctx context.Context, arg ScanSecretValuesParams) ([]ScanSecretValuesRow, error)
 	ScanTotpSecrets(ctx context.Context, arg ScanTotpSecretsParams) ([]ScanTotpSecretsRow, error)
 	ScrubOrganizationLogs(ctx context.Context, arg ScrubOrganizationLogsParams) (int64, error)
+	SecretScopeOfJob(ctx context.Context, arg SecretScopeOfJobParams) (SecretScopeOfJobRow, error)
 	SetInvitationEmailStatus(ctx context.Context, arg SetInvitationEmailStatusParams) error
 	SetLocalLockTimeout(ctx context.Context, timeout string) error
 	SetMemberRole(ctx context.Context, arg SetMemberRoleParams) (int64, error)
@@ -484,6 +485,7 @@ type Querier interface {
 	SetPreflightTimeouts(ctx context.Context, arg SetPreflightTimeoutsParams) error
 	SetRunDefinition(ctx context.Context, arg SetRunDefinitionParams) error
 	SetRunIssues(ctx context.Context, arg SetRunIssuesParams) error
+	SetRunJobFailureDetail(ctx context.Context, arg SetRunJobFailureDetailParams) error
 	SetRunSource(ctx context.Context, arg SetRunSourceParams) error
 	SetRunnerFeatures(ctx context.Context, arg SetRunnerFeaturesParams) error
 	SetTeamBindingRole(ctx context.Context, arg SetTeamBindingRoleParams) (int64, error)

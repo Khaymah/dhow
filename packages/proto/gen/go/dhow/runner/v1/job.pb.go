@@ -133,6 +133,7 @@ type JobSpec struct {
 	Artifacts      []*ArtifactUpload      `protobuf:"bytes,12,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
 	Inputs         []*ArtifactInput       `protobuf:"bytes,13,rep,name=inputs,proto3" json:"inputs,omitempty"`
 	Cache          *Cache                 `protobuf:"bytes,14,opt,name=cache,proto3" json:"cache,omitempty"`
+	RegistryAuth   []*RegistryAuth        `protobuf:"bytes,15,rep,name=registry_auth,json=registryAuth,proto3" json:"registry_auth,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -265,6 +266,65 @@ func (x *JobSpec) GetCache() *Cache {
 	return nil
 }
 
+func (x *JobSpec) GetRegistryAuth() []*RegistryAuth {
+	if x != nil {
+		return x.RegistryAuth
+	}
+	return nil
+}
+
+type RegistryAuth struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	SecretName    string                 `protobuf:"bytes,2,opt,name=secret_name,json=secretName,proto3" json:"secret_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegistryAuth) Reset() {
+	*x = RegistryAuth{}
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegistryAuth) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegistryAuth) ProtoMessage() {}
+
+func (x *RegistryAuth) ProtoReflect() protoreflect.Message {
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegistryAuth.ProtoReflect.Descriptor instead.
+func (*RegistryAuth) Descriptor() ([]byte, []int) {
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *RegistryAuth) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *RegistryAuth) GetSecretName() string {
+	if x != nil {
+		return x.SecretName
+	}
+	return ""
+}
+
 type ArtifactUpload struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Name             string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -277,7 +337,7 @@ type ArtifactUpload struct {
 
 func (x *ArtifactUpload) Reset() {
 	*x = ArtifactUpload{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[1]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -289,7 +349,7 @@ func (x *ArtifactUpload) String() string {
 func (*ArtifactUpload) ProtoMessage() {}
 
 func (x *ArtifactUpload) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[1]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -302,7 +362,7 @@ func (x *ArtifactUpload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArtifactUpload.ProtoReflect.Descriptor instead.
 func (*ArtifactUpload) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{1}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ArtifactUpload) GetName() string {
@@ -345,7 +405,7 @@ type ArtifactInput struct {
 
 func (x *ArtifactInput) Reset() {
 	*x = ArtifactInput{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[2]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -357,7 +417,7 @@ func (x *ArtifactInput) String() string {
 func (*ArtifactInput) ProtoMessage() {}
 
 func (x *ArtifactInput) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[2]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -370,7 +430,7 @@ func (x *ArtifactInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArtifactInput.ProtoReflect.Descriptor instead.
 func (*ArtifactInput) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{2}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ArtifactInput) GetName() string {
@@ -410,7 +470,7 @@ type CacheHash struct {
 
 func (x *CacheHash) Reset() {
 	*x = CacheHash{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[3]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -422,7 +482,7 @@ func (x *CacheHash) String() string {
 func (*CacheHash) ProtoMessage() {}
 
 func (x *CacheHash) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[3]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -435,7 +495,7 @@ func (x *CacheHash) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CacheHash.ProtoReflect.Descriptor instead.
 func (*CacheHash) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{3}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CacheHash) GetPatterns() []string {
@@ -458,7 +518,7 @@ type Cache struct {
 
 func (x *Cache) Reset() {
 	*x = Cache{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[4]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -470,7 +530,7 @@ func (x *Cache) String() string {
 func (*Cache) ProtoMessage() {}
 
 func (x *Cache) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[4]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -483,7 +543,7 @@ func (x *Cache) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Cache.ProtoReflect.Descriptor instead.
 func (*Cache) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{4}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Cache) GetKeyExpression() string {
@@ -536,7 +596,7 @@ type Step struct {
 
 func (x *Step) Reset() {
 	*x = Step{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[5]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -548,7 +608,7 @@ func (x *Step) String() string {
 func (*Step) ProtoMessage() {}
 
 func (x *Step) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[5]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -561,7 +621,7 @@ func (x *Step) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Step.ProtoReflect.Descriptor instead.
 func (*Step) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{5}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Step) GetName() string {
@@ -623,7 +683,7 @@ type Plugin struct {
 
 func (x *Plugin) Reset() {
 	*x = Plugin{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[6]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -635,7 +695,7 @@ func (x *Plugin) String() string {
 func (*Plugin) ProtoMessage() {}
 
 func (x *Plugin) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[6]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -648,7 +708,7 @@ func (x *Plugin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Plugin.ProtoReflect.Descriptor instead.
 func (*Plugin) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{6}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Plugin) GetImage() string {
@@ -680,7 +740,7 @@ type Checkout struct {
 
 func (x *Checkout) Reset() {
 	*x = Checkout{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[7]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -692,7 +752,7 @@ func (x *Checkout) String() string {
 func (*Checkout) ProtoMessage() {}
 
 func (x *Checkout) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[7]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -705,7 +765,7 @@ func (x *Checkout) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Checkout.ProtoReflect.Descriptor instead.
 func (*Checkout) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{7}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Checkout) GetRepositoryUrl() string {
@@ -772,7 +832,7 @@ type SecretRef struct {
 
 func (x *SecretRef) Reset() {
 	*x = SecretRef{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[8]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -784,7 +844,7 @@ func (x *SecretRef) String() string {
 func (*SecretRef) ProtoMessage() {}
 
 func (x *SecretRef) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[8]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -797,7 +857,7 @@ func (x *SecretRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretRef.ProtoReflect.Descriptor instead.
 func (*SecretRef) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{8}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SecretRef) GetName() string {
@@ -867,7 +927,7 @@ type Resources struct {
 
 func (x *Resources) Reset() {
 	*x = Resources{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[9]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -879,7 +939,7 @@ func (x *Resources) String() string {
 func (*Resources) ProtoMessage() {}
 
 func (x *Resources) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[9]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -892,7 +952,7 @@ func (x *Resources) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Resources.ProtoReflect.Descriptor instead.
 func (*Resources) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{9}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Resources) GetCpuMillis() int64 {
@@ -932,7 +992,7 @@ type Network struct {
 
 func (x *Network) Reset() {
 	*x = Network{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[10]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -944,7 +1004,7 @@ func (x *Network) String() string {
 func (*Network) ProtoMessage() {}
 
 func (x *Network) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[10]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -957,7 +1017,7 @@ func (x *Network) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Network.ProtoReflect.Descriptor instead.
 func (*Network) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{10}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Network) GetEgress() []string {
@@ -978,7 +1038,7 @@ type SealedSecrets struct {
 
 func (x *SealedSecrets) Reset() {
 	*x = SealedSecrets{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[11]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +1050,7 @@ func (x *SealedSecrets) String() string {
 func (*SealedSecrets) ProtoMessage() {}
 
 func (x *SealedSecrets) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[11]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +1063,7 @@ func (x *SealedSecrets) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SealedSecrets.ProtoReflect.Descriptor instead.
 func (*SealedSecrets) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{11}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SealedSecrets) GetKem() HpkeKem {
@@ -1037,7 +1097,7 @@ type SecretValue struct {
 
 func (x *SecretValue) Reset() {
 	*x = SecretValue{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[12]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1049,7 +1109,7 @@ func (x *SecretValue) String() string {
 func (*SecretValue) ProtoMessage() {}
 
 func (x *SecretValue) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[12]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1062,7 +1122,7 @@ func (x *SecretValue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretValue.ProtoReflect.Descriptor instead.
 func (*SecretValue) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{12}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SecretValue) GetName() string {
@@ -1088,7 +1148,7 @@ type SecretBundle struct {
 
 func (x *SecretBundle) Reset() {
 	*x = SecretBundle{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[13]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1100,7 +1160,7 @@ func (x *SecretBundle) String() string {
 func (*SecretBundle) ProtoMessage() {}
 
 func (x *SecretBundle) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[13]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1113,7 +1173,7 @@ func (x *SecretBundle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretBundle.ProtoReflect.Descriptor instead.
 func (*SecretBundle) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{13}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SecretBundle) GetSecrets() []*SecretValue {
@@ -1140,7 +1200,7 @@ type LeaseGrant struct {
 
 func (x *LeaseGrant) Reset() {
 	*x = LeaseGrant{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[14]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1152,7 +1212,7 @@ func (x *LeaseGrant) String() string {
 func (*LeaseGrant) ProtoMessage() {}
 
 func (x *LeaseGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[14]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1165,7 +1225,7 @@ func (x *LeaseGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaseGrant.ProtoReflect.Descriptor instead.
 func (*LeaseGrant) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{14}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *LeaseGrant) GetLeaseId() string {
@@ -1242,7 +1302,7 @@ type SignedLeaseGrant struct {
 
 func (x *SignedLeaseGrant) Reset() {
 	*x = SignedLeaseGrant{}
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[15]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1254,7 +1314,7 @@ func (x *SignedLeaseGrant) String() string {
 func (*SignedLeaseGrant) ProtoMessage() {}
 
 func (x *SignedLeaseGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_dhow_runner_v1_job_proto_msgTypes[15]
+	mi := &file_dhow_runner_v1_job_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1267,7 +1327,7 @@ func (x *SignedLeaseGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignedLeaseGrant.ProtoReflect.Descriptor instead.
 func (*SignedLeaseGrant) Descriptor() ([]byte, []int) {
-	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{15}
+	return file_dhow_runner_v1_job_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SignedLeaseGrant) GetGrantBytes() []byte {
@@ -1295,7 +1355,7 @@ var File_dhow_runner_v1_job_proto protoreflect.FileDescriptor
 
 const file_dhow_runner_v1_job_proto_rawDesc = "" +
 	"\n" +
-	"\x18dhow/runner/v1/job.proto\x12\x0edhow.runner.v1\x1a\x1bdhow/runner/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd1\x05\n" +
+	"\x18dhow/runner/v1/job.proto\x12\x0edhow.runner.v1\x1a\x1bdhow/runner/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x94\x06\n" +
 	"\aJobSpec\x12\x14\n" +
 	"\x05image\x18\x01 \x01(\tR\x05image\x12*\n" +
 	"\x05steps\x18\x02 \x03(\v2\x14.dhow.runner.v1.StepR\x05steps\x122\n" +
@@ -1311,10 +1371,15 @@ const file_dhow_runner_v1_job_proto_rawDesc = "" +
 	"\x0ederived_values\x18\v \x03(\tR\rderivedValues\x12<\n" +
 	"\tartifacts\x18\f \x03(\v2\x1e.dhow.runner.v1.ArtifactUploadR\tartifacts\x125\n" +
 	"\x06inputs\x18\r \x03(\v2\x1d.dhow.runner.v1.ArtifactInputR\x06inputs\x12+\n" +
-	"\x05cache\x18\x0e \x01(\v2\x15.dhow.runner.v1.CacheR\x05cache\x1a6\n" +
+	"\x05cache\x18\x0e \x01(\v2\x15.dhow.runner.v1.CacheR\x05cache\x12A\n" +
+	"\rregistry_auth\x18\x0f \x03(\v2\x1c.dhow.runner.v1.RegistryAuthR\fregistryAuth\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x84\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"C\n" +
+	"\fRegistryAuth\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x1f\n" +
+	"\vsecret_name\x18\x02 \x01(\tR\n" +
+	"secretName\"\x84\x01\n" +
 	"\x0eArtifactUpload\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05paths\x18\x02 \x03(\tR\x05paths\x12\x1b\n" +
@@ -1426,57 +1491,59 @@ func file_dhow_runner_v1_job_proto_rawDescGZIP() []byte {
 }
 
 var file_dhow_runner_v1_job_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_dhow_runner_v1_job_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_dhow_runner_v1_job_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_dhow_runner_v1_job_proto_goTypes = []any{
 	(CheckoutTransport)(0),        // 0: dhow.runner.v1.CheckoutTransport
 	(HpkeKem)(0),                  // 1: dhow.runner.v1.HpkeKem
 	(*JobSpec)(nil),               // 2: dhow.runner.v1.JobSpec
-	(*ArtifactUpload)(nil),        // 3: dhow.runner.v1.ArtifactUpload
-	(*ArtifactInput)(nil),         // 4: dhow.runner.v1.ArtifactInput
-	(*CacheHash)(nil),             // 5: dhow.runner.v1.CacheHash
-	(*Cache)(nil),                 // 6: dhow.runner.v1.Cache
-	(*Step)(nil),                  // 7: dhow.runner.v1.Step
-	(*Plugin)(nil),                // 8: dhow.runner.v1.Plugin
-	(*Checkout)(nil),              // 9: dhow.runner.v1.Checkout
-	(*SecretRef)(nil),             // 10: dhow.runner.v1.SecretRef
-	(*Resources)(nil),             // 11: dhow.runner.v1.Resources
-	(*Network)(nil),               // 12: dhow.runner.v1.Network
-	(*SealedSecrets)(nil),         // 13: dhow.runner.v1.SealedSecrets
-	(*SecretValue)(nil),           // 14: dhow.runner.v1.SecretValue
-	(*SecretBundle)(nil),          // 15: dhow.runner.v1.SecretBundle
-	(*LeaseGrant)(nil),            // 16: dhow.runner.v1.LeaseGrant
-	(*SignedLeaseGrant)(nil),      // 17: dhow.runner.v1.SignedLeaseGrant
-	nil,                           // 18: dhow.runner.v1.JobSpec.EnvEntry
-	nil,                           // 19: dhow.runner.v1.Step.EnvEntry
-	nil,                           // 20: dhow.runner.v1.Plugin.InputsEntry
-	(Isolation)(0),                // 21: dhow.runner.v1.Isolation
-	(*timestamppb.Timestamp)(nil), // 22: google.protobuf.Timestamp
+	(*RegistryAuth)(nil),          // 3: dhow.runner.v1.RegistryAuth
+	(*ArtifactUpload)(nil),        // 4: dhow.runner.v1.ArtifactUpload
+	(*ArtifactInput)(nil),         // 5: dhow.runner.v1.ArtifactInput
+	(*CacheHash)(nil),             // 6: dhow.runner.v1.CacheHash
+	(*Cache)(nil),                 // 7: dhow.runner.v1.Cache
+	(*Step)(nil),                  // 8: dhow.runner.v1.Step
+	(*Plugin)(nil),                // 9: dhow.runner.v1.Plugin
+	(*Checkout)(nil),              // 10: dhow.runner.v1.Checkout
+	(*SecretRef)(nil),             // 11: dhow.runner.v1.SecretRef
+	(*Resources)(nil),             // 12: dhow.runner.v1.Resources
+	(*Network)(nil),               // 13: dhow.runner.v1.Network
+	(*SealedSecrets)(nil),         // 14: dhow.runner.v1.SealedSecrets
+	(*SecretValue)(nil),           // 15: dhow.runner.v1.SecretValue
+	(*SecretBundle)(nil),          // 16: dhow.runner.v1.SecretBundle
+	(*LeaseGrant)(nil),            // 17: dhow.runner.v1.LeaseGrant
+	(*SignedLeaseGrant)(nil),      // 18: dhow.runner.v1.SignedLeaseGrant
+	nil,                           // 19: dhow.runner.v1.JobSpec.EnvEntry
+	nil,                           // 20: dhow.runner.v1.Step.EnvEntry
+	nil,                           // 21: dhow.runner.v1.Plugin.InputsEntry
+	(Isolation)(0),                // 22: dhow.runner.v1.Isolation
+	(*timestamppb.Timestamp)(nil), // 23: google.protobuf.Timestamp
 }
 var file_dhow_runner_v1_job_proto_depIdxs = []int32{
-	7,  // 0: dhow.runner.v1.JobSpec.steps:type_name -> dhow.runner.v1.Step
-	18, // 1: dhow.runner.v1.JobSpec.env:type_name -> dhow.runner.v1.JobSpec.EnvEntry
-	10, // 2: dhow.runner.v1.JobSpec.secrets:type_name -> dhow.runner.v1.SecretRef
-	11, // 3: dhow.runner.v1.JobSpec.resources:type_name -> dhow.runner.v1.Resources
-	12, // 4: dhow.runner.v1.JobSpec.network:type_name -> dhow.runner.v1.Network
-	21, // 5: dhow.runner.v1.JobSpec.isolation:type_name -> dhow.runner.v1.Isolation
-	9,  // 6: dhow.runner.v1.JobSpec.checkout:type_name -> dhow.runner.v1.Checkout
-	3,  // 7: dhow.runner.v1.JobSpec.artifacts:type_name -> dhow.runner.v1.ArtifactUpload
-	4,  // 8: dhow.runner.v1.JobSpec.inputs:type_name -> dhow.runner.v1.ArtifactInput
-	6,  // 9: dhow.runner.v1.JobSpec.cache:type_name -> dhow.runner.v1.Cache
-	5,  // 10: dhow.runner.v1.Cache.hashes:type_name -> dhow.runner.v1.CacheHash
-	19, // 11: dhow.runner.v1.Step.env:type_name -> dhow.runner.v1.Step.EnvEntry
-	8,  // 12: dhow.runner.v1.Step.plugin:type_name -> dhow.runner.v1.Plugin
-	20, // 13: dhow.runner.v1.Plugin.inputs:type_name -> dhow.runner.v1.Plugin.InputsEntry
-	0,  // 14: dhow.runner.v1.Checkout.transport:type_name -> dhow.runner.v1.CheckoutTransport
-	1,  // 15: dhow.runner.v1.SealedSecrets.kem:type_name -> dhow.runner.v1.HpkeKem
-	14, // 16: dhow.runner.v1.SecretBundle.secrets:type_name -> dhow.runner.v1.SecretValue
-	22, // 17: dhow.runner.v1.LeaseGrant.issued_at:type_name -> google.protobuf.Timestamp
-	2,  // 18: dhow.runner.v1.LeaseGrant.spec:type_name -> dhow.runner.v1.JobSpec
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	8,  // 0: dhow.runner.v1.JobSpec.steps:type_name -> dhow.runner.v1.Step
+	19, // 1: dhow.runner.v1.JobSpec.env:type_name -> dhow.runner.v1.JobSpec.EnvEntry
+	11, // 2: dhow.runner.v1.JobSpec.secrets:type_name -> dhow.runner.v1.SecretRef
+	12, // 3: dhow.runner.v1.JobSpec.resources:type_name -> dhow.runner.v1.Resources
+	13, // 4: dhow.runner.v1.JobSpec.network:type_name -> dhow.runner.v1.Network
+	22, // 5: dhow.runner.v1.JobSpec.isolation:type_name -> dhow.runner.v1.Isolation
+	10, // 6: dhow.runner.v1.JobSpec.checkout:type_name -> dhow.runner.v1.Checkout
+	4,  // 7: dhow.runner.v1.JobSpec.artifacts:type_name -> dhow.runner.v1.ArtifactUpload
+	5,  // 8: dhow.runner.v1.JobSpec.inputs:type_name -> dhow.runner.v1.ArtifactInput
+	7,  // 9: dhow.runner.v1.JobSpec.cache:type_name -> dhow.runner.v1.Cache
+	3,  // 10: dhow.runner.v1.JobSpec.registry_auth:type_name -> dhow.runner.v1.RegistryAuth
+	6,  // 11: dhow.runner.v1.Cache.hashes:type_name -> dhow.runner.v1.CacheHash
+	20, // 12: dhow.runner.v1.Step.env:type_name -> dhow.runner.v1.Step.EnvEntry
+	9,  // 13: dhow.runner.v1.Step.plugin:type_name -> dhow.runner.v1.Plugin
+	21, // 14: dhow.runner.v1.Plugin.inputs:type_name -> dhow.runner.v1.Plugin.InputsEntry
+	0,  // 15: dhow.runner.v1.Checkout.transport:type_name -> dhow.runner.v1.CheckoutTransport
+	1,  // 16: dhow.runner.v1.SealedSecrets.kem:type_name -> dhow.runner.v1.HpkeKem
+	15, // 17: dhow.runner.v1.SecretBundle.secrets:type_name -> dhow.runner.v1.SecretValue
+	23, // 18: dhow.runner.v1.LeaseGrant.issued_at:type_name -> google.protobuf.Timestamp
+	2,  // 19: dhow.runner.v1.LeaseGrant.spec:type_name -> dhow.runner.v1.JobSpec
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_dhow_runner_v1_job_proto_init() }
@@ -1485,7 +1552,7 @@ func file_dhow_runner_v1_job_proto_init() {
 		return
 	}
 	file_dhow_runner_v1_common_proto_init()
-	file_dhow_runner_v1_job_proto_msgTypes[8].OneofWrappers = []any{
+	file_dhow_runner_v1_job_proto_msgTypes[9].OneofWrappers = []any{
 		(*SecretRef_AsEnv)(nil),
 		(*SecretRef_AsFile)(nil),
 	}
@@ -1495,7 +1562,7 @@ func file_dhow_runner_v1_job_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dhow_runner_v1_job_proto_rawDesc), len(file_dhow_runner_v1_job_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

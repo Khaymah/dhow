@@ -19,6 +19,7 @@ type jobAnalysis struct {
 	exprs       *exprChecker
 	ifExpr      string
 	env         map[string]value
+	files       map[string]string
 	timeout     int32
 	labels      []string
 	resources   *runnerv1.Resources
@@ -34,6 +35,7 @@ type stepAnalysis struct {
 	ifExpr  string
 	env     map[string]value
 	with    map[string]value
+	files   map[string]string
 	timeout int32
 }
 
@@ -99,15 +101,15 @@ func (a *analysis) job(ja *jobAnalysis) {
 		ja.ifExpr = ja.exprs.condition(scopeJobIf, job.If, p+".if")
 	}
 	ja.env = a.envMap(ja, job.Env, scopeJobValue, p+".env")
+	ja.files = a.filesMap(ja, job.Files, scopeJobValue, p+".files")
+	if job.IDToken != nil {
+		a.issues.add(CodeIDTokenUnsupported, p+".id_token")
+	}
 	a.runner(job.Runner, p+".runner")
 	ja.labels = a.labels(job)
 	ja.timeout = a.timeout(job.Timeout, p+".timeout")
-	if job.Environment != "" {
-		if environmentPattern.MatchString(job.Environment) {
-			a.issues.warn(CodeEnvironmentsDeferred, p+".environment")
-		} else {
-			a.issues.add(CodeEnvironmentInvalid, p+".environment")
-		}
+	if job.Environment != "" && !environmentPattern.MatchString(job.Environment) {
+		a.issues.add(CodeEnvironmentInvalid, p+".environment")
 	}
 	if job.Network != nil {
 		a.egress(job.Network.Egress, p+".network.egress")
@@ -117,9 +119,7 @@ func (a *analysis) job(ja *jobAnalysis) {
 	a.image(ja)
 	a.artifacts(ja)
 	a.cache(ja)
-	if ja.usesSecrets {
-		a.issues.warn(CodeSecretsUnavailable, p)
-	}
+	a.countFiles(ja, p+".files")
 }
 
 func (a *analysis) labels(job *Job) []string {
@@ -196,6 +196,42 @@ func (a *analysis) envMap(ja *jobAnalysis, env map[string]Scalar, scope exprScop
 		}
 	}
 	return out
+}
+
+func (a *analysis) filesMap(ja *jobAnalysis, files map[string]Scalar, scope exprScope, path string) map[string]string {
+	out := map[string]string{}
+	for _, name := range sortedNames(files) {
+		p := joinPath(path, name)
+		if !jobspec.ValidSecretFile(name) {
+			a.issues.add(CodeSecretFileInvalid, p)
+			continue
+		}
+		v, ok := a.scalarValue(ja, files[name], scope, p, jobspec.MaxEnvValueBytes)
+		if !ok {
+			continue
+		}
+		if v.secret == "" {
+			a.issues.add(CodeSecretFileNotSecret, p)
+			continue
+		}
+		out[name] = v.secret
+	}
+	return out
+}
+
+func (a *analysis) countFiles(ja *jobAnalysis, path string) {
+	names := map[string]bool{}
+	for n := range ja.files {
+		names[n] = true
+	}
+	for _, sa := range ja.steps {
+		for n := range sa.files {
+			names[n] = true
+		}
+	}
+	if len(names) > jobspec.MaxSecretFiles {
+		a.issues.add(CodeTooManySecretFiles, path)
+	}
 }
 
 func (a *analysis) scalarValue(ja *jobAnalysis, s Scalar, scope exprScope, path string, limit int) (value, bool) {

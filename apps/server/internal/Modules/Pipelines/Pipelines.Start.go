@@ -126,7 +126,11 @@ func (s *Service) prepare(ctx context.Context, run sqlc.PipelineRun, project sql
 	}
 	p.compiled = c
 	run.Inputs = encodeInputs(inputs)
-	groupCtx, err := evalContext(run, project.Name, nil)
+	vars, err := s.variablesOf(ctx, nil, run)
+	if err != nil {
+		return nil, err
+	}
+	groupCtx, err := evalContext(run, project.Name, nil, vars)
 	if err != nil {
 		return nil, err
 	}

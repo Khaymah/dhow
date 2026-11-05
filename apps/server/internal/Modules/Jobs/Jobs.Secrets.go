@@ -17,16 +17,28 @@ type SecretRequest struct {
 	AttemptID      uuid.UUID
 	Names          []string
 	Checkout       *runnerv1.Checkout
+	Registries     map[string]string
+}
+
+const (
+	OriginManual   = "manual"
+	OriginPipeline = "pipeline"
+)
+
+type Origin struct {
+	OrganizationID uuid.UUID
+	Kind           string
+	ID             uuid.UUID
 }
 
 type SecretResolver interface {
-	Accepts(ctx context.Context, organizationID uuid.UUID, names []string) error
+	Accepts(ctx context.Context, origin Origin, names []string) error
 	Resolve(ctx context.Context, req SecretRequest) (map[string][]byte, error)
 }
 
 type NoSecrets struct{}
 
-func (NoSecrets) Accepts(context.Context, uuid.UUID, []string) error { return ErrSecretsUnavailable }
+func (NoSecrets) Accepts(context.Context, Origin, []string) error { return ErrSecretsUnavailable }
 
 func (NoSecrets) Resolve(context.Context, SecretRequest) (map[string][]byte, error) {
 	return nil, ErrSecretsUnavailable

@@ -12,6 +12,8 @@ const (
 
 	ForkPolicyApproval  = "approval"
 	ForkPolicyAutomatic = "automatic"
+	ForkCacheNone       = "none"
+	ForkCacheDefault    = "default_branch"
 
 	DefaultPipelinePath = ".dhow.yml"
 )
@@ -23,6 +25,7 @@ type Project struct {
 	Name           string
 	PipelinePath   string
 	ForkPolicy     string
+	ForkCache      string
 	State          string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -40,6 +43,7 @@ type UpdateInput struct {
 	Name         *string
 	PipelinePath *string
 	ForkPolicy   *string
+	ForkCache    *string
 }
 
 type Page struct {

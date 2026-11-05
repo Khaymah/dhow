@@ -63,8 +63,10 @@ const (
 const (
 	CodeProjectArchived      = "PROJECT_ARCHIVED"
 	CodeForkPolicyNotAllowed = "FORK_POLICY_NOT_ALLOWED"
+	CodeForkCacheNotAllowed  = "FORK_CACHE_NOT_ALLOWED"
 	KeyProjectArchived       = "errors.projectArchived"
 	KeyForkPolicyNotAllowed  = "errors.forkPolicyNotAllowed"
+	KeyForkCacheNotAllowed   = "errors.forkCacheNotAllowed"
 )
 
 const (

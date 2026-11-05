@@ -87,6 +87,7 @@ export const AuditAr = {
   'audit.action.registry_credential.created': 'إضافة حساب سجل صور',
   'audit.action.registry_credential.updated': 'تغيير حساب سجل صور',
   'audit.action.registry_credential.removed': 'حذف حساب سجل صور',
+  'audit.action.job.secrets_delivered': 'إرسال الأسرار إلى جهاز التشغيل',
   'audit.group.auth': 'حدث في الدخول والأمان',
   'audit.group.identity': 'حدث في المؤسسة',
   'audit.group.runner': 'حدث في أجهزة التشغيل',

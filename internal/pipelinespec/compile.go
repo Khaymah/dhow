@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -58,6 +59,7 @@ type StepPlan struct {
 	ID      string
 	If      string
 	Secrets map[string]string
+	Files   map[string]string
 	Plugin  *PluginPlan
 }
 
@@ -168,7 +170,7 @@ func (a *analysis) jobSpec(ja *jobAnalysis, rj *RunJob) *runnerv1.JobSpec {
 		for _, name := range sortedNames(sa.env) {
 			place(spec, rj, sa.env[name], name, prefix+"Env."+name, step.Env, []int32{int32(i)})
 		}
-		plan := StepPlan{ID: s.ID, If: sa.ifExpr, Secrets: map[string]string{}}
+		plan := StepPlan{ID: s.ID, If: sa.ifExpr, Secrets: map[string]string{}, Files: stepFiles(ja.files, sa)}
 		for name, v := range sa.env {
 			if v.secret != "" {
 				plan.Secrets[name] = v.secret
@@ -181,7 +183,47 @@ func (a *analysis) jobSpec(ja *jobAnalysis, rj *RunJob) *runnerv1.JobSpec {
 		spec.Steps = append(spec.Steps, step)
 		rj.Steps = append(rj.Steps, plan)
 	}
+	placeFiles(spec, rj.Steps)
 	return spec
+}
+
+func stepFiles(job map[string]string, sa stepAnalysis) map[string]string {
+	out := map[string]string{}
+	if sa.step.Uses == "" {
+		for name, secret := range job {
+			out[name] = secret
+		}
+	}
+	for name, secret := range sa.files {
+		out[name] = secret
+	}
+	return out
+}
+
+func placeFiles(spec *runnerv1.JobSpec, steps []StepPlan) {
+	type target struct{ name, secret string }
+	byTarget := map[target][]int32{}
+	for i, sp := range steps {
+		for name, secret := range sp.Files {
+			t := target{name, secret}
+			byTarget[t] = append(byTarget[t], int32(i))
+		}
+	}
+	keys := make([]target, 0, len(byTarget))
+	for t := range byTarget {
+		keys = append(keys, t)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].name != keys[j].name {
+			return keys[i].name < keys[j].name
+		}
+		return keys[i].secret < keys[j].secret
+	})
+	for _, t := range keys {
+		spec.Secrets = append(spec.Secrets, &runnerv1.SecretRef{
+			Name: t.secret, Target: &runnerv1.SecretRef_AsFile{AsFile: t.name}, StepIndexes: byTarget[t],
+		})
+	}
 }
 
 func place(spec *runnerv1.JobSpec, rj *RunJob, v value, name, ref string, env map[string]string, steps []int32) {

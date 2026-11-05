@@ -419,7 +419,7 @@ func (q *Queries) GetRun(ctx context.Context, arg GetRunParams) (PipelineRun, er
 }
 
 const getRunJob = `-- name: GetRunJob :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt", "FailureDetail"
 FROM "RunJobs"
 WHERE "Id" = $1 AND "OrganizationId" = $2
 `
@@ -454,6 +454,7 @@ func (q *Queries) GetRunJob(ctx context.Context, arg GetRunJobParams) (RunJob, e
 		&i.Outputs,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.FailureDetail,
 	)
 	return i, err
 }
@@ -628,7 +629,7 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (PipelineR
 const insertRunJob = `-- name: InsertRunJob :one
 INSERT INTO "RunJobs" ("OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, $10)
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt", "FailureDetail"
 `
 
 type InsertRunJobParams struct {
@@ -680,6 +681,7 @@ func (q *Queries) InsertRunJob(ctx context.Context, arg InsertRunJobParams) (Run
 		&i.Outputs,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.FailureDetail,
 	)
 	return i, err
 }
@@ -867,7 +869,7 @@ func (q *Queries) ListRunCancellations(ctx context.Context, batch int32) ([]List
 }
 
 const listRunJobs = `-- name: ListRunJobs :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest", "State", "FailureReason", "CurrentJobId", "Attempts", "Outputs", "StartedAt", "FinishedAt", "FailureDetail"
 FROM "RunJobs"
 WHERE "RunId" = $1 AND NOT "IsDeleted"
 ORDER BY "Position"
@@ -904,6 +906,7 @@ func (q *Queries) ListRunJobs(ctx context.Context, runID uuid.UUID) ([]RunJob, e
 			&i.Outputs,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.FailureDetail,
 		); err != nil {
 			return nil, err
 		}
@@ -1291,6 +1294,42 @@ func (q *Queries) RunCreatorIsMember(ctx context.Context, arg RunCreatorIsMember
 	return column_1, err
 }
 
+const secretScopeOfJob = `-- name: SecretScopeOfJob :one
+SELECT r."ProjectId", r."Id" AS "RunId", rj."Id" AS "RunJobId", r."IsFork", (r."Trigger" = 'pull_request')::boolean AS "PullRequest"
+FROM "Jobs" j
+JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId"
+    AND rj."CurrentJobId" = j."Id" AND rj."State" = 'active' AND NOT rj."IsDeleted"
+JOIN "PipelineRuns" r ON r."Id" = rj."RunId" AND r."OrganizationId" = rj."OrganizationId"
+    AND r."State" IN ('pending', 'running') AND NOT r."IsDeleted"
+WHERE j."Id" = $1 AND j."OrganizationId" = $2 AND j."OriginKind" = 'pipeline' AND NOT j."IsDeleted"
+`
+
+type SecretScopeOfJobParams struct {
+	JobID          uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+type SecretScopeOfJobRow struct {
+	ProjectId   uuid.UUID
+	RunId       uuid.UUID
+	RunJobId    uuid.UUID
+	IsFork      bool
+	PullRequest bool
+}
+
+func (q *Queries) SecretScopeOfJob(ctx context.Context, arg SecretScopeOfJobParams) (SecretScopeOfJobRow, error) {
+	row := q.db.QueryRow(ctx, secretScopeOfJob, arg.JobID, arg.OrganizationID)
+	var i SecretScopeOfJobRow
+	err := row.Scan(
+		&i.ProjectId,
+		&i.RunId,
+		&i.RunJobId,
+		&i.IsFork,
+		&i.PullRequest,
+	)
+	return i, err
+}
+
 const setRunDefinition = `-- name: SetRunDefinition :exec
 UPDATE "PipelineRuns"
 SET "DefinitionSource" = $1, "DefinitionDigest" = $2, "ImagePins" = $3,
@@ -1337,6 +1376,22 @@ type SetRunIssuesParams struct {
 
 func (q *Queries) SetRunIssues(ctx context.Context, arg SetRunIssuesParams) error {
 	_, err := q.db.Exec(ctx, setRunIssues, arg.Issues, arg.ID)
+	return err
+}
+
+const setRunJobFailureDetail = `-- name: SetRunJobFailureDetail :exec
+UPDATE "RunJobs" SET "FailureDetail" = $1::jsonb, "UpdatedAt" = now()
+WHERE "Id" = $2 AND "OrganizationId" = $3
+`
+
+type SetRunJobFailureDetailParams struct {
+	FailureDetail  []byte
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) SetRunJobFailureDetail(ctx context.Context, arg SetRunJobFailureDetailParams) error {
+	_, err := q.db.Exec(ctx, setRunJobFailureDetail, arg.FailureDetail, arg.ID, arg.OrganizationID)
 	return err
 }
 

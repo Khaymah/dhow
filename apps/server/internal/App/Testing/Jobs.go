@@ -28,7 +28,7 @@ func NewFakeSecrets(values map[string]string) *FakeSecrets {
 	return &FakeSecrets{values: values}
 }
 
-func (f *FakeSecrets) Accepts(_ context.Context, _ uuid.UUID, names []string) error {
+func (f *FakeSecrets) Accepts(_ context.Context, _ jobs.Origin, names []string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, n := range names {

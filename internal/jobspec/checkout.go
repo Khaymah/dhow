@@ -43,6 +43,9 @@ func Features(spec *runnerv1.JobSpec) []string {
 	if spec.GetCache() != nil {
 		out = append(out, FeatureCache)
 	}
+	if len(spec.GetRegistryAuth()) > 0 {
+		out = append(out, FeatureRegistryAuth)
+	}
 	return out
 }
 

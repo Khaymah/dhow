@@ -41,10 +41,22 @@ func (a *attempt) execute(ctx context.Context) result {
 	if r, ok := a.openWorkspace(ctx); !ok {
 		return r
 	}
-	if r, ok := a.prepare(ctx, 0, segs[0]); !ok {
-		return r
+	if a.needsLogin(segs[0].image) {
+		if r, ok := a.startAttempt(ctx); !ok {
+			return r
+		}
+		if r, ok := a.prepare(ctx, 0, segs[0]); !ok {
+			return r
+		}
+	} else {
+		if r, ok := a.prepare(ctx, 0, segs[0]); !ok {
+			return r
+		}
+		if r, ok := a.startAttempt(ctx); !ok {
+			return r
+		}
 	}
-	if r, ok := a.start(ctx); !ok {
+	if r, ok := a.startBox(ctx); !ok {
 		return r
 	}
 	return a.runSegments(ctx, segs)
@@ -76,12 +88,18 @@ func (a *attempt) prepare(ctx context.Context, seq int, seg segment) (result, bo
 	ch := make(chan prepared, 1)
 	go func() {
 		r := spec.GetResources()
+		authFile, authErr := a.writeAuthFile(seq, seg.image)
+		if authErr != nil {
+			ch <- prepared{err: fmt.Errorf("%w: %w", sandbox.ErrImagePull, authErr)}
+			return
+		}
 		box, err := a.e.o.Driver.Prepare(pctx, sandbox.PrepareSpec{
 			RunnerID: a.e.o.Identity.RunnerID, AttemptID: a.grant.GetAttemptId(), Seq: seq, Kind: seg.kind, Image: seg.image,
 			Isolation: spec.GetIsolation(),
 			Resources: sandbox.Resources{CPUMillis: r.GetCpuMillis(), MemoryBytes: r.GetMemoryBytes(), Pids: r.GetPids(), DiskBytes: r.GetDiskBytes()},
-			Dir:       a.dir, DiskMode: a.e.o.Config.DiskMode, Egress: seg.egress, Workspace: ws,
+			Dir:       a.dir, DiskMode: a.e.o.Config.DiskMode, Egress: seg.egress, Workspace: ws, AuthFile: authFile,
 		})
+		removeAuthFile(authFile)
 		ch <- prepared{box: box, err: err}
 	}()
 	var why result
@@ -123,7 +141,7 @@ func (a *attempt) prepared(ctx, pctx context.Context, p prepared, allow []string
 	return result{}, true
 }
 
-func (a *attempt) start(ctx context.Context) (result, bool) {
+func (a *attempt) startAttempt(ctx context.Context) (result, bool) {
 	spec := a.grant.GetSpec()
 	proof := a.e.o.Identity.Sign(runnersig.StartMessage(a.ref.GetLeaseId(), a.ref.GetFencingToken(), runnersig.GrantDigest(a.grantBytes)))
 	var res *runnerv1.StartResponse
@@ -171,6 +189,10 @@ func (a *attempt) start(ctx context.Context) (result, bool) {
 		a.pipe.Systemf(nil, "dhow: SANDBOX_FAILED: the job secrets could not be opened")
 		return failed(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, 0), false
 	}
+	return result{}, true
+}
+
+func (a *attempt) startBox(ctx context.Context) (result, bool) {
 	if a.fenced() {
 		return a.lostResult(), false
 	}
@@ -198,7 +220,7 @@ func (a *attempt) currentBox() sandbox.Sandbox {
 
 func (a *attempt) openSecrets(sealed *runnerv1.SealedSecrets) error {
 	refs := a.grant.GetSpec().GetSecrets()
-	if len(refs) == 0 {
+	if len(refs) == 0 && len(a.grant.GetSpec().GetRegistryAuth()) == 0 {
 		return nil
 	}
 	if sealed == nil {
@@ -237,11 +259,15 @@ func (a *attempt) openSecrets(sealed *runnerv1.SealedSecrets) error {
 		}
 		batch = append(batch, v)
 	}
+	a.scan.AddAll(batch)
 	for i, added := range a.masker.AddAll(batch) {
 		if !added {
 			a.pipe.Systemf(nil, "dhow: warning: the secret %s is shorter than %d characters, so the log does not hide it",
 				refs[i].GetName(), masking.MinLength)
 		}
+	}
+	if err := a.openRegistries(values); err != nil {
+		return err
 	}
 	a.secrets = values
 	return nil

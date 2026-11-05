@@ -86,7 +86,7 @@ func (s *Service) Create(ctx context.Context, org uuid.UUID, in models.CreateInp
 		return models.Detail{}, specViolations(err)
 	}
 	if names := jobspec.SecretNames(spec); len(names) > 0 {
-		if err := s.secrets.Accepts(ctx, org, names); err != nil {
+		if err := s.secrets.Accepts(ctx, Origin{OrganizationID: org, Kind: OriginManual}, names); err != nil {
 			if errors.Is(err, ErrSecretsUnavailable) {
 				return models.Detail{}, apperrors.SecretsUnavailable()
 			}

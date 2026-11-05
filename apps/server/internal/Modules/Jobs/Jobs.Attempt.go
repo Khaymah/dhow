@@ -151,8 +151,13 @@ func (s *Service) resolveSecrets(ctx context.Context, l sqlc.LockActiveLeaseRow,
 	if len(names) == 0 {
 		return nil, nil
 	}
+	registries := map[string]string{}
+	for _, r := range spec.GetRegistryAuth() {
+		registries[r.GetSecretName()] = r.GetHost()
+	}
 	values, err := s.secrets.Resolve(ctx, SecretRequest{
 		OrganizationID: l.OrganizationId, JobID: l.JobId, AttemptID: l.AttemptId, Names: names, Checkout: spec.GetCheckout(),
+		Registries: registries,
 	})
 	if err == nil {
 		for _, n := range names {

@@ -224,3 +224,7 @@ func ProjectArchived() *AppError {
 func ForkPolicyNotAllowed() *AppError {
 	return New(http.StatusForbidden, CodeForkPolicyNotAllowed, KeyForkPolicyNotAllowed)
 }
+
+func ForkCacheNotAllowed() *AppError {
+	return New(http.StatusForbidden, CodeForkCacheNotAllowed, KeyForkCacheNotAllowed)
+}

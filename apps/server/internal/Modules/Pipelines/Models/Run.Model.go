@@ -52,6 +52,9 @@ const (
 	ReasonEnvironments          = "ENVIRONMENTS_UNAVAILABLE"
 	ReasonForkEnvironment       = "FORK_PR_NO_ENVIRONMENT"
 	ReasonForkSecrets           = "FORK_PR_NO_SECRETS" //nolint:gosec // A failure reason, not a credential.
+	ReasonSecretNotFound        = "SECRET_NOT_FOUND"   //nolint:gosec // A failure reason, not a credential.
+	ReasonSecretNotForPRs       = "SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS"
+	ReasonSecretsTooLarge       = "SECRETS_TOO_LARGE" //nolint:gosec // A failure reason, not a credential.
 	ReasonSecretsUnavailable    = "SECRETS_UNAVAILABLE"
 	ReasonJobSpecInvalid        = "JOB_SPEC_INVALID"
 	ReasonCreatorNotMember      = "CREATOR_NOT_MEMBER"
@@ -149,6 +152,7 @@ type RunJob struct {
 	Needs         []string
 	State         string
 	FailureReason string
+	FailureNames  []string
 	CurrentJobID  *uuid.UUID
 	Attempts      int
 	StartedAt     *time.Time

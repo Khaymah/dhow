@@ -36,7 +36,7 @@ func TestValidPipelinesPass(t *testing.T) {
 func TestWarnings(t *testing.T) {
 	_, issues := Check([]byte(pipeline("  a:\n    image: alpine:3\n    environment: prod\n    env: {T: '${{ secrets.T }}'}\n    steps: [{run: make}]\n")))
 	assert.Empty(t, issueCodes(issues, SeverityError), "%v", issues)
-	assert.ElementsMatch(t, []string{CodeImageNotPinned, CodeEnvironmentsDeferred, CodeSecretsUnavailable}, issueCodes(issues, SeverityWarning))
+	assert.ElementsMatch(t, []string{CodeImageNotPinned}, issueCodes(issues, SeverityWarning))
 }
 
 func TestIssuesCarryPathAndPosition(t *testing.T) {
