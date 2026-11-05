@@ -109,7 +109,7 @@ func TestEveryMountedRunnerProcedureDeclaresAPolicy(t *testing.T) {
 	for p := range declared {
 		assert.True(t, mounted[p], "%s has a policy but is not mounted", p)
 	}
-	assert.Len(t, mounted, 17, "RegistrationService, AuthService, LeaseService, LogService, ArtifactService, CacheService and the blob routes are mounted")
+	assert.Len(t, mounted, 18, "RegistrationService, AuthService, LeaseService, LogService, ArtifactService, CacheService, ReleaseService and the blob routes are mounted")
 }
 
 func TestTheBlobRoutesRefuseOtherMethods(t *testing.T) {
