@@ -15,19 +15,17 @@ const (
 	maxHistoryLines = 500
 )
 
-func (d *run) cutOver(ctx context.Context) *Failure {
+func (d *run) switchOver(batch int) *Failure {
 	if !d.resumed {
 		d.writeState("switching", d.cfg.ReleaseID, d.previous)
 		if err := d.switchTo(d.cfg.ReleaseID); err != nil {
-			d.cleanStage()
-			return d.abort(fail(ExitFailed, CauseSwitch, "cannot switch to the new release", err))
+			return fail(ExitFailed, CauseSwitch, "cannot switch to the new release", err)
 		}
 	}
-	d.e.Report.Emit(Event{Event: EventSwitched, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID, PreviousReleaseID: d.known, Batch: 1})
-	if f := d.afterSwitch(ctx); f != nil {
-		return d.recover(ctx, f)
-	}
-	return d.finish(ctx)
+	d.switched = true
+	d.batch = batch
+	d.e.Report.Emit(Event{Event: EventSwitched, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID, PreviousReleaseID: d.known, Batch: batch})
+	return nil
 }
 
 func (d *run) switchTo(id string) error {
@@ -47,21 +45,27 @@ func (d *run) switchTo(id string) error {
 	return nil
 }
 
-func (d *run) afterSwitch(ctx context.Context) *Failure {
+func (d *run) activate(ctx context.Context) *Failure {
 	if d.cfg.ReloadCommand != "" {
 		if f := d.hook(ctx, "reload", d.cfg.ReloadCommand, d.releaseDir, d.cfg.ReleaseID, d.previous); f != nil {
 			return f
 		}
 	}
 	if d.cfg.PostSwitch != "" {
-		if f := d.hook(ctx, "post-switch", d.cfg.PostSwitch, d.releaseDir, d.cfg.ReleaseID, d.previous); f != nil {
-			return f
-		}
+		return d.hook(ctx, "post-switch", d.cfg.PostSwitch, d.releaseDir, d.cfg.ReleaseID, d.previous)
 	}
+	return nil
+}
+
+func (d *run) checkHealth(ctx context.Context) *Failure {
 	if !d.cfg.Health.Enabled() {
 		return nil
 	}
 	res, err := CheckHealth(ctx, d.e.Doer, d.cfg.HostName, d.cfg.Health, d.e.Clock)
+	return d.healthVerdict(ctx, res, err)
+}
+
+func (d *run) healthVerdict(ctx context.Context, res HealthResult, err error) *Failure {
 	if err != nil && ctx.Err() != nil {
 		return fail(ExitFailed, CauseCanceled, "the deployment was canceled", err)
 	}
@@ -75,49 +79,24 @@ func (d *run) afterSwitch(ctx context.Context) *Failure {
 	return nil
 }
 
-func (d *run) finish(ctx context.Context) *Failure {
-	id := d.cfg.ReleaseID
-	if err := WriteFile(d.r, d.dhow+"/"+verifiedName, []byte(id+"\n"), 0o644); err != nil {
-		return d.recover(ctx, fail(ExitFailed, CauseOther, "cannot record the verified release", err))
+func (d *run) markVerified() error {
+	if err := WriteFile(d.r, d.dhow+"/"+verifiedName, []byte(d.cfg.ReleaseID+"\n"), 0o644); err != nil {
+		return err
 	}
-	d.appendHistory(id)
-	d.writeState("idle", id, d.previous)
-	d.e.Report.Emit(Event{Event: EventVerified, HostID: d.cfg.HostID, ReleaseID: id})
-	d.e.Report.Emit(Event{Event: EventVerified, ReleaseID: id})
-	removed := d.prune()
-	d.e.Report.Emit(Event{Event: EventPruned, HostID: d.cfg.HostID, ReleaseID: id, Message: fmt.Sprintf("%d old releases removed", removed)})
+	d.marked = true
 	return nil
 }
 
-func (d *run) recover(ctx context.Context, cause *Failure) *Failure {
-	d.e.Log.Warn("the new release failed after the switch", "reason", cause.Reason, "error", cause.Error())
-	if d.previous == "" {
-		return d.keepWithoutPrevious(cause)
-	}
-	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), RollbackBudget)
-	defer cancel()
-	if err := d.rollBack(rctx); err != nil {
-		d.e.Report.Emit(Event{Event: EventRollbackFailed, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID, Reason: cause.Reason, Message: "the rollback failed"})
-		d.e.Report.Emit(Event{Event: EventRollbackFailed, ReleaseID: d.cfg.ReleaseID, Reason: cause.Reason, Message: "the rollback failed"})
-		return fail(ExitRollbackFailed, cause.Reason, "the rollback failed", errors.Join(cause, err))
-	}
-	d.e.Report.Emit(Event{Event: EventRolledBack, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID, PreviousReleaseID: d.known, Reason: cause.Reason, Message: "rolled back to the previous release"})
-	d.e.Report.Emit(Event{Event: EventRolledBack, ReleaseID: d.cfg.ReleaseID, PreviousReleaseID: d.known, Reason: cause.Reason, Message: "rolled back to the previous release"})
-	return fail(ExitRolledBack, cause.Reason, "rolled back to the previous release", cause)
+func (d *run) completeRelease() {
+	id := d.cfg.ReleaseID
+	d.appendHistory(id)
+	d.writeState("idle", id, d.previous)
+	d.e.Report.Emit(Event{Event: EventVerified, HostID: d.cfg.HostID, ReleaseID: id})
 }
 
-func (d *run) keepWithoutPrevious(cause *Failure) *Failure {
-	text := "the first release failed and there is no earlier release to go back to, so current is left as it is"
-	if d.cfg.FirstFailure == FirstFailureFail {
-		text = "the first release failed and there is no earlier release to go back to"
-	}
-	d.e.Report.Emit(Event{Event: EventFailed, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID, Reason: cause.Reason, Message: text})
-	d.e.Report.Emit(Event{Event: EventFailed, ReleaseID: d.cfg.ReleaseID, Reason: cause.Reason, Message: text})
-	exit := ExitFailed
-	if cause.Reason == CauseHealth {
-		exit = ExitHealthFailed
-	}
-	return fail(exit, cause.Reason, text, cause)
+func (d *run) pruneOld() {
+	removed := d.prune()
+	d.e.Report.Emit(Event{Event: EventPruned, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID, Message: fmt.Sprintf("%d old releases removed", removed)})
 }
 
 func (d *run) rollBack(ctx context.Context) error {
@@ -132,6 +111,12 @@ func (d *run) rollBack(ctx context.Context) error {
 		if f := d.hook(ctx, "reload", d.cfg.ReloadCommand, d.releases+"/"+d.previous, d.previous, d.cfg.ReleaseID); f != nil {
 			return f
 		}
+	}
+	if d.marked {
+		if err := WriteFile(d.r, d.dhow+"/"+verifiedName, []byte(d.previous+"\n"), 0o644); err != nil {
+			return err
+		}
+		d.marked = false
 	}
 	d.writeState("idle", d.previous, d.cfg.ReleaseID)
 	return nil

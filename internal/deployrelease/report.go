@@ -19,6 +19,8 @@ const (
 	EventRollbackFailed = "rollback_failed"
 	EventPruned         = "pruned"
 	EventFailed         = "failed"
+	EventSkipped        = "skipped"
+	EventBatchPassed    = "batch_passed"
 
 	ModeDeploy = "deploy"
 
