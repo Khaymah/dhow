@@ -54,7 +54,7 @@ func lex(line string) ([]string, error) {
 func TestQuotedArgumentsComeBackExactlyAsOneWordEach(t *testing.T) {
 	for _, argv := range [][]string{
 		{"ls", "-la", "/srv/app"},
-		{"echo", "it's", "a \"test\"", "$(id)", "`id`", "a;b", "a|b", "a&&b", "*", "~root", "", " ", "\n", "-n"},
+		{"echo", "it's", "a \"test\"", "$(id)", "`id`", "a;b", "a|b", "a&&b", "*", "~root", "", " ", "\n", "-n", "=rm", "a=b", "~"},
 		{"env", "A=b c", "sh", "-c", `cd "$X" && eval "$1"`, "h", "rm -rf / ; echo 'x'"},
 	} {
 		line, err := deployrelease.Command(argv...)
@@ -67,7 +67,7 @@ func TestQuotedArgumentsComeBackExactlyAsOneWordEach(t *testing.T) {
 
 func TestACommandNeedsASafeProgramAndNoNulBytes(t *testing.T) {
 	for _, argv := range [][]string{
-		nil, {""}, {"-rf"}, {"rm -rf"}, {"a;b"}, {"$(id)"}, {"ls", "a\x00b"}, {"ls", strings.Repeat("a", 5000)},
+		nil, {""}, {"-rf"}, {"=ls"}, {"rm -rf"}, {"a;b"}, {"$(id)"}, {"ls", "a\x00b"}, {"ls", strings.Repeat("a", 5000)},
 	} {
 		_, err := deployrelease.Command(argv...)
 		assert.ErrorIs(t, err, deployrelease.ErrCommand, "%q", argv)

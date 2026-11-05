@@ -18,14 +18,14 @@ var (
 )
 
 func Quote(arg string) string {
-	if bareArg.MatchString(arg) && !strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "~") {
+	if bareArg.MatchString(arg) && !strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "~") && !strings.HasPrefix(arg, "=") {
 		return arg
 	}
 	return "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
 }
 
 func Command(argv ...string) (string, error) {
-	if len(argv) == 0 || argv[0] == "" || !bareArg.MatchString(argv[0]) || strings.HasPrefix(argv[0], "-") {
+	if len(argv) == 0 || argv[0] == "" || !bareArg.MatchString(argv[0]) || strings.HasPrefix(argv[0], "-") || strings.HasPrefix(argv[0], "=") {
 		return "", ErrCommand
 	}
 	parts := make([]string, len(argv))

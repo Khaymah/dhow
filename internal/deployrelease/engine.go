@@ -41,6 +41,7 @@ type run struct {
 	previous   string
 	known      string
 	resumed    bool
+	hasFiles   bool
 	started    bool
 	locked     bool
 	totals     scan

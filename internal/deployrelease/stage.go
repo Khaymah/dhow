@@ -76,11 +76,22 @@ func (d *run) upload(ctx context.Context) *Failure {
 	}
 	defer func() { _ = f.Close() }()
 	u := &uploader{d: d, ctx: ctx, made: map[string]bool{}}
-	if _, err := archive.Walk(f, d.cfg.Limits, u.visit); err != nil {
+	hash := sha256.New()
+	if _, err := archive.Walk(io.TeeReader(f, hash), d.cfg.Limits, u.visit); err != nil {
 		if ctx.Err() != nil {
 			return fail(ExitFailed, CauseCanceled, "the deployment was canceled", ctx.Err())
 		}
 		return archiveFailure(err)
+	}
+	if _, err := io.Copy(hash, f); err != nil {
+		return fail(ExitInput, CauseOther, "the artifact cannot be read", err)
+	}
+	if d.cfg.ArchiveDigest != "" && hex.EncodeToString(hash.Sum(nil)) != d.cfg.ArchiveDigest {
+		return fail(ExitUnsafeArtifact, CauseOther, "the artifact changed while it was uploaded", ErrDigest)
+	}
+	d.hasFiles = len(u.manifest) > 0
+	if !d.hasFiles {
+		return nil
 	}
 	return u.writeManifest()
 }
@@ -141,6 +152,9 @@ func (u *uploader) writeManifest() *Failure {
 }
 
 func (d *run) verifyUpload(ctx context.Context) *Failure {
+	if !d.hasFiles {
+		return nil
+	}
 	defer func() { _ = d.r.Remove(d.manifest) }()
 	res, err := d.r.Exec(ctx, []string{"sha256sum", "-c", "--", d.manifest})
 	switch {

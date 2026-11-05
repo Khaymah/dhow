@@ -1,9 +1,15 @@
 package deployrelease_test
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -362,4 +368,67 @@ func TestAnInvalidConfigurationIsRefusedBeforeAnyWork(t *testing.T) {
 		})
 	}
 	assert.NoDirExists(t, r.path("/srv/app/releases"))
+}
+
+type swapRemote struct {
+	*localRemote
+	onIncoming func()
+}
+
+func (s swapRemote) Mkdir(name string, mode fs.FileMode) error {
+	if strings.Contains(name, ".incoming-") && s.onIncoming != nil {
+		s.onIncoming()
+	}
+	return s.localRemote.Mkdir(name, mode)
+}
+
+func TestAnArchiveSwappedAfterTheScanIsRefusedBeforeItGoesLive(t *testing.T) {
+	r := newLocalRemote(t)
+	good, digest := makeArchive(t, map[string]string{"index.html": "good"})
+	other, _ := makeArchive(t, map[string]string{"index.html": "evil"})
+	rec := &recorder{}
+	e := &deployrelease.Engine{
+		Config: baseConfig(good, digest, "1-aaaaaaaa-1"), Doer: &probe{status: healthy}, Report: rec, Clock: fastClock(),
+		Connect: func(context.Context) (deployrelease.Remote, error) {
+			return swapRemote{localRemote: r, onIncoming: func() {
+				raw, err := os.ReadFile(other)
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(good, raw, 0o644))
+			}}, nil
+		},
+	}
+	f := e.Run(context.Background())
+	require.NotNil(t, f)
+	assert.Equal(t, deployrelease.ExitUnsafeArtifact, f.Exit)
+	assert.ErrorIs(t, f, deployrelease.ErrDigest)
+	assert.Empty(t, r.currentTarget())
+	assert.NoDirExists(t, r.path("/srv/app/releases/1-aaaaaaaa-1"))
+	assert.Empty(t, r.releaseNames(), "the upload directory is cleaned")
+}
+
+func TestAnArchiveWithoutFilesDeploysWithoutAChecksumList(t *testing.T) {
+	r := newLocalRemote(t)
+	path := filepath.Join(t.TempDir(), "empty.tgz")
+	f, err := os.Create(path)
+	require.NoError(t, err)
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+	require.NoError(t, tw.WriteHeader(&tar.Header{Name: "assets/", Typeflag: tar.TypeDir, Mode: 0o755}))
+	require.NoError(t, tw.Close())
+	require.NoError(t, gz.Close())
+	require.NoError(t, f.Close())
+	out := deploy(t, r, baseConfig(path, digestFile(t, path), "1-aaaaaaaa-1"), &probe{status: healthy})
+	require.Nil(t, out.failure)
+	assert.Equal(t, "releases/1-aaaaaaaa-1", r.currentTarget())
+	for _, argv := range r.execs {
+		assert.NotEqual(t, "sha256sum", argv[0])
+	}
+}
+
+func digestFile(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
 }
