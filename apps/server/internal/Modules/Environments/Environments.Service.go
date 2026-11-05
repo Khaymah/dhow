@@ -53,6 +53,7 @@ type Service struct {
 	bus     Publisher
 	log     *slog.Logger
 	now     func() time.Time
+	reopen  func(ctx context.Context, run uuid.UUID) error
 }
 
 func NewService(o Options) *Service {

@@ -97,3 +97,13 @@ WHERE a."OrganizationId" = @organization_id AND a."State" = 'pending' AND a."Exp
   AND e."ProjectId" = ANY(@project_ids::uuid[])
 ORDER BY a."CreatedAt", a."Id"
 LIMIT @page_limit;
+
+-- name: EnvironmentAllowsSelfApproval :one
+SELECT "AllowSelfApproval"
+FROM "Environments"
+WHERE "Id" = @id AND "OrganizationId" = @organization_id;
+
+-- name: OrganizationProjectIDs :many
+SELECT "Id"
+FROM "Projects"
+WHERE "OrganizationId" = @organization_id AND NOT "IsDeleted";

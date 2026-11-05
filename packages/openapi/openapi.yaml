@@ -2591,6 +2591,155 @@ paths:
                 $ref: "#/components/schemas/DeploymentListResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs/{runId}/approvals:
+    get:
+      operationId: listRunApprovals
+      tags: [environments]
+      summary: List the approval requests of a run
+      description: >-
+        Needs `run.read` on the project. One request per environment and round of the run, oldest first, with its
+        decision. A comment or bypass reason is shown as written.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: The approval requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeploymentApprovalListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/approve:
+    post:
+      operationId: approveDeployment
+      tags: [environments]
+      summary: Approve a deploy
+      description: >-
+        Needs `deployment.approve` on the project, a reviewer of the environment with the Developer role or above, and a
+        second factor in `CurrentFactor` (an app code, a recovery code or a passkey; a password answers 403
+        `REVIEWER_NEEDS_SECOND_FACTOR`). Unless the environment allows self-approval, the user who started the run, or
+        whose linked GitHub or GitLab login pushed it, answers 403 `SELF_REVIEW_NOT_ALLOWED`. A request that is not
+        pending, has expired or was made under older rules answers 409 `APPROVAL_NOT_PENDING`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/ApprovalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecideDeploymentRequest"
+      responses:
+        "200":
+          description: The decided request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeploymentApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/reject:
+    post:
+      operationId: rejectDeployment
+      tags: [environments]
+      summary: Reject a deploy
+      description: >-
+        The same rules as approving. The jobs of the run waiting on this environment fail with `DEPLOYMENT_REJECTED`, and
+        the jobs after them are skipped.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/ApprovalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecideDeploymentRequest"
+      responses:
+        "200":
+          description: The decided request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeploymentApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/bypass:
+    post:
+      operationId: bypassDeployment
+      tags: [environments]
+      summary: Bypass the reviewers and the wait timer
+      description: >-
+        Needs `environment.bypass` on the project (Admin and Owner), an environment with `AllowAdminBypass` (403
+        `BYPASS_NOT_ALLOWED` otherwise), a `Reason` and a second factor. Skips the reviewers and the wait timer only: the
+        ref rule, the pinned images and plugins, and the pause still apply.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/ApprovalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BypassDeploymentRequest"
+      responses:
+        "200":
+          description: The decided request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeploymentApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/deployment-approvals:
+    get:
+      operationId: listPendingApprovals
+      tags: [environments]
+      summary: List the deploys waiting for approval
+      description: >-
+        Pending requests of the projects whose runs you can read (`run.read`), oldest first. With `Mine=true`, only the
+        requests you may decide: you are a reviewer of the environment, and not the one who started the run when the
+        environment refuses self-approval.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: Mine
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: The pending requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeploymentApprovalListResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/secrets:
     get:
       operationId: listOrganizationSecrets
@@ -4373,6 +4522,13 @@ components:
         pattern: "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
     RegistryCredentialId:
       name: credentialId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ApprovalId:
+      name: approvalId
       in: path
       required: true
       schema:
@@ -7480,6 +7636,100 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/Environment"
+    DeploymentApprovalState:
+      type: string
+      enum: [pending, approved, rejected, expired, superseded, canceled, bypassed]
+    DeploymentApproval:
+      type: object
+      additionalProperties: false
+      required: [Id, ProjectId, EnvironmentId, Environment, RunId, RunNumber, Ref, Round, RuleVersion, State, ExpiresAt, CreatedAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        ProjectId:
+          type: string
+          format: uuid
+        EnvironmentId:
+          type: string
+          format: uuid
+        Environment:
+          type: string
+        RunId:
+          type: string
+          format: uuid
+        RunNumber:
+          type: integer
+          format: int64
+        Ref:
+          type: string
+        Round:
+          type: integer
+          description: A rerun of the failed jobs starts a new round, which needs a new approval.
+        RuleVersion:
+          type: integer
+          format: int64
+        State:
+          $ref: "#/components/schemas/DeploymentApprovalState"
+        ExpiresAt:
+          type: string
+          format: date-time
+        CreatedAt:
+          type: string
+          format: date-time
+        DecidedByUserId:
+          type: string
+          format: uuid
+        DecidedAt:
+          type: string
+          format: date-time
+        FactorKind:
+          type: string
+          description: The kind of second factor used for the decision (`totp`, `recovery_code` or `passkey`), never its value.
+        Comment:
+          type: string
+        BypassReason:
+          type: string
+        SupersededByRunId:
+          type: string
+          format: uuid
+    DeploymentApprovalResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/DeploymentApproval"
+    DeploymentApprovalListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/DeploymentApproval"
+    DecideDeploymentRequest:
+      type: object
+      additionalProperties: false
+      required: [CurrentFactor]
+      properties:
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+        Comment:
+          type: string
+          maxLength: 1024
+    BypassDeploymentRequest:
+      type: object
+      additionalProperties: false
+      required: [CurrentFactor, Reason]
+      properties:
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+        Reason:
+          type: string
+          minLength: 1
+          maxLength: 1024
     DeploymentState:
       type: string
       enum: [queued, running, succeeded, failed, canceled]
@@ -7739,6 +7989,7 @@ components:
           type: string
           description: >-
             For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`,
+            `DEPLOYMENT_REJECTED`, `APPROVAL_EXPIRED`, `SUPERSEDED`,
             `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`,
             `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as
             `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.

@@ -15,6 +15,8 @@ import (
 const (
 	environmentsPath = "/organizations/{id}/projects/{projectId}/environments"
 	environmentPath  = environmentsPath + "/{environmentName}"
+	approvalsPath    = "/organizations/{id}/projects/{projectId}/runs/{runId}/approvals"
+	approvalPath     = approvalsPath + "/{approvalId}"
 	orgParam         = "id"
 	projectParam     = "projectId"
 )
@@ -35,6 +37,11 @@ func Policies() []policy.Rule {
 		policy.Project(http.MethodPost, environmentPath+"/pause", policy.EnvironmentPause, orgParam, projectParam),
 		policy.Project(http.MethodPost, environmentPath+"/resume", policy.EnvironmentManage, orgParam, projectParam),
 		policy.Project(http.MethodGet, environmentPath+"/deployments", policy.RunRead, orgParam, projectParam).AllowTokens(),
+		policy.Project(http.MethodGet, approvalsPath, policy.RunRead, orgParam, projectParam).AllowTokens(),
+		policy.Project(http.MethodPost, approvalPath+"/approve", policy.DeploymentApprove, orgParam, projectParam),
+		policy.Project(http.MethodPost, approvalPath+"/reject", policy.DeploymentApprove, orgParam, projectParam),
+		policy.Project(http.MethodPost, approvalPath+"/bypass", policy.EnvironmentBypass, orgParam, projectParam),
+		policy.Organization(http.MethodGet, "/organizations/{id}/deployment-approvals", policy.RunRead, orgParam).AllowTokens(),
 	}
 }
 

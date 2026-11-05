@@ -387,7 +387,7 @@ type RunJob struct {
 	// FailureNames With `SECRET_NOT_FOUND` or `SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS`, the names of the secrets. Never a value.
 	FailureNames *[]string `json:"FailureNames,omitempty"`
 
-	// FailureReason For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`, `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`, `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
+	// FailureReason For example `NEEDS_FAILED`, `CONDITION_FALSE`, `FORK_PR_NO_ENVIRONMENT`, `ENVIRONMENT_NOT_FOUND`, `DEPLOYMENT_REJECTED`, `APPROVAL_EXPIRED`, `SUPERSEDED`, `ENVIRONMENT_REF_NOT_ALLOWED`, `ENVIRONMENT_REQUIRES_PINNED_IMAGES`, `ENVIRONMENT_PLUGIN_NOT_ALLOWED`, `ENVIRONMENT_RULE_CHANGED`, `SECRETS_UNAVAILABLE`, `JOB_SPEC_INVALID`, or the failure of the job itself such as `STEP_FAILED` or `CHECKOUT_REF_MOVED`. A job that succeeded with outputs too large to keep has `OUTPUTS_TRUNCATED`.
 	FailureReason *string    `json:"FailureReason,omitempty"`
 	FinishedAt    *time.Time `json:"FinishedAt,omitempty"`
 

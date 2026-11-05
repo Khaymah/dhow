@@ -131,6 +131,24 @@ func (q *Queries) DecideApproval(ctx context.Context, arg DecideApprovalParams) 
 	return result.RowsAffected(), nil
 }
 
+const environmentAllowsSelfApproval = `-- name: EnvironmentAllowsSelfApproval :one
+SELECT "AllowSelfApproval"
+FROM "Environments"
+WHERE "Id" = $1 AND "OrganizationId" = $2
+`
+
+type EnvironmentAllowsSelfApprovalParams struct {
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) EnvironmentAllowsSelfApproval(ctx context.Context, arg EnvironmentAllowsSelfApprovalParams) (bool, error) {
+	row := q.db.QueryRow(ctx, environmentAllowsSelfApproval, arg.ID, arg.OrganizationID)
+	var AllowSelfApproval bool
+	err := row.Scan(&AllowSelfApproval)
+	return AllowSelfApproval, err
+}
+
 const insertApproval = `-- name: InsertApproval :one
 INSERT INTO "DeploymentApprovals" (
     "OrganizationId", "EnvironmentId", "RunId", "RunNumber", "Ref", "Round", "RuleVersion", "ExpiresAt", "CreatedAt", "UpdatedAt"
@@ -555,6 +573,32 @@ func (q *Queries) LockApproval(ctx context.Context, arg LockApprovalParams) (Loc
 		&i.Paused,
 	)
 	return i, err
+}
+
+const organizationProjectIDs = `-- name: OrganizationProjectIDs :many
+SELECT "Id"
+FROM "Projects"
+WHERE "OrganizationId" = $1 AND NOT "IsDeleted"
+`
+
+func (q *Queries) OrganizationProjectIDs(ctx context.Context, organizationID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, organizationProjectIDs, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var Id uuid.UUID
+		if err := rows.Scan(&Id); err != nil {
+			return nil, err
+		}
+		items = append(items, Id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const supersedeDecidedApproval = `-- name: SupersedeDecidedApproval :execrows

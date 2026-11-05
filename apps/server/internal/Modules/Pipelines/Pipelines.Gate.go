@@ -171,6 +171,19 @@ func (s *Service) settleEnvironments(ctx context.Context, q *sqlc.Queries, st *s
 	return s.publishFinished(ctx, q, st.run, done)
 }
 
+func (s *Service) Reopen(ctx context.Context, id uuid.UUID) error {
+	return s.inTx(ctx, func(q *sqlc.Queries) error {
+		run, err := q.LockRun(ctx, id)
+		if err != nil || run.State != models.RunRunning {
+			return err
+		}
+		if err := s.resume(ctx, q, run); err != nil {
+			return err
+		}
+		return q.TouchRun(ctx, id)
+	})
+}
+
 func (s *Service) releaseRun(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun) error {
 	if s.gate == nil {
 		return nil

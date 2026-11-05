@@ -89,7 +89,7 @@ func (p *gitHubProvider) Exchange(ctx context.Context, code string, f Flow) (Ide
 	if name == "" {
 		name = user.Login
 	}
-	out := Identity{Issuer: p.cfg.Issuer, Subject: strconv.FormatInt(user.ID, 10), Name: name}
+	out := Identity{Issuer: p.cfg.Issuer, Subject: strconv.FormatInt(user.ID, 10), Name: name, Login: CleanLogin(user.Login)}
 	var emails []gitHubEmail
 	if err := p.get(ctx, token.AccessToken, "/user/emails", &emails); err == nil {
 		for i, e := range emails {

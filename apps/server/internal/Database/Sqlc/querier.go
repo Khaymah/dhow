@@ -107,6 +107,7 @@ type Querier interface {
 	EnsureThrottle(ctx context.Context, arg EnsureThrottleParams) error
 	EnsureWebauthnHandle(ctx context.Context, arg EnsureWebauthnHandleParams) ([]byte, error)
 	EnsureWebhookPartitions(ctx context.Context, daysAhead int32) (int32, error)
+	EnvironmentAllowsSelfApproval(ctx context.Context, arg EnvironmentAllowsSelfApprovalParams) (bool, error)
 	EnvironmentQueueAhead(ctx context.Context, arg EnvironmentQueueAheadParams) (bool, error)
 	EraseAllSecretVersions(ctx context.Context, arg EraseAllSecretVersionsParams) (int64, error)
 	EraseExpiredSecretVersions(ctx context.Context, arg EraseExpiredSecretVersionsParams) (int64, error)
@@ -384,6 +385,7 @@ type Querier interface {
 	OlderGroupRuns(ctx context.Context, arg OlderGroupRunsParams) ([]uuid.UUID, error)
 	OldestCacheEntries(ctx context.Context, arg OldestCacheEntriesParams) ([]OldestCacheEntriesRow, error)
 	OrganizationArtifactBytes(ctx context.Context, organizationID uuid.UUID) (int64, error)
+	OrganizationProjectIDs(ctx context.Context, organizationID uuid.UUID) ([]uuid.UUID, error)
 	OrganizationsWithLogRetention(ctx context.Context) ([]OrganizationsWithLogRetentionRow, error)
 	OriginUsedElsewhere(ctx context.Context, arg OriginUsedElsewhereParams) (bool, error)
 	OwnedBlobSize(ctx context.Context, arg OwnedBlobSizeParams) (int64, error)

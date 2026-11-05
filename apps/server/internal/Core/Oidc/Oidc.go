@@ -68,6 +68,7 @@ type oidcClaims struct {
 	EmailVerified bool
 	Name          string
 	Azp           string
+	Login         string
 }
 
 func decodeClaims(idt *gooidc.IDToken) (oidcClaims, error) {
@@ -82,7 +83,7 @@ func decodeClaims(idt *gooidc.IDToken) (oidcClaims, error) {
 		}
 		return v
 	}
-	return oidcClaims{Email: text("email"), EmailVerified: truthy(raw["email_verified"]), Name: text("name"), Azp: text("azp")}, nil
+	return oidcClaims{Email: text("email"), EmailVerified: truthy(raw["email_verified"]), Name: text("name"), Azp: text("azp"), Login: text("preferred_username")}, nil
 }
 
 func (p *oidcProvider) Exchange(ctx context.Context, code string, f Flow) (Identity, error) {
@@ -117,7 +118,7 @@ func (p *oidcProvider) Exchange(ctx context.Context, code string, f Flow) (Ident
 	if idt.Subject == "" || len(idt.Subject) > MaxSubjectLength {
 		return Identity{}, rejected("id_token", errBadSubject)
 	}
-	out := Identity{Issuer: p.cfg.Issuer, Subject: idt.Subject, Name: claims.Name}
+	out := Identity{Issuer: p.cfg.Issuer, Subject: idt.Subject, Name: claims.Name, Login: CleanLogin(claims.Login)}
 	if email := strings.TrimSpace(claims.Email); email != "" {
 		out.Emails = []Email{{Address: email, Verified: claims.EmailVerified, Primary: true}}
 	}

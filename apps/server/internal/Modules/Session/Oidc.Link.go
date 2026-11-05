@@ -89,7 +89,7 @@ func (s *Service) CompleteOidcLink(ctx context.Context, in models.OidcCallback) 
 		}
 		row, err := q.InsertIdentity(ctx, sqlc.InsertIdentityParams{
 			UserID: p.UserID, Provider: t.row.Provider, Issuer: got.identity.Issuer, Subject: got.identity.Subject,
-			Email: got.email, Now: now,
+			Email: got.email, Login: loginOf(got.identity), Now: now,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return s.linkConflict(ctx, q, p.UserID, t.row.Provider, got)
