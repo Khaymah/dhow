@@ -11,7 +11,7 @@ import { Input } from '@/Core/Ui/Input';
 import { Skeleton } from '@/Core/Ui/Skeleton';
 import { useT } from '@/I18n/useT';
 import { createEnvironment, type TEnvironment } from '@/Modules/Environments/Api/EnvironmentsApi';
-import { FactorGate } from '@/Modules/Environments/Components/FactorGate';
+import { FactorGate } from '@/Core/Ui/FactorGate';
 import { FactorSubmit } from '@/Modules/Environments/Components/FactorSubmit';
 import { RuleFields } from '@/Modules/Environments/Components/RuleFields';
 import { useEnvironmentRefresh } from '@/Modules/Environments/Hooks/useEnvironmentRefresh';

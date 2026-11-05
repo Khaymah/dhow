@@ -1,3 +1,5 @@
+import { byteLength } from '@/Core/Forms/ByteLength';
+
 export const NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 export const RESERVED_PREFIX = 'DHOW_';
 export const SECRET_MIN_BYTES = 8;
@@ -7,9 +9,7 @@ export const DESCRIPTION_MAX = 256;
 export const USERNAME_MAX = 256;
 export const HOST_MAX = 259;
 
-const ENCODER = new TextEncoder();
-
-export const byteLength = (value: string): number => ENCODER.encode(value).length;
+export { byteLength };
 
 export type TNameProblem = 'empty' | 'pattern' | 'reserved';
 

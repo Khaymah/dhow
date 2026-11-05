@@ -9,7 +9,7 @@ import { StatusDot } from '@/Core/Ui/StatusDot';
 import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useT } from '@/I18n/useT';
 import { DEPLOYMENTS_PAGE_SIZE, type TDeployment } from '@/Modules/Environments/Api/EnvironmentsApi';
-import { LinkRow } from '@/Modules/Environments/Components/LinkRow';
+import { LinkRow } from '@/Core/Ui/LinkRow';
 import { useDeployments } from '@/Modules/Environments/Hooks/useEnvironments';
 import { deploymentStatusOf, shortRef, shortSha } from '@/Modules/Environments/Types/DeploymentState';
 

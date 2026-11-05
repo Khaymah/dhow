@@ -7,7 +7,7 @@ import { CardStates, cardStateOf } from '@/Core/Ui/CardStates';
 import { Rows } from '@/Core/Ui/Row';
 import { useT } from '@/I18n/useT';
 import type { TEnvironment } from '@/Modules/Environments/Api/EnvironmentsApi';
-import { LinkRow } from '@/Modules/Environments/Components/LinkRow';
+import { LinkRow } from '@/Core/Ui/LinkRow';
 import { useDeployedNow, useEnvironments } from '@/Modules/Environments/Hooks/useEnvironments';
 import { shortRef, shortSha } from '@/Modules/Environments/Types/DeploymentState';
 

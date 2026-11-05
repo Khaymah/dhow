@@ -32,6 +32,10 @@ const PROJECT_CREATE_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer'];
 const SECRET_READ_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer', 'developer'];
 const ORGANIZATION_SECRET_MANAGE_ROLES: readonly TRole[] = ['owner', 'admin'];
 const PROJECT_SECRET_MANAGE_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer'];
+const DEPLOYMENT_APPROVE_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer', 'developer'];
+
+export const canApproveDeployments = (role: TRole | undefined): boolean =>
+  role !== undefined && DEPLOYMENT_APPROVE_ROLES.includes(role);
 
 export const canReadAudit = (role: TRole | undefined): boolean => role !== undefined && AUDIT_ROLES.includes(role);
 

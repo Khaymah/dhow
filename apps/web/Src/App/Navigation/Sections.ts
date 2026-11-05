@@ -1,5 +1,6 @@
 import { anyone, instanceOwner, member, type TGate } from '@/App/Navigation/Gates';
 import {
+  canApproveDeployments,
   canManageMembers,
   canManageRunners,
   canManageTokens,
@@ -18,6 +19,7 @@ export type TSectionId =
   | 'home'
   | 'projects'
   | 'jobs'
+  | 'approvals'
   | 'runners'
   | 'runnerTokens'
   | 'members'
@@ -39,6 +41,7 @@ export type TSectionPath =
   | '/'
   | '/projects'
   | '/jobs'
+  | '/approvals'
   | '/runners'
   | '/runners/tokens'
   | '/org/members'
@@ -101,6 +104,15 @@ export const SECTIONS: readonly ISection[] = [
     detail: 'jobs.detail.title',
     detailAllow: member,
     allow: member,
+  },
+  {
+    id: 'approvals',
+    path: '/approvals',
+    label: 'shell.nav.approvals',
+    icon: 'check',
+    group: 'run',
+    menu: true,
+    allow: canApproveDeployments,
   },
   {
     id: 'runners',

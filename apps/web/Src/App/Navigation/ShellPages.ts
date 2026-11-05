@@ -1,6 +1,7 @@
 import { lazyPage } from '@/App/Navigation/LazyPage';
 import { instanceOwner, member } from '@/App/Navigation/Gates';
 import {
+  canApproveDeployments,
   canManageMembers,
   canManageRunners,
   canManageTokens,
@@ -25,6 +26,10 @@ export const SHELL_PAGES = {
   environment: lazyPage(() => import('@/App/Pages/EnvironmentPage').then((module) => module.EnvironmentPage), member),
   run: lazyPage(() => import('@/App/Pages/RunPage').then((module) => module.RunPage), member),
   jobs: lazyPage(() => import('@/App/Pages/JobsPage').then((module) => module.JobsPage), member),
+  approvals: lazyPage(
+    () => import('@/App/Pages/ApprovalsPage').then((module) => module.ApprovalsPage),
+    canApproveDeployments,
+  ),
   job: lazyPage(() => import('@/App/Pages/JobPage').then((module) => module.JobPage), member),
   runners: lazyPage(() => import('@/App/Pages/RunnersPage').then((module) => module.RunnersPage), canReadRunners),
   runnerTokens: lazyPage(

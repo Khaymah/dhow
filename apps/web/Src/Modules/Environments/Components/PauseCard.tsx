@@ -15,7 +15,7 @@ import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Textarea } from '@/Core/Ui/Textarea';
 import { useT } from '@/I18n/useT';
 import { pauseEnvironment, resumeEnvironment, type TEnvironment } from '@/Modules/Environments/Api/EnvironmentsApi';
-import { FactorGate } from '@/Modules/Environments/Components/FactorGate';
+import { FactorGate } from '@/Core/Ui/FactorGate';
 import { useEnvironmentRefresh } from '@/Modules/Environments/Hooks/useEnvironmentRefresh';
 import { hasInvisible, REASON_MAX } from '@/Modules/Environments/Types/EnvironmentRules';
 

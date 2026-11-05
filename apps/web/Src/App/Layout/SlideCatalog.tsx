@@ -1,4 +1,5 @@
 import {
+  LazyDecisionBody,
   LazyEnvironmentNewBody,
   LazyInviteBody,
   LazyInviteFooter,
@@ -24,7 +25,16 @@ import {
   LazyTriggerRunBody,
   LazyVariableFormBody,
 } from '@/App/Layout/LazySlides';
-import { oidcOf, secretsTargetOf, themeOf, type ISecretsEditTarget, type TSlideId, type TStaticSlideId } from '@/App/Panels';
+import {
+  decisionTargetOf,
+  oidcOf,
+  secretsTargetOf,
+  themeOf,
+  type IDecisionTarget,
+  type ISecretsEditTarget,
+  type TSlideId,
+  type TStaticSlideId,
+} from '@/App/Panels';
 import type { ICustomTheme } from '@/Core/Theme/ThemeTokens';
 import type { ISlide } from '@/Core/Ui/SlideStack';
 import type { TTranslate } from '@/I18n/I18nContext';
@@ -44,6 +54,9 @@ export interface ISlideContext {
   openRun: (projectId: string, runId: string) => void;
   environmentName: string | undefined;
   openEnvironment: (projectId: string, environmentName: string) => void;
+  runId: string | undefined;
+  decided: () => void;
+  openSecurity: () => void;
 }
 
 type TBuilder = (context: ISlideContext) => Omit<ISlide, 'id'>;
@@ -208,12 +221,31 @@ const secretsEditSlide = (id: TSlideId, target: ISecretsEditTarget, { t, close, 
   };
 };
 
+const decisionSlide = (id: TSlideId, target: IDecisionTarget, { t, close, projectId, runId, decided, openSecurity }: ISlideContext): ISlide => ({
+  id,
+  title: t(`approvals.decide.${target.Decision}.title`),
+  subtitle: <span>{t(`approvals.decide.${target.Decision}.subtitle`)}</span>,
+  children: (
+    <LazyDecisionBody
+      projectId={projectId}
+      runId={runId}
+      approvalId={target.ApprovalId}
+      decision={target.Decision}
+      onDecided={decided}
+      onDone={close}
+      onSecondFactor={openSecurity}
+    />
+  ),
+});
+
 export const buildSlide = (id: TSlideId, context: ISlideContext): ISlide => {
   if (id === 'theme-edit' || themeOf(id) !== null) return themeEditSlide(id, context);
   const providerId = oidcOf(id);
   if (providerId !== null) return oidcEditSlide(id, providerId, context);
   const target = secretsTargetOf(id);
   if (target !== null) return secretsEditSlide(id, target, context);
+  const decision = decisionTargetOf(id);
+  if (decision !== null) return decisionSlide(id, decision, context);
   const builder = Object.hasOwn(BUILDERS, id) ? BUILDERS[id as keyof typeof BUILDERS] : undefined;
   return builder ? { id, ...builder(context) } : themeEditSlide(id, context);
 };

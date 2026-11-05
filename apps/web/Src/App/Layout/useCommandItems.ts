@@ -21,6 +21,7 @@ const PAGE_COMMANDS: Record<TSectionId, TMessageKey> = {
   home: 'palette.command.home',
   projects: 'palette.command.projects',
   jobs: 'palette.command.jobs',
+  approvals: 'palette.command.approvals',
   runners: 'palette.command.runners',
   runnerTokens: 'palette.command.runnerTokens',
   members: 'palette.command.members',

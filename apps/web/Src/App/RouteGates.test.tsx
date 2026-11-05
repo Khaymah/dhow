@@ -29,6 +29,7 @@ const ADMINS: readonly TRoleName[] = ['owner', 'admin'];
 const GATES: readonly IGateCase[] = [
   { url: '/jobs', title: Ar['jobs.title'], endpoint: /\/jobs/, allowed: EVERYONE },
   { url: `/jobs/${ID}`, title: Ar['jobs.detail.title'], endpoint: /\/jobs\//, allowed: EVERYONE },
+  { url: '/approvals', title: Ar['approvals.page.title'], endpoint: /\/deployment-approvals/, allowed: BUILDERS },
   { url: '/runners', title: Ar['runners.title'], endpoint: /\/runners/, allowed: BUILDERS },
   { url: `/runners/${ID}`, title: Ar['runners.title'], endpoint: /\/runners\//, allowed: BUILDERS },
   { url: '/runners/tokens', title: Ar['runners.tokens.title'], endpoint: /\/runner-registration-tokens/, allowed: ADMINS },

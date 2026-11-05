@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { Card } from '@/Core/Ui/Card';
 import { StatusDot } from '@/Core/Ui/StatusDot';
 import { useT } from '@/I18n/useT';
@@ -11,15 +13,17 @@ export interface IRunStagesProps {
   now: number;
   jobHref: (jobId: string) => string;
   onOpenJob: (jobId: string) => void;
+  jobExtra?: (job: TRunJob) => ReactNode;
 }
 
-const JobEntry = ({ job, now, jobHref, onOpenJob }: { job: TRunJob } & Omit<IRunStagesProps, 'jobs'>) => {
+const JobEntry = ({ job, now, jobHref, onOpenJob, jobExtra }: { job: TRunJob } & Omit<IRunStagesProps, 'jobs'>) => {
   const t = useT();
   const text = useRunText();
   const name = job.Kind === 'discovery' ? t('runs.job.system.discovery') : job.Name === '' ? job.JobId : job.Name;
   const matrix = matrixOf(job).filter((pair) => !name.includes(pair));
   const took = job.StartedAt === undefined ? '' : text.duration(job.StartedAt, job.FinishedAt ?? now);
-  const reason = job.FailureReason === undefined || job.FailureReason === '' ? null : text.reason(job.FailureReason);
+  const extra = jobExtra?.(job) ?? null;
+  const reason = extra !== null || job.FailureReason === undefined || job.FailureReason === '' ? null : text.reason(job.FailureReason);
   const title = <bdi>{name}</bdi>;
   const target = job.CurrentJobId;
 
@@ -80,12 +84,13 @@ const JobEntry = ({ job, now, jobHref, onOpenJob }: { job: TRunJob } & Omit<IRun
         ) : null}
       </dl>
       {reason === null ? null : <p className="m-0 text-body-sm text-secondary">{reason}</p>}
+      {extra}
       {target === undefined && job.State === 'waiting' ? <p className="m-0 text-body-sm text-tertiary">{t('runs.job.notStarted')}</p> : null}
     </li>
   );
 };
 
-export const RunStages = ({ jobs, now, jobHref, onOpenJob }: IRunStagesProps) => {
+export const RunStages = ({ jobs, now, jobHref, onOpenJob, jobExtra }: IRunStagesProps) => {
   const t = useT();
   if (jobs.length === 0) {
     return (
@@ -101,7 +106,7 @@ export const RunStages = ({ jobs, now, jobHref, onOpenJob }: IRunStagesProps) =>
           <Card title={t('runs.stage.title', { number: index + 1 })} icon="layers" end={t('runs.stage.count', { count: stage.Jobs.length })}>
             <ul aria-label={t('runs.stage.title', { number: index + 1 })} className="m-0 grid list-none p-0">
               {stage.Jobs.map((job) => (
-                <JobEntry key={job.Id} job={job} now={now} jobHref={jobHref} onOpenJob={onOpenJob} />
+                <JobEntry key={job.Id} job={job} now={now} jobHref={jobHref} onOpenJob={onOpenJob} jobExtra={jobExtra} />
               ))}
             </ul>
           </Card>
