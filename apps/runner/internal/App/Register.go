@@ -85,6 +85,9 @@ func runnerFeatures(cfg config.Config) []runnerv1.RunnerFeature {
 	if cfg.CheckoutImage != "" {
 		features = append(features, runnerv1.RunnerFeature_RUNNER_FEATURE_CHECKOUT,
 			runnerv1.RunnerFeature_RUNNER_FEATURE_ARTIFACTS, runnerv1.RunnerFeature_RUNNER_FEATURE_CACHE)
+		if caps := driverCapabilities(cfg); caps.Inputs && caps.ExactEgress {
+			features = append(features, runnerv1.RunnerFeature_RUNNER_FEATURE_DEPLOY_TARGETS)
+		}
 	}
 	return features
 }

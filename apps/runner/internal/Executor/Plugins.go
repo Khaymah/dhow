@@ -66,26 +66,38 @@ func (a *attempt) silentOutcome(end stepEnd, why result, stopped bool) (result, 
 
 func (a *attempt) runPlugin(ctx, jobCtx context.Context, idx int32) (result, bool) {
 	step := a.grant.GetSpec().GetSteps()[idx]
-	if r, ok := a.beginStep(ctx, idx, step.GetMutating()); !ok {
-		return r, false
-	}
 	var labels map[string]string
 	if l, ok := a.currentBox().(sandbox.Labeled); ok {
 		labels = l.ImageLabels()
 	}
-	m, err := plugin.Parse(labels[sandbox.PluginManifestLabel])
-	if err != nil {
-		return a.refusePlugin(ctx, idx, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID, err)
+	m, parseErr := plugin.Parse(labels[sandbox.PluginManifestLabel])
+	if r, ok := a.beginStep(ctx, idx, step.GetMutating() || (parseErr == nil && m.Mutating)); !ok {
+		return r, false
 	}
+	if parseErr != nil {
+		return a.refusePlugin(ctx, idx, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID, parseErr)
+	}
+	defer a.dropArchives(a.spentArchives(idx))
 	with, env, files := a.pluginEnv(idx, step)
 	inputs, err := m.Env(with)
+	if err != nil {
+		clear(with)
+		return a.refusePlugin(ctx, idx, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_INPUT_INVALID, err)
+	}
+	delivered, err := a.artifactEnv(m, with, idx)
 	clear(with)
 	if err != nil {
 		return a.refusePlugin(ctx, idx, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_INPUT_INVALID, err)
 	}
+	target, err := a.targetEnv(idx)
+	if err != nil {
+		return a.refusePlugin(ctx, idx, runnerv1.FailureReason_FAILURE_REASON_SPEC_REJECTED, err)
+	}
 	maps.Copy(env, inputs)
+	maps.Copy(env, delivered)
+	maps.Copy(env, target)
 	allowed := append([]string{}, m.Outputs...)
-	return a.runStep(ctx, jobCtx, idx, step, execPlan{argv: m.Entrypoint, env: env, files: files, allowed: allowed, isolated: true})
+	return a.runStep(ctx, jobCtx, idx, step, execPlan{argv: m.Entrypoint, env: env, files: files, allowed: allowed, isolated: true, report: target != nil})
 }
 
 func (a *attempt) pluginEnv(idx int32, step *runnerv1.Step) (map[string]string, map[string]string, map[string][]byte) {
@@ -98,7 +110,7 @@ func (a *attempt) pluginEnv(idx int32, step *runnerv1.Step) (map[string]string, 
 	maps.Copy(env, step.GetEnv())
 	files := map[string][]byte{}
 	for _, ref := range spec.GetSecrets() {
-		if ref.GetName() == jobspec.CheckoutSecret || !slices.Contains(ref.GetStepIndexes(), idx) {
+		if ref.GetName() == jobspec.CheckoutSecret || !slices.Contains(ref.GetStepIndexes(), idx) || foreignTargetKey(spec, ref.GetName(), idx) {
 			continue
 		}
 		v := a.secrets[ref.GetName()]
@@ -113,7 +125,7 @@ func (a *attempt) pluginEnv(idx int32, step *runnerv1.Step) (map[string]string, 
 			files[t.AsFile] = append([]byte(nil), v...)
 		}
 	}
-	if len(spec.GetNetwork().GetEgress()) > 0 {
+	if usesProxy(spec) {
 		maps.Copy(env, proxyEnv())
 	}
 	return with, env, files

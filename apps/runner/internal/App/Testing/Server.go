@@ -48,6 +48,7 @@ type Lease struct {
 	Closed               bool
 	Cancel               bool
 	Steps                map[int32]string
+	MutatingSteps        map[int32]bool
 	Completes            []*runnerv1.CompleteRequest
 	Chunks               []*runnerv1.LogChunk
 	LastSeq              int64
@@ -105,6 +106,7 @@ type Server struct {
 	calls    map[string]int
 	replays  []*runnerv1.SignedLeaseGrant
 	blobs    blobState
+	releases releaseState
 }
 
 func NewServer(t testing.TB) *Server {
@@ -134,6 +136,7 @@ func NewServer(t testing.TB) *Server {
 	mux.Handle(runnerv1connect.NewLogServiceHandler(h, opts))
 	mux.Handle(runnerv1connect.NewArtifactServiceHandler(h, opts))
 	mux.Handle(runnerv1connect.NewCacheServiceHandler(cacheHandlers{s: s}, opts))
+	mux.Handle(runnerv1connect.NewReleaseServiceHandler(releaseHandlers{s: s}, opts))
 	mux.HandleFunc(blobPath, s.serveBlob)
 	root := http.NewServeMux()
 	root.Handle(config.APIPrefix+"/", http.StripPrefix(config.APIPrefix, mux))

@@ -15,6 +15,8 @@ type segment struct {
 	image  string
 	steps  []int32
 	egress []string
+	exact  []string
+	inputs []string
 	save   bool
 }
 
@@ -29,14 +31,18 @@ func segments(spec *runnerv1.JobSpec, checkoutImage string) []segment {
 	for i, s := range spec.GetSteps() {
 		idx := int32(i)
 		if p := s.GetPlugin(); p != nil {
-			out = append(out, segment{kind: sandbox.KindPlugin, image: p.GetImage(), steps: []int32{idx}, egress: spec.GetNetwork().GetEgress()})
+			seg := segment{kind: sandbox.KindPlugin, image: p.GetImage(), steps: []int32{idx}, egress: spec.GetNetwork().GetEgress(), exact: spec.GetNetwork().GetExactEndpoints()}
+			if name, ok := targetArtifact(spec, idx); ok {
+				seg.inputs = []string{name}
+			}
+			out = append(out, seg)
 			continue
 		}
 		if n := len(out); n > 0 && out[n-1].kind == sandbox.KindJob {
 			out[n-1].steps = append(out[n-1].steps, idx)
 			continue
 		}
-		out = append(out, segment{kind: sandbox.KindJob, image: spec.GetImage(), steps: []int32{idx}, egress: spec.GetNetwork().GetEgress()})
+		out = append(out, segment{kind: sandbox.KindJob, image: spec.GetImage(), steps: []int32{idx}, egress: spec.GetNetwork().GetEgress(), exact: spec.GetNetwork().GetExactEndpoints()})
 	}
 	if saves(spec) {
 		out = append(out, segment{kind: sandbox.KindTransfer, image: checkoutImage, save: true})

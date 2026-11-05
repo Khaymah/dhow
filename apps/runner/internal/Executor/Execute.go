@@ -97,7 +97,7 @@ func (a *attempt) prepare(ctx context.Context, seq int, seg segment) (result, bo
 			RunnerID: a.e.o.Identity.RunnerID, AttemptID: a.grant.GetAttemptId(), Seq: seq, Kind: seg.kind, Image: seg.image,
 			Isolation: spec.GetIsolation(),
 			Resources: sandbox.Resources{CPUMillis: r.GetCpuMillis(), MemoryBytes: r.GetMemoryBytes(), Pids: r.GetPids(), DiskBytes: r.GetDiskBytes()},
-			Dir:       a.dir, DiskMode: a.e.o.Config.DiskMode, Egress: seg.egress, Workspace: ws, AuthFile: authFile,
+			Dir:       a.dir, DiskMode: a.e.o.Config.DiskMode, Egress: seg.egress, Exact: seg.exact, Inputs: a.inputFiles(seg.inputs), Workspace: ws, AuthFile: authFile,
 		})
 		removeAuthFile(authFile)
 		ch <- prepared{box: box, err: err}
@@ -105,7 +105,7 @@ func (a *attempt) prepare(ctx context.Context, seq int, seg segment) (result, bo
 	var why result
 	select {
 	case p := <-ch:
-		return a.prepared(ctx, pctx, p, seg.egress)
+		return a.prepared(ctx, pctx, p, seg)
 	case <-a.fence.Lost():
 		why = a.lostResult()
 	case <-a.fence.Canceled():
@@ -120,7 +120,7 @@ func (a *attempt) prepare(ctx context.Context, seq int, seg segment) (result, bo
 	return why, false
 }
 
-func (a *attempt) prepared(ctx, pctx context.Context, p prepared, allow []string) (result, bool) {
+func (a *attempt) prepared(ctx, pctx context.Context, p prepared, seg segment) (result, bool) {
 	if p.err != nil {
 		reason := runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED
 		if errors.Is(p.err, sandbox.ErrImagePull) || errors.Is(pctx.Err(), context.DeadlineExceeded) {
@@ -133,7 +133,7 @@ func (a *attempt) prepared(ctx, pctx context.Context, p prepared, allow []string
 	if !a.setBox(ctx, p.box) {
 		return a.lostResult(), false
 	}
-	if err := a.startEgress(ctx, p.box, allow); err != nil {
+	if err := a.startEgress(ctx, p.box, seg.egress, seg.exact); err != nil {
 		a.log.Error("could not start the egress proxy", "error", a.masked(err))
 		a.pipe.Systemf(nil, "dhow: %s: the egress proxy could not start", reasonName(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED))
 		return failed(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, 0), false

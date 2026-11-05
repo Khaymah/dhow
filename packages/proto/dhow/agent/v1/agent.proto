@@ -13,6 +13,7 @@ message Frame {
     Shutdown shutdown = 7;
     RunExec run_exec = 8;
     Input input = 9;
+    Report report = 10;
   }
 }
 
@@ -39,12 +40,18 @@ message RunExec {
   map<string, string> env = 3;
   repeated SecretFile secret_files = 4;
   bool stdin = 5;
+  bool report = 6;
 }
 
 message Input {
   int32 step_index = 1;
   bytes data = 2;
   bool eof = 3;
+}
+
+message Report {
+  int32 step_index = 1;
+  bytes data = 2;
 }
 
 enum OutputStream {

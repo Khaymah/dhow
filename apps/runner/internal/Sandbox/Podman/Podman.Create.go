@@ -28,19 +28,24 @@ type layout struct {
 	kind       sandbox.Kind
 	agentPath  string
 	controlDir string
+	inputsDir  string
 	workDir    string
 	idStart    int64
 	hostStart  int64
 }
 
 func helperMounts(l layout) []string {
-	if l.kind != sandbox.KindCheckout {
-		return nil
+	var out []string
+	if l.inputsDir != "" {
+		out = append(out, "--mount", fmt.Sprintf("type=bind,src=%s,dst=%s,ro=true,relabel=private,U=true", l.inputsDir, inputsMount))
 	}
-	return []string{
+	if l.kind != sandbox.KindCheckout {
+		return out
+	}
+	return append(out,
 		"--mount", fmt.Sprintf("type=bind,src=%s,dst=%s,ro=true", l.agentPath, gitSSHMount),
 		"--mount", fmt.Sprintf("type=bind,src=%s,dst=%s,ro=true", l.agentPath, askpassMount),
-	}
+	)
 }
 
 func createArgs(spec sandbox.PrepareSpec, l layout, seccompFile, imageID string) []string {

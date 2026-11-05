@@ -6,6 +6,7 @@ import (
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	middleware "github.com/Khaymah/dhow/apps/server/internal/Core/Middleware"
 	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
+	environments "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	runners "github.com/Khaymah/dhow/apps/server/internal/Modules/Runners"
 )
@@ -15,6 +16,9 @@ func RunnerPlane(o Options) http.Handler {
 	runners.ConnectRoutes(mux, runners.Deps{Service: o.Runners, Gate: o.Gate, Log: o.Log})
 	if o.Jobs != nil {
 		jobs.ConnectRoutes(mux, jobs.Deps{Service: o.Jobs, Gate: o.Gate, Log: o.Log})
+	}
+	if o.Envs != nil {
+		environments.ConnectRoutes(mux, environments.ConnectDeps{Service: o.Envs, Gate: o.Gate, Log: o.Log})
 	}
 	if o.Artifacts != nil {
 		artifacts.ConnectRoutes(mux, artifacts.Deps{Service: o.Artifacts, Gate: o.Gate, Log: o.Log})

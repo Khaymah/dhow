@@ -15,6 +15,7 @@ type Querier interface {
 	AbandonCommitStatuses(ctx context.Context, arg AbandonCommitStatusesParams) (int64, error)
 	ActivateRunJob(ctx context.Context, arg ActivateRunJobParams) (int64, error)
 	AddKeyRekeyProgress(ctx context.Context, arg AddKeyRekeyProgressParams) error
+	AdoptRelease(ctx context.Context, arg AdoptReleaseParams) error
 	AdvanceAttemptLog(ctx context.Context, arg AdvanceAttemptLogParams) error
 	AdvanceBackfill(ctx context.Context, arg AdvanceBackfillParams) error
 	AdvanceTotpStep(ctx context.Context, arg AdvanceTotpStepParams) (int64, error)
@@ -90,6 +91,7 @@ type Querier interface {
 	DisableRunnerAsClone(ctx context.Context, arg DisableRunnerAsCloneParams) (int64, error)
 	DiscardPendingTotp(ctx context.Context, arg DiscardPendingTotpParams) error
 	DiscoveryLog(ctx context.Context, jobID uuid.UUID) ([][]byte, error)
+	DowngradeRelease(ctx context.Context, arg DowngradeReleaseParams) error
 	DropLogPartitions(ctx context.Context, retentionDays int32) (int32, error)
 	DropWebhookPartitions(ctx context.Context, retentionDays int32) (int32, error)
 	EndAttemptStep(ctx context.Context, arg EndAttemptStepParams) (int64, error)
@@ -125,6 +127,7 @@ type Querier interface {
 	FinishAttempt(ctx context.Context, arg FinishAttemptParams) (JobAttempt, error)
 	FinishJob(ctx context.Context, arg FinishJobParams) (Job, error)
 	FinishKeyRekey(ctx context.Context, id uuid.UUID) error
+	FinishRelease(ctx context.Context, arg FinishReleaseParams) error
 	FinishRun(ctx context.Context, arg FinishRunParams) error
 	FinishRunJob(ctx context.Context, arg FinishRunJobParams) (int64, error)
 	FinishUpload(ctx context.Context, arg FinishUploadParams) error
@@ -165,6 +168,7 @@ type Querier interface {
 	GetProjectState(ctx context.Context, arg GetProjectStateParams) (string, error)
 	GetRegistrationToken(ctx context.Context, arg GetRegistrationTokenParams) (RunnerRegistrationToken, error)
 	GetRegistryCredentialForUpdate(ctx context.Context, arg GetRegistryCredentialForUpdateParams) (RegistryCredential, error)
+	GetReleaseForUpdate(ctx context.Context, arg GetReleaseForUpdateParams) (DeploymentRelease, error)
 	GetRepositoryByHook(ctx context.Context, arg GetRepositoryByHookParams) (GetRepositoryByHookRow, error)
 	GetRepositoryByProject(ctx context.Context, arg GetRepositoryByProjectParams) (Repository, error)
 	GetRun(ctx context.Context, arg GetRunParams) (PipelineRun, error)
@@ -173,6 +177,7 @@ type Querier interface {
 	GetRunner(ctx context.Context, arg GetRunnerParams) (Runner, error)
 	GetRunnerIdentity(ctx context.Context, id uuid.UUID) (GetRunnerIdentityRow, error)
 	GetRunnerNames(ctx context.Context, arg GetRunnerNamesParams) ([]GetRunnerNamesRow, error)
+	GetRunningReleaseOfTarget(ctx context.Context, arg GetRunningReleaseOfTargetParams) (DeploymentRelease, error)
 	GetSchemaFloor(ctx context.Context) (string, error)
 	GetSecretForUpdate(ctx context.Context, arg GetSecretForUpdateParams) (Secret, error)
 	GetSecretVersion(ctx context.Context, arg GetSecretVersionParams) (GetSecretVersionRow, error)
@@ -227,6 +232,8 @@ type Querier interface {
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RunnerRegistrationToken, error)
 	InsertRegistryCredential(ctx context.Context, arg InsertRegistryCredentialParams) (InsertRegistryCredentialRow, error)
+	InsertRelease(ctx context.Context, arg InsertReleaseParams) (DeploymentRelease, error)
+	InsertReleaseHost(ctx context.Context, arg InsertReleaseHostParams) error
 	InsertRepository(ctx context.Context, arg InsertRepositoryParams) (Repository, error)
 	InsertRun(ctx context.Context, arg InsertRunParams) (PipelineRun, error)
 	InsertRunJob(ctx context.Context, arg InsertRunJobParams) (RunJob, error)
@@ -249,6 +256,7 @@ type Querier interface {
 	IsActiveMember(ctx context.Context, arg IsActiveMemberParams) (bool, error)
 	IsEnabledMemberOf(ctx context.Context, arg IsEnabledMemberOfParams) (bool, error)
 	IsEnvironmentReviewer(ctx context.Context, arg IsEnvironmentReviewerParams) (bool, error)
+	IsLeaseActive(ctx context.Context, leaseID uuid.UUID) (bool, error)
 	IsMemberByEmail(ctx context.Context, arg IsMemberByEmailParams) (bool, error)
 	JobCancelRequestedAt(ctx context.Context, id uuid.UUID) (*time.Time, error)
 	JobExists(ctx context.Context, arg JobExistsParams) (bool, error)
@@ -266,6 +274,7 @@ type Querier interface {
 	ListDeployTargetHosts(ctx context.Context, arg ListDeployTargetHostsParams) ([]DeployTargetHost, error)
 	ListDeployTargetKeyNames(ctx context.Context, arg ListDeployTargetKeyNamesParams) ([]string, error)
 	ListDeployTargets(ctx context.Context, arg ListDeployTargetsParams) ([]DeployTarget, error)
+	ListDeploymentReleases(ctx context.Context, arg ListDeploymentReleasesParams) ([]DeploymentRelease, error)
 	ListDeployments(ctx context.Context, arg ListDeploymentsParams) ([]Deployment, error)
 	ListDoneBackfills(ctx context.Context, names []string) ([]string, error)
 	ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobsParams) ([]ListDriftedRunJobsRow, error)
@@ -293,6 +302,7 @@ type Querier interface {
 	ListQueuedRuns(ctx context.Context, batch int32) ([]ListQueuedRunsRow, error)
 	ListRegistrationTokens(ctx context.Context, arg ListRegistrationTokensParams) ([]RunnerRegistrationToken, error)
 	ListRegistryCredentialsInScope(ctx context.Context, arg ListRegistryCredentialsInScopeParams) ([]ListRegistryCredentialsInScopeRow, error)
+	ListReleaseHostsForUpdate(ctx context.Context, arg ListReleaseHostsForUpdateParams) ([]DeploymentReleaseHost, error)
 	ListRunApprovals(ctx context.Context, arg ListRunApprovalsParams) ([]ListRunApprovalsRow, error)
 	ListRunArtifacts(ctx context.Context, arg ListRunArtifactsParams) ([]Artifact, error)
 	ListRunCancellations(ctx context.Context, batch int32) ([]ListRunCancellationsRow, error)
@@ -346,6 +356,7 @@ type Querier interface {
 	LockPendingTotp(ctx context.Context, arg LockPendingTotpParams) (LockPendingTotpRow, error)
 	LockProject(ctx context.Context, arg LockProjectParams) (Project, error)
 	LockProjectCache(ctx context.Context, projectID string) error
+	LockReleaseLease(ctx context.Context, arg LockReleaseLeaseParams) (LockReleaseLeaseRow, error)
 	LockRepositoryByProject(ctx context.Context, arg LockRepositoryByProjectParams) (Repository, error)
 	LockRun(ctx context.Context, id uuid.UUID) (PipelineRun, error)
 	LockRunTrigger(ctx context.Context, arg LockRunTriggerParams) error
@@ -353,9 +364,12 @@ type Querier interface {
 	LockRunnerLease(ctx context.Context, runnerID uuid.UUID) (uuid.UUID, error)
 	LockRunnerSlots(ctx context.Context, runnerID string) error
 	LockRunnerThrottle(ctx context.Context, key string) (LockRunnerThrottleRow, error)
+	LockRunningReleasesOfRun(ctx context.Context, arg LockRunningReleasesOfRunParams) ([]DeploymentRelease, error)
 	LockSecretsEnvironment(ctx context.Context, arg LockSecretsEnvironmentParams) (uuid.UUID, error)
 	LockSecretsProject(ctx context.Context, arg LockSecretsProjectParams) (string, error)
 	LockSecretsScope(ctx context.Context, scopeKey string) error
+	LockStaleRunningReleases(ctx context.Context) ([]DeploymentRelease, error)
+	LockSucceededReleasesOfFailedJobs(ctx context.Context, arg LockSucceededReleasesOfFailedJobsParams) ([]DeploymentRelease, error)
 	LockSupersededDataKeys(ctx context.Context) ([]uuid.UUID, error)
 	LockTeam(ctx context.Context, arg LockTeamParams) (LockTeamRow, error)
 	LockTeamBinding(ctx context.Context, arg LockTeamBindingParams) (LockTeamBindingRow, error)
@@ -379,6 +393,8 @@ type Querier interface {
 	MarkLateResultLogged(ctx context.Context, arg MarkLateResultLoggedParams) error
 	MarkMfaReset(ctx context.Context, arg MarkMfaResetParams) error
 	MarkMutationStarted(ctx context.Context, id uuid.UUID) error
+	MarkReleaseDeploymentRunning(ctx context.Context, arg MarkReleaseDeploymentRunningParams) error
+	MarkReleaseHostsUnknown(ctx context.Context, arg MarkReleaseHostsUnknownParams) (int64, error)
 	MarkSetupTokenUsed(ctx context.Context, arg MarkSetupTokenUsedParams) error
 	MarkUnusedBlobs(ctx context.Context, arg MarkUnusedBlobsParams) ([][]byte, error)
 	NextAuditId(ctx context.Context) (uuid.UUID, error)
@@ -421,6 +437,7 @@ type Querier interface {
 	ReissueInvitation(ctx context.Context, arg ReissueInvitationParams) (int64, error)
 	ReleaseBlobSweepLock(ctx context.Context, lockKey int64) (bool, error)
 	ReleaseEnvironments(ctx context.Context, arg ReleaseEnvironmentsParams) error
+	ReleaseExists(ctx context.Context, arg ReleaseExistsParams) (bool, error)
 	ReleaseRetentionLock(ctx context.Context, lockKey int64) (bool, error)
 	ReleaseRunClaim(ctx context.Context, id uuid.UUID) error
 	ReleaseStaleEnvironments(ctx context.Context) (int64, error)
@@ -458,6 +475,7 @@ type Querier interface {
 	RequestJobCancel(ctx context.Context, arg RequestJobCancelParams) (Job, error)
 	RequestRunCancel(ctx context.Context, arg RequestRunCancelParams) error
 	RequeueJob(ctx context.Context, arg RequeueJobParams) (Job, error)
+	ResetReleaseHosts(ctx context.Context, arg ResetReleaseHostsParams) error
 	ResetRunJob(ctx context.Context, id uuid.UUID) error
 	ResetThrottle(ctx context.Context, arg ResetThrottleParams) error
 	ResolveApiToken(ctx context.Context, arg ResolveApiTokenParams) (ResolveApiTokenRow, error)
@@ -519,6 +537,7 @@ type Querier interface {
 	SetOrganizationLogRetention(ctx context.Context, arg SetOrganizationLogRetentionParams) (SetOrganizationLogRetentionRow, error)
 	SetOrganizationSecondFactor(ctx context.Context, arg SetOrganizationSecondFactorParams) (SetOrganizationSecondFactorRow, error)
 	SetPreflightTimeouts(ctx context.Context, arg SetPreflightTimeoutsParams) error
+	SetReleaseFailedHost(ctx context.Context, arg SetReleaseFailedHostParams) error
 	SetRunDefinition(ctx context.Context, arg SetRunDefinitionParams) error
 	SetRunIssues(ctx context.Context, arg SetRunIssuesParams) error
 	SetRunJobFailureDetail(ctx context.Context, arg SetRunJobFailureDetailParams) error
@@ -571,6 +590,7 @@ type Querier interface {
 	UpdateOrganizationName(ctx context.Context, arg UpdateOrganizationNameParams) (UpdateOrganizationNameRow, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
 	UpdateRegistryCredential(ctx context.Context, arg UpdateRegistryCredentialParams) (UpdateRegistryCredentialRow, error)
+	UpdateReleaseHost(ctx context.Context, arg UpdateReleaseHostParams) error
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
 	UpdateRunner(ctx context.Context, arg UpdateRunnerParams) (Runner, error)
 	UpdateRunnerThrottle(ctx context.Context, arg UpdateRunnerThrottleParams) error

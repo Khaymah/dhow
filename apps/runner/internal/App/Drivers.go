@@ -15,6 +15,13 @@ import (
 
 var ErrDriverMissing = errors.New("is not built into this dhow-runner yet; the Kubernetes driver arrives with M3.11")
 
+func driverCapabilities(cfg config.Config) sandbox.Capabilities {
+	if cfg.Driver == config.DriverPodman {
+		return sandbox.CapabilitiesOf(&podman.Driver{})
+	}
+	return sandbox.Capabilities{}
+}
+
 func newDriver(ctx context.Context, cfg config.Config, log *slog.Logger) (sandbox.Driver, error) {
 	switch cfg.Driver {
 	case config.DriverPodman:

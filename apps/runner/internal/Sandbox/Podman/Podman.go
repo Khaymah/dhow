@@ -157,6 +157,11 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 	if err := config.EnsurePrivateDir(l.controlDir); err != nil {
 		return nil, err
 	}
+	inputs, err := stageInputs(spec.Dir, spec.Seq, spec.Inputs)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", sandbox.ErrSandbox, err)
+	}
+	l.inputsDir = inputs
 	imageID, labels, err := d.pull(ctx, spec.Image, spec.AuthFile)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", sandbox.ErrImagePull, err)

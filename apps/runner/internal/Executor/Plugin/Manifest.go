@@ -22,6 +22,12 @@ const (
 	MaxOutputValue    = 1 << 10
 	InputEnvPrefix    = "DHOW_INPUT_"
 	EnvOutput         = "DHOW_OUTPUT"
+	EnvDeployReport   = "DHOW_DEPLOY_REPORT"
+	FileSuffix        = "_FILE"
+	DigestSuffix      = "_DIGEST"
+
+	KindValue    = "value"
+	KindArtifact = "artifact"
 )
 
 var (
@@ -36,13 +42,17 @@ var (
 type Input struct {
 	Required bool    `json:"Required"`
 	Default  *string `json:"Default"`
+	Kind     string  `json:"Kind"`
 }
+
+func (in Input) IsArtifact() bool { return in.Kind == KindArtifact }
 
 type Manifest struct {
 	Version    int              `json:"Version"`
 	Entrypoint []string         `json:"Entrypoint"`
 	Inputs     map[string]Input `json:"Inputs"`
 	Outputs    []string         `json:"Outputs"`
+	Mutating   bool             `json:"Mutating"`
 }
 
 func Parse(label string) (Manifest, error) {
@@ -80,6 +90,12 @@ func (m Manifest) check() error {
 	for name, in := range m.Inputs {
 		if !inputPattern.MatchString(name) || (in.Default != nil && (len(*in.Default) > jobspec.MaxPluginInputBytes || strings.ContainsRune(*in.Default, 0))) {
 			return ErrManifest
+		}
+		if in.Kind != "" && in.Kind != KindValue && in.Kind != KindArtifact {
+			return fmt.Errorf("%w: input %s has the unknown kind %q", ErrManifest, name, in.Kind)
+		}
+		if in.IsArtifact() && (in.Default != nil || !in.Required) {
+			return fmt.Errorf("%w: the artifact input %s must be required and have no default", ErrManifest, name)
 		}
 	}
 	for _, o := range m.Outputs {

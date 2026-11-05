@@ -66,7 +66,8 @@ type attempt struct {
 	shutdown   <-chan struct{}
 	secrets    map[string][]byte
 
-	outputs map[string]string
+	outputs  map[string]string
+	archives map[string]archive
 
 	cacheKeyValue string
 	cacheHit      bool

@@ -31,7 +31,7 @@ var allowedDataKeys = map[string]struct{}{
 	"EnvironmentId": {}, "RestoredFrom": {}, "Delivered": {}, "ForkCacheRestore": {}, "RunId": {}, "AttemptId": {}, "Registries": {}, "ApprovalId": {},
 	"AllowExtraDeployEgress": {}, "Kind": {}, "Username": {}, "DeployPath": {}, "Hosts": {}, "KeyName": {}, "PreviousKeyName": {},
 	"HostId": {}, "Address": {}, "Position": {}, "DroppedFingerprint": {}, "Source": {}, "PinnedFingerprint": {},
-	"PreviousFingerprint": {}, "Environment": {},
+	"PreviousFingerprint": {}, "Environment": {}, "DeploymentId": {}, "ReleaseId": {}, "Step": {}, "TargetId": {},
 }
 
 var credentialMarkers = []string{config.APITokenPrefix, config.RunnerAccessTokenPrefix, config.RunnerRegistrationTokenPrefix}

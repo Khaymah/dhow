@@ -52,7 +52,10 @@ func newBox(ctx context.Context, d *Driver, l layout, spec sandbox.PrepareSpec) 
 		return nil, fmt.Errorf("lock down the control channel: %w", err)
 	}
 	b := &box{d: d, name: l.name, spec: spec, socket: socket, owned: []string{l.controlDir}, listener: ln, idStart: l.hostStart}
-	if len(spec.Egress) > 0 {
+	if l.inputsDir != "" {
+		b.owned = append(b.owned, l.inputsDir)
+	}
+	if len(spec.Egress)+len(spec.Exact) > 0 {
 		eln, err := listenPrivate(ctx, filepath.Join(l.controlDir, egressSocketName))
 		if err != nil {
 			_ = ln.Close()
@@ -164,6 +167,10 @@ func (b *box) readStep(ctx context.Context, conn *wire.Conn, step sandbox.StepSp
 		switch body := frame.GetBody().(type) {
 		case *agentv1.Frame_Output:
 			writeOutput(step, body.Output)
+		case *agentv1.Frame_Report:
+			if step.Report != nil && body.Report.GetStepIndex() == step.Index {
+				_, _ = step.Report.Write(body.Report.GetData())
+			}
 		case *agentv1.Frame_StepExit:
 			if body.StepExit.GetIndex() != step.Index {
 				return sandbox.StepResult{}, fmt.Errorf("%w: the agent ended step %d while step %d was running", sandbox.ErrSandbox, body.StepExit.GetIndex(), step.Index)
@@ -229,7 +236,7 @@ func runStepFrame(step sandbox.StepSpec) *agentv1.Frame {
 	}
 	if len(step.Argv) > 0 {
 		return &agentv1.Frame{Body: &agentv1.Frame_RunExec{RunExec: &agentv1.RunExec{
-			Index: step.Index, Argv: step.Argv, Env: step.Env, SecretFiles: files, Stdin: step.Stdin != nil,
+			Index: step.Index, Argv: step.Argv, Env: step.Env, SecretFiles: files, Stdin: step.Stdin != nil, Report: step.Report != nil,
 		}}}
 	}
 	return &agentv1.Frame{Body: &agentv1.Frame_RunStep{RunStep: &agentv1.RunStep{

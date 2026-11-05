@@ -72,8 +72,16 @@ type PrepareSpec struct {
 	Dir       string
 	DiskMode  string
 	Egress    []string
+	Exact     []string
+	Inputs    []InputFile
 	Workspace Workspace
 	AuthFile  string
+}
+
+type InputFile struct {
+	Name   string
+	Path   string
+	Digest string
 }
 
 type StepSpec struct {
@@ -84,6 +92,7 @@ type StepSpec struct {
 	Env     map[string]string
 	Files   map[string][]byte
 	Stdin   io.Reader
+	Report  io.Writer
 	Stdout  io.Writer
 	Stderr  io.Writer
 	Started func()

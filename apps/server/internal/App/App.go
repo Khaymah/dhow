@@ -90,7 +90,7 @@ func RateLimited() []ratelimit.Route {
 }
 
 func RunnerPolicies() []policy.Rule {
-	return append(append(runners.Procedures(), jobs.Procedures()...), artifacts.Procedures()...)
+	return append(append(append(runners.Procedures(), jobs.Procedures()...), artifacts.Procedures()...), environments.Procedures()...)
 }
 
 type noSessions struct{}

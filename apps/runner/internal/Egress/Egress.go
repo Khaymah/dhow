@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,7 +25,12 @@ const (
 	maxAcceptBackoff     = time.Second
 )
 
-var ErrNoRules = errors.New("the job has no egress allowlist, so it gets no proxy")
+var (
+	ErrNoRules       = errors.New("the job has no egress allowlist, so it gets no proxy")
+	ErrExactEndpoint = errors.New("an exact endpoint is not a host and port")
+)
+
+const reasonIPNotListed = "an IP address, and the allowlist holds host names only"
 
 type Resolver interface {
 	LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error)
@@ -39,6 +45,7 @@ type Decision struct {
 
 type Options struct {
 	Allow         []string
+	Exact         []string
 	AllowPrivate  []netip.Prefix
 	HostAddrs     []netip.Addr
 	Resolver      Resolver
@@ -52,13 +59,18 @@ type Options struct {
 
 type Proxy struct {
 	rules  []jobspec.EgressRule
+	exact  map[string]struct{}
 	ranges ranges
 	o      Options
 }
 
 func New(o Options) (*Proxy, error) {
-	if len(o.Allow) == 0 {
+	if len(o.Allow) == 0 && len(o.Exact) == 0 {
 		return nil, ErrNoRules
+	}
+	exact, err := parseExact(o.Exact)
+	if err != nil {
+		return nil, err
 	}
 	rules := make([]jobspec.EgressRule, 0, len(o.Allow))
 	for _, entry := range o.Allow {
@@ -82,7 +94,7 @@ func New(o Options) (*Proxy, error) {
 	o.Idle = positiveDuration(o.Idle, DefaultIdle)
 	o.DialTimeout = positiveDuration(o.DialTimeout, DefaultDialTimeout)
 	o.HeaderTimeout = positiveDuration(o.HeaderTimeout, DefaultHeaderTimeout)
-	return &Proxy{rules: rules, ranges: ranges{guard: netguard.Policy{Allowed: o.AllowPrivate}, host: o.HostAddrs}, o: o}, nil
+	return &Proxy{rules: rules, exact: exact, ranges: ranges{guard: netguard.Policy{Allowed: o.AllowPrivate}, host: o.HostAddrs}, o: o}, nil
 }
 
 func (p *Proxy) Serve(ctx context.Context, ln net.Listener) error {
@@ -125,12 +137,18 @@ func (p *Proxy) Serve(ctx context.Context, ln net.Listener) error {
 }
 
 func (p *Proxy) decide(host string, port int, tunnel bool) (string, string) {
+	if addr, err := netip.ParseAddr(host); err == nil {
+		return p.decideIP(host, addr, port)
+	}
 	name, err := jobspec.NormalizeHost(host)
 	if errors.Is(err, jobspec.ErrEgressIP) {
-		return printable(host), "an IP address, and the allowlist holds host names only"
+		return printable(host), reasonIPNotListed
 	}
 	if err != nil {
 		return printable(host), "not a valid host name"
+	}
+	if p.exactAllows(name, port) {
+		return name, ""
 	}
 	for _, r := range p.rules {
 		if r.Allows(name, port, tunnel) {
@@ -140,11 +158,40 @@ func (p *Proxy) decide(host string, port int, tunnel bool) (string, string) {
 	return name, "not in the job's network.egress list"
 }
 
+func (p *Proxy) decideIP(host string, addr netip.Addr, port int) (string, string) {
+	addr = addr.Unmap()
+	if addr.Zone() == "" && p.exactAllows(addr.String(), port) {
+		return addr.String(), ""
+	}
+	if len(p.exact) > 0 {
+		return printable(host), "an IP address that is not one of the job's exact endpoints"
+	}
+	return printable(host), reasonIPNotListed
+}
+
+func (p *Proxy) exactAllows(host string, port int) bool {
+	_, ok := p.exact[net.JoinHostPort(host, strconv.Itoa(port))]
+	return ok
+}
+
+func parseExact(entries []string) (map[string]struct{}, error) {
+	out := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		host, port, ok := jobspec.ParseEndpoint(entry)
+		if !ok {
+			return nil, fmt.Errorf("%w: %q", ErrExactEndpoint, printable(entry))
+		}
+		if addr, err := netip.ParseAddr(host); err == nil {
+			host = addr.Unmap().String()
+		}
+		out[net.JoinHostPort(strings.ToLower(host), strconv.Itoa(port))] = struct{}{}
+	}
+	return out, nil
+}
+
 func (p *Proxy) dial(ctx context.Context, name string, port int) (net.Conn, string, int) {
-	lctx, cancel := context.WithTimeout(ctx, p.o.DialTimeout)
-	defer cancel()
-	addrs, err := p.o.Resolver.LookupNetIP(lctx, "ip", name+".")
-	if err != nil || len(addrs) == 0 {
+	addrs, ok := p.resolve(ctx, name)
+	if !ok {
 		return nil, "the name did not resolve", statusBadGateway
 	}
 	denial, status := "", statusForbidden
@@ -164,6 +211,16 @@ func (p *Proxy) dial(ctx context.Context, name string, port int) (net.Conn, stri
 		denial, status = "the connection failed", statusBadGateway
 	}
 	return nil, denial, status
+}
+
+func (p *Proxy) resolve(ctx context.Context, name string) ([]netip.Addr, bool) {
+	if addr, err := netip.ParseAddr(name); err == nil {
+		return []netip.Addr{addr}, true
+	}
+	lctx, cancel := context.WithTimeout(ctx, p.o.DialTimeout)
+	defer cancel()
+	addrs, err := p.o.Resolver.LookupNetIP(lctx, "ip", name+".")
+	return addrs, err == nil && len(addrs) > 0
 }
 
 func (p *Proxy) report(host string, port int, reason string) {

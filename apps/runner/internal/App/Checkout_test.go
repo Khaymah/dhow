@@ -267,7 +267,7 @@ func TestARunnerWithoutTheCheckoutImageNeitherClaimsNorRunsACheckout(t *testing.
 	srv2.Enqueue(runnertest.Spec(), nil)
 	require.Equal(t, runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED, running2.Next(t, finishWithin).Result)
 	_, signed = srv2.RunnerFeatures()
-	assert.True(t, slices.Equal([]string{runnersig.FeatureArtifacts, runnersig.FeatureCache, runnersig.FeatureCheckout, runnersig.FeaturePlugins, runnersig.FeatureRegistry}, signed),
+	assert.True(t, slices.Equal([]string{runnersig.FeatureArtifacts, runnersig.FeatureCache, runnersig.FeatureCheckout, runnersig.FeatureDeploy, runnersig.FeaturePlugins, runnersig.FeatureRegistry}, signed),
 		"%v", signed)
 }
 
