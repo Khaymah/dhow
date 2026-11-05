@@ -1,7 +1,6 @@
 package instancesettings
 
 import (
-	"crypto/rand"
 	"io"
 	"log/slog"
 	"testing"
@@ -18,10 +17,7 @@ import (
 
 func newStore(t *testing.T, env settingspec.Raw) *Store {
 	t.Helper()
-	key := make([]byte, 32)
-	_, err := rand.Read(key)
-	require.NoError(t, err)
-	s, err := New(Options{Values: keys.NewValues(keys.NewEnvelope(nil, nil), key), Env: env, Log: logging.New(io.Discard, slog.LevelError)})
+	s, err := New(Options{Values: keys.NewValues(keys.NewEnvelope(nil, nil)), Env: env, Log: logging.New(io.Discard, slog.LevelError)})
 	require.NoError(t, err)
 	return s
 }
@@ -71,7 +67,7 @@ func TestASecretIsSetFromEitherSourceAndNeverShownAsText(t *testing.T) {
 }
 
 func TestTheSealedSecretsRoundTripOnlyForTheirGroup(t *testing.T) {
-	s := newDBStore(t, dbtest.NewPool(t), nil)
+	s := newDBStore(t, dbtest.NewPool(t))
 	raw := settingspec.Raw{settingspec.EnvSMTPHost: "smtp.example.com", settingspec.EnvSMTPPassword: "relay-credential"}
 	value, sealed, err := s.encode(t.Context(), sqlc.New(s.db), settingspec.GroupMail, raw)
 	require.NoError(t, err)

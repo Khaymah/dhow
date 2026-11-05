@@ -89,7 +89,7 @@
 - الوثائق في النسختين: أي `git commit` فيه ملف تحت `docs/` من غير مقابله في `docs/en/` (أو العكس، أو ملف root من غير `.en.md` بتاعه) بيترفض ويقول الملف الناقص. الـ rename من `docs/X` لـ `docs/en/X` بيتحسب الاتنين (ADR-0064).
 - الملفات المتولّدة.
 - الأسرار.
-- `appcrypto.NewSealer` بره `Core/Crypto` و`Core/Keys/Values.go` (قراية الصيغة القديمة) والاختبارات: القيم الجديدة بتتختم بـ `Core/Keys` (ADR-0082).
+- `appcrypto.NewSealer` بره `Core/Crypto`: القيم بتتختم بـ `Core/Keys`، والصيغة القديمة `0x01` اتقفلت (ADR-0082 وADR-0088).
 - مكان الـ Markdown.
 - طول الملف.
 - الـ migrations اللي اتعملها merge.

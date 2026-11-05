@@ -23,8 +23,8 @@ func TotpSecretSpec() keys.Spec {
 func ValueLocations() []keys.Location {
 	return []keys.Location{keys.RowLocation[sqlc.ScanTotpSecretsRow]{
 		Of: TotpSecretSpec(),
-		ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32, legacyOnly bool) ([]sqlc.ScanTotpSecretsRow, error) {
-			return q.ScanTotpSecrets(ctx, sqlc.ScanTotpSecretsParams{After: after, LegacyOnly: legacyOnly, Batch: limit})
+		ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32) ([]sqlc.ScanTotpSecretsRow, error) {
+			return q.ScanTotpSecrets(ctx, sqlc.ScanTotpSecretsParams{After: after, Batch: limit})
 		},
 		Read: func(r sqlc.ScanTotpSecretsRow) (uuid.UUID, keys.Owner, []byte, []byte) {
 			return r.Id, keys.UserOwner(r.UserId), totpContext(r.UserId), r.Sealed
@@ -32,7 +32,6 @@ func ValueLocations() []keys.Location {
 		ReplaceRow: func(ctx context.Context, q *sqlc.Queries, id uuid.UUID, old, sealed []byte) (int64, error) {
 			return q.ReplaceTotpSecrets(ctx, sqlc.ReplaceTotpSecretsParams{Sealed: sealed, ID: id, Old: old})
 		},
-		CountOld: func(ctx context.Context, q *sqlc.Queries) (int64, error) { return q.CountLegacyTotpSecrets(ctx) },
 		CountByKeys: func(ctx context.Context, q *sqlc.Queries, ids [][]byte) (int64, error) {
 			return q.CountTotpSecretsUnder(ctx, ids)
 		},

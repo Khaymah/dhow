@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -15,7 +14,6 @@ import (
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	backfill "github.com/Khaymah/dhow/apps/server/internal/Core/Backfill"
-	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	"github.com/Khaymah/dhow/internal/buildinfo"
@@ -176,26 +174,13 @@ func printBackfills(ctx context.Context, pool *pgxpool.Pool, p *printer) error {
 	if err != nil {
 		return err
 	}
-	reg, err := ValueRegistry()
-	if err != nil {
-		return err
-	}
 	seen := map[string]backfill.Progress{}
+	names := []string{}
+	done := 0
 	for _, b := range list {
 		seen[b.Name] = b
-	}
-	names := []string{}
-	for _, l := range reg.Locations() {
-		names = append(names, keys.BackfillName(l.Spec()))
-	}
-	for _, b := range list {
-		if !slices.Contains(names, b.Name) {
-			names = append(names, b.Name)
-		}
-	}
-	done := 0
-	for _, n := range names {
-		if seen[n].Done() {
+		names = append(names, b.Name)
+		if b.Done() {
 			done++
 		}
 	}

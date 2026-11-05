@@ -89,7 +89,7 @@ func (e *Env) SeedRepository(org, project, creator uuid.UUID) uuid.UUID {
 	require.NoError(e.T, e.Pool.QueryRow(context.Background(),
 		`INSERT INTO "Repositories" ("OrganizationId", "ProjectId", "Provider", "FullName", "CloneUrl", "Transport", "HookId",
 		 "WebhookSecretSealed", "CreatedByUserId")
-		 VALUES ($1, $2, 'generic', 'team/app', 'https://git.example.com/team/app.git', 'https', $3, '\x01', $4) RETURNING "Id"`,
+		 VALUES ($1, $2, 'generic', 'team/app', 'https://git.example.com/team/app.git', 'https', $3, '\x03', $4) RETURNING "Id"`,
 		org, project, hex32(hook), creator).Scan(&id))
 	return id
 }

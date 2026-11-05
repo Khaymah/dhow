@@ -132,7 +132,7 @@ Every encrypted column is registered in the code as a value location: the table 
 
 ## Values saved before the keyring
 
-Before the keyring, values were encrypted with a key derived from `DHOW_SECRET_KEY`, in a format whose first byte is `0x01`. New values use the keyring format (`0x03`). The server reads both formats, writes only the new one, and converts the old values [in the background](upgrades.md#background-backfills), one backfill per column, with the same label and context:
+Before the keyring, values were encrypted with a key derived from `DHOW_SECRET_KEY`, in a format whose first byte is `0x01`. New values use the keyring format (`0x03`). The old format is gone: the server reads and writes the keyring format only, and refuses any value whose first byte is not `0x03`. Each of the following columns also has a CHECK constraint in the database that blocks writing any other format:
 
 | Column | Owner |
 |---|---|
@@ -141,8 +141,13 @@ Before the keyring, values were encrypted with a key derived from `DHOW_SECRET_K
 | `"OidcProviders"."Secret"` | The instance |
 | `"Repositories"."DeployKeySealed"` and `"PreviousDeployKeySealed"` | The project |
 | `"Repositories"."WebhookSecretSealed"` | The project |
+| `"SecretVersions"."ValueSealed"` | The organization, project or environment |
+| `"RegistryCredentials"."PasswordSealed"` | The organization or project |
+| `"GitConnections"."TokenSealed"` | Not used yet: nothing writes it before GitHub and GitLab connections arrive |
 
-Once the backfills are done (`dhow-server migrate status`), `DHOW_SECRET_KEY` opens no stored value and only derives signing and HMAC keys. Changing it does not touch the stored secrets, but every runner must register again, current API tokens and recovery codes stop working, and OIDC sign-ins that started before it and temporary artifact download links fail. So change it only if it leaked.
+Stop every server of the older release before you upgrade, so that no server writes a value in the old format while the migration runs. The migration that adds these constraints stops with `BACKFILL_NOT_DONE` if a column still holds a value in the old format whose conversion has not finished. In that case run the previous Dhow release until `dhow-server migrate status` says the conversion is done, then upgrade again. If the conversion is done and a value that cannot be opened is left, the next migration stops at that constraint, so delete that value or save it again, then restart.
+
+Now `DHOW_SECRET_KEY` opens no stored value and only derives signing and HMAC keys. Changing it does not touch the stored secrets, but every runner must register again, current API tokens and recovery codes stop working, and OIDC sign-ins that started before it and temporary artifact download links fail. So change it only if it leaked.
 
 ## Backups and export
 

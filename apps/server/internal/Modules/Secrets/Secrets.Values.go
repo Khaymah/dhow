@@ -29,8 +29,8 @@ func ValueLocations() []keys.Location {
 	return []keys.Location{
 		keys.RowLocation[sqlc.ScanSecretValuesRow]{
 			Of: SecretValueSpec(),
-			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32, legacy bool) ([]sqlc.ScanSecretValuesRow, error) {
-				return q.ScanSecretValues(ctx, sqlc.ScanSecretValuesParams{After: after, LegacyOnly: legacy, Batch: limit})
+			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32) ([]sqlc.ScanSecretValuesRow, error) {
+				return q.ScanSecretValues(ctx, sqlc.ScanSecretValuesParams{After: after, Batch: limit})
 			},
 			Read: func(r sqlc.ScanSecretValuesRow) (uuid.UUID, keys.Owner, []byte, []byte) {
 				return r.Id, ownerOf(r.Scope, r.OrganizationId, r.ProjectId, r.EnvironmentId), sealContext(r.SecretId, r.Version), r.Sealed
@@ -38,15 +38,14 @@ func ValueLocations() []keys.Location {
 			ReplaceRow: func(ctx context.Context, q *sqlc.Queries, id uuid.UUID, old, sealed []byte) (int64, error) {
 				return q.ReplaceSecretValue(ctx, sqlc.ReplaceSecretValueParams{Sealed: sealed, ID: id, Old: old})
 			},
-			CountOld: func(ctx context.Context, q *sqlc.Queries) (int64, error) { return q.CountLegacySecretValues(ctx) },
 			CountByKeys: func(ctx context.Context, q *sqlc.Queries, ids [][]byte) (int64, error) {
 				return q.CountSecretValuesUnder(ctx, ids)
 			},
 		},
 		keys.RowLocation[sqlc.ScanRegistryPasswordsRow]{
 			Of: RegistryPasswordSpec(),
-			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32, legacy bool) ([]sqlc.ScanRegistryPasswordsRow, error) {
-				return q.ScanRegistryPasswords(ctx, sqlc.ScanRegistryPasswordsParams{After: after, LegacyOnly: legacy, Batch: limit})
+			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32) ([]sqlc.ScanRegistryPasswordsRow, error) {
+				return q.ScanRegistryPasswords(ctx, sqlc.ScanRegistryPasswordsParams{After: after, Batch: limit})
 			},
 			Read: func(r sqlc.ScanRegistryPasswordsRow) (uuid.UUID, keys.Owner, []byte, []byte) {
 				scope := models.ScopeOrganization
@@ -58,7 +57,6 @@ func ValueLocations() []keys.Location {
 			ReplaceRow: func(ctx context.Context, q *sqlc.Queries, id uuid.UUID, old, sealed []byte) (int64, error) {
 				return q.ReplaceRegistryPassword(ctx, sqlc.ReplaceRegistryPasswordParams{Sealed: sealed, ID: id, Old: old})
 			},
-			CountOld: func(ctx context.Context, q *sqlc.Queries) (int64, error) { return q.CountLegacyRegistryPasswords(ctx) },
 			CountByKeys: func(ctx context.Context, q *sqlc.Queries, ids [][]byte) (int64, error) {
 				return q.CountRegistryPasswordsUnder(ctx, ids)
 			},

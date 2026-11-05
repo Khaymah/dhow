@@ -11,7 +11,7 @@ import (
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	settingspec "github.com/Khaymah/dhow/apps/server/internal/Config/Settings"
-	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	dbtest "github.com/Khaymah/dhow/apps/server/internal/Database/Testing"
 )
 
@@ -103,10 +103,9 @@ func TestTheDashboardSendsMailWithoutTLSOnlyToThisMachine(t *testing.T) {
 }
 
 func TestASecretSetInTheEnvironmentSurvivesANewSecretKey(t *testing.T) {
-	sealer, err := appcrypto.NewSealer(randomKey(t), config.InstanceSettingsSealLabel)
-	require.NoError(t, err)
-	sealed, err := sealer.Seal([]byte(`{"Password":"old-relay-credential"}`), []byte("instance-settings:mail"))
-	require.NoError(t, err)
+	sealed := append([]byte{keys.FormatVersion}, randomKey(t)...)
+	sealed = append(sealed, randomKey(t)...)
+	sealed = append(sealed, randomKey(t)...)
 	pool := seededPool(t, "mail", `{"Host": "smtp.example.com", "From": "dhow@example.com", "Username": "dhow"}`, sealed)
 	require.Error(t, build(t, randomKey(t), nil, pool), "without the variable the start fails closed")
 

@@ -46,8 +46,6 @@ func needle(t *testing.T, name string, value []byte) leaksweep.Needle {
 
 func TestTheDatabaseDumpHoldsNoSealedValueNoDataKeyAndNoKeyringKey(t *testing.T) {
 	w := newSealedWorld(t)
-	makeLegacy(t, w.env)
-	drainBackfills(t, w.env)
 	dir := apptest.PrivateDir(t)
 	require.Positive(t, dumpTables(t, w.env, dir))
 

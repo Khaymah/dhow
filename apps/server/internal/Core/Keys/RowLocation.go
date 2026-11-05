@@ -11,16 +11,15 @@ import (
 
 type RowLocation[R any] struct {
 	Of          Spec
-	ScanRows    func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32, legacyOnly bool) ([]R, error)
+	ScanRows    func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32) ([]R, error)
 	Read        func(row R) (id uuid.UUID, owner Owner, rowContext, sealed []byte)
 	ReplaceRow  func(ctx context.Context, q *sqlc.Queries, id uuid.UUID, old, sealed []byte) (int64, error)
-	CountOld    func(ctx context.Context, q *sqlc.Queries) (int64, error)
 	CountByKeys func(ctx context.Context, q *sqlc.Queries, dataKeys [][]byte) (int64, error)
 }
 
 func (l RowLocation[R]) Spec() Spec { return l.Of }
 
-func (l RowLocation[R]) Scan(ctx context.Context, db sqlc.DBTX, after string, limit int32, legacyOnly bool) ([]Value, error) {
+func (l RowLocation[R]) Scan(ctx context.Context, db sqlc.DBTX, after string, limit int32) ([]Value, error) {
 	start := uuid.Nil
 	if after != "" {
 		id, err := uuid.Parse(after)
@@ -29,7 +28,7 @@ func (l RowLocation[R]) Scan(ctx context.Context, db sqlc.DBTX, after string, li
 		}
 		start = id
 	}
-	rows, err := l.ScanRows(ctx, sqlc.New(db), start, limit, legacyOnly)
+	rows, err := l.ScanRows(ctx, sqlc.New(db), start, limit)
 	if err != nil {
 		return nil, fmt.Errorf("read the values of %s: %w", l.Of.Name(), err)
 	}
@@ -51,10 +50,6 @@ func (l RowLocation[R]) Replace(ctx context.Context, db sqlc.DBTX, v Value, seal
 		return false, fmt.Errorf("store a value of %s: %w", l.Of.Name(), err)
 	}
 	return n == 1, nil
-}
-
-func (l RowLocation[R]) CountLegacy(ctx context.Context, db sqlc.DBTX) (int64, error) {
-	return l.CountOld(ctx, sqlc.New(db))
 }
 
 func (l RowLocation[R]) CountUnder(ctx context.Context, db sqlc.DBTX, dataKeys [][]byte) (int64, error) {

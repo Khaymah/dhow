@@ -50,8 +50,8 @@ func ValueLocations() []keys.Location {
 	return []keys.Location{
 		keys.RowLocation[sqlc.ScanRepositoryDeployKeysRow]{
 			Of: DeployKeySpec(),
-			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32, legacy bool) ([]sqlc.ScanRepositoryDeployKeysRow, error) {
-				return q.ScanRepositoryDeployKeys(ctx, sqlc.ScanRepositoryDeployKeysParams{After: after, LegacyOnly: legacy, Batch: limit})
+			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32) ([]sqlc.ScanRepositoryDeployKeysRow, error) {
+				return q.ScanRepositoryDeployKeys(ctx, sqlc.ScanRepositoryDeployKeysParams{After: after, Batch: limit})
 			},
 			Read: func(r sqlc.ScanRepositoryDeployKeysRow) (uuid.UUID, keys.Owner, []byte, []byte) {
 				owner, rowContext := deployOwner(r.ProjectId, r.Id)
@@ -60,17 +60,14 @@ func ValueLocations() []keys.Location {
 			ReplaceRow: func(ctx context.Context, q *sqlc.Queries, id uuid.UUID, old, sealed []byte) (int64, error) {
 				return q.ReplaceRepositoryDeployKeys(ctx, sqlc.ReplaceRepositoryDeployKeysParams{Sealed: sealed, ID: id, Old: old})
 			},
-			CountOld: func(ctx context.Context, q *sqlc.Queries) (int64, error) {
-				return q.CountLegacyRepositoryDeployKeys(ctx)
-			},
 			CountByKeys: func(ctx context.Context, q *sqlc.Queries, ids [][]byte) (int64, error) {
 				return q.CountRepositoryDeployKeysUnder(ctx, ids)
 			},
 		},
 		keys.RowLocation[sqlc.ScanRepositoryPreviousDeployKeysRow]{
 			Of: PreviousDeployKeySpec(),
-			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32, legacy bool) ([]sqlc.ScanRepositoryPreviousDeployKeysRow, error) {
-				return q.ScanRepositoryPreviousDeployKeys(ctx, sqlc.ScanRepositoryPreviousDeployKeysParams{After: after, LegacyOnly: legacy, Batch: limit})
+			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32) ([]sqlc.ScanRepositoryPreviousDeployKeysRow, error) {
+				return q.ScanRepositoryPreviousDeployKeys(ctx, sqlc.ScanRepositoryPreviousDeployKeysParams{After: after, Batch: limit})
 			},
 			Read: func(r sqlc.ScanRepositoryPreviousDeployKeysRow) (uuid.UUID, keys.Owner, []byte, []byte) {
 				owner, rowContext := deployOwner(r.ProjectId, r.Id)
@@ -79,17 +76,14 @@ func ValueLocations() []keys.Location {
 			ReplaceRow: func(ctx context.Context, q *sqlc.Queries, id uuid.UUID, old, sealed []byte) (int64, error) {
 				return q.ReplaceRepositoryPreviousDeployKeys(ctx, sqlc.ReplaceRepositoryPreviousDeployKeysParams{Sealed: sealed, ID: id, Old: old})
 			},
-			CountOld: func(ctx context.Context, q *sqlc.Queries) (int64, error) {
-				return q.CountLegacyRepositoryPreviousDeployKeys(ctx)
-			},
 			CountByKeys: func(ctx context.Context, q *sqlc.Queries, ids [][]byte) (int64, error) {
 				return q.CountRepositoryPreviousDeployKeysUnder(ctx, ids)
 			},
 		},
 		keys.RowLocation[sqlc.ScanRepositoryWebhookSecretsRow]{
 			Of: WebhookSecretSpec(),
-			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32, legacy bool) ([]sqlc.ScanRepositoryWebhookSecretsRow, error) {
-				return q.ScanRepositoryWebhookSecrets(ctx, sqlc.ScanRepositoryWebhookSecretsParams{After: after, LegacyOnly: legacy, Batch: limit})
+			ScanRows: func(ctx context.Context, q *sqlc.Queries, after uuid.UUID, limit int32) ([]sqlc.ScanRepositoryWebhookSecretsRow, error) {
+				return q.ScanRepositoryWebhookSecrets(ctx, sqlc.ScanRepositoryWebhookSecretsParams{After: after, Batch: limit})
 			},
 			Read: func(r sqlc.ScanRepositoryWebhookSecretsRow) (uuid.UUID, keys.Owner, []byte, []byte) {
 				owner, rowContext := webhookOwner(r.ProjectId, r.Id)
@@ -97,9 +91,6 @@ func ValueLocations() []keys.Location {
 			},
 			ReplaceRow: func(ctx context.Context, q *sqlc.Queries, id uuid.UUID, old, sealed []byte) (int64, error) {
 				return q.ReplaceRepositoryWebhookSecrets(ctx, sqlc.ReplaceRepositoryWebhookSecretsParams{Sealed: sealed, ID: id, Old: old})
-			},
-			CountOld: func(ctx context.Context, q *sqlc.Queries) (int64, error) {
-				return q.CountLegacyRepositoryWebhookSecrets(ctx)
 			},
 			CountByKeys: func(ctx context.Context, q *sqlc.Queries, ids [][]byte) (int64, error) {
 				return q.CountRepositoryWebhookSecretsUnder(ctx, ids)

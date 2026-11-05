@@ -11,39 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const countLegacyRepositoryDeployKeys = `-- name: CountLegacyRepositoryDeployKeys :one
-SELECT count(*)::bigint FROM "Repositories" WHERE "DeployKeySealed" IS NOT NULL AND get_byte("DeployKeySealed", 0) = 1
-`
-
-func (q *Queries) CountLegacyRepositoryDeployKeys(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countLegacyRepositoryDeployKeys)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const countLegacyRepositoryPreviousDeployKeys = `-- name: CountLegacyRepositoryPreviousDeployKeys :one
-SELECT count(*)::bigint FROM "Repositories" WHERE "PreviousDeployKeySealed" IS NOT NULL AND get_byte("PreviousDeployKeySealed", 0) = 1
-`
-
-func (q *Queries) CountLegacyRepositoryPreviousDeployKeys(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countLegacyRepositoryPreviousDeployKeys)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const countLegacyRepositoryWebhookSecrets = `-- name: CountLegacyRepositoryWebhookSecrets :one
-SELECT count(*)::bigint FROM "Repositories" WHERE "WebhookSecretSealed" IS NOT NULL AND get_byte("WebhookSecretSealed", 0) = 1
-`
-
-func (q *Queries) CountLegacyRepositoryWebhookSecrets(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countLegacyRepositoryWebhookSecrets)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const countRepositoryDeployKeysUnder = `-- name: CountRepositoryDeployKeysUnder :one
 SELECT count(*)::bigint FROM "Repositories"
 WHERE "DeployKeySealed" IS NOT NULL AND get_byte("DeployKeySealed", 0) = 3 AND substring("DeployKeySealed" FROM 2 FOR 16) = ANY($1::bytea[])
@@ -137,16 +104,15 @@ func (q *Queries) ReplaceRepositoryWebhookSecrets(ctx context.Context, arg Repla
 const scanRepositoryDeployKeys = `-- name: ScanRepositoryDeployKeys :many
 SELECT "Id", "ProjectId", "DeployKeySealed" AS "Sealed"
 FROM "Repositories"
-WHERE "DeployKeySealed" IS NOT NULL AND "Id" > $1::uuid AND (NOT $2::boolean OR get_byte("DeployKeySealed", 0) = 1)
+WHERE "DeployKeySealed" IS NOT NULL AND "Id" > $1::uuid
 ORDER BY "Id"
-LIMIT $3
+LIMIT $2
 FOR UPDATE SKIP LOCKED
 `
 
 type ScanRepositoryDeployKeysParams struct {
-	After      uuid.UUID
-	LegacyOnly bool
-	Batch      int32
+	After uuid.UUID
+	Batch int32
 }
 
 type ScanRepositoryDeployKeysRow struct {
@@ -156,7 +122,7 @@ type ScanRepositoryDeployKeysRow struct {
 }
 
 func (q *Queries) ScanRepositoryDeployKeys(ctx context.Context, arg ScanRepositoryDeployKeysParams) ([]ScanRepositoryDeployKeysRow, error) {
-	rows, err := q.db.Query(ctx, scanRepositoryDeployKeys, arg.After, arg.LegacyOnly, arg.Batch)
+	rows, err := q.db.Query(ctx, scanRepositoryDeployKeys, arg.After, arg.Batch)
 	if err != nil {
 		return nil, err
 	}
@@ -178,16 +144,15 @@ func (q *Queries) ScanRepositoryDeployKeys(ctx context.Context, arg ScanReposito
 const scanRepositoryPreviousDeployKeys = `-- name: ScanRepositoryPreviousDeployKeys :many
 SELECT "Id", "ProjectId", "PreviousDeployKeySealed" AS "Sealed"
 FROM "Repositories"
-WHERE "PreviousDeployKeySealed" IS NOT NULL AND "Id" > $1::uuid AND (NOT $2::boolean OR get_byte("PreviousDeployKeySealed", 0) = 1)
+WHERE "PreviousDeployKeySealed" IS NOT NULL AND "Id" > $1::uuid
 ORDER BY "Id"
-LIMIT $3
+LIMIT $2
 FOR UPDATE SKIP LOCKED
 `
 
 type ScanRepositoryPreviousDeployKeysParams struct {
-	After      uuid.UUID
-	LegacyOnly bool
-	Batch      int32
+	After uuid.UUID
+	Batch int32
 }
 
 type ScanRepositoryPreviousDeployKeysRow struct {
@@ -197,7 +162,7 @@ type ScanRepositoryPreviousDeployKeysRow struct {
 }
 
 func (q *Queries) ScanRepositoryPreviousDeployKeys(ctx context.Context, arg ScanRepositoryPreviousDeployKeysParams) ([]ScanRepositoryPreviousDeployKeysRow, error) {
-	rows, err := q.db.Query(ctx, scanRepositoryPreviousDeployKeys, arg.After, arg.LegacyOnly, arg.Batch)
+	rows, err := q.db.Query(ctx, scanRepositoryPreviousDeployKeys, arg.After, arg.Batch)
 	if err != nil {
 		return nil, err
 	}
@@ -219,16 +184,15 @@ func (q *Queries) ScanRepositoryPreviousDeployKeys(ctx context.Context, arg Scan
 const scanRepositoryWebhookSecrets = `-- name: ScanRepositoryWebhookSecrets :many
 SELECT "Id", "ProjectId", "WebhookSecretSealed" AS "Sealed"
 FROM "Repositories"
-WHERE "WebhookSecretSealed" IS NOT NULL AND "Id" > $1::uuid AND (NOT $2::boolean OR get_byte("WebhookSecretSealed", 0) = 1)
+WHERE "WebhookSecretSealed" IS NOT NULL AND "Id" > $1::uuid
 ORDER BY "Id"
-LIMIT $3
+LIMIT $2
 FOR UPDATE SKIP LOCKED
 `
 
 type ScanRepositoryWebhookSecretsParams struct {
-	After      uuid.UUID
-	LegacyOnly bool
-	Batch      int32
+	After uuid.UUID
+	Batch int32
 }
 
 type ScanRepositoryWebhookSecretsRow struct {
@@ -238,7 +202,7 @@ type ScanRepositoryWebhookSecretsRow struct {
 }
 
 func (q *Queries) ScanRepositoryWebhookSecrets(ctx context.Context, arg ScanRepositoryWebhookSecretsParams) ([]ScanRepositoryWebhookSecretsRow, error) {
-	rows, err := q.db.Query(ctx, scanRepositoryWebhookSecrets, arg.After, arg.LegacyOnly, arg.Batch)
+	rows, err := q.db.Query(ctx, scanRepositoryWebhookSecrets, arg.After, arg.Batch)
 	if err != nil {
 		return nil, err
 	}

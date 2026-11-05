@@ -11,17 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const countLegacyTotpSecrets = `-- name: CountLegacyTotpSecrets :one
-SELECT count(*)::bigint FROM "TotpFactors" WHERE "SecretSealed" IS NOT NULL AND get_byte("SecretSealed", 0) = 1
-`
-
-func (q *Queries) CountLegacyTotpSecrets(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countLegacyTotpSecrets)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const countTotpSecretsUnder = `-- name: CountTotpSecretsUnder :one
 SELECT count(*)::bigint FROM "TotpFactors"
 WHERE "SecretSealed" IS NOT NULL AND get_byte("SecretSealed", 0) = 3 AND substring("SecretSealed" FROM 2 FOR 16) = ANY($1::bytea[])
@@ -55,16 +44,15 @@ func (q *Queries) ReplaceTotpSecrets(ctx context.Context, arg ReplaceTotpSecrets
 const scanTotpSecrets = `-- name: ScanTotpSecrets :many
 SELECT "Id", "UserId", "SecretSealed" AS "Sealed"
 FROM "TotpFactors"
-WHERE "SecretSealed" IS NOT NULL AND "Id" > $1::uuid AND (NOT $2::boolean OR get_byte("SecretSealed", 0) = 1)
+WHERE "SecretSealed" IS NOT NULL AND "Id" > $1::uuid
 ORDER BY "Id"
-LIMIT $3
+LIMIT $2
 FOR UPDATE SKIP LOCKED
 `
 
 type ScanTotpSecretsParams struct {
-	After      uuid.UUID
-	LegacyOnly bool
-	Batch      int32
+	After uuid.UUID
+	Batch int32
 }
 
 type ScanTotpSecretsRow struct {
@@ -74,7 +62,7 @@ type ScanTotpSecretsRow struct {
 }
 
 func (q *Queries) ScanTotpSecrets(ctx context.Context, arg ScanTotpSecretsParams) ([]ScanTotpSecretsRow, error) {
-	rows, err := q.db.Query(ctx, scanTotpSecrets, arg.After, arg.LegacyOnly, arg.Batch)
+	rows, err := q.db.Query(ctx, scanTotpSecrets, arg.After, arg.Batch)
 	if err != nil {
 		return nil, err
 	}

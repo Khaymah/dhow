@@ -165,6 +165,7 @@ needle "runner registration token" "$registration_token"
 need "an API token is made" api_token
 need "Forgejo has a user and an empty repository" forgejo_repo
 need "a project is made with the API token" project
+need "a secret in each scope and a registry password are stored" sealed_values
 need "the repository is linked and its host key is pinned after a fingerprint check" link
 need "Forgejo has the read-only deploy key and the webhook" forgejo_hooks
 

@@ -34,7 +34,7 @@ func (k KeysRunner) rekey(ctx context.Context) error {
 		return err
 	}
 	k.say("Replacing the data key of every owner and sealing every stored value again. This is safe to stop and run again.")
-	res, err := manager.Rekey(ctx, pool, keys.NewValues(manager.Envelope(), nil), reg, keys.RekeyOptions{Grace: k.Opts.Grace})
+	res, err := manager.Rekey(ctx, pool, keys.NewValues(manager.Envelope()), reg, keys.RekeyOptions{Grace: k.Opts.Grace})
 	if res.Resumed {
 		k.say("Resumed the rekey that started before.")
 	}

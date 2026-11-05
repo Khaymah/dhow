@@ -157,3 +157,22 @@ checkout_image() {
   export DHOW_DEMO_CHECKOUT_IMAGE="registry.dhow-demo.test/dhow-git$digest"
   printf '    checkout image %s\n' "$DHOW_DEMO_CHECKOUT_IMAGE"
 }
+
+sealed_values() {
+  local name value scope path
+  api "$work/environment" POST "/api/v1/organizations/$org_id/projects/$project_id/environments" \
+    "$(printf '{"Name":"staging","CurrentFactor":{"Method":"password","Password":"%s"}}' "$password")" "${session[@]}" >/dev/null || return 1
+  for scope in "organization secret:/api/v1/organizations/$org_id" \
+    "project secret:/api/v1/organizations/$org_id/projects/$project_id" \
+    "environment secret:/api/v1/organizations/$org_id/projects/$project_id/environments/staging"; do
+    name=${scope%%:*}
+    path=${scope#*:}
+    value="demo-$(od -An -tx1 -N18 /dev/urandom | tr -d ' \n')"
+    [[ $(api "$work/secret" PUT "$path/secrets/DEMO_${name%% *}_SECRET" "$(printf '{"Value":"%s"}' "$value")" "${session[@]}") == 2?? ]] || return 1
+    needle "$name" "$value"
+  done
+  value="demo-$(od -An -tx1 -N18 /dev/urandom | tr -d ' \n')"
+  [[ $(api "$work/registry" POST "/api/v1/organizations/$org_id/registry-credentials" \
+    "$(printf '{"Host":"registry.dhow-demo.test","Username":"demo","Password":"%s"}' "$value")" "${session[@]}") == 2?? ]] || return 1
+  needle "registry password" "$value"
+}

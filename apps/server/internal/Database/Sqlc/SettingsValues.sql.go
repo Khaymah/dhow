@@ -23,28 +23,6 @@ func (q *Queries) CountInstanceSettingSecretsUnder(ctx context.Context, dataKeys
 	return column_1, err
 }
 
-const countLegacyInstanceSettingSecrets = `-- name: CountLegacyInstanceSettingSecrets :one
-SELECT count(*)::bigint FROM "InstanceSettings" WHERE "Secrets" IS NOT NULL AND get_byte("Secrets", 0) = 1
-`
-
-func (q *Queries) CountLegacyInstanceSettingSecrets(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countLegacyInstanceSettingSecrets)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const countLegacyOidcProviderSecrets = `-- name: CountLegacyOidcProviderSecrets :one
-SELECT count(*)::bigint FROM "OidcProviders" WHERE "Secret" IS NOT NULL AND get_byte("Secret", 0) = 1
-`
-
-func (q *Queries) CountLegacyOidcProviderSecrets(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countLegacyOidcProviderSecrets)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const countOidcProviderSecretsUnder = `-- name: CountOidcProviderSecretsUnder :one
 SELECT count(*)::bigint FROM "OidcProviders"
 WHERE "Secret" IS NOT NULL AND get_byte("Secret", 0) = 3 AND substring("Secret" FROM 2 FOR 16) = ANY($1::bytea[])
@@ -96,16 +74,15 @@ func (q *Queries) ReplaceOidcProviderSecrets(ctx context.Context, arg ReplaceOid
 const scanInstanceSettingSecrets = `-- name: ScanInstanceSettingSecrets :many
 SELECT "Id", "Group", "Secrets" AS "Sealed"
 FROM "InstanceSettings"
-WHERE "Secrets" IS NOT NULL AND "Id" > $1::uuid AND (NOT $2::boolean OR get_byte("Secrets", 0) = 1)
+WHERE "Secrets" IS NOT NULL AND "Id" > $1::uuid
 ORDER BY "Id"
-LIMIT $3
+LIMIT $2
 FOR UPDATE SKIP LOCKED
 `
 
 type ScanInstanceSettingSecretsParams struct {
-	After      uuid.UUID
-	LegacyOnly bool
-	Batch      int32
+	After uuid.UUID
+	Batch int32
 }
 
 type ScanInstanceSettingSecretsRow struct {
@@ -115,7 +92,7 @@ type ScanInstanceSettingSecretsRow struct {
 }
 
 func (q *Queries) ScanInstanceSettingSecrets(ctx context.Context, arg ScanInstanceSettingSecretsParams) ([]ScanInstanceSettingSecretsRow, error) {
-	rows, err := q.db.Query(ctx, scanInstanceSettingSecrets, arg.After, arg.LegacyOnly, arg.Batch)
+	rows, err := q.db.Query(ctx, scanInstanceSettingSecrets, arg.After, arg.Batch)
 	if err != nil {
 		return nil, err
 	}
@@ -137,16 +114,15 @@ func (q *Queries) ScanInstanceSettingSecrets(ctx context.Context, arg ScanInstan
 const scanOidcProviderSecrets = `-- name: ScanOidcProviderSecrets :many
 SELECT "Id", "ProviderId", "Secret" AS "Sealed"
 FROM "OidcProviders"
-WHERE "Secret" IS NOT NULL AND "Id" > $1::uuid AND (NOT $2::boolean OR get_byte("Secret", 0) = 1)
+WHERE "Secret" IS NOT NULL AND "Id" > $1::uuid
 ORDER BY "Id"
-LIMIT $3
+LIMIT $2
 FOR UPDATE SKIP LOCKED
 `
 
 type ScanOidcProviderSecretsParams struct {
-	After      uuid.UUID
-	LegacyOnly bool
-	Batch      int32
+	After uuid.UUID
+	Batch int32
 }
 
 type ScanOidcProviderSecretsRow struct {
@@ -156,7 +132,7 @@ type ScanOidcProviderSecretsRow struct {
 }
 
 func (q *Queries) ScanOidcProviderSecrets(ctx context.Context, arg ScanOidcProviderSecretsParams) ([]ScanOidcProviderSecretsRow, error) {
-	rows, err := q.db.Query(ctx, scanOidcProviderSecrets, arg.After, arg.LegacyOnly, arg.Batch)
+	rows, err := q.db.Query(ctx, scanOidcProviderSecrets, arg.After, arg.Batch)
 	if err != nil {
 		return nil, err
 	}

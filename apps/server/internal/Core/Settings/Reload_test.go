@@ -2,7 +2,6 @@ package instancesettings
 
 import (
 	"context"
-	"crypto/rand"
 	"io"
 	"log/slog"
 	"testing"
@@ -17,14 +16,11 @@ import (
 
 func TestAFailedReloadRetriesWithABoundedBackoffAndFailsReadinessUntilItRecovers(t *testing.T) {
 	pool := dbtest.NewPool(t)
-	key := make([]byte, 32)
-	_, err := rand.Read(key)
-	require.NoError(t, err)
 	var waits []time.Duration
 	var readyWhileFailing []error
 	var s *Store
-	s, err = New(Options{
-		DB: pool, Values: testValues(t, pool, key), Log: logging.New(io.Discard, slog.LevelError),
+	s, err := New(Options{
+		DB: pool, Values: testValues(t, pool), Log: logging.New(io.Discard, slog.LevelError),
 		Wait: func(ctx context.Context, d time.Duration) bool {
 			waits = append(waits, d)
 			readyWhileFailing = append(readyWhileFailing, s.Ready(ctx))
@@ -55,14 +51,11 @@ func TestAFailedReloadRetriesWithABoundedBackoffAndFailsReadinessUntilItRecovers
 
 func TestAReloadStopsRetryingWhenTheServerStops(t *testing.T) {
 	pool := dbtest.NewPool(t)
-	key := make([]byte, 32)
-	_, err := rand.Read(key)
-	require.NoError(t, err)
-	_, err = pool.Exec(t.Context(), `INSERT INTO "InstanceSettings" ("Group", "Value") VALUES ('logs', '{"RetentionDays": 0}'::jsonb)`)
+	_, err := pool.Exec(t.Context(), `INSERT INTO "InstanceSettings" ("Group", "Value") VALUES ('logs', '{"RetentionDays": 0}'::jsonb)`)
 	require.NoError(t, err)
 	calls := 0
 	s, err := New(Options{
-		DB: pool, Values: testValues(t, pool, key), Log: logging.New(io.Discard, slog.LevelError),
+		DB: pool, Values: testValues(t, pool), Log: logging.New(io.Discard, slog.LevelError),
 		Wait: func(context.Context, time.Duration) bool {
 			calls++
 			return false

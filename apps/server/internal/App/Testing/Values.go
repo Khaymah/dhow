@@ -92,7 +92,7 @@ func (e *Env) AllValues(t testing.TB) map[string][]keys.Value {
 			var batch []keys.Value
 			require.NoError(t, pgx.BeginFunc(context.Background(), e.Pool, func(tx pgx.Tx) error {
 				var err error
-				batch, err = l.Scan(context.Background(), tx, after, 500, false)
+				batch, err = l.Scan(context.Background(), tx, after, 500)
 				return err
 			}))
 			out[l.Spec().Name()] = append(out[l.Spec().Name()], batch...)

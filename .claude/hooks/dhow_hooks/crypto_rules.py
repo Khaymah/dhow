@@ -1,23 +1,22 @@
 import re
 
-from .common import GENERATED_PATH, is_test, new_lines
+from .common import GENERATED_PATH, new_lines
 
 SERVER = "apps/server/"
 CRYPTO_PACKAGE = "apps/server/internal/Core/Crypto/"
-LEGACY_READ = ("apps/server/internal/Core/Keys/Values.go",)
 NEW_SEALER = re.compile(r"(?<![\w])NewSealer(?![\w])")
 DEFINITION = re.compile(r"^\s*func\s+NewSealer\s*\(")
-ADR = "Plan/ADR/0082-sealer-users-move-to-the-envelope.md"
+ADR = "Plan/ADR/0088-contract-the-old-sealed-format.md"
 
 
 def check_new_sealer(rel, added, old, **_):
     if not rel.endswith(".go") or not rel.startswith(SERVER) or GENERATED_PATH.search(rel):
         return None
-    if rel.startswith(CRYPTO_PACKAGE) or rel in LEGACY_READ or is_test(rel) or "/Test/" in rel:
+    if rel.startswith(CRYPTO_PACKAGE):
         return None
     for line in new_lines(added, old):
         if NEW_SEALER.search(line) and not DEFINITION.match(line):
-            return (f"{rel}: appcrypto.NewSealer is only for reading values sealed before the keyring, in "
-                    f"{LEGACY_READ[0]}. Seal new values with Core/Keys: register the column as a value location "
+            return (f"{rel}: appcrypto.NewSealer lives in Core/Crypto only; the old sealed format is not read any more. "
+                    f"Seal new values with Core/Keys: register the column as a value location "
                     f"(keys.Spec with its owner, label and context) and use values.Column(spec) ({ADR}).")
     return None
