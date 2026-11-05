@@ -170,7 +170,8 @@ func (c *Client) Close() error {
 	var err error
 	c.once.Do(func() {
 		close(c.done)
-		err = errors.Join(c.ssh.Close(), c.sftp.Close())
+		err = c.ssh.Close()
+		_ = c.sftp.Close()
 	})
 	return err
 }
