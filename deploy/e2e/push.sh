@@ -22,7 +22,9 @@ git_in_tools checkout --quiet main
 if [[ $branch != main ]]; then
   git_in_tools checkout --quiet -B "$branch"
 fi
-printf 'A change on %s at %s.\n' "$branch" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$work/repo/README.md"
+change="change-${branch//\//-}-$(date -u +%Y%m%dT%H%M%S%N).txt"
+printf 'A change on %s.\n' "$branch" >"$work/repo/$change"
+chmod 0644 "$work/repo/$change"
 git_in_tools add --all
 git_in_tools commit --quiet -m "Change $branch"
 git_in_tools push --quiet origin "HEAD:refs/heads/$branch" 2>&1
