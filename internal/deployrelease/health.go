@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"syscall"
 	"time"
 
@@ -191,10 +192,24 @@ func NewHealthClient(transport http.RoundTripper) *http.Client {
 			if len(via) > maxHealthRedirects {
 				return errors.New("too many redirects")
 			}
-			if req.URL.Host != via[0].URL.Host {
-				return errors.New("a redirect to another host")
+			if !sameOrigin(req.URL, via[0].URL) {
+				return errors.New("a redirect to another origin")
 			}
 			return nil
 		},
 	}
+}
+
+func sameOrigin(a, b *url.URL) bool {
+	return a.Scheme == b.Scheme && strings.EqualFold(a.Hostname(), b.Hostname()) && effectivePort(a) == effectivePort(b)
+}
+
+func effectivePort(u *url.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	if u.Scheme == "https" {
+		return "443"
+	}
+	return "80"
 }
