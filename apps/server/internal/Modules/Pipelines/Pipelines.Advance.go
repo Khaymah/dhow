@@ -181,7 +181,7 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 	if env != nil && !env.RefAllowed {
 		return true, s.endWithDetail(ctx, q, st, i, models.JobSkipped, models.ReasonEnvironmentRef, refDetail(st.run, env.Name))
 	}
-	spec, err := plan.Build(ctx, evalCtx)
+	spec, origin, err := plan.BuildWithOrigins(ctx, evalCtx)
 	if errors.Is(err, pipelinespec.ErrSecretScope) {
 		s.log.ErrorContext(ctx, "a built job spec gives a step a secret it did not declare", "run_job_id", st.rows[i].Id.String())
 		return true, s.endRunJob(ctx, q, st, i, models.JobFailed, models.ReasonJobSpecInvalid)
@@ -192,13 +192,11 @@ func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, 
 	if len(spec.GetSteps()) == 0 {
 		return true, s.endRunJob(ctx, q, st, i, models.JobSkipped, models.ReasonConditionFalse)
 	}
-	return s.admitJob(ctx, q, st, i, plan, spec, evalCtx, env)
+	return s.admitJob(ctx, q, st, i, candidate{plan: plan, spec: spec, eval: evalCtx, origin: origin}, env)
 }
 
-func (s *Service) admitJob(
-	ctx context.Context, q *sqlc.Queries, st *step, i int, plan *pipelinespec.RunJob, spec *runnerv1.JobSpec,
-	evalCtx pipelinespec.Context, env *deployments.Environment,
-) (bool, error) {
+func (s *Service) admitJob(ctx context.Context, q *sqlc.Queries, st *step, i int, c candidate, env *deployments.Environment) (bool, error) {
+	plan, spec := c.plan, c.spec
 	var envID *uuid.UUID
 	if env != nil {
 		pins, err := decodePins(st.run.ImagePins)
@@ -222,6 +220,12 @@ func (s *Service) admitJob(
 		}
 		return true, s.endWithDetail(ctx, q, st, i, models.JobFailed, reason, detail)
 	}
+	if d, err := s.attachTargets(ctx, q, st, i, c, env); err != nil || d.reason != "" {
+		if err != nil {
+			return false, err
+		}
+		return true, s.endWithDetail(ctx, q, st, i, models.JobFailed, d.reason, d.detail())
+	}
 	var approval *uuid.UUID
 	if env != nil {
 		p, err := s.gateOf(ctx, q, st.run, st.rows[i], *env)
@@ -237,7 +241,7 @@ func (s *Service) admitJob(
 		approval = p.approval
 	}
 	rj := st.rows[i]
-	if reason, err := s.attachTransfers(ctx, q, st, rj, plan, spec, evalCtx); err != nil || reason != "" {
+	if reason, err := s.attachTransfers(ctx, q, st, rj, plan, spec, c.eval); err != nil || reason != "" {
 		if err != nil {
 			return false, err
 		}

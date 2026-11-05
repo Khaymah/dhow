@@ -20,6 +20,11 @@ SELECT *
 FROM "DeployTargets"
 WHERE "EnvironmentId" = @environment_id AND "OrganizationId" = @organization_id AND "Name" = @name AND NOT "IsDeleted";
 
+-- name: GetDeployTargetByID :one
+SELECT *
+FROM "DeployTargets"
+WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "EnvironmentId" = @environment_id AND NOT "IsDeleted";
+
 -- name: LockDeployTarget :one
 SELECT *
 FROM "DeployTargets"
@@ -136,3 +141,14 @@ SELECT EXISTS (
     WHERE "OrganizationId" = @organization_id AND "EnvironmentId" = @environment_id AND "Scope" = 'environment'
       AND lower("Name") = lower(@name::text) AND NOT "IsDeleted"
 )::boolean;
+
+-- name: EnvironmentSecretVersion :one
+SELECT "CurrentVersion"
+FROM "Secrets"
+WHERE "OrganizationId" = @organization_id AND "EnvironmentId" = @environment_id AND "Scope" = 'environment'
+  AND lower("Name") = lower(@name::text) AND NOT "IsDeleted";
+
+-- name: ListDeployTargetKeyNames :many
+SELECT "KeySecretName"::text
+FROM "DeployTargets"
+WHERE "OrganizationId" = @organization_id AND "EnvironmentId" = @environment_id AND NOT "IsDeleted" AND "KeySecretName" IS NOT NULL;

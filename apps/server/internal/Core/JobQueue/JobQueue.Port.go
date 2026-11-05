@@ -20,6 +20,7 @@ const (
 	FeatureArtifacts = "artifacts"
 	FeatureCache     = "cache"
 	FeatureRegistry  = "registry_auth"
+	FeatureDeploy    = "deploy_targets"
 )
 
 type Request struct {

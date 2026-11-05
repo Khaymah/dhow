@@ -21,6 +21,40 @@ message JobSpec {
   repeated ArtifactInput inputs = 13;
   Cache cache = 14;
   repeated RegistryAuth registry_auth = 15;
+  repeated StepTarget targets = 16;
+}
+
+message StepTarget {
+  int32 step_index = 1;
+  string target_id = 2;
+  int64 version = 3;
+  string name = 4;
+  string kind = 5;
+  string user = 6;
+  string deploy_path = 7;
+  string release_id = 8;
+  int32 keep_releases = 9;
+  repeated TargetHost hosts = 10;
+  TargetSettings settings = 11;
+}
+
+message TargetHost {
+  string host_id = 1;
+  string host = 2;
+  int32 port = 3;
+  string known_hosts_line = 4;
+}
+
+message TargetSettings {
+  int32 batch_size = 1;
+  int32 batch_pause_seconds = 2;
+  string reload_command = 3;
+  string pre_switch_command = 4;
+  string post_switch_command = 5;
+  repeated string shared = 6;
+  string compose_project = 7;
+  string compose_file = 8;
+  bool allow_unsafe_compose = 9;
 }
 
 message RegistryAuth {
@@ -103,6 +137,7 @@ message Resources {
 
 message Network {
   repeated string egress = 1;
+  repeated string exact_endpoints = 2;
 }
 
 enum HpkeKem {

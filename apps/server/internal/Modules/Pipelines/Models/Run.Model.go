@@ -79,6 +79,24 @@ const (
 )
 
 const (
+	ReasonTargetNotFound         = "TARGET_NOT_FOUND"
+	ReasonTargetNotLiteral       = "TARGET_NOT_LITERAL"
+	ReasonTargetNeedsEnvironment = "TARGET_REQUIRES_ENVIRONMENT"
+	ReasonTargetHostKey          = "TARGET_HOST_KEY_UNCONFIRMED"
+	ReasonTargetKeyNotFound      = "TARGET_KEY_NOT_FOUND"
+	ReasonTargetPluginNotAllowed = "TARGET_PLUGIN_NOT_ALLOWED"
+	ReasonTargetArtifact         = "TARGET_ARTIFACT_REQUIRED"
+	ReasonTargetEgress           = "TARGET_JOB_EGRESS_NOT_ALLOWED"
+	ReasonTargetChanged          = "TARGET_CHANGED"
+	ReasonHealthURLInvalid       = "HEALTH_URL_INVALID"
+	ReasonHealthURLNotAllowed    = "HEALTH_URL_NOT_ALLOWED"
+	ReasonTargetPluginNotPinned  = "TARGET_PLUGIN_NOT_PINNED"
+	ReasonTargetKeyReferenced    = "TARGET_KEY_NOT_REFERENCEABLE"
+	ReasonHealthBudget           = "HEALTH_BUDGET_EXCEEDED"
+	ReasonRollingBudget          = "ROLLING_BUDGET_EXCEEDED"
+)
+
+const (
 	ForkPolicyApproval  = "approval"
 	ForkPolicyAutomatic = "automatic"
 )

@@ -35,18 +35,19 @@ type Target struct {
 }
 
 type Environment struct {
-	ID                   uuid.UUID
-	Name                 string
-	RuleVersion          int64
-	RefAllowed           bool
-	HasReviewers         bool
-	WaitMinutes          int
-	RequirePinnedImages  bool
-	AllowedPlugins       []string
-	Paused               bool
-	LockedByRunID        *uuid.UUID
-	ApprovalTimeoutHours int
-	SupersedePending     bool
+	ID                     uuid.UUID
+	Name                   string
+	RuleVersion            int64
+	RefAllowed             bool
+	HasReviewers           bool
+	WaitMinutes            int
+	RequirePinnedImages    bool
+	AllowedPlugins         []string
+	Paused                 bool
+	LockedByRunID          *uuid.UUID
+	ApprovalTimeoutHours   int
+	SupersedePending       bool
+	AllowExtraDeployEgress bool
 }
 
 type Deployment struct {
@@ -98,4 +99,49 @@ type Gate interface {
 	CancelApprovals(ctx context.Context, tx *sqlc.Queries, org, run uuid.UUID) error
 	Settle(ctx context.Context, tx *sqlc.Queries, org, run uuid.UUID, keep []string) ([]Finished, error)
 	ReleaseStale(ctx context.Context, tx *sqlc.Queries) (int64, error)
+}
+
+type Hooks struct {
+	Reload     string
+	PreSwitch  string
+	PostSwitch string
+}
+
+type TargetSettings struct {
+	BatchSize         int
+	BatchPauseSeconds int
+	Hooks             Hooks
+	Shared            []string
+	ComposeProject    string
+	ComposeFile       string
+	AllowUnsafe       bool
+}
+
+type TargetHost struct {
+	ID       uuid.UUID
+	Position int
+	Host     string
+	Port     int
+	HostKey  string
+}
+
+type DeployTarget struct {
+	ID            uuid.UUID
+	Name          string
+	Kind          string
+	Username      string
+	DeployPath    string
+	KeySecretName string
+	KeyFound      bool
+	KeyVersion    int32
+	KeepReleases  int
+	Version       int64
+	AllowedImages []string
+	Settings      TargetSettings
+	Hosts         []TargetHost
+}
+
+type Targets interface {
+	Find(ctx context.Context, tx *sqlc.Queries, org, environment uuid.UUID, name string) (DeployTarget, bool, error)
+	KeyNames(ctx context.Context, tx *sqlc.Queries, org, environment uuid.UUID) ([]string, error)
 }

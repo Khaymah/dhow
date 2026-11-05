@@ -12,6 +12,9 @@ import (
 var (
 	ErrSecretsUnavailable     = errors.New("no secret store is configured")
 	ErrEnvironmentRuleChanged = errors.New("the environment of the job or its rules changed after the gate")
+	ErrTargetChanged          = errors.New("the deploy target of the job or the host key of one of its hosts changed after the job was queued")
+	ErrTargetKeyUsed          = errors.New("a step names the secret that holds the key of a deploy target, which only the deploy step may receive")
+	ErrTargetKeyMissing       = errors.New("the secret that holds the key of the deploy target of the job no longer exists")
 )
 
 type SecretRequest struct {
@@ -21,6 +24,7 @@ type SecretRequest struct {
 	Names          []string
 	Checkout       *runnerv1.Checkout
 	Registries     map[string]string
+	Targets        []*runnerv1.StepTarget
 }
 
 const (

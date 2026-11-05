@@ -252,7 +252,7 @@ FUZZ_TARGETS := \
 	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName \
 	Core/Keys:FuzzKeyring Core/Keys:FuzzOpen Modules/Environments/Test/Edge:FuzzAllowedRefs Modules/Environments/Test/Edge:FuzzDeployPath \
 	Modules/Environments/Test/Edge:FuzzKeySecretName Modules/Secrets/Test/Edge:FuzzSecretName) \
-	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare \
+	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare internal/jobspec:FuzzHealthEndpoints internal/jobspec:FuzzParseEndpoint \
 	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
 	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern
 

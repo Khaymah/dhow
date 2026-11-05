@@ -199,7 +199,7 @@ func (q *Queries) ListDeployments(ctx context.Context, arg ListDeploymentsParams
 const lockGateEnvironment = `-- name: LockGateEnvironment :one
 SELECT e."Id", e."Name", e."RuleVersion", e."AllowedRefs", e."AllowPullRequests", e."WaitMinutes", e."RequirePinnedImages",
        e."AllowedPlugins", (e."PausedAt" IS NOT NULL)::boolean AS "Paused", e."LockedByRunId", e."ApprovalTimeoutHours",
-       e."SupersedePending",
+       e."SupersedePending", e."AllowExtraDeployEgress",
        EXISTS (SELECT 1
                FROM "EnvironmentReviewers" r
                WHERE r."EnvironmentId" = e."Id" AND r."OrganizationId" = e."OrganizationId" AND NOT r."IsDeleted")::boolean
@@ -216,19 +216,20 @@ type LockGateEnvironmentParams struct {
 }
 
 type LockGateEnvironmentRow struct {
-	Id                   uuid.UUID
-	Name                 string
-	RuleVersion          int64
-	AllowedRefs          []byte
-	AllowPullRequests    bool
-	WaitMinutes          int32
-	RequirePinnedImages  bool
-	AllowedPlugins       []string
-	Paused               bool
-	LockedByRunId        *uuid.UUID
-	ApprovalTimeoutHours int32
-	SupersedePending     bool
-	HasReviewers         bool
+	Id                     uuid.UUID
+	Name                   string
+	RuleVersion            int64
+	AllowedRefs            []byte
+	AllowPullRequests      bool
+	WaitMinutes            int32
+	RequirePinnedImages    bool
+	AllowedPlugins         []string
+	Paused                 bool
+	LockedByRunId          *uuid.UUID
+	ApprovalTimeoutHours   int32
+	SupersedePending       bool
+	AllowExtraDeployEgress bool
+	HasReviewers           bool
 }
 
 func (q *Queries) LockGateEnvironment(ctx context.Context, arg LockGateEnvironmentParams) (LockGateEnvironmentRow, error) {
@@ -247,6 +248,7 @@ func (q *Queries) LockGateEnvironment(ctx context.Context, arg LockGateEnvironme
 		&i.LockedByRunId,
 		&i.ApprovalTimeoutHours,
 		&i.SupersedePending,
+		&i.AllowExtraDeployEgress,
 		&i.HasReviewers,
 	)
 	return i, err

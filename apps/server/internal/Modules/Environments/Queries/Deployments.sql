@@ -1,7 +1,7 @@
 -- name: LockGateEnvironment :one
 SELECT e."Id", e."Name", e."RuleVersion", e."AllowedRefs", e."AllowPullRequests", e."WaitMinutes", e."RequirePinnedImages",
        e."AllowedPlugins", (e."PausedAt" IS NOT NULL)::boolean AS "Paused", e."LockedByRunId", e."ApprovalTimeoutHours",
-       e."SupersedePending",
+       e."SupersedePending", e."AllowExtraDeployEgress",
        EXISTS (SELECT 1
                FROM "EnvironmentReviewers" r
                WHERE r."EnvironmentId" = e."Id" AND r."OrganizationId" = e."OrganizationId" AND NOT r."IsDeleted")::boolean

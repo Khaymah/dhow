@@ -148,7 +148,7 @@ func (s *Service) markStarted(ctx context.Context, q *sqlc.Queries, l sqlc.LockA
 
 func (s *Service) resolveSecrets(ctx context.Context, l sqlc.LockActiveLeaseRow, spec *runnerv1.JobSpec) (map[string][]byte, error) {
 	if g, ok := s.secrets.(StartGuard); ok {
-		if err := g.Admit(ctx, SecretRequest{OrganizationID: l.OrganizationId, JobID: l.JobId, AttemptID: l.AttemptId}); err != nil {
+		if err := g.Admit(ctx, SecretRequest{OrganizationID: l.OrganizationId, JobID: l.JobId, AttemptID: l.AttemptId, Names: jobspec.SecretNames(spec), Targets: spec.GetTargets()}); err != nil {
 			return nil, err
 		}
 	}
@@ -162,7 +162,7 @@ func (s *Service) resolveSecrets(ctx context.Context, l sqlc.LockActiveLeaseRow,
 	}
 	values, err := s.secrets.Resolve(ctx, SecretRequest{
 		OrganizationID: l.OrganizationId, JobID: l.JobId, AttemptID: l.AttemptId, Names: names, Checkout: spec.GetCheckout(),
-		Registries: registries,
+		Registries: registries, Targets: spec.GetTargets(),
 	})
 	if err == nil {
 		for _, n := range names {
@@ -187,6 +187,12 @@ func secretRefusal(err error) (string, bool) {
 	switch {
 	case errors.Is(err, ErrEnvironmentRuleChanged):
 		return models.ReasonEnvironmentRule, true
+	case errors.Is(err, ErrTargetChanged):
+		return models.ReasonTargetChanged, true
+	case errors.Is(err, ErrTargetKeyUsed):
+		return models.ReasonTargetKeyUsed, true
+	case errors.Is(err, ErrTargetKeyMissing):
+		return models.ReasonTargetKeyMissing, true
 	case errors.Is(err, ErrSecretsUnavailable):
 		return models.ReasonSecretsMissing, true
 	default:

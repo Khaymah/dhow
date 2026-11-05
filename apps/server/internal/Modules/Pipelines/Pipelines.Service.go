@@ -68,6 +68,7 @@ type Service struct {
 	secrets       secretstore.Store
 	vars          secretstore.VariableStore
 	gate          deployments.Gate
+	targets       deployments.Targets
 	checkoutImage string
 	publicURL     string
 	limiter       ratelimit.Limiter
