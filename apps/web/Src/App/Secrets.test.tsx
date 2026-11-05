@@ -181,9 +181,12 @@ describe('the project secrets tab', () => {
     const view = mount(`/projects/${PROJECT_ID}`, 'maintainer');
     const tabs = await screen.findByRole('navigation', { name: Ar['projects.nav.label'] });
     await view.user.click(within(tabs).getByRole('link', { name: Ar['projects.nav.secrets'] }));
+    await waitFor(() => {
+      expect(view.router.state.location.pathname).toBe(PROJECT_URL);
+    });
+    expect(await screen.findByText('PROJECT_KEY')).toBeInTheDocument();
     const main = await findPage('Web app');
-    expect(view.router.state.location.pathname).toBe(PROJECT_URL);
-    expect(await within(main).findByText('PROJECT_KEY')).toBeInTheDocument();
+    expect(within(main).getByText('PROJECT_KEY')).toBeInTheDocument();
     expect(within(main).getByText(Ar['secrets.overrides.organization'])).toBeInTheDocument();
     expect(await within(main).findByText('PROJECT_HOST')).toBeInTheDocument();
     expect(within(main).getAllByRole('button', { name: Ar['secrets.add'] }).length).toBeGreaterThan(0);
