@@ -99,6 +99,15 @@ func (s *Service) GenerateKey(ctx context.Context, org, project uuid.UUID, envNa
 			return err
 		}
 		secretName := KeySecretName(locked.target.Name)
+		taken, err := q.EnvironmentSecretExists(ctx, sqlc.EnvironmentSecretExistsParams{
+			OrganizationID: org, EnvironmentID: &locked.env.ID, Name: secretName,
+		})
+		if err != nil {
+			return err
+		}
+		if taken && !strings.EqualFold(locked.target.KeySecretName, secretName) {
+			return apperrors.TargetKeyNameTaken()
+		}
 		written, err := s.secrets.PutEnvironmentSecret(ctx, q, secretstore.EnvironmentSecret{
 			OrganizationID: org, ProjectID: project, EnvironmentID: locked.env.ID, Name: secretName,
 			Description: "Deploy key of the target " + locked.target.Name, Value: secretstore.Value(key.private),
@@ -159,6 +168,9 @@ func (s *Service) FetchHostKey(ctx context.Context, org, project uuid.UUID, envN
 	host, ok := findHost(t, hostID)
 	if !ok {
 		return models.Target{}, apperrors.NotFound()
+	}
+	if err := s.checkProject(ctx, s.queries(), org, project); err != nil {
+		return models.Target{}, err
 	}
 	if err := s.chargeDial(ctx, org, p.UserID); err != nil {
 		return models.Target{}, err

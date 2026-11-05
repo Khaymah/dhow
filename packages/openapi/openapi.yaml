@@ -2783,7 +2783,7 @@ paths:
       description: >-
         Needs `environment.manage` and a fresh `CurrentFactor`. Dhow makes an ed25519 key pair and keeps the private half as the secret
         `<TARGET>_SSH_KEY` of the environment. The answer carries only the public half in `PublicKey`, to put in `authorized_keys` on every
-        host. Doing it again makes a new key and a new version of that secret.
+        host. Doing it again makes a new key and a new version of that secret. If the environment already has a secret with that name that this target did not make, the answer is 409 `TARGET_KEY_NAME_TAKEN` and nothing is written.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -5581,7 +5581,7 @@ components:
             `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`,
             `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT`, `REVIEWER_NOT_ELIGIBLE`, `TARGET_EXISTS`, `TARGET_DUPLICATE`,
             `TARGET_VERSION_CONFLICT`, `TARGET_HOST_BLOCKED`, `TARGET_HOST_UNREACHABLE`, `TARGET_KEY_NOT_FOUND`,
-            `DEPLOY_PATH_INVALID`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
+            `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
           example: INTERNAL
         Message:
           type: string

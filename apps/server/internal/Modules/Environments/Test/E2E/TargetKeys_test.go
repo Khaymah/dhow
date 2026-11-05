@@ -133,7 +133,11 @@ func TestAPrivateOrMetadataAddressIsNeverDialed(t *testing.T) {
 		{http.StatusBadGateway, "TARGET_HOST_UNREACHABLE"},
 		{http.StatusBadGateway, "TARGET_HOST_UNREACHABLE"},
 	} {
-		requireError(t, w.fetchKey(w.owner, "production", "web", target.Hosts[i].Id), want.status, want.code)
+		res := w.fetchKey(w.owner, "production", "web", target.Hosts[i].Id)
+		requireError(t, res, want.status, want.code)
+		for _, leak := range []string{"dial", "tcp", "connection refused", "127.0.0.1", "203.0.113.20", "10.1.2.3", "169.254", "lookup", "example.test"} {
+			assert.NotContains(t, string(res.Raw), leak, "the dial error never reaches the body")
+		}
 	}
 	after := decodeTarget(t, w.targetCall(w.owner, http.MethodGet, "production", "/web", nil), http.StatusOK)
 	for _, h := range after.Hosts {
@@ -264,4 +268,65 @@ func assertNoPrivateField(t *testing.T, typ reflect.Type, path string) {
 		}
 		assertNoPrivateField(t, f.Type, path+"."+f.Name)
 	}
+}
+
+func TestGeneratingAKeyNeverOverwritesAnotherSecret(t *testing.T) {
+	w := newTargetWorld(t)
+	w.production(t)
+	ref := apptest.SecretRef(w.org, &w.project, "production")
+	w.env.SeedSecret(ref, "WEB_SSH_KEY", "a user secret that must survive")
+	w.newTarget(t, "production", "web")
+	body := map[string]any{"CurrentFactor": w.ownerFactor()}
+	requireError(t, w.targetCall(w.owner, http.MethodPost, "production", "/web/generate-key", body), http.StatusConflict, "TARGET_KEY_NAME_TAKEN")
+
+	env := w.environmentID(t, "production")
+	got, err := w.env.Wired.Options.Secrets.Resolve(context.Background(), secretstore.Request{
+		OrganizationID: w.org, ProjectID: w.project, EnvironmentID: &env, Names: []string{"WEB_SSH_KEY"},
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "a user secret that must survive", string(got[0].Value))
+	assert.Equal(t, int32(1), got[0].Version)
+	secretstore.Wipe(got)
+	still := decodeTarget(t, w.targetCall(w.owner, http.MethodGet, "production", "/web", nil), http.StatusOK)
+	assert.Nil(t, still.KeySecretName)
+	assert.Zero(t, w.env.AuditCount("target.key_generated"))
+}
+
+func TestTwoTargetsThatWouldShareAKeyNameAreRefused(t *testing.T) {
+	w := newTargetWorld(t)
+	w.production(t)
+	w.newTarget(t, "production", "web-1")
+	other := w.targetBody("web_1", hostEntry(publicHost, 2299))
+	other["DeployPath"] = "/srv/other"
+	requireError(t, w.createTarget(w.owner, "production", other), http.StatusConflict, "TARGET_DUPLICATE")
+	third := w.targetBody("web-2", hostEntry(publicHost, 2298))
+	third["DeployPath"] = "/srv/third"
+	decodeTarget(t, w.createTarget(w.owner, "production", third), http.StatusCreated)
+}
+
+func TestRotatingTheKeyOfTheSameTargetStaysAllowed(t *testing.T) {
+	w := newTargetWorld(t)
+	w.production(t)
+	w.newTarget(t, "production", "web")
+	body := map[string]any{"CurrentFactor": w.ownerFactor()}
+	first := decodeTarget(t, w.targetCall(w.owner, http.MethodPost, "production", "/web/generate-key", body), http.StatusOK)
+	second := decodeTarget(t, w.targetCall(w.owner, http.MethodPost, "production", "/web/generate-key", body), http.StatusOK)
+	assert.NotEqual(t, *first.PublicKey, *second.PublicKey)
+	assert.Equal(t, "WEB_SSH_KEY", *second.KeySecretName)
+}
+
+func TestAnArchivedProjectTakesNoTargetWrites(t *testing.T) {
+	w := newTargetWorld(t)
+	w.production(t)
+	server := startSSH(t)
+	target := w.newTarget(t, "production", "web", hostEntry(publicHost, portOf(t, server)))
+	_, err := w.env.Pool.Exec(context.Background(), `UPDATE "Projects" SET "State" = 'archived', "ArchivedAt" = now() WHERE "Id" = $1`, w.project)
+	require.NoError(t, err)
+	factor := map[string]any{"CurrentFactor": w.ownerFactor()}
+	requireError(t, w.createTarget(w.owner, "production", w.targetBody("api")), http.StatusConflict, "PROJECT_ARCHIVED")
+	requireError(t, w.targetCall(w.owner, http.MethodPost, "production", "/web/generate-key", factor), http.StatusConflict, "PROJECT_ARCHIVED")
+	requireError(t, w.fetchKey(w.owner, "production", "web", target.Hosts[0].Id), http.StatusConflict, "PROJECT_ARCHIVED")
+	requireError(t, w.targetCall(w.owner, http.MethodPost, "production", "/web/remove", factor), http.StatusConflict, "PROJECT_ARCHIVED")
+	assert.Equal(t, http.StatusOK, w.targetCall(w.owner, http.MethodGet, "production", "/web", nil).Status, "reading still works")
 }

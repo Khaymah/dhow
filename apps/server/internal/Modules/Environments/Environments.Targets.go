@@ -182,6 +182,9 @@ func (s *Service) lockTarget(ctx context.Context, q *sqlc.Queries, org, project 
 	if err != nil {
 		return lockedTarget{}, err
 	}
+	if err := s.checkProject(ctx, q, org, project); err != nil {
+		return lockedTarget{}, err
+	}
 	row, err := q.LockDeployTarget(ctx, sqlc.LockDeployTargetParams{EnvironmentID: env.ID, OrganizationID: org, Name: name})
 	if err != nil {
 		return lockedTarget{}, notFoundOr(err)
@@ -305,6 +308,12 @@ func (s *Service) CreateTarget(ctx context.Context, org, project uuid.UUID, envN
 			return err
 		}
 		if err := s.requireSecret(ctx, q, env, fields.keySecretName); err != nil {
+			return err
+		}
+		if err := s.checkProject(ctx, q, org, project); err != nil {
+			return err
+		}
+		if err := s.checkKeyNameFree(ctx, q, env, in.Name); err != nil {
 			return err
 		}
 		now := s.now()

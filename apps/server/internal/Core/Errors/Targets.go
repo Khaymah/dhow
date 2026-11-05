@@ -10,6 +10,7 @@ const (
 	CodeTargetHostUnreachable = "TARGET_HOST_UNREACHABLE"
 	CodeTargetKeyNotFound     = "TARGET_KEY_NOT_FOUND"
 	CodeDeployPathInvalid     = "DEPLOY_PATH_INVALID"
+	CodeTargetKeyNameTaken    = "TARGET_KEY_NAME_TAKEN"
 	KeyTargetExists           = "errors.targetExists"
 	KeyTargetDuplicate        = "errors.targetDuplicate"
 	KeyTargetVersionConflict  = "errors.targetVersionConflict"
@@ -17,6 +18,7 @@ const (
 	KeyTargetHostUnreachable  = "errors.targetHostUnreachable"
 	KeyTargetKeyNotFound      = "errors.targetKeyNotFound"
 	KeyDeployPathInvalid      = "errors.deployPathInvalid"
+	KeyTargetKeyNameTaken     = "errors.targetKeyNameTaken"
 )
 
 func TargetExists() *AppError {
@@ -53,4 +55,8 @@ func DeployPathInvalid(details ...IErrorDetail) *AppError {
 	e := New(http.StatusUnprocessableEntity, CodeDeployPathInvalid, KeyDeployPathInvalid)
 	e.Details = details
 	return e
+}
+
+func TargetKeyNameTaken() *AppError {
+	return New(http.StatusConflict, CodeTargetKeyNameTaken, KeyTargetKeyNameTaken)
 }
