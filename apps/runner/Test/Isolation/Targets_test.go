@@ -66,10 +66,11 @@ func newTargetAttempt(t *testing.T) (string, string) {
 	return id, dir
 }
 
-func TestTheKeyFileIsInTheDeploySandboxOnlyNotInAnotherSandboxOfTheSameJob(t *testing.T) {
+func TestTheKeyFileStaysInTheDeploySandboxAwayFromALiveNeighbourAndTheNextStep(t *testing.T) {
 	id, dir := newTargetAttempt(t)
+	otherID, otherDir := newTargetAttempt(t)
 	deploy := prepare(t, dir, id, 1, sandbox.KindPlugin, nil)
-	other := prepare(t, dir, id, 2, sandbox.KindJob, nil)
+	other := prepare(t, otherDir, otherID, 1, sandbox.KindJob, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), stepTimeout)
 	defer cancel()
 	require.NoError(t, deploy.Start(ctx))
@@ -104,6 +105,16 @@ func TestTheKeyFileIsInTheDeploySandboxOnlyNotInAnotherSandboxOfTheSameJob(t *te
 
 	cancel()
 	<-held
+	require.NoError(t, deploy.Destroy(context.Background()))
+
+	next := prepare(t, dir, id, 2, sandbox.KindJob, nil)
+	nctx, ncancel := context.WithTimeout(context.Background(), stepTimeout)
+	defer ncancel()
+	require.NoError(t, next.Start(nctx))
+	after := run(t, next, hunt, nil)
+	assert.NotContains(t, after.stdout, keyLine1, "the next step of the same job finds no key in the workspace or under /run/dhow")
+	assert.NotContains(t, after.stdout, "target-key")
+	assert.Contains(t, after.stdout, "done")
 }
 
 func TestTheDeployStepReadsTheKeyFromItsFileAndTheFileIsGoneWhenItEnds(t *testing.T) {
@@ -121,18 +132,16 @@ func TestTheDeployStepReadsTheKeyFromItsFileAndTheFileIsGoneWhenItEnds(t *testin
 	assert.Equal(t, "0", strings.TrimSpace(after.stdout), "the secrets directory is wiped after the step")
 }
 
-func TestOnlyTheSandboxThatWasGivenAnArchiveSeesItAndItCannotChangeIt(t *testing.T) {
+func TestOnlyTheStepThatWasGivenAnArchiveSeesItAndItCannotChangeIt(t *testing.T) {
 	id, dir := newTargetAttempt(t)
 	archive := filepath.Join(dir, "archive-site.tgz")
 	require.NoError(t, os.WriteFile(archive, []byte("not really a tarball, only bytes\n"), config.PrivateFileMode))
 	plugin := prepare(t, dir, id, 1, sandbox.KindPlugin, func(s *sandbox.PrepareSpec) {
 		s.Inputs = []sandbox.InputFile{{Name: "site.tgz", Path: archive, Digest: strings.Repeat("a", 64)}}
 	})
-	other := prepare(t, dir, id, 2, sandbox.KindJob, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), stepTimeout)
 	defer cancel()
 	require.NoError(t, plugin.Start(ctx))
-	require.NoError(t, other.Start(ctx))
 
 	got := runCtx(ctx, t, plugin, sandbox.StepSpec{Index: 1, Argv: []string{busybox, "cat", sandbox.InputsPath + "/site.tgz"}})
 	assert.Zero(t, got.result.ExitCode)
@@ -142,7 +151,10 @@ func TestOnlyTheSandboxThatWasGivenAnArchiveSeesItAndItCannotChangeIt(t *testing
 	assert.NotContains(t, write.stdout, "write=0")
 	assert.NotContains(t, write.stdout, "touch=0")
 	assert.NotContains(t, write.stdout, "changed")
+	require.NoError(t, plugin.Destroy(context.Background()))
 
+	other := prepare(t, dir, id, 2, sandbox.KindJob, nil)
+	require.NoError(t, other.Start(ctx))
 	absent := run(t, other, "ls "+sandbox.InputsPath+" 2>&1; echo \"ls=$?\"\n", nil)
 	assert.NotContains(t, absent.stdout, "site.tgz")
 	assert.NotContains(t, absent.stdout, "ls=0")
