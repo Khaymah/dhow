@@ -90,7 +90,7 @@ WHERE "Id" = (SELECT r."Id"
               ORDER BY r."CreatedAt"
               LIMIT 1
               FOR UPDATE SKIP LOCKED)
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt", "Round"
 `
 
 type ClaimPendingRunParams struct {
@@ -139,6 +139,7 @@ func (q *Queries) ClaimPendingRun(ctx context.Context, arg ClaimPendingRunParams
 		&i.ClaimedUntil,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.Round,
 	)
 	return i, err
 }
@@ -393,7 +394,7 @@ func (q *Queries) GetManualDefinition(ctx context.Context, arg GetManualDefiniti
 }
 
 const getRun = `-- name: GetRun :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt", "Round"
 FROM "PipelineRuns"
 WHERE "Id" = $1 AND "OrganizationId" = $2 AND "ProjectId" = $3 AND NOT "IsDeleted"
 `
@@ -445,6 +446,7 @@ func (q *Queries) GetRun(ctx context.Context, arg GetRunParams) (PipelineRun, er
 		&i.ClaimedUntil,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.Round,
 	)
 	return i, err
 }
@@ -570,7 +572,7 @@ VALUES ($1, $2, $3::uuid, $4::text, $5, $6, $7,
         $8::text, $9::text, $10::text, $11, $12::integer,
         $13::text, $14, $15, $16::text, $17,
         $18::uuid, $19::uuid)
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt", "Round"
 `
 
 type InsertRunParams struct {
@@ -656,6 +658,7 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (PipelineR
 		&i.ClaimedUntil,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.Round,
 	)
 	return i, err
 }
@@ -995,7 +998,7 @@ func (q *Queries) ListRunJobs(ctx context.Context, runID uuid.UUID) ([]RunJob, e
 }
 
 const listRuns = `-- name: ListRuns :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt", "Round"
 FROM "PipelineRuns"
 WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
   AND (cardinality($3::text[]) = 0 OR "State" = ANY($3::text[]))
@@ -1067,6 +1070,7 @@ func (q *Queries) ListRuns(ctx context.Context, arg ListRunsParams) ([]PipelineR
 			&i.ClaimedUntil,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.Round,
 		); err != nil {
 			return nil, err
 		}
@@ -1169,7 +1173,7 @@ func (q *Queries) LockConcurrencyGroup(ctx context.Context, arg LockConcurrencyG
 }
 
 const lockRun = `-- name: LockRun :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt", "Round"
 FROM "PipelineRuns"
 WHERE "Id" = $1
 FOR UPDATE
@@ -1216,6 +1220,7 @@ func (q *Queries) LockRun(ctx context.Context, id uuid.UUID) (PipelineRun, error
 		&i.ClaimedUntil,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.Round,
 	)
 	return i, err
 }
@@ -1315,7 +1320,7 @@ func (q *Queries) ReleaseRunClaim(ctx context.Context, id uuid.UUID) error {
 const reopenRun = `-- name: ReopenRun :exec
 UPDATE "PipelineRuns"
 SET "State" = 'running', "FailureReason" = '', "FinishedAt" = NULL, "CancelRequestedAt" = NULL, "CancelRequestedBy" = NULL,
-    "UpdatedAt" = now()
+    "Round" = "Round" + 1, "UpdatedAt" = now()
 WHERE "Id" = $1 AND "State" IN ('failed', 'canceled')
 `
 

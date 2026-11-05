@@ -143,7 +143,7 @@ WHERE "Id" = @id;
 -- name: ReopenRun :exec
 UPDATE "PipelineRuns"
 SET "State" = 'running', "FailureReason" = '', "FinishedAt" = NULL, "CancelRequestedAt" = NULL, "CancelRequestedBy" = NULL,
-    "UpdatedAt" = now()
+    "Round" = "Round" + 1, "UpdatedAt" = now()
 WHERE "Id" = @id AND "State" IN ('failed', 'canceled');
 
 -- name: LockConcurrencyGroup :exec

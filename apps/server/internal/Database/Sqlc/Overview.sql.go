@@ -12,6 +12,34 @@ import (
 	"github.com/google/uuid"
 )
 
+const countOverviewApprovals = `-- name: CountOverviewApprovals :one
+SELECT count(*)::bigint
+FROM "DeploymentApprovals" a
+WHERE a."OrganizationId" = $1 AND a."State" = 'pending' AND a."ExpiresAt" > $2::timestamptz AND NOT a."IsDeleted"
+  AND EXISTS (SELECT 1
+              FROM "EnvironmentReviewers" r
+              WHERE r."EnvironmentId" = a."EnvironmentId" AND r."OrganizationId" = a."OrganizationId" AND NOT r."IsDeleted"
+                AND (r."UserId" = $3
+                     OR EXISTS (SELECT 1
+                                FROM "TeamMembers" tm
+                                JOIN "Teams" t ON t."Id" = tm."TeamId" AND t."OrganizationId" = tm."OrganizationId" AND NOT t."IsDeleted"
+                                WHERE tm."TeamId" = r."TeamId" AND tm."OrganizationId" = r."OrganizationId"
+                                  AND tm."UserId" = $3 AND NOT tm."IsDeleted")))
+`
+
+type CountOverviewApprovalsParams struct {
+	OrganizationID uuid.UUID
+	Now            time.Time
+	UserID         *uuid.UUID
+}
+
+func (q *Queries) CountOverviewApprovals(ctx context.Context, arg CountOverviewApprovalsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countOverviewApprovals, arg.OrganizationID, arg.Now, arg.UserID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countOverviewInvitations = `-- name: CountOverviewInvitations :one
 SELECT count(*) FILTER (WHERE "ExpiresAt" > $1::timestamptz)::bigint AS pending
 FROM "Invitations"

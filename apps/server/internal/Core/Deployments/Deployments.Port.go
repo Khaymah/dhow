@@ -16,6 +16,13 @@ const (
 	GateTimer           = "timer"
 	GatePaused          = "paused"
 	GateEnvironmentBusy = "environment_busy"
+
+	ApprovalPassed     = "passed"
+	ApprovalBypassed   = "bypassed"
+	ApprovalWaiting    = "waiting"
+	ApprovalRejected   = "rejected"
+	ApprovalExpired    = "expired"
+	ApprovalSuperseded = "superseded"
 )
 
 type Target struct {
@@ -28,16 +35,18 @@ type Target struct {
 }
 
 type Environment struct {
-	ID                  uuid.UUID
-	Name                string
-	RuleVersion         int64
-	RefAllowed          bool
-	HasReviewers        bool
-	WaitMinutes         int
-	RequirePinnedImages bool
-	AllowedPlugins      []string
-	Paused              bool
-	LockedByRunID       *uuid.UUID
+	ID                   uuid.UUID
+	Name                 string
+	RuleVersion          int64
+	RefAllowed           bool
+	HasReviewers         bool
+	WaitMinutes          int
+	RequirePinnedImages  bool
+	AllowedPlugins       []string
+	Paused               bool
+	LockedByRunID        *uuid.UUID
+	ApprovalTimeoutHours int
+	SupersedePending     bool
 }
 
 type Deployment struct {
@@ -51,11 +60,42 @@ type Deployment struct {
 	Ref            string
 	Sha            string
 	RuleVersion    int64
+	ApprovalID     *uuid.UUID
+}
+
+type ApprovalRequest struct {
+	OrganizationID   uuid.UUID
+	ProjectID        uuid.UUID
+	EnvironmentID    uuid.UUID
+	RunID            uuid.UUID
+	RunNumber        int64
+	Ref              string
+	Round            int32
+	RuleVersion      int64
+	TimeoutHours     int
+	SupersedePending bool
+}
+
+type Approval struct {
+	ID         uuid.UUID
+	Outcome    string
+	Requested  bool
+	Expired    bool
+	Superseded []uuid.UUID
+}
+
+type Finished struct {
+	DeploymentID  uuid.UUID
+	EnvironmentID uuid.UUID
+	RunJobID      uuid.UUID
+	State         string
 }
 
 type Gate interface {
 	Lock(ctx context.Context, tx *sqlc.Queries, t Target) (Environment, bool, error)
 	Started(ctx context.Context, tx *sqlc.Queries, d Deployment) error
-	Settle(ctx context.Context, tx *sqlc.Queries, org, run uuid.UUID, keep []string) error
+	Approve(ctx context.Context, tx *sqlc.Queries, r ApprovalRequest) (Approval, error)
+	CancelApprovals(ctx context.Context, tx *sqlc.Queries, org, run uuid.UUID) error
+	Settle(ctx context.Context, tx *sqlc.Queries, org, run uuid.UUID, keep []string) ([]Finished, error)
 	ReleaseStale(ctx context.Context, tx *sqlc.Queries) (int64, error)
 }

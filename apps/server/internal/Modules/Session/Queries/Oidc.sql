@@ -19,7 +19,7 @@ WHERE i."Issuer" = @issuer AND i."Subject" = @subject AND NOT i."IsDeleted";
 
 -- name: TouchIdentity :exec
 UPDATE "UserIdentities"
-SET "LastUsedAt" = @now::timestamptz, "Email" = @email, "UpdatedAt" = @now
+SET "LastUsedAt" = @now::timestamptz, "Email" = @email, "Login" = COALESCE(sqlc.narg('login')::text, "Login"), "UpdatedAt" = @now
 WHERE "Id" = @id AND NOT "IsDeleted";
 
 -- name: ListUserIdentities :many
@@ -34,8 +34,8 @@ SELECT EXISTS (
 ) AS "Linked";
 
 -- name: InsertIdentity :one
-INSERT INTO "UserIdentities" ("UserId", "Provider", "Issuer", "Subject", "Email", "LastUsedAt", "CreatedAt", "UpdatedAt")
-VALUES (@user_id, @provider, @issuer, @subject, @email, @now::timestamptz, @now, @now)
+INSERT INTO "UserIdentities" ("UserId", "Provider", "Issuer", "Subject", "Email", "Login", "LastUsedAt", "CreatedAt", "UpdatedAt")
+VALUES (@user_id, @provider, @issuer, @subject, @email, sqlc.narg('login')::text, @now::timestamptz, @now, @now)
 ON CONFLICT DO NOTHING
 RETURNING "Id", "Provider", "Email", "CreatedAt", "LastUsedAt";
 

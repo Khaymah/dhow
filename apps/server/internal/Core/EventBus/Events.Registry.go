@@ -92,11 +92,19 @@ const (
 	RunRerunRequested  = "project.run_rerun_requested"
 	RunApproved        = "project.run_approved"
 
-	EnvironmentCreated = "environment.created"
-	EnvironmentUpdated = "environment.updated"
-	EnvironmentRemoved = "environment.removed"
-	EnvironmentPaused  = "environment.paused"
-	EnvironmentResumed = "environment.resumed"
+	EnvironmentCreated  = "environment.created"
+	EnvironmentUpdated  = "environment.updated"
+	EnvironmentRemoved  = "environment.removed"
+	EnvironmentPaused   = "environment.paused"
+	EnvironmentResumed  = "environment.resumed"
+	EnvironmentBypassed = "environment.bypassed"
+
+	DeploymentApprovalRequested = "deployment.approval_requested"
+	DeploymentApprovalExpired   = "deployment.approval_expired"
+	DeploymentApproved          = "deployment.approved"
+	DeploymentRejected          = "deployment.rejected"
+	DeploymentStarted           = "deployment.started"
+	DeploymentFinished          = "deployment.finished"
 
 	SecretCreated             = "secret.created"
 	SecretUpdated             = "secret.updated"
@@ -190,6 +198,13 @@ func AuditedEvents() []string {
 		EnvironmentRemoved,
 		EnvironmentPaused,
 		EnvironmentResumed,
+		EnvironmentBypassed,
+		DeploymentApprovalRequested,
+		DeploymentApprovalExpired,
+		DeploymentApproved,
+		DeploymentRejected,
+		DeploymentStarted,
+		DeploymentFinished,
 		SecretCreated,
 		SecretUpdated,
 		SecretVersionRestored,

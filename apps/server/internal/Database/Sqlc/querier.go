@@ -18,12 +18,14 @@ type Querier interface {
 	AdvanceAttemptLog(ctx context.Context, arg AdvanceAttemptLogParams) error
 	AdvanceBackfill(ctx context.Context, arg AdvanceBackfillParams) error
 	AdvanceTotpStep(ctx context.Context, arg AdvanceTotpStepParams) (int64, error)
+	ApprovalRun(ctx context.Context, arg ApprovalRunParams) (ApprovalRunRow, error)
 	ApproveRun(ctx context.Context, arg ApproveRunParams) error
 	ArchiveProject(ctx context.Context, arg ArchiveProjectParams) (Project, error)
 	ArtifactOwner(ctx context.Context, arg ArtifactOwnerParams) (string, error)
 	ArtifactSize(ctx context.Context, arg ArtifactSizeParams) (int64, error)
 	BlobSize(ctx context.Context, digest []byte) (int64, error)
 	CancelQueuedJob(ctx context.Context, arg CancelQueuedJobParams) (Job, error)
+	CancelRunApprovals(ctx context.Context, arg CancelRunApprovalsParams) error
 	CheckoutRepositoryOfJob(ctx context.Context, arg CheckoutRepositoryOfJobParams) (CheckoutRepositoryOfJobRow, error)
 	ClaimCommitStatuses(ctx context.Context, arg ClaimCommitStatusesParams) ([]ClaimCommitStatusesRow, error)
 	ClaimPendingRun(ctx context.Context, arg ClaimPendingRunParams) (PipelineRun, error)
@@ -32,6 +34,7 @@ type Querier interface {
 	ClearDataKeyUnreadable(ctx context.Context) (int64, error)
 	ClearMfaReset(ctx context.Context, arg ClearMfaResetParams) error
 	ClearSecretProjectAccess(ctx context.Context, arg ClearSecretProjectAccessParams) error
+	CloseApproval(ctx context.Context, arg CloseApprovalParams) (int64, error)
 	CompleteInstanceSetup(ctx context.Context, completedAt time.Time) error
 	ConfirmTotpFactor(ctx context.Context, arg ConfirmTotpFactorParams) error
 	ConsumeRecoveryCode(ctx context.Context, arg ConsumeRecoveryCodeParams) (int64, error)
@@ -60,6 +63,7 @@ type Querier interface {
 	CountOidcProviders(ctx context.Context) (int64, error)
 	CountOrganizationProjects(ctx context.Context, arg CountOrganizationProjectsParams) (int64, error)
 	CountOtherActiveOwners(ctx context.Context, arg CountOtherActiveOwnersParams) (int64, error)
+	CountOverviewApprovals(ctx context.Context, arg CountOverviewApprovalsParams) (int64, error)
 	CountOverviewInvitations(ctx context.Context, arg CountOverviewInvitationsParams) (int64, error)
 	CountOverviewJobs(ctx context.Context, arg CountOverviewJobsParams) (CountOverviewJobsRow, error)
 	CountOverviewRunners(ctx context.Context, arg CountOverviewRunnersParams) (CountOverviewRunnersRow, error)
@@ -83,6 +87,7 @@ type Querier interface {
 	CountUsersOutsideDomains(ctx context.Context, arg CountUsersOutsideDomainsParams) (int64, error)
 	CountVariablesInScope(ctx context.Context, arg CountVariablesInScopeParams) (int64, error)
 	CurrentProviderIssuer(ctx context.Context, provider string) (string, error)
+	DecideApproval(ctx context.Context, arg DecideApprovalParams) (int64, error)
 	DeleteTeam(ctx context.Context, arg DeleteTeamParams) (int64, error)
 	DeleteTeamBinding(ctx context.Context, arg DeleteTeamBindingParams) (int64, error)
 	DemoteActiveKeyEncryptionKey(ctx context.Context) (int64, error)
@@ -103,6 +108,7 @@ type Querier interface {
 	EnsureThrottle(ctx context.Context, arg EnsureThrottleParams) error
 	EnsureWebauthnHandle(ctx context.Context, arg EnsureWebauthnHandleParams) ([]byte, error)
 	EnsureWebhookPartitions(ctx context.Context, daysAhead int32) (int32, error)
+	EnvironmentAllowsSelfApproval(ctx context.Context, arg EnvironmentAllowsSelfApprovalParams) (bool, error)
 	EnvironmentQueueAhead(ctx context.Context, arg EnvironmentQueueAheadParams) (bool, error)
 	EraseAllSecretVersions(ctx context.Context, arg EraseAllSecretVersionsParams) (int64, error)
 	EraseExpiredSecretVersions(ctx context.Context, arg EraseExpiredSecretVersionsParams) (int64, error)
@@ -194,6 +200,7 @@ type Querier interface {
 	HasIdentityForProvider(ctx context.Context, arg HasIdentityForProviderParams) (bool, error)
 	HoldEnvironment(ctx context.Context, arg HoldEnvironmentParams) error
 	InsertApiToken(ctx context.Context, arg InsertApiTokenParams) (InsertApiTokenRow, error)
+	InsertApproval(ctx context.Context, arg InsertApprovalParams) (DeploymentApproval, error)
 	InsertArtifact(ctx context.Context, arg InsertArtifactParams) (Artifact, error)
 	InsertAttempt(ctx context.Context, arg InsertAttemptParams) (JobAttempt, error)
 	InsertAttemptStep(ctx context.Context, arg InsertAttemptStepParams) (uuid.UUID, error)
@@ -242,10 +249,12 @@ type Querier interface {
 	InvalidateSetupTokens(ctx context.Context, now time.Time) error
 	IsActiveMember(ctx context.Context, arg IsActiveMemberParams) (bool, error)
 	IsEnabledMemberOf(ctx context.Context, arg IsEnabledMemberOfParams) (bool, error)
+	IsEnvironmentReviewer(ctx context.Context, arg IsEnvironmentReviewerParams) (bool, error)
 	IsMemberByEmail(ctx context.Context, arg IsMemberByEmailParams) (bool, error)
 	JobCancelRequestedAt(ctx context.Context, id uuid.UUID) (*time.Time, error)
 	JobExists(ctx context.Context, arg JobExistsParams) (bool, error)
 	KnownBlobs(ctx context.Context, digests [][]byte) ([][]byte, error)
+	LatestApproval(ctx context.Context, arg LatestApprovalParams) (DeploymentApproval, error)
 	LatestTrustedSha(ctx context.Context, arg LatestTrustedShaParams) (string, error)
 	LinkedProjects(ctx context.Context, arg LinkedProjectsParams) ([]uuid.UUID, error)
 	ListAcceptedInvitations(ctx context.Context, arg ListAcceptedInvitationsParams) ([]ListAcceptedInvitationsRow, error)
@@ -277,10 +286,12 @@ type Querier interface {
 	ListOpenInvitations(ctx context.Context, arg ListOpenInvitationsParams) ([]ListOpenInvitationsRow, error)
 	ListOpenProjectRuns(ctx context.Context, arg ListOpenProjectRunsParams) ([]uuid.UUID, error)
 	ListOrganizationBindings(ctx context.Context, organizationID uuid.UUID) ([]ListOrganizationBindingsRow, error)
+	ListPendingApprovals(ctx context.Context, arg ListPendingApprovalsParams) ([]ListPendingApprovalsRow, error)
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error)
 	ListQueuedRuns(ctx context.Context, batch int32) ([]ListQueuedRunsRow, error)
 	ListRegistrationTokens(ctx context.Context, arg ListRegistrationTokensParams) ([]RunnerRegistrationToken, error)
 	ListRegistryCredentialsInScope(ctx context.Context, arg ListRegistryCredentialsInScopeParams) ([]ListRegistryCredentialsInScopeRow, error)
+	ListRunApprovals(ctx context.Context, arg ListRunApprovalsParams) ([]ListRunApprovalsRow, error)
 	ListRunArtifacts(ctx context.Context, arg ListRunArtifactsParams) ([]Artifact, error)
 	ListRunCancellations(ctx context.Context, batch int32) ([]ListRunCancellationsRow, error)
 	ListRunJobArtifacts(ctx context.Context, arg ListRunJobArtifactsParams) ([]Artifact, error)
@@ -303,8 +314,10 @@ type Querier interface {
 	ListenJobsQueued(ctx context.Context) error
 	ListenLogAppended(ctx context.Context) error
 	ListenSettingsChanged(ctx context.Context) error
+	LiveApproval(ctx context.Context, arg LiveApprovalParams) (DeploymentApproval, error)
 	LockActiveDataKeyForOwner(ctx context.Context, arg LockActiveDataKeyForOwnerParams) (LockActiveDataKeyForOwnerRow, error)
 	LockActiveLease(ctx context.Context, arg LockActiveLeaseParams) (LockActiveLeaseRow, error)
+	LockApproval(ctx context.Context, arg LockApprovalParams) (LockApprovalRow, error)
 	LockArtifactLease(ctx context.Context, arg LockArtifactLeaseParams) (LockArtifactLeaseRow, error)
 	LockAttemptLog(ctx context.Context, id uuid.UUID) (LockAttemptLogRow, error)
 	LockAuditChain(ctx context.Context, chainKey string) error
@@ -373,6 +386,7 @@ type Querier interface {
 	OlderGroupRuns(ctx context.Context, arg OlderGroupRunsParams) ([]uuid.UUID, error)
 	OldestCacheEntries(ctx context.Context, arg OldestCacheEntriesParams) ([]OldestCacheEntriesRow, error)
 	OrganizationArtifactBytes(ctx context.Context, organizationID uuid.UUID) (int64, error)
+	OrganizationProjectIDs(ctx context.Context, organizationID uuid.UUID) ([]uuid.UUID, error)
 	OrganizationsWithLogRetention(ctx context.Context) ([]OrganizationsWithLogRetentionRow, error)
 	OriginUsedElsewhere(ctx context.Context, arg OriginUsedElsewhereParams) (bool, error)
 	OwnedBlobSize(ctx context.Context, arg OwnedBlobSizeParams) (int64, error)
@@ -502,11 +516,13 @@ type Querier interface {
 	SetTeamBindingRole(ctx context.Context, arg SetTeamBindingRoleParams) (int64, error)
 	SetUserLocale(ctx context.Context, arg SetUserLocaleParams) error
 	SetUserPassword(ctx context.Context, arg SetUserPasswordParams) error
-	SettleDeployments(ctx context.Context, arg SettleDeploymentsParams) error
+	SettleDeployments(ctx context.Context, arg SettleDeploymentsParams) ([]SettleDeploymentsRow, error)
 	SignInProviderActive(ctx context.Context, arg SignInProviderActiveParams) (bool, error)
 	StartAttempt(ctx context.Context, id uuid.UUID) (JobAttempt, error)
 	StartRun(ctx context.Context, id uuid.UUID) error
 	SupersedeDataKey(ctx context.Context, id uuid.UUID) (int64, error)
+	SupersedeDecidedApproval(ctx context.Context, arg SupersedeDecidedApprovalParams) (int64, error)
+	SupersedeOlderPending(ctx context.Context, arg SupersedeOlderPendingParams) ([]SupersedeOlderPendingRow, error)
 	SupersedeSecretVersions(ctx context.Context, arg SupersedeSecretVersionsParams) error
 	TakeOidcFlow(ctx context.Context, arg TakeOidcFlowParams) (TakeOidcFlowRow, error)
 	TakeRateLimit(ctx context.Context, arg TakeRateLimitParams) (TakeRateLimitRow, error)
@@ -551,6 +567,7 @@ type Querier interface {
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (time.Time, error)
 	UseMfaChallenge(ctx context.Context, arg UseMfaChallengeParams) (int64, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)
+	UserLogins(ctx context.Context, userID uuid.UUID) ([]UserLoginsRow, error)
 	VisibleSecretNames(ctx context.Context, arg VisibleSecretNamesParams) ([]VisibleSecretNamesRow, error)
 	VisibleVariableNames(ctx context.Context, arg VisibleVariableNamesParams) ([]VisibleVariableNamesRow, error)
 	WalkAuditChain(ctx context.Context, arg WalkAuditChainParams) ([]WalkAuditChainRow, error)

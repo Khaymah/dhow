@@ -222,10 +222,19 @@ func (s *Service) admitJob(
 		}
 		return true, s.endWithDetail(ctx, q, st, i, models.JobFailed, reason, detail)
 	}
+	var approval *uuid.UUID
 	if env != nil {
-		if held, err := s.holdAtGate(ctx, q, st, i, *env); err != nil || held {
+		p, err := s.gateOf(ctx, q, st.run, st.rows[i], *env)
+		if err != nil {
 			return false, err
 		}
+		if p.state != "" {
+			return true, s.endRunJob(ctx, q, st, i, p.state, p.reason)
+		}
+		if p.gate != "" {
+			return false, s.holdAtGate(ctx, q, st, i, *env, p)
+		}
+		approval = p.approval
 	}
 	rj := st.rows[i]
 	if reason, err := s.attachTransfers(ctx, q, st, rj, plan, spec, evalCtx); err != nil || reason != "" {
@@ -242,7 +251,7 @@ func (s *Service) admitJob(
 		return true, s.endRunJob(ctx, q, st, i, models.JobFailed, reason)
 	}
 	if env != nil {
-		return true, s.deployed(ctx, q, st, i, *env)
+		return true, s.deployed(ctx, q, st, i, *env, approval)
 	}
 	return true, nil
 }

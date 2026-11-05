@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 )
@@ -47,7 +49,16 @@ type Identity struct {
 	Issuer  string
 	Subject string
 	Name    string
+	Login   string
 	Emails  []Email
+}
+
+func CleanLogin(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" || len(v) > MaxSubjectLength || strings.ContainsFunc(v, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+		return ""
+	}
+	return v
 }
 
 type Flow struct {

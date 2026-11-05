@@ -64,6 +64,10 @@ func secretsBody(env *apptest.Env, rule policy.Rule) any {
 		return map[string]string{"Host": "rt-" + randomSuffix(env.T) + ".example.com", "Username": "robot", "Password": "a registry password"}
 	case rule.Method == http.MethodPut && strings.HasSuffix(path, "/registry-credentials/{credentialId}"):
 		return map[string]string{"Username": "robot", "Password": "a new registry password"}
+	case rule.Method == http.MethodPost && (strings.HasSuffix(path, "/approve") || strings.HasSuffix(path, "/reject")):
+		return map[string]any{"CurrentFactor": apptest.PasswordFactor("not the password at all")}
+	case rule.Method == http.MethodPost && strings.HasSuffix(path, "/bypass"):
+		return map[string]any{"CurrentFactor": apptest.PasswordFactor("not the password at all"), "Reason": "Route table"}
 	}
 	return nil
 }
@@ -71,6 +75,9 @@ func secretsBody(env *apptest.Env, rule policy.Rule) any {
 func projectParams(env *apptest.Env, path string, project uuid.UUID) string {
 	if strings.Contains(path, "{runId}") {
 		path = strings.ReplaceAll(path, "{runId}", env.SeedRun(project, "awaiting_approval").String())
+	}
+	if strings.Contains(path, "{approvalId}") {
+		path = strings.ReplaceAll(path, "{approvalId}", uuid.NewString())
 	}
 	if strings.Contains(path, "{artifactId}") {
 		path = strings.ReplaceAll(path, "{artifactId}", env.SeedArtifact(project, "web", []byte("archive"), false).ID.String())

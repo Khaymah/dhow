@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
@@ -39,6 +40,10 @@ type takenFlow struct {
 	row      sqlc.TakeOidcFlowRow
 	provider oidcauth.Provider
 	flow     oidcauth.Flow
+}
+
+func loginOf(id oidcauth.Identity) pgtype.Text {
+	return pgtype.Text{String: id.Login, Valid: id.Login != ""}
 }
 
 type exchanged struct {

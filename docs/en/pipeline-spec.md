@@ -277,7 +277,7 @@ jobs:
 
 - **The `schedule` trigger** comes after the first release, and **the `artifact` trigger** (a build from external CI) comes with M6. Both are refused with `TRIGGER_NOT_SUPPORTED_YET`, not ignored.
 - **`isolation: gvisor`** is refused with `ISOLATION_NOT_SUPPORTED_YET` until gVisor returns after the first release.
-- **Environment approvals** arrive in a coming update. Until then a job on an environment with reviewers waits and does not start. **`id_token:`** (an OIDC token for cloud services) arrives after the first release and is refused with `ID_TOKEN_NOT_SUPPORTED_YET`.
+- **`id_token:`** (an OIDC token for cloud services) arrives after the first release and is refused with `ID_TOKEN_NOT_SUPPORTED_YET`.
 - **`services:`** (containers that live for the whole job) and the visual editor come after the first release.
 
 ## 9. Environment protection (server-side, not in YAML)

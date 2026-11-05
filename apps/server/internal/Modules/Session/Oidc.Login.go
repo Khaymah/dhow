@@ -38,7 +38,7 @@ func (s *Service) CompleteOidcLogin(ctx context.Context, in models.OidcCallback)
 		id := user.Id
 		return models.LoginResult{}, s.failOidcLogin(ctx, t.row.Provider, reasonDisabled, &id, got.identity, apperrors.OidcSignInFailed())
 	}
-	if err := s.queries().TouchIdentity(ctx, sqlc.TouchIdentityParams{ID: user.IdentityId, Now: now, Email: got.email}); err != nil {
+	if err := s.queries().TouchIdentity(ctx, sqlc.TouchIdentityParams{ID: user.IdentityId, Now: now, Email: got.email, Login: loginOf(got.identity)}); err != nil {
 		return models.LoginResult{}, err
 	}
 	who := sessionUser{ID: user.Id, Email: user.Email, Name: user.Name, Locale: user.Locale}

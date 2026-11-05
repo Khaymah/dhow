@@ -57,6 +57,9 @@ const (
 	ReasonEnvironmentPlugin       = "ENVIRONMENT_PLUGIN_NOT_ALLOWED"
 	ReasonEnvironmentIsolation    = "ENVIRONMENT_ISOLATION_REQUIRED"
 	ReasonEnvironmentRuleChanged  = "ENVIRONMENT_RULE_CHANGED"
+	ReasonDeploymentRejected      = "DEPLOYMENT_REJECTED"
+	ReasonApprovalExpired         = "APPROVAL_EXPIRED"
+	ReasonSuperseded              = "SUPERSEDED"
 	ReasonForkSecrets             = "FORK_PR_NO_SECRETS" //nolint:gosec // A failure reason, not a credential.
 	ReasonSecretNotFound          = "SECRET_NOT_FOUND"   //nolint:gosec // A failure reason, not a credential.
 	ReasonSecretNotForPRs         = "SECRET_NOT_AVAILABLE_TO_PULL_REQUESTS"

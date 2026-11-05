@@ -17,27 +17,60 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for DeploymentApprovalState.
+const (
+	DeploymentApprovalStateApproved   DeploymentApprovalState = "approved"
+	DeploymentApprovalStateBypassed   DeploymentApprovalState = "bypassed"
+	DeploymentApprovalStateCanceled   DeploymentApprovalState = "canceled"
+	DeploymentApprovalStateExpired    DeploymentApprovalState = "expired"
+	DeploymentApprovalStatePending    DeploymentApprovalState = "pending"
+	DeploymentApprovalStateRejected   DeploymentApprovalState = "rejected"
+	DeploymentApprovalStateSuperseded DeploymentApprovalState = "superseded"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentApprovalState enum.
+func (e DeploymentApprovalState) Valid() bool {
+	switch e {
+	case DeploymentApprovalStateApproved:
+		return true
+	case DeploymentApprovalStateBypassed:
+		return true
+	case DeploymentApprovalStateCanceled:
+		return true
+	case DeploymentApprovalStateExpired:
+		return true
+	case DeploymentApprovalStatePending:
+		return true
+	case DeploymentApprovalStateRejected:
+		return true
+	case DeploymentApprovalStateSuperseded:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeploymentState.
 const (
-	Canceled  DeploymentState = "canceled"
-	Failed    DeploymentState = "failed"
-	Queued    DeploymentState = "queued"
-	Running   DeploymentState = "running"
-	Succeeded DeploymentState = "succeeded"
+	DeploymentStateCanceled  DeploymentState = "canceled"
+	DeploymentStateFailed    DeploymentState = "failed"
+	DeploymentStateQueued    DeploymentState = "queued"
+	DeploymentStateRunning   DeploymentState = "running"
+	DeploymentStateSucceeded DeploymentState = "succeeded"
 )
 
 // Valid indicates whether the value is a known member of the DeploymentState enum.
 func (e DeploymentState) Valid() bool {
 	switch e {
-	case Canceled:
+	case DeploymentStateCanceled:
 		return true
-	case Failed:
+	case DeploymentStateFailed:
 		return true
-	case Queued:
+	case DeploymentStateQueued:
 		return true
-	case Running:
+	case DeploymentStateRunning:
 		return true
-	case Succeeded:
+	case DeploymentStateSucceeded:
 		return true
 	default:
 		return false
@@ -101,6 +134,13 @@ func (e FactorMethod) Valid() bool {
 	}
 }
 
+// BypassDeploymentRequest defines model for BypassDeploymentRequest.
+type BypassDeploymentRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+	Reason        string        `json:"Reason"`
+}
+
 // CreateEnvironmentRequest defines model for CreateEnvironmentRequest.
 type CreateEnvironmentRequest struct {
 	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
@@ -132,6 +172,14 @@ type CurrentFactorRequest struct {
 	CurrentFactor CurrentFactor `json:"CurrentFactor"`
 }
 
+// DecideDeploymentRequest defines model for DecideDeploymentRequest.
+type DecideDeploymentRequest struct {
+	Comment *string `json:"Comment,omitempty"`
+
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+}
+
 // Deployment defines model for Deployment.
 type Deployment struct {
 	CreatedAt  time.Time          `json:"CreatedAt"`
@@ -151,6 +199,61 @@ type Deployment struct {
 	Sha         *string            `json:"Sha,omitempty"`
 	State       DeploymentState    `json:"State"`
 }
+
+// DeploymentApproval defines model for DeploymentApproval.
+type DeploymentApproval struct {
+	BypassReason    *string             `json:"BypassReason,omitempty"`
+	Comment         *string             `json:"Comment,omitempty"`
+	CreatedAt       time.Time           `json:"CreatedAt"`
+	DecidedAt       *time.Time          `json:"DecidedAt,omitempty"`
+	DecidedByUserId *openapi_types.UUID `json:"DecidedByUserId,omitempty"`
+	Environment     string              `json:"Environment"`
+	EnvironmentId   openapi_types.UUID  `json:"EnvironmentId"`
+	ExpiresAt       time.Time           `json:"ExpiresAt"`
+
+	// FactorKind The kind of second factor used for the decision (`totp`, `recovery_code` or `passkey`), never its value.
+	FactorKind *string            `json:"FactorKind,omitempty"`
+	Id         openapi_types.UUID `json:"Id"`
+	ProjectId  openapi_types.UUID `json:"ProjectId"`
+	Ref        string             `json:"Ref"`
+
+	// Round A rerun of the failed jobs starts a new round, which needs a new approval.
+	Round             int                     `json:"Round"`
+	RuleVersion       int64                   `json:"RuleVersion"`
+	RunId             openapi_types.UUID      `json:"RunId"`
+	RunNumber         int64                   `json:"RunNumber"`
+	State             DeploymentApprovalState `json:"State"`
+	SupersededByRunId *openapi_types.UUID     `json:"SupersededByRunId,omitempty"`
+}
+
+// DeploymentApprovalListResponse defines model for DeploymentApprovalListResponse.
+type DeploymentApprovalListResponse struct {
+	Data  *[]DeploymentApproval `json:"Data,omitempty"`
+	Error *ErrorDetail          `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// DeploymentApprovalResponse defines model for DeploymentApprovalResponse.
+type DeploymentApprovalResponse struct {
+	Data  *DeploymentApproval `json:"Data,omitempty"`
+	Error *ErrorDetail        `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// DeploymentApprovalState defines model for DeploymentApprovalState.
+type DeploymentApprovalState string
 
 // DeploymentListResponse defines model for DeploymentListResponse.
 type DeploymentListResponse struct {
@@ -368,6 +471,9 @@ type UpdateEnvironmentRequest struct {
 // WebAuthnJson A W3C WebAuthn JSON structure (`PublicKeyCredentialCreationOptionsJSON`, `PublicKeyCredentialRequestOptionsJSON` or the `toJSON()` form of a `PublicKeyCredential`). It keeps the camelCase names of the WebAuthn specification, the only place where the API does not use PascalCase.
 type WebAuthnJson = json.RawMessage
 
+// ApprovalId defines model for ApprovalId.
+type ApprovalId = openapi_types.UUID
+
 // EnvironmentName defines model for EnvironmentName.
 type EnvironmentName = string
 
@@ -383,8 +489,16 @@ type Page = int
 // ProjectId defines model for ProjectId.
 type ProjectId = openapi_types.UUID
 
+// RunId defines model for RunId.
+type RunId = openapi_types.UUID
+
 // Error defines model for Error.
 type Error = ErrorResponse
+
+// ListPendingApprovalsParams defines parameters for ListPendingApprovals.
+type ListPendingApprovalsParams struct {
+	Mine *bool `form:"Mine,omitempty" json:"Mine,omitempty"`
+}
 
 // ListEnvironmentsParams defines parameters for ListEnvironments.
 type ListEnvironmentsParams struct {
@@ -413,8 +527,20 @@ type RemoveEnvironmentJSONRequestBody = CurrentFactorRequest
 // ResumeEnvironmentJSONRequestBody defines body for ResumeEnvironment for application/json ContentType.
 type ResumeEnvironmentJSONRequestBody = CurrentFactorRequest
 
+// ApproveDeploymentJSONRequestBody defines body for ApproveDeployment for application/json ContentType.
+type ApproveDeploymentJSONRequestBody = DecideDeploymentRequest
+
+// BypassDeploymentJSONRequestBody defines body for BypassDeployment for application/json ContentType.
+type BypassDeploymentJSONRequestBody = BypassDeploymentRequest
+
+// RejectDeploymentJSONRequestBody defines body for RejectDeployment for application/json ContentType.
+type RejectDeploymentJSONRequestBody = DecideDeploymentRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListPendingApprovals List the deploys waiting for approval
+	// (GET /organizations/{id}/deployment-approvals)
+	ListPendingApprovals(w http.ResponseWriter, r *http.Request, id Id, params ListPendingApprovalsParams)
 	// ListEnvironments List the environments of a project
 	// (GET /organizations/{id}/projects/{projectId}/environments)
 	ListEnvironments(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, params ListEnvironmentsParams)
@@ -439,11 +565,29 @@ type ServerInterface interface {
 	// ResumeEnvironment Allow deploys to a paused environment again
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/resume)
 	ResumeEnvironment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName)
+	// ListRunApprovals List the approval requests of a run
+	// (GET /organizations/{id}/projects/{projectId}/runs/{runId}/approvals)
+	ListRunApprovals(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId)
+	// ApproveDeployment Approve a deploy
+	// (POST /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/approve)
+	ApproveDeployment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId, approvalId ApprovalId)
+	// BypassDeployment Bypass the reviewers and the wait timer
+	// (POST /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/bypass)
+	BypassDeployment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId, approvalId ApprovalId)
+	// RejectDeployment Reject a deploy
+	// (POST /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/reject)
+	RejectDeployment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId, approvalId ApprovalId)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// ListPendingApprovals List the deploys waiting for approval
+// (GET /organizations/{id}/deployment-approvals)
+func (_ Unimplemented) ListPendingApprovals(w http.ResponseWriter, r *http.Request, id Id, params ListPendingApprovalsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // ListEnvironments List the environments of a project
 // (GET /organizations/{id}/projects/{projectId}/environments)
@@ -493,6 +637,30 @@ func (_ Unimplemented) ResumeEnvironment(w http.ResponseWriter, r *http.Request,
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListRunApprovals List the approval requests of a run
+// (GET /organizations/{id}/projects/{projectId}/runs/{runId}/approvals)
+func (_ Unimplemented) ListRunApprovals(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ApproveDeployment Approve a deploy
+// (POST /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/approve)
+func (_ Unimplemented) ApproveDeployment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId, approvalId ApprovalId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// BypassDeployment Bypass the reviewers and the wait timer
+// (POST /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/bypass)
+func (_ Unimplemented) BypassDeployment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId, approvalId ApprovalId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// RejectDeployment Reject a deploy
+// (POST /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/reject)
+func (_ Unimplemented) RejectDeployment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId, approvalId ApprovalId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ServerInterfaceWrapper converts contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler            ServerInterface
@@ -501,6 +669,48 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListPendingApprovals operation middleware
+func (siw *ServerInterfaceWrapper) ListPendingApprovals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPendingApprovalsParams
+
+	// ------------- Optional query parameter "Mine" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "Mine", r.URL.Query(), &params.Mine, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "Mine"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Mine", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPendingApprovals(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListEnvironments operation middleware
 func (siw *ServerInterfaceWrapper) ListEnvironments(w http.ResponseWriter, r *http.Request) {
@@ -894,6 +1104,209 @@ func (siw *ServerInterfaceWrapper) ResumeEnvironment(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListRunApprovals operation middleware
+func (siw *ServerInterfaceWrapper) ListRunApprovals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRunApprovals(w, r, id, projectId, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveDeployment operation middleware
+func (siw *ServerInterfaceWrapper) ApproveDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "approvalId" -------------
+	var approvalId ApprovalId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "approvalId", chi.URLParam(r, "approvalId"), &approvalId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "approvalId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveDeployment(w, r, id, projectId, runId, approvalId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BypassDeployment operation middleware
+func (siw *ServerInterfaceWrapper) BypassDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "approvalId" -------------
+	var approvalId ApprovalId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "approvalId", chi.URLParam(r, "approvalId"), &approvalId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "approvalId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BypassDeployment(w, r, id, projectId, runId, approvalId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RejectDeployment operation middleware
+func (siw *ServerInterfaceWrapper) RejectDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "approvalId" -------------
+	var approvalId ApprovalId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "approvalId", chi.URLParam(r, "approvalId"), &approvalId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "approvalId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RejectDeployment(w, r, id, projectId, runId, approvalId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1031,11 +1444,66 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/deployments", wrapper.ListDeployments)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/runs/{runId}/approvals", wrapper.ListRunApprovals)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/approve", wrapper.ApproveDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/reject", wrapper.RejectDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/bypass", wrapper.BypassDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/organizations/{id}/deployment-approvals", wrapper.ListPendingApprovals)
+	})
 
 	return r
 }
 
 type ErrorJSONResponse ErrorResponse
+
+type ListPendingApprovalsRequestObject struct {
+	Id     Id `json:"id"`
+	Params ListPendingApprovalsParams
+}
+
+type ListPendingApprovalsResponseObject interface {
+	VisitListPendingApprovalsResponse(w http.ResponseWriter) error
+}
+
+type ListPendingApprovals200JSONResponse DeploymentApprovalListResponse
+
+func (response ListPendingApprovals200JSONResponse) VisitListPendingApprovalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingApprovalsdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response ListPendingApprovalsdefaultJSONResponse) VisitListPendingApprovalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type ListEnvironmentsRequestObject struct {
 	Id        Id        `json:"id"`
@@ -1370,8 +1838,181 @@ func (response ResumeEnvironmentdefaultJSONResponse) VisitResumeEnvironmentRespo
 	return err
 }
 
+type ListRunApprovalsRequestObject struct {
+	Id        Id        `json:"id"`
+	ProjectId ProjectId `json:"projectId"`
+	RunId     RunId     `json:"runId"`
+}
+
+type ListRunApprovalsResponseObject interface {
+	VisitListRunApprovalsResponse(w http.ResponseWriter) error
+}
+
+type ListRunApprovals200JSONResponse DeploymentApprovalListResponse
+
+func (response ListRunApprovals200JSONResponse) VisitListRunApprovalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRunApprovalsdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response ListRunApprovalsdefaultJSONResponse) VisitListRunApprovalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveDeploymentRequestObject struct {
+	Id         Id         `json:"id"`
+	ProjectId  ProjectId  `json:"projectId"`
+	RunId      RunId      `json:"runId"`
+	ApprovalId ApprovalId `json:"approvalId"`
+	Body       *ApproveDeploymentJSONRequestBody
+}
+
+type ApproveDeploymentResponseObject interface {
+	VisitApproveDeploymentResponse(w http.ResponseWriter) error
+}
+
+type ApproveDeployment200JSONResponse DeploymentApprovalResponse
+
+func (response ApproveDeployment200JSONResponse) VisitApproveDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveDeploymentdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response ApproveDeploymentdefaultJSONResponse) VisitApproveDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BypassDeploymentRequestObject struct {
+	Id         Id         `json:"id"`
+	ProjectId  ProjectId  `json:"projectId"`
+	RunId      RunId      `json:"runId"`
+	ApprovalId ApprovalId `json:"approvalId"`
+	Body       *BypassDeploymentJSONRequestBody
+}
+
+type BypassDeploymentResponseObject interface {
+	VisitBypassDeploymentResponse(w http.ResponseWriter) error
+}
+
+type BypassDeployment200JSONResponse DeploymentApprovalResponse
+
+func (response BypassDeployment200JSONResponse) VisitBypassDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BypassDeploymentdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response BypassDeploymentdefaultJSONResponse) VisitBypassDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectDeploymentRequestObject struct {
+	Id         Id         `json:"id"`
+	ProjectId  ProjectId  `json:"projectId"`
+	RunId      RunId      `json:"runId"`
+	ApprovalId ApprovalId `json:"approvalId"`
+	Body       *RejectDeploymentJSONRequestBody
+}
+
+type RejectDeploymentResponseObject interface {
+	VisitRejectDeploymentResponse(w http.ResponseWriter) error
+}
+
+type RejectDeployment200JSONResponse DeploymentApprovalResponse
+
+func (response RejectDeployment200JSONResponse) VisitRejectDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectDeploymentdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response RejectDeploymentdefaultJSONResponse) VisitRejectDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListPendingApprovals List the deploys waiting for approval
+	// (GET /organizations/{id}/deployment-approvals)
+	ListPendingApprovals(ctx context.Context, request ListPendingApprovalsRequestObject) (ListPendingApprovalsResponseObject, error)
 	// ListEnvironments List the environments of a project
 	// (GET /organizations/{id}/projects/{projectId}/environments)
 	ListEnvironments(ctx context.Context, request ListEnvironmentsRequestObject) (ListEnvironmentsResponseObject, error)
@@ -1396,6 +2037,18 @@ type StrictServerInterface interface {
 	// ResumeEnvironment Allow deploys to a paused environment again
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/resume)
 	ResumeEnvironment(ctx context.Context, request ResumeEnvironmentRequestObject) (ResumeEnvironmentResponseObject, error)
+	// ListRunApprovals List the approval requests of a run
+	// (GET /organizations/{id}/projects/{projectId}/runs/{runId}/approvals)
+	ListRunApprovals(ctx context.Context, request ListRunApprovalsRequestObject) (ListRunApprovalsResponseObject, error)
+	// ApproveDeployment Approve a deploy
+	// (POST /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/approve)
+	ApproveDeployment(ctx context.Context, request ApproveDeploymentRequestObject) (ApproveDeploymentResponseObject, error)
+	// BypassDeployment Bypass the reviewers and the wait timer
+	// (POST /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/bypass)
+	BypassDeployment(ctx context.Context, request BypassDeploymentRequestObject) (BypassDeploymentResponseObject, error)
+	// RejectDeployment Reject a deploy
+	// (POST /organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/reject)
+	RejectDeployment(ctx context.Context, request RejectDeploymentRequestObject) (RejectDeploymentResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1435,6 +2088,33 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListPendingApprovals operation middleware
+func (sh *strictHandler) ListPendingApprovals(w http.ResponseWriter, r *http.Request, id Id, params ListPendingApprovalsParams) {
+	var request ListPendingApprovalsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPendingApprovals(ctx, request.(ListPendingApprovalsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPendingApprovals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPendingApprovalsResponseObject); ok {
+		if err := validResponse.VisitListPendingApprovalsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListEnvironments operation middleware
@@ -1689,6 +2369,142 @@ func (sh *strictHandler) ResumeEnvironment(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ResumeEnvironmentResponseObject); ok {
 		if err := validResponse.VisitResumeEnvironmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRunApprovals operation middleware
+func (sh *strictHandler) ListRunApprovals(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId) {
+	var request ListRunApprovalsRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.RunId = runId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRunApprovals(ctx, request.(ListRunApprovalsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRunApprovals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRunApprovalsResponseObject); ok {
+		if err := validResponse.VisitListRunApprovalsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApproveDeployment operation middleware
+func (sh *strictHandler) ApproveDeployment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId, approvalId ApprovalId) {
+	var request ApproveDeploymentRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.RunId = runId
+	request.ApprovalId = approvalId
+
+	var body ApproveDeploymentJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveDeployment(ctx, request.(ApproveDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveDeploymentResponseObject); ok {
+		if err := validResponse.VisitApproveDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BypassDeployment operation middleware
+func (sh *strictHandler) BypassDeployment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId, approvalId ApprovalId) {
+	var request BypassDeploymentRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.RunId = runId
+	request.ApprovalId = approvalId
+
+	var body BypassDeploymentJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BypassDeployment(ctx, request.(BypassDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BypassDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BypassDeploymentResponseObject); ok {
+		if err := validResponse.VisitBypassDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RejectDeployment operation middleware
+func (sh *strictHandler) RejectDeployment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId, approvalId ApprovalId) {
+	var request RejectDeploymentRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.RunId = runId
+	request.ApprovalId = approvalId
+
+	var body RejectDeploymentJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RejectDeployment(ctx, request.(RejectDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RejectDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RejectDeploymentResponseObject); ok {
+		if err := validResponse.VisitRejectDeploymentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

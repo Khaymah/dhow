@@ -6,7 +6,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -15,7 +14,6 @@ import (
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
 	"github.com/Khaymah/dhow/internal/gitref"
 	"github.com/Khaymah/dhow/internal/jobspec"
-	"github.com/Khaymah/dhow/internal/pipelinespec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -159,88 +157,4 @@ func staticRefusal(env deployments.Environment, spec *runnerv1.JobSpec, pins map
 		}
 	}
 	return ""
-}
-
-func (s *Service) gateOf(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, rj sqlc.RunJob, env deployments.Environment) (string, *time.Time, error) {
-	switch {
-	case env.Paused:
-		return deployments.GatePaused, rj.GateOpensAt, nil
-	case env.HasReviewers:
-		return deployments.GateApproval, rj.GateOpensAt, nil
-	}
-	opens := rj.GateOpensAt
-	if env.WaitMinutes > 0 {
-		if opens == nil {
-			t := s.now().Add(time.Duration(env.WaitMinutes) * time.Minute)
-			opens = &t
-		}
-		if s.now().Before(*opens) {
-			return deployments.GateTimer, opens, nil
-		}
-	}
-	if env.LockedByRunID != nil {
-		if *env.LockedByRunID == run.Id {
-			return "", opens, nil
-		}
-		return deployments.GateEnvironmentBusy, opens, nil
-	}
-	ahead, err := q.EnvironmentQueueAhead(ctx, sqlc.EnvironmentQueueAheadParams{
-		EnvironmentID: &env.ID, OrganizationID: run.OrganizationId, RunID: run.Id, Number: run.Number,
-	})
-	if err != nil || !ahead {
-		return "", opens, err
-	}
-	return deployments.GateEnvironmentBusy, opens, nil
-}
-
-func (s *Service) holdAtGate(ctx context.Context, q *sqlc.Queries, st *step, i int, env deployments.Environment) (bool, error) {
-	rj := st.rows[i]
-	gate, opens, err := s.gateOf(ctx, q, st.run, rj, env)
-	if err != nil || gate == "" {
-		return false, err
-	}
-	same := rj.Gate.Valid && rj.Gate.String == gate && rj.EnvironmentId != nil && *rj.EnvironmentId == env.ID &&
-		((opens == nil) == (rj.GateOpensAt == nil)) && (opens == nil || opens.Equal(*rj.GateOpensAt))
-	if same {
-		return true, nil
-	}
-	if err := q.SetRunJobGate(ctx, sqlc.SetRunJobGateParams{
-		Gate: text(gate), GateOpensAt: opens, EnvironmentID: &env.ID, ID: rj.Id, OrganizationID: st.run.OrganizationId,
-	}); err != nil {
-		return false, err
-	}
-	st.rows[i].Gate, st.rows[i].GateOpensAt, st.rows[i].EnvironmentId = text(gate), opens, &env.ID
-	return true, nil
-}
-
-func (s *Service) deployed(ctx context.Context, q *sqlc.Queries, st *step, i int, env deployments.Environment) error {
-	rj := st.rows[i]
-	if rj.CurrentJobId == nil {
-		return nil
-	}
-	return s.gate.Started(ctx, q, deployments.Deployment{
-		OrganizationID: st.run.OrganizationId, EnvironmentID: env.ID, RunID: st.run.Id, RunNumber: st.run.Number,
-		RunJobID: rj.Id, JobID: *rj.CurrentJobId, JobKey: rj.Key, Ref: st.run.Ref, Sha: st.run.Sha.String, RuleVersion: env.RuleVersion,
-	})
-}
-
-func (s *Service) settleEnvironments(ctx context.Context, q *sqlc.Queries, st *step) error {
-	if s.gate == nil || !slices.ContainsFunc(st.c.plan.Jobs, func(j *pipelinespec.RunJob) bool { return j.Environment != "" }) {
-		return nil
-	}
-	keep := []string{}
-	for _, rj := range st.rows {
-		plan, ok := st.c.byKey[rj.Key]
-		if ok && plan.Environment != "" && !models.JobFinished(rj.State) && !slices.Contains(keep, plan.Environment) {
-			keep = append(keep, plan.Environment)
-		}
-	}
-	return s.gate.Settle(ctx, q, st.run.OrganizationId, st.run.Id, keep)
-}
-
-func (s *Service) releaseRun(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun) error {
-	if s.gate == nil {
-		return nil
-	}
-	return s.gate.Settle(ctx, q, run.OrganizationId, run.Id, nil)
 }

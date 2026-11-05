@@ -210,6 +210,29 @@ type Deployment struct {
 	RuleVersion    int64
 	State          string
 	FinishedAt     *time.Time
+	ApprovalId     *uuid.UUID
+}
+
+type DeploymentApproval struct {
+	Id                uuid.UUID
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	IsDeleted         bool
+	OrganizationId    uuid.UUID
+	EnvironmentId     uuid.UUID
+	RunId             uuid.UUID
+	RunNumber         int64
+	Ref               string
+	Round             int32
+	RuleVersion       int64
+	State             string
+	ExpiresAt         time.Time
+	DecidedByUserId   *uuid.UUID
+	DecidedAt         *time.Time
+	FactorKind        pgtype.Text
+	Comment           pgtype.Text
+	BypassReason      pgtype.Text
+	SupersededByRunId *uuid.UUID
 }
 
 type Environment struct {
@@ -569,6 +592,7 @@ type PipelineRun struct {
 	ClaimedUntil      *time.Time
 	StartedAt         *time.Time
 	FinishedAt        *time.Time
+	Round             int32
 }
 
 type PipelineRunCounter struct {
@@ -919,6 +943,7 @@ type UserIdentity struct {
 	Subject    string
 	Email      string
 	LastUsedAt *time.Time
+	Login      pgtype.Text
 }
 
 type UserPreference struct {
