@@ -12,10 +12,11 @@ export interface ISecretFieldsProps {
   draft: ISecretDraft;
   editing: boolean;
   organizationId: string | null;
+  pullRequests: boolean;
   busy: boolean;
 }
 
-export const SecretFields = ({ draft, editing, organizationId, busy }: ISecretFieldsProps) => {
+export const SecretFields = ({ draft, editing, organizationId, pullRequests, busy }: ISecretFieldsProps) => {
   const t = useT();
 
   return (
@@ -55,7 +56,7 @@ export const SecretFields = ({ draft, editing, organizationId, busy }: ISecretFi
         </Field>
         <small className="text-body-sm text-tertiary">{t('secrets.form.description.hint')}</small>
       </div>
-      <PullRequestsToggle checked={draft.Pulls} disabled={busy} onChange={draft.SetPulls} />
+      {pullRequests ? <PullRequestsToggle checked={draft.Pulls} disabled={busy} onChange={draft.SetPulls} /> : null}
       {organizationId === null ? null : (
         <SecretVisibilityFields
           organizationId={organizationId}

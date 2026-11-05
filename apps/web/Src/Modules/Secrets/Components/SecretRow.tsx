@@ -15,7 +15,8 @@ export interface ISecretRowProps {
 export const SecretRow = ({ secret, scope, writable, onEdit }: ISecretRowProps) => {
   const t = useT();
   const organization = scope.ProjectId === null;
-  const covers = secret.Overrides.includes('organization');
+  const coversOrganization = secret.Overrides.includes('organization');
+  const coversProject = secret.Overrides.includes('project');
 
   return (
     <li className="grid min-w-0 gap-3 border-t border-line px-4 py-3 first:border-t-0">
@@ -28,7 +29,8 @@ export const SecretRow = ({ secret, scope, writable, onEdit }: ISecretRowProps) 
           {secret.Description ? <small className="text-body-sm text-tertiary">{secret.Description}</small> : null}
         </span>
         <span className="flex flex-wrap items-center gap-1.5">
-          {covers ? <Badge tone="info">{t('secrets.overrides.organization')}</Badge> : null}
+          {coversOrganization ? <Badge tone="info">{t('secrets.overrides.organization')}</Badge> : null}
+          {coversProject ? <Badge tone="info">{t('secrets.overrides.project')}</Badge> : null}
           {secret.AvailableToPullRequests ? <Badge tone="warn">{t('secrets.pullRequests')}</Badge> : null}
           {writable ? (
             <Button

@@ -9,12 +9,13 @@ import { useSecretScope } from '@/Modules/Secrets/Hooks/useSecretScope';
 
 export interface IFormGateProps {
   projectId: string | undefined;
+  environmentName?: string;
   children: (scope: ISecretScope) => ReactNode;
 }
 
-export const FormGate = ({ projectId, children }: IFormGateProps) => {
+export const FormGate = ({ projectId, environmentName, children }: IFormGateProps) => {
   const t = useT();
-  const access = useSecretScope(projectId);
+  const access = useSecretScope(projectId, environmentName);
   if (access.Kind === 'loading') return <Skeleton label={t('ui.loading')} lines={5} />;
   if (access.Kind === 'denied') return <InlineAlert accent="awaiting" title={t('secrets.form.forbidden')} />;
   return <>{children(access.Scope)}</>;

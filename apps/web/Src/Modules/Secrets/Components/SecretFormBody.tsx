@@ -13,6 +13,7 @@ import type { TTranslate } from '@/I18n/I18nContext';
 
 export interface ISecretFormBodyProps {
   projectId?: string;
+  environmentName?: string;
   name?: string;
   onDone: () => void;
 }
@@ -73,7 +74,13 @@ const SecretForm = ({ scope, existing, onDone }: ISecretFormProps) => {
         }}
       >
         {save.Notice ? <InlineAlert accent="failed" title={save.Notice} /> : null}
-        <SecretFields draft={draft} editing={editing} organizationId={organization ? scope.OrganizationId : null} busy={save.Busy} />
+        <SecretFields
+          draft={draft}
+          editing={editing}
+          organizationId={organization ? scope.OrganizationId : null}
+          pullRequests={scope.EnvironmentName === undefined}
+          busy={save.Busy}
+        />
         <Button type="submit" variant="primary" iconStart="check" className="justify-self-start" disabled={save.Busy}>
           {save.Busy ? t('secrets.form.submitting') : editing ? t('secrets.form.submit.edit') : t('secrets.form.submit')}
         </Button>
@@ -88,16 +95,16 @@ const ExistingSecret = ({ scope, name, onDone }: { scope: ISecretScope; name: st
   const query = useSecrets(scope);
   return (
     <FormLookup query={query} find={(items) => items.find((item) => item.Name === name)} missing={t('secrets.form.notFound')}>
-      {(secret) => <SecretForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}:${secret.Name}`} scope={scope} existing={secret} onDone={onDone} />}
+      {(secret) => <SecretForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}:${scope.EnvironmentName ?? ""}:${secret.Name}`} scope={scope} existing={secret} onDone={onDone} />}
     </FormLookup>
   );
 };
 
-export const SecretFormBody = ({ projectId, name, onDone }: ISecretFormBodyProps) => (
-  <FormGate projectId={projectId}>
+export const SecretFormBody = ({ projectId, environmentName, name, onDone }: ISecretFormBodyProps) => (
+  <FormGate projectId={projectId} environmentName={environmentName}>
     {(scope) =>
       name === undefined ? (
-        <SecretForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}`} scope={scope} existing={undefined} onDone={onDone} />
+        <SecretForm key={`${scope.OrganizationId}:${scope.ProjectId ?? ""}:${scope.EnvironmentName ?? ""}`} scope={scope} existing={undefined} onDone={onDone} />
       ) : (
         <ExistingSecret scope={scope} name={name} onDone={onDone} />
       )

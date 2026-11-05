@@ -8,6 +8,8 @@ import { App } from '@/App/App';
 import { createAppRouter } from '@/App/Router';
 import { createQueryClient } from '@/Core/Api/QueryClient';
 import { auditFixture, startBackend } from '@/Core/Testing/Backend';
+import { ENVIRONMENT_NAME, environmentsRoute, newEnvironmentsState } from '@/Core/Testing/EnvironmentsBackend';
+import { ok, PROJECT_ID, projectFixture, projectsRoute } from '@/Core/Testing/ProjectsBackend';
 import { settingsFixture, settingsRoute } from '@/Core/Testing/SettingsBackend';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Ar } from '@/I18n/Locales/Ar';
@@ -201,5 +203,49 @@ describe('API requests per page', () => {
       expect(countsOf(view.calls, endpointOf)['GET /api/v1/sessions']).toBe(2);
     });
     expect(within(list).queryByText(`${isolate('Firefox')} على ${isolate('Windows')}`)).not.toBeInTheDocument();
+  });
+});
+
+describe('API requests of the environment pages', () => {
+  const PROJECT = 'GET /api/v1/organizations/{id}/projects/{id}';
+  const ENVIRONMENTS = `${PROJECT}/environments`;
+  const ENVIRONMENT = `${ENVIRONMENTS}/${ENVIRONMENT_NAME}`;
+
+  const mountEnvironments = (url: string, role: string) => {
+    const backend = startBackend({
+      role,
+      routes: [environmentsRoute(newEnvironmentsState()), projectsRoute({ project: () => ok(projectFixture({ CallerRole: role })) })],
+    });
+    const router = createAppRouter(createMemoryHistory({ initialEntries: [url] }));
+    const client = createQueryClient({ retry: false });
+    render(<App router={router} queryClient={client} />);
+    return { ...backend, client };
+  };
+
+  it.each([
+    [`/projects/${PROJECT_ID}/environments`, 'owner', [PROJECT, ENVIRONMENTS, `${ENVIRONMENT}/deployments`]],
+    [
+      `/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}`,
+      'owner',
+      [
+        PROJECT,
+        ENVIRONMENT,
+        `${ENVIRONMENT}/deployments`,
+        `${ENVIRONMENT}/secrets`,
+        `${ENVIRONMENT}/variables`,
+        'GET /api/v1/me/mfa',
+        MEMBERS,
+        'GET /api/v1/organizations/{id}/teams',
+      ],
+    ],
+    [`/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}`, 'viewer', [PROJECT, ENVIRONMENT, `${ENVIRONMENT}/deployments`]],
+  ] as const)('opens %s cold as a %s with only what the page shows, each once', async (url, role, own) => {
+    const view = mountEnvironments(url, role);
+    await screen.findByRole('heading', { level: 1, name: url.endsWith('environments') ? 'Web app' : ENVIRONMENT_NAME });
+    const expected = [...SHELL, ...own];
+    await settle(view.client, view.calls, expected);
+
+    expect(repeated(view.calls)).toEqual([]);
+    expect([...new Set(view.calls.map(endpointOf))].sort()).toEqual([...expected].sort());
   });
 });

@@ -50,6 +50,8 @@ const projectsRoute = page('projects', SHELL_PAGES.projects);
 const projectRoute = page('projects/$projectId', SHELL_PAGES.project);
 const projectSettingsRoute = page('projects/$projectId/settings', SHELL_PAGES.projectSettings);
 const projectSecretsRoute = page('projects/$projectId/secrets', SHELL_PAGES.projectSecrets);
+const projectEnvironmentsRoute = page('projects/$projectId/environments', SHELL_PAGES.projectEnvironments);
+const environmentRoute = page('projects/$projectId/environments/$environmentName', SHELL_PAGES.environment);
 const runRoute = page('projects/$projectId/runs/$runId', SHELL_PAGES.run);
 const jobsRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -129,6 +131,8 @@ const routeTree = rootRoute.addChildren([
     projectRoute,
     projectSettingsRoute,
     projectSecretsRoute,
+    projectEnvironmentsRoute,
+    environmentRoute,
     runRoute,
     jobsRoute,
     jobRoute,

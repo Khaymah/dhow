@@ -4,7 +4,7 @@ import { canReadSecrets, type TRole } from '@/Core/Auth/AuthTypes';
 import { SectionNav } from '@/Core/Ui/SectionNav';
 import { useT } from '@/I18n/useT';
 
-export type TProjectTab = 'runs' | 'secrets' | 'settings';
+export type TProjectTab = 'runs' | 'environments' | 'secrets' | 'settings';
 
 export const ProjectNav = ({ projectId, current, role }: { projectId: string; current: TProjectTab; role?: TRole }) => {
   const t = useT();
@@ -20,6 +20,15 @@ export const ProjectNav = ({ projectId, current, role }: { projectId: string; cu
           current: current === 'runs',
           onSelect: () => {
             void navigate({ to: '/projects/$projectId', params: { projectId } });
+          },
+        },
+        {
+          id: 'environments',
+          label: t('projects.nav.environments'),
+          href: `/projects/${projectId}/environments`,
+          current: current === 'environments',
+          onSelect: () => {
+            void navigate({ to: '/projects/$projectId/environments', params: { projectId } });
           },
         },
         ...(canReadSecrets(role)

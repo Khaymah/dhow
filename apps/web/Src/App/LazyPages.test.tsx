@@ -2,15 +2,23 @@ import { createMemoryHistory } from '@tanstack/react-router';
 import { configure, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { auditFixture, startBackend } from '@/Core/Testing/Backend';
+import { auditFixture, startBackend, type TRouteHandler } from '@/Core/Testing/Backend';
+import { ENVIRONMENT_NAME, environmentsRoute, newEnvironmentsState } from '@/Core/Testing/EnvironmentsBackend';
 import { apiUp } from '@/Core/Testing/Fetch';
+import { ok, PROJECT_ID, projectFixture, projectsRoute } from '@/Core/Testing/ProjectsBackend';
 import { Ar } from '@/I18n/Locales/Ar';
 
 interface IPageCase {
   url: string;
   title: string;
   body: (main: HTMLElement) => Promise<HTMLElement>;
+  routes?: () => TRouteHandler[];
 }
+
+const environmentRoutes = (): TRouteHandler[] => [
+  environmentsRoute(newEnvironmentsState()),
+  projectsRoute({ project: () => ok(projectFixture({ CallerRole: 'owner' })) }),
+];
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -27,6 +35,18 @@ const CASES: IPageCase[] = [
   { url: '/audit', title: Ar['audit.title'], body: (main) => within(main).findByRole('list', { name: Ar['audit.list.title'] }) },
   { url: '/org/members', title: Ar['shell.nav.members'], body: (main) => within(main).findByRole('list', { name: Ar['members.title'] }) },
   { url: '/notifications', title: Ar['notifications.title'], body: (main) => within(main).findByText(Ar['notifications.empty']) },
+  {
+    url: `/projects/${PROJECT_ID}/environments`,
+    title: 'Web app',
+    body: (main) => within(main).findByRole('list', { name: Ar['environments.list'] }),
+    routes: environmentRoutes,
+  },
+  {
+    url: `/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}`,
+    title: ENVIRONMENT_NAME,
+    body: (main) => within(main).findByRole('region', { name: Ar['environments.group.rules'] }),
+    routes: environmentRoutes,
+  },
 ];
 
 const openFresh = async (url: string, title: string) => {
@@ -43,8 +63,8 @@ const openFresh = async (url: string, title: string) => {
 };
 
 describe('lazy pages opened from the address', () => {
-  it.each(CASES)('opens $url on a cold load, and again after a reload', async ({ url, title, body }) => {
-    startBackend({ audit: auditFixture(3) });
+  it.each(CASES)('opens $url on a cold load, and again after a reload', async ({ url, title, body, routes }) => {
+    startBackend({ audit: auditFixture(3), routes: routes?.() });
     const first = await openFresh(url, title);
     expect(await body(first.main)).toBeInTheDocument();
     expect(first.router.state.location.href).toBe(url);

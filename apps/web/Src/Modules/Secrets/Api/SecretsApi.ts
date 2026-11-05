@@ -1,5 +1,14 @@
 import { ApiClient, request } from '@/Core/Api/Client';
 import type { components } from '@/Core/Api/Schema';
+import {
+  listEnvironmentSecrets,
+  listEnvironmentVariables,
+  putEnvironmentSecret,
+  putEnvironmentVariable,
+  removeEnvironmentSecret,
+  removeEnvironmentVariable,
+  type IEnvironmentScope,
+} from '@/Modules/Secrets/Api/EnvironmentSecretsApi';
 
 type TSchemas = components['schemas'];
 
@@ -13,6 +22,7 @@ export type TOrganizationProject = TSchemas['Project'];
 export interface ISecretScope {
   OrganizationId: string;
   ProjectId: string | null;
+  EnvironmentName?: string;
 }
 
 export interface ISecretInput {
@@ -30,7 +40,8 @@ export interface IRegistryInput {
 
 export const ALL_SECRETS_KEY = ['secrets'] as const;
 
-export const scopeKey = (scope: ISecretScope) => [...ALL_SECRETS_KEY, scope.OrganizationId, scope.ProjectId ?? 'organization'] as const;
+export const scopeKey = (scope: ISecretScope) =>
+  [...ALL_SECRETS_KEY, scope.OrganizationId, scope.ProjectId ?? 'organization', scope.EnvironmentName ?? 'all'] as const;
 export const secretsKey = (scope: ISecretScope) => [...scopeKey(scope), 'secrets'] as const;
 export const variablesKey = (scope: ISecretScope) => [...scopeKey(scope), 'variables'] as const;
 export const registryKey = (scope: ISecretScope) => [...scopeKey(scope), 'registry'] as const;
@@ -40,12 +51,19 @@ const LIST_LIMIT = 500;
 const PROJECT_LIMIT = 100;
 const LIST_QUERY = { Page: 1, Limit: LIST_LIMIT };
 
+const environmentOf = (scope: ISecretScope): IEnvironmentScope | null =>
+  scope.ProjectId !== null && scope.EnvironmentName !== undefined
+    ? { OrganizationId: scope.OrganizationId, ProjectId: scope.ProjectId, EnvironmentName: scope.EnvironmentName }
+    : null;
+
 const organizationPath = (scope: ISecretScope) => ({
   params: { path: { id: scope.OrganizationId } },
 });
 
-export const listSecrets = (scope: ISecretScope): Promise<TSecret[]> =>
-  scope.ProjectId === null
+export const listSecrets = (scope: ISecretScope): Promise<TSecret[]> => {
+  const environment = environmentOf(scope);
+  if (environment !== null) return listEnvironmentSecrets(environment);
+  return scope.ProjectId === null
     ? request(() =>
         ApiClient.GET('/organizations/{id}/secrets', {
           params: { path: { id: scope.OrganizationId }, query: LIST_QUERY },
@@ -62,8 +80,13 @@ export const listSecrets = (scope: ISecretScope): Promise<TSecret[]> =>
           },
         }),
       );
+};
 
 export const putSecret = (scope: ISecretScope, name: string, input: ISecretInput): Promise<TSecret> => {
+  const environment = environmentOf(scope);
+  if (environment !== null) {
+    return putEnvironmentSecret(environment, name, { Value: input.Value, Description: input.Description });
+  }
   const common = {
     Value: input.Value,
     Description: input.Description,
@@ -92,8 +115,10 @@ export const putSecret = (scope: ISecretScope, name: string, input: ISecretInput
   );
 };
 
-export const removeSecret = (scope: ISecretScope, name: string): Promise<TSecret> =>
-  scope.ProjectId === null
+export const removeSecret = (scope: ISecretScope, name: string): Promise<TSecret> => {
+  const environment = environmentOf(scope);
+  if (environment !== null) return removeEnvironmentSecret(environment, name);
+  return scope.ProjectId === null
     ? request(() =>
         ApiClient.POST('/organizations/{id}/secrets/{secretName}/remove', {
           params: { path: { id: scope.OrganizationId, secretName: name } },
@@ -110,9 +135,12 @@ export const removeSecret = (scope: ISecretScope, name: string): Promise<TSecret
           },
         }),
       );
+};
 
-export const listVariables = (scope: ISecretScope): Promise<TVariable[]> =>
-  scope.ProjectId === null
+export const listVariables = (scope: ISecretScope): Promise<TVariable[]> => {
+  const environment = environmentOf(scope);
+  if (environment !== null) return listEnvironmentVariables(environment);
+  return scope.ProjectId === null
     ? request(() =>
         ApiClient.GET('/organizations/{id}/variables', {
           params: { path: { id: scope.OrganizationId }, query: LIST_QUERY },
@@ -129,9 +157,12 @@ export const listVariables = (scope: ISecretScope): Promise<TVariable[]> =>
           },
         }),
       );
+};
 
-export const putVariable = (scope: ISecretScope, name: string, value: string): Promise<TVariable> =>
-  scope.ProjectId === null
+export const putVariable = (scope: ISecretScope, name: string, value: string): Promise<TVariable> => {
+  const environment = environmentOf(scope);
+  if (environment !== null) return putEnvironmentVariable(environment, name, value);
+  return scope.ProjectId === null
     ? request(() =>
         ApiClient.PUT('/organizations/{id}/variables/{variableName}', {
           params: { path: { id: scope.OrganizationId, variableName: name } },
@@ -150,9 +181,12 @@ export const putVariable = (scope: ISecretScope, name: string, value: string): P
           body: { Value: value },
         }),
       );
+};
 
-export const removeVariable = (scope: ISecretScope, name: string): Promise<TVariable> =>
-  scope.ProjectId === null
+export const removeVariable = (scope: ISecretScope, name: string): Promise<TVariable> => {
+  const environment = environmentOf(scope);
+  if (environment !== null) return removeEnvironmentVariable(environment, name);
+  return scope.ProjectId === null
     ? request(() =>
         ApiClient.POST('/organizations/{id}/variables/{variableName}/remove', {
           params: { path: { id: scope.OrganizationId, variableName: name } },
@@ -169,6 +203,7 @@ export const removeVariable = (scope: ISecretScope, name: string): Promise<TVari
           },
         }),
       );
+};
 
 export const listRegistryCredentials = (scope: ISecretScope): Promise<TRegistryCredential[]> =>
   scope.ProjectId === null

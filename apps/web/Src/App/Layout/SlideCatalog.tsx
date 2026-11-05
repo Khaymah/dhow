@@ -1,4 +1,5 @@
 import {
+  LazyEnvironmentNewBody,
   LazyInviteBody,
   LazyInviteFooter,
   LazyLeaveBody,
@@ -41,6 +42,8 @@ export interface ISlideContext {
   projectId: string | undefined;
   openProject: (projectId: string) => void;
   openRun: (projectId: string, runId: string) => void;
+  environmentName: string | undefined;
+  openEnvironment: (projectId: string, environmentName: string) => void;
 }
 
 type TBuilder = (context: ISlideContext) => Omit<ISlide, 'id'>;
@@ -126,20 +129,32 @@ const BUILDERS: Record<Exclude<TStaticSlideId, 'theme-edit'>, TBuilder> = {
       />
     ),
   }),
-  'secret-new': ({ t, close, projectId }) => ({
+  'secret-new': ({ t, close, projectId, environmentName }) => ({
     title: t('secrets.new.title'),
     subtitle: <span>{t('secrets.new.subtitle')}</span>,
-    children: <LazySecretFormBody projectId={projectId} onDone={close} />,
+    children: <LazySecretFormBody projectId={projectId} environmentName={environmentName} onDone={close} />,
   }),
-  'variable-new': ({ t, close, projectId }) => ({
+  'variable-new': ({ t, close, projectId, environmentName }) => ({
     title: t('variables.new.title'),
     subtitle: <span>{t('variables.new.subtitle')}</span>,
-    children: <LazyVariableFormBody projectId={projectId} onDone={close} />,
+    children: <LazyVariableFormBody projectId={projectId} environmentName={environmentName} onDone={close} />,
   }),
   'registry-new': ({ t, close, projectId }) => ({
     title: t('registry.new.title'),
     subtitle: <span>{t('registry.new.subtitle')}</span>,
     children: <LazyRegistryFormBody projectId={projectId} onDone={close} />,
+  }),
+  'environment-new': ({ t, projectId, openEnvironment }) => ({
+    title: t('environments.new.title'),
+    subtitle: <span>{t('environments.new.subtitle')}</span>,
+    children: (
+      <LazyEnvironmentNewBody
+        projectId={projectId}
+        onCreated={(name) => {
+          if (projectId !== undefined) openEnvironment(projectId, name);
+        }}
+      />
+    ),
   }),
   'account-token-new': ({ t, close }) => ({
     title: t('tokens.slide.title'),
@@ -168,13 +183,13 @@ const oidcEditSlide = (id: TSlideId, providerId: string, { t, close }: ISlideCon
   children: <LazyOidcProviderBody providerId={providerId} onDone={close} />,
 });
 
-const secretsEditSlide = (id: TSlideId, target: ISecretsEditTarget, { t, close, projectId }: ISlideContext): ISlide => {
+const secretsEditSlide = (id: TSlideId, target: ISecretsEditTarget, { t, close, projectId, environmentName }: ISlideContext): ISlide => {
   if (target.Kind === 'secret') {
     return {
       id,
       title: t('secrets.edit.title', { name: target.Key }),
       subtitle: <span>{t('secrets.edit.subtitle')}</span>,
-      children: <LazySecretFormBody projectId={projectId} name={target.Key} onDone={close} />,
+      children: <LazySecretFormBody projectId={projectId} environmentName={environmentName} name={target.Key} onDone={close} />,
     };
   }
   if (target.Kind === 'variable') {
@@ -182,7 +197,7 @@ const secretsEditSlide = (id: TSlideId, target: ISecretsEditTarget, { t, close, 
       id,
       title: t('variables.edit.title', { name: target.Key }),
       subtitle: <span>{t('variables.edit.subtitle')}</span>,
-      children: <LazyVariableFormBody projectId={projectId} name={target.Key} onDone={close} />,
+      children: <LazyVariableFormBody projectId={projectId} environmentName={environmentName} name={target.Key} onDone={close} />,
     };
   }
   return {
