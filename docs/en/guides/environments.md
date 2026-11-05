@@ -4,7 +4,7 @@
 
 An environment is where a project deploys, such as `staging` or `production`. Its protection rules live on the server only, so no commit can change them: a job only names its environment with `environment:` in the pipeline file.
 
-A job with `environment:` passes [the gate](#the-gate) before it starts, and gets the secrets and variables of the environment only after it. Approvals arrive in a coming update. Until then a job on an environment with reviewers waits and does not start.
+A job with `environment:` passes [the gate](#the-gate) before it starts, and gets the secrets and variables of the environment only after it. An environment with reviewers waits for [the approval](#approvals) of one of them.
 
 ## Who can do what
 
@@ -13,6 +13,8 @@ A job with `environment:` passes [the gate](#the-gate) before it starts, and get
 | See environments and their rules | Every member |
 | Pause deploys to an environment | Maintainer and above |
 | Create an environment, change its rules, resume it and remove it | Admin and owner |
+| Approve or reject a deploy | A reviewer of the environment, Developer and above |
+| Bypass the reviewers and the wait | Admin and owner, when the environment allows it |
 
 The role on the project is your organization role after the bindings of teams and members on the project, so an Admin binding on one project lets you manage the environments of that project only. API tokens can read environments but never change them. Reviewer ids show only to people who can manage the environment; everyone else, and every API token, sees how many reviewers there are.
 
@@ -85,6 +87,39 @@ GET /api/v1/organizations/{id}/projects/{projectId}/environments/{environmentNam
 
 Newest first, and "deployed now" is the newest deploy whose state is `succeeded`. Everyone who can see runs (`run.read`) reads it.
 
+## Approvals
+
+When a job reaches an environment with reviewers, we make one approval request for the run on this environment, which covers every job of the run on it. The request stays open for `ApprovalTimeoutHours` hours.
+
+```http
+GET /api/v1/organizations/{id}/projects/{projectId}/runs/{runId}/approvals
+POST /api/v1/organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/approve
+{"CurrentFactor": {"Method": "totp", "Code": "123456"}, "Comment": "Checked the migration"}
+```
+
+- **Who approves:** a reviewer of the environment (directly or through a team) who is a member of the organization with the Developer role or above on the project. Anyone else gets `REVIEWER_NOT_ELIGIBLE`.
+- **Second factor:** every approval and rejection needs an app code, a recovery code or a passkey. A password alone gets `REVIEWER_NEEDS_SECOND_FACTOR`.
+- **No self-approval:** whoever started the run by hand or with an API key, and whoever pushed it with their GitHub or GitLab account, cannot approve it (`SELF_REVIEW_NOT_ALLOWED`), unless an Admin turned on `AllowSelfApproval`. We know who pushed from the account name, which we save when they sign in to Dhow with that account. Someone who has not signed in with it yet is not known.
+- **Rejection** (`.../reject` with the same rules): the job fails with `DEPLOYMENT_REJECTED`, and the jobs that need it are skipped.
+- **Expiry:** a request nobody decides in time expires, and the job fails with `APPROVAL_EXPIRED`.
+- **A newer run:** with `SupersedePending`, a newer run on the same branch that asks for approval on the same environment cancels the older request that still waits, and the old job is canceled with `SUPERSEDED`. An approval already given is not canceled.
+- **Rule changes:** an approval is bound to `RuleVersion`. If the rules change before the job starts, we ask for a new approval. If the person who approved is no longer a reviewer or a member, we ask for a new approval too.
+- **Rerunning the failed jobs** starts a new round with a new request.
+- **One decision:** if several people decide at the same moment, one decision is taken and the others get `APPROVAL_NOT_PENDING`.
+
+### Bypass the reviewers
+
+```http
+POST /api/v1/organizations/{id}/projects/{projectId}/runs/{runId}/approvals/{approvalId}/bypass
+{"CurrentFactor": {"Method": "totp", "Code": "123456"}, "Reason": "Security fix for the login page"}
+```
+
+Admins and owners only, on an environment that allows it (`AllowAdminBypass`, otherwise `BYPASS_NOT_ALLOWED`), and the reason is required. A bypass skips the reviewers and the wait only: the allowed branches, the images, the plugins and the pause still apply. It is recorded as `environment.bypassed` with the reason.
+
+### What waits for you
+
+`GET /api/v1/organizations/{id}/deployment-approvals?Mine=true` lists the requests you can decide, and `Approvals.Pending` on the organization home page counts the requests on environments where you are a reviewer.
+
 ## Change the rules
 
 ```http
@@ -114,6 +149,6 @@ Jobs that already run finish, and a job that has not reached the gate yet waits 
 
 ## The audit log
 
-Every change is in the audit log, written in the same transaction as the change, so a change without its event never stays: `environment.created` with the initial rules, `environment.updated` with the changed fields and their old and new values, `environment.removed`, `environment.paused` with the reason, and `environment.resumed`.
+Every change is in the audit log, written in the same transaction as the change, so a change without its event never stays: `environment.created` with the initial rules, `environment.updated` with the changed fields and their old and new values, `environment.removed`, `environment.paused` with the reason, and `environment.resumed`. For deploys: `deployment.approval_requested`, `deployment.approved`, `deployment.rejected`, `deployment.approval_expired`, `environment.bypassed`, `deployment.started` and `deployment.finished`, with the kind of second factor only, never its value.
 
 Each rule has its own entry. The lists (`AllowedRefs` and `AllowedPlugins`) always carry their count and a SHA-256 of the old and new values, and the values themselves only when they fit in 256 characters. Reviewers carry the ids added and removed, their count and a digest. When a value does not fit, the event says `Truncated: true` and keeps the digest, so a hidden change still shows.
