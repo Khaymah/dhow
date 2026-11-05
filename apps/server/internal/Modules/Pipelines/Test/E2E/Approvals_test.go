@@ -269,3 +269,35 @@ func TestThePendingListShowsWhatIMayDecide(t *testing.T) {
 		assert.Equal(t, c.want, o.Approvals.Pending)
 	}
 }
+
+func TestAnApprovalStopsCountingWhenTheRulesOrTheReviewerChange(t *testing.T) {
+	for _, change := range []string{
+		`UPDATE "Environments" SET "RuleVersion" = "RuleVersion" + 1 WHERE "Id" = $1`,
+		`UPDATE "EnvironmentReviewers" SET "IsDeleted" = true WHERE "EnvironmentId" = $1 AND "UserId" = $2`,
+	} {
+		w := newWorld(t)
+		env := w.production(t)
+		rev := w.reviewer(t, env, "reviewer@example.com", "developer")
+		w.reviewer(t, env, "second@example.com", "developer")
+		w.exec(t, `UPDATE "Environments" SET "WaitMinutes" = 10 WHERE "Id" = $1`, env)
+		w.defs.Put(shaA, pipeline(envPipeline))
+		run, a := w.gatedDeploy(t, shaA)
+		res := w.decide(rev.c, run, a.Id, "approve", map[string]any{"CurrentFactor": rev.factor()})
+		require.Equal(t, http.StatusOK, res.Status, string(res.Raw))
+		gate, _ := w.gate(t, run, "deploy")
+		require.Equal(t, "timer", gate, "approved, now waiting for the timer")
+
+		if change[len(change)-2:] == "$2" {
+			w.exec(t, change, env, rev.id)
+		} else {
+			w.exec(t, change, env)
+		}
+		w.reopen(t)
+		list := w.approvals(t, run)
+		require.Len(t, list, 2)
+		assert.Equal(t, []string{"superseded", "pending"}, []string{list[0].State, list[1].State})
+		gate, _ = w.gate(t, run, "deploy")
+		assert.Equal(t, "approval", gate, "the old approval no longer lets the job through")
+		assert.False(t, w.secretUsed(t))
+	}
+}

@@ -23,10 +23,10 @@ CREATE TABLE "DeploymentApprovals" (
     "SupersededByRunId" uuid,
     FOREIGN KEY ("EnvironmentId", "OrganizationId") REFERENCES "Environments" ("Id", "OrganizationId"),
     CHECK (("State" = 'pending') = ("DecidedAt" IS NULL)),
-    CHECK (("State" IN ('approved', 'rejected', 'bypassed')) = ("DecidedByUserId" IS NOT NULL)),
+    CHECK ("State" = 'superseded' OR (("State" IN ('approved', 'rejected', 'bypassed')) = ("DecidedByUserId" IS NOT NULL))),
     CHECK (("DecidedByUserId" IS NULL) = ("FactorKind" IS NULL)),
-    CHECK (("State" = 'bypassed') = ("BypassReason" IS NOT NULL)),
-    CHECK ("Comment" IS NULL OR "State" IN ('approved', 'rejected')),
+    CHECK ("State" = 'superseded' OR (("State" = 'bypassed') = ("BypassReason" IS NOT NULL))),
+    CHECK ("Comment" IS NULL OR "State" IN ('approved', 'rejected', 'superseded')),
     CHECK ("SupersededByRunId" IS NULL OR "State" = 'superseded')
 );
 
