@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Khaymah/dhow/internal/netguard"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -158,7 +157,7 @@ func placeholderIsHost(raw string) bool {
 
 var internalSuffixes = []string{".localhost", ".local", ".internal", ".localdomain", ".home.arpa"}
 
-func HealthHostAllowed(host string, targetHosts []string, extra bool) bool {
+func HealthHostAllowed(host string, targetHosts []string, extra bool, denied func(netip.Addr) bool) bool {
 	if slices.Contains(targetHosts, host) {
 		return true
 	}
@@ -166,7 +165,7 @@ func HealthHostAllowed(host string, targetHosts []string, extra bool) bool {
 		return false
 	}
 	if addr, err := netip.ParseAddr(host); err == nil {
-		return netguard.Policy{}.Denial(addr) == ""
+		return !denied(addr)
 	}
 	if _, err := ParseEgress(host); err != nil {
 		return false

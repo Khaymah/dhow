@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"net/netip"
 	"testing"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Khaymah/dhow/internal/jobspec"
+	"github.com/Khaymah/dhow/internal/netguard"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -355,6 +357,6 @@ func TestHealthHostAllowed(t *testing.T) {
 		{"0.0.0.0", true, false},
 	}
 	for _, c := range cases {
-		assert.Equal(t, c.want, jobspec.HealthHostAllowed(c.host, targets, c.extra), "%s extra=%v", c.host, c.extra)
+		assert.Equal(t, c.want, jobspec.HealthHostAllowed(c.host, targets, c.extra, func(a netip.Addr) bool { return netguard.Policy{}.Denial(a) != "" }), "%s extra=%v", c.host, c.extra)
 	}
 }
