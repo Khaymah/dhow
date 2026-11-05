@@ -47,9 +47,14 @@ jobs:
     environment: production
     steps:
       - name: Deploy
-        run: echo "deploying"
+        run: |
+          mkdir -p out
+          echo "deployed" > out/report.txt
         env:
           DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+    artifacts:
+      - name: report
+        paths: [out]
 YAML
   chmod -R a+rX "$work/repo"
 }
