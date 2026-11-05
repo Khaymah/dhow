@@ -15,7 +15,7 @@ var safePath = regexp.MustCompile(`^/[A-Za-z0-9._/-]{1,200}$`)
 func FuzzDeployPath(f *testing.F) {
 	for _, seed := range []string{
 		"/srv/shop", "/", "", "/srv/../etc", "/etc/x", "/srv/a;b", "/srv/a b", "/srv/a\nb", "/srv//a", "/srv/./a", "//srv/a",
-		"/var/lib/docker/x", "/srv/a/", "/srv/-a", "/srv/‮a", "/srv/a\x00b", "/proc/self",
+		"/var/lib/docker/x", "/srv/a/", "/srv/-a", "/srv/\u202ea", "/srv/a\x00b", "/proc/self",
 	} {
 		f.Add(seed)
 	}
