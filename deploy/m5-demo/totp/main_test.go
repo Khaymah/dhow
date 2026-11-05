@@ -55,3 +55,12 @@ func TestABadSecretOrUsageIsRefused(t *testing.T) {
 	require.NoError(t, os.WriteFile(state, []byte("999999999999\n"), 0o600))
 	assert.Equal(t, 1, run([]string{state}, strings.NewReader(rfcSecret), &bytes.Buffer{}, now, func(time.Duration) {}))
 }
+
+func TestTheSecretIsNeverTakenFromTheArguments(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "state")
+	now := func() time.Time { return time.Unix(0, 0) }
+	var out bytes.Buffer
+	assert.Equal(t, 2, run([]string{state, rfcSecret}, strings.NewReader(rfcSecret), &out, now, func(time.Duration) {}))
+	assert.Empty(t, out.String())
+	assert.NoFileExists(t, state)
+}

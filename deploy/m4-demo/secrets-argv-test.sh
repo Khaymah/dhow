@@ -51,6 +51,8 @@ for script in deploy/m4-demo/run.sh deploy/m4-demo/project.sh deploy/e2e/run.sh 
     check "$script passes no secret with $pattern" absent "$pattern" "$root/$script"
   done
 done
+check "the TOTP helper takes only a state file as an argument and the secret on stdin" grep -qF 'len(args) != 1' "$root/deploy/m5-demo/totp/main.go"
+check "the keys commands of the M5 demo read the database URL from a file" grep -qF 'DHOW_DATABASE_URL_FILE=' "$root/deploy/m5-demo/lib.sh"
 check "the Forgejo password reaches curl on stdin" grep -qF 'curl --config - ' "$root/deploy/m4-demo/project.sh"
 check "git reads the Forgejo password through GIT_ASKPASS" grep -qF 'GIT_ASKPASS="$work/askpass"' "$root/deploy/m4-demo/project.sh"
 

@@ -15,7 +15,7 @@ decision_status=
 error_code=
 manual_run_id=
 database_url='postgres://dhow:dhow-dev-only@db:5432/dhow?sslmode=disable'
-secret_lengths='41,41,41'
+secret_lengths='environment=45 organization=37 project=41'
 
 project_path() { printf '/api/v1/organizations/%s/projects/%s' "$org_id" "$project_id"; }
 
@@ -156,9 +156,14 @@ run_settled() {
 job_skipped_by_ref_rule() {
   run_settled "$1" || return 1
   grep -qF '"FailureReason":"ENVIRONMENT_REF_NOT_ALLOWED"' "$work/run.body" && grep -qF '"State":"skipped"' "$work/run.body" &&
-    ! grep -qF '"Gate":' "$work/run.body" && return 0
+    ! grep -qF '"Gate":' "$work/run.body" && no_secrets_delivered "$1" && return 0
   why "the run after the push to the feature branch: $(head -c 800 "$work/run.body")"
   return 1
+}
+
+no_secrets_delivered() {
+  api "$work/audit" GET "/api/v1/organizations/$org_id/audit-events?Action=job.secrets_delivered" '' "${session[@]}" >/dev/null || return 1
+  ! grep -qF "$1" "$work/audit.body"
 }
 
 run_is_running() {
@@ -229,7 +234,7 @@ saw() { grep -qF -- "$1" "$work/logs.txt"; }
 
 deployed_with_secrets() {
   run_logs "$1" || return 1
-  saw "dhow-demo deploy secrets=$secret_lengths" && saw 'dhow-demo deploy prefix=ok' && return 0
+  saw "dhow-demo deploy $secret_lengths" && saw 'dhow-demo deploy prefix=ok' && return 0
   why "the demo lines seen: $(grep -o 'dhow-demo [^"\\]*' "$work/logs.txt" | sort -u | tr '\n' ';')"
   return 1
 }
@@ -268,7 +273,8 @@ cancel_run() {
 }
 
 keys_exec() {
-  docker compose exec -T -e DHOW_DEV=true -e "DHOW_DATABASE_URL=$database_url" server /tmp/dhow-server keys "$@" --file /tmp/dhow-keyring </dev/null
+  [[ -f $work/server/database-url ]] || printf '%s' "$database_url" >"$work/server/database-url"
+  docker compose exec -T -e DHOW_DEV=true -e DHOW_DATABASE_URL_FILE=/run/dhow-demo/database-url server /tmp/dhow-server keys "$@" --file /tmp/dhow-keyring </dev/null
 }
 
 kek_added() {

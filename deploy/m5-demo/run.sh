@@ -52,7 +52,7 @@ jobs:
         run: |
           mkdir -p out
           echo "deployed" > out/report.txt
-          echo "dhow-demo deploy secrets=${#DEPLOY_TOKEN},${#ORG_VALUE},${#PROJECT_VALUE}"
+          echo "dhow-demo deploy environment=${#DEPLOY_TOKEN} organization=${#ORG_VALUE} project=${#PROJECT_VALUE}"
           case "$DEPLOY_TOKEN$ORG_VALUE$PROJECT_VALUE" in demo-*demo-*demo-*) echo "dhow-demo deploy prefix=ok" ;; esac
         env:
           DEPLOY_TOKEN: ${{ secrets.DEMO_environment_SECRET }}
