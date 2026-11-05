@@ -136,7 +136,7 @@ func (q *Queries) InsertDeployment(ctx context.Context, arg InsertDeploymentPara
 }
 
 const listDeployments = `-- name: ListDeployments :many
-SELECT d."Id", d."CreatedAt", d."UpdatedAt", d."IsDeleted", d."OrganizationId", d."EnvironmentId", d."RunId", d."RunNumber", d."RunJobId", d."JobId", d."JobKey", d."Ref", d."Sha", d."RuleVersion", d."State", d."FinishedAt"
+SELECT d."Id", d."CreatedAt", d."UpdatedAt", d."IsDeleted", d."OrganizationId", d."EnvironmentId", d."RunId", d."RunNumber", d."RunJobId", d."JobId", d."JobKey", d."Ref", d."Sha", d."RuleVersion", d."State", d."FinishedAt", d."ApprovalId"
 FROM "Deployments" d
 WHERE d."EnvironmentId" = $1 AND d."OrganizationId" = $2 AND NOT d."IsDeleted"
 ORDER BY d."CreatedAt" DESC, d."Id" DESC
@@ -181,6 +181,7 @@ func (q *Queries) ListDeployments(ctx context.Context, arg ListDeploymentsParams
 			&i.RuleVersion,
 			&i.State,
 			&i.FinishedAt,
+			&i.ApprovalId,
 		); err != nil {
 			return nil, err
 		}
