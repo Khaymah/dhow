@@ -245,7 +245,7 @@ FUZZ_TARGETS := \
 	Core/Auth:FuzzWebAuthnResponses Core/I18n:FuzzParseAcceptLanguage Core/Middleware:FuzzClientIP Core/RateLimit:FuzzNetwork \
 	Core/Oidc:FuzzEmailVerifiedClaim Core/Oidc:FuzzAcceptedEmail Modules/Sources/Test/Edge:FuzzWebhook \
 	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName \
-	Core/Keys:FuzzKeyring Core/Keys:FuzzOpen) \
+	Core/Keys:FuzzKeyring Core/Keys:FuzzOpen Modules/Environments/Test/Edge:FuzzAllowedRefs Modules/Secrets/Test/Edge:FuzzSecretName) \
 	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare \
 	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
 	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern
