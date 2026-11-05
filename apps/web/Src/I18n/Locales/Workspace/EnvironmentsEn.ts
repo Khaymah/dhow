@@ -1,4 +1,5 @@
 export const EnvironmentsEn = {
+  'environments.refs.emptyConfirm': 'No branch or tag is allowed any more, so nothing will deploy to this environment. Press Save again to confirm.',
   'projects.nav.environments': 'Environments',
   'environments.lead': 'An environment is where the project deploys, such as staging or production. Protection rules live on the server, so no commit can change them.',
   'environments.list': 'Environments',

@@ -31,12 +31,12 @@ const PAGE_URL = `/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}`;
 const PATH = `/organizations/${ORG_ID}/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}`;
 const MONA_ID = '0198a000-0000-7000-8000-0000000000b2';
 
-const mount = (role = 'owner', state: IEnvironmentsState = newEnvironmentsState()) => {
+const mount = (role = 'owner', state: IEnvironmentsState = newEnvironmentsState(), url = PAGE_URL) => {
   const backend = startBackend({
     role,
     routes: [environmentsRoute(state), projectsRoute({ project: () => ok(projectFixture({ CallerRole: role })) })],
   });
-  const router = createAppRouter(createMemoryHistory({ initialEntries: [PAGE_URL] }));
+  const router = createAppRouter(createMemoryHistory({ initialEntries: [url] }));
   const client = createQueryClient({ retry: false });
   const user = userEvent.setup();
   render(<App router={router} queryClient={client} />);
@@ -157,6 +157,33 @@ describe('the reviewers and patterns of an environment', () => {
       expect(view.state.writes).toHaveLength(1);
     });
     expect(view.state.writes[0]?.Body).toMatchObject({ Rules: { AllowedRefs: [{ Kind: 'tag', Pattern: 'v*' }] } });
+  });
+
+  it('asks again before a save leaves no branch or tag allowed', async () => {
+    const view = mount();
+    const { region } = await openRules();
+    for (const remove of within(region).getAllByRole('button', { name: Ar['environments.refs.remove'] })) {
+      await view.user.click(remove);
+    }
+    await enterFactor(view, region);
+    await save(view, region);
+    expect(await within(region).findByText(Ar['environments.refs.emptyConfirm'])).toBeInTheDocument();
+    expect(view.state.writes).toHaveLength(0);
+
+    await save(view, region);
+    await waitFor(() => {
+      expect(view.state.writes).toHaveLength(1);
+    });
+    expect(view.state.writes[0]?.Body).toMatchObject({ Rules: { AllowedRefs: [] } });
+  });
+
+  it('opens no secret slide on the address of an environment with an invalid name', async () => {
+    const view = mount('owner', newEnvironmentsState(), `/projects/${PROJECT_ID}/environments/Bad_Name?slide=secret-new`);
+    await waitFor(() => {
+      expect(view.router.state.location.search).not.toHaveProperty('slide');
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(view.state.writes).toHaveLength(0);
   });
 
   it('refuses a number out of range, an invalid pattern and too many plugins before the server', async () => {

@@ -14,7 +14,7 @@ import { FactorSubmit } from '@/Modules/Environments/Components/FactorSubmit';
 import { RuleFields } from '@/Modules/Environments/Components/RuleFields';
 import { useEnvironmentRefresh } from '@/Modules/Environments/Hooks/useEnvironmentRefresh';
 import { useRulesDraft } from '@/Modules/Environments/Hooks/useRulesDraft';
-import { draftOf, draftProblem, hasDraftChanges, rulesInputOf } from '@/Modules/Environments/Types/RulesDraft';
+import { draftOf, draftProblem, emptiesRefs, hasDraftChanges, rulesInputOf } from '@/Modules/Environments/Types/RulesDraft';
 
 export interface IRulesFormProps {
   organizationId: string;
@@ -54,6 +54,7 @@ const EditableRules = ({ organizationId, projectId, environment, methods, onRelo
   const reviewersEditable = environment.Rules.Reviewers.IdsShown;
   const [Failure, setFailure] = useState<ApiError | null>(null);
   const [Problem, setProblem] = useState<string | null>(null);
+  const [EmptyWarned, setEmptyWarned] = useState(false);
   const changed = hasDraftChanges(form.Draft, original, reviewersEditable);
 
   const action = useFactorAction<TEnvironment>(methods, async (proof) => {
@@ -77,6 +78,10 @@ const EditableRules = ({ organizationId, projectId, environment, methods, onRelo
     const problem = draftProblem(form.Draft, reviewersEditable);
     setProblem(problem === null ? null : t(problem));
     if (problem !== null) return;
+    if (emptiesRefs(form.Draft, original) && !EmptyWarned) {
+      setEmptyWarned(true);
+      return;
+    }
     void action.Run().then((saved) => {
       if (saved === null) return;
       refresh.Saved(saved);
@@ -95,6 +100,7 @@ const EditableRules = ({ organizationId, projectId, environment, methods, onRelo
         }}
       >
         {Problem ? <InlineAlert accent="failed" title={Problem} /> : null}
+        {EmptyWarned && emptiesRefs(form.Draft, original) ? <InlineAlert accent="awaiting" title={t('environments.refs.emptyConfirm')} /> : null}
         <FailureNotes failure={Failure} notice={action.Notice} onReload={onReload} />
         <RuleFields form={form} organizationId={organizationId} disabled={action.Busy} reviewersEditable={reviewersEditable} creating={false} />
         {reviewersEditable ? null : <InlineAlert accent="building" title={t('environments.reviewers.hidden')} />}

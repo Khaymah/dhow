@@ -36,7 +36,8 @@ export const SlideHost = () => {
     setSeen(slide);
     setMissing(themeMissing(slide, customThemes));
   }
-  const refused = slide !== null && !slideAllowed(slide, role);
+  const badEnvironment = environmentName !== undefined && !isEnvironmentName(environmentName);
+  const refused = slide !== null && (badEnvironment || !slideAllowed(slide, role));
   const editing = slide !== null && isThemeEditSlide(slide);
 
   const rejectLink = useEffectEvent(() => {

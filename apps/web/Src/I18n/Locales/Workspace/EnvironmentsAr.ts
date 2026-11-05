@@ -1,4 +1,5 @@
 export const EnvironmentsAr = {
+  'environments.refs.emptyConfirm': 'لم يبق فرع ولا وسم مسموح، فلن ينشر شيء على هذه البيئة. اضغط «احفظ» مرة أخرى لتأكيد ذلك.',
   'projects.nav.environments': 'البيئات',
   'environments.lead': 'البيئة هي المكان الذي ينشر فيه المشروع، مثل بيئة الاختبار وبيئة الإنتاج. قواعد الحماية تُحفظ في السيرفر ولا يغيّرها أي تعديل في الكود.',
   'environments.list': 'قائمة البيئات',

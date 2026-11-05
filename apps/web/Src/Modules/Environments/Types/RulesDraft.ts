@@ -87,6 +87,9 @@ const refLines = (refs: readonly IRefDraft[]): string[] => refs.map((ref) => `${
 
 const cleanRefs = (refs: readonly IRefDraft[]): IRefDraft[] => refs.map((ref) => ({ Kind: ref.Kind, Pattern: ref.Pattern.trim() }));
 
+export const emptiesRefs = (draft: IRulesDraft, original: IRulesDraft): boolean =>
+  original.Refs.length > 0 && cleanRefs(draft.Refs).every((ref) => ref.Pattern === '');
+
 export const hasDraftChanges = (draft: IRulesDraft, original: IRulesDraft, reviewersEditable: boolean): boolean =>
   draft.Description !== original.Description ||
   !sameList(refLines(draft.Refs), refLines(original.Refs)) ||
