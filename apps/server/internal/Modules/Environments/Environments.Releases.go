@@ -1,12 +1,13 @@
 package environments
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"encoding/hex"
 	"errors"
 	"strconv"
 	"time"
+
+	"connectrpc.com/connect"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

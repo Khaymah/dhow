@@ -193,7 +193,8 @@ func TestAReportOfAnotherLeaseAnOldFencingTokenOrAnotherStepIsRejected(t *testin
 	j.refuse(t, connect.CodePermissionDenied, "NOT_A_TARGET_STEP", 0, ev(kindUploaded, h[0]))
 	j.refuse(t, connect.CodePermissionDenied, "NOT_A_TARGET_STEP", 7, ev(kindUploaded, h[0]))
 
-	j.env.Pool.Exec(context.Background(), `UPDATE "DeploymentReleases" SET "LeaseId" = $1 WHERE "ReleaseId" = $2`, uuid.New(), j.release)
+	_, err := j.env.Pool.Exec(context.Background(), `UPDATE "DeploymentReleases" SET "LeaseId" = $1 WHERE "ReleaseId" = $2`, uuid.New(), j.release)
+	require.NoError(t, err)
 	j.refuse(t, connect.CodePermissionDenied, "RELEASE_LEASE_MISMATCH", 1, ev(kindUploaded, h[0]))
 	assert.Equal(t, "pending", j.hostStates(t)[h[0]], "a forged report changes nothing")
 }

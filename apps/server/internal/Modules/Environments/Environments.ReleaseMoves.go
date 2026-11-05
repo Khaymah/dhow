@@ -1,10 +1,11 @@
 package environments
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"errors"
 	"slices"
+
+	"connectrpc.com/connect"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -50,7 +51,7 @@ func (sc *reportScope) start(ctx context.Context, ev *runnerv1.DeployEvent) erro
 	for i, h := range sc.target.GetHosts() {
 		hid := uuid.MustParse(h.GetHostId())
 		if err := sc.q.InsertReleaseHost(ctx, sqlc.InsertReleaseHostParams{
-			OrganizationID: rel.OrganizationId, ReleaseRowID: rel.Id, HostID: hid, ReleaseID: rel.ReleaseId, Position: int32(i + 1), Now: sc.now, //nolint:gosec // At most MaxTargetHosts.
+			OrganizationID: rel.OrganizationId, ReleaseRowID: rel.Id, HostID: hid, ReleaseID: rel.ReleaseId, Position: int32(i + 1), Now: sc.now,
 		}); err != nil {
 			return err
 		}
