@@ -32,6 +32,8 @@ ok_status() {
   return 1
 }
 
+user_id_of() { sed 's/.*"User":{//' "$1" | grep -o '"Id":"[^"]*"' | head -1 | cut -d'"' -f4; }
+
 session_cookie_of() { sed -n 's/^[Ss]et-[Cc]ookie: \([^=;]*dhow_session=[^;]*\);.*/\1/p' "$1" | tr -d '\r' | head -1; }
 
 invite_reviewer() {
@@ -45,7 +47,7 @@ invite_reviewer() {
   needle "reviewer password" "$reviewer_password"
   ok_status "$work/accept" "$(api "$work/accept" POST /api/v1/invitations/accept \
     "$(printf '{"Token":"%s","Name":"%s","Password":"%s"}' "$token" "$reviewer_name" "$reviewer_password")")" 200 || return 1
-  reviewer_id=$(json_field "$work/accept.body" Id)
+  reviewer_id=$(user_id_of "$work/accept.body")
   [[ -n $reviewer_id ]]
 }
 
@@ -93,7 +95,7 @@ reviewer_ready() {
 }
 
 owner_ready() {
-  owner_id=$(json_field "$work/login.body" Id)
+  owner_id=$(user_id_of "$work/login.body")
   [[ -n $owner_id ]] || return 1
   enroll_totp owner "$password" "${session[@]}" || return 1
   owner_totp=$enrolled_secret
