@@ -197,6 +197,8 @@ func TestAnAdminBypassSkipsTheReviewersAndTheTimerOnly(t *testing.T) {
 	requireCode(t, w.decide(owner.c, run, a.Id, "bypass", map[string]any{"CurrentFactor": owner.factor(), "Reason": "hotfix"}),
 		http.StatusForbidden, "BYPASS_NOT_ALLOWED")
 	w.exec(t, `UPDATE "Environments" SET "AllowAdminBypass" = true WHERE "Id" = $1`, env)
+	requireCode(t, w.decide(owner.c, run, a.Id, "bypass", map[string]any{"CurrentFactor": apptest.PasswordFactor(apptest.DefaultSetup().Password), "Reason": "hotfix"}),
+		http.StatusForbidden, "REVIEWER_NEEDS_SECOND_FACTOR")
 	run2, a2 := run, a
 	res := w.decide(owner.c, run2, a2.Id, "bypass", map[string]any{"CurrentFactor": owner.factor()})
 	assert.Equal(t, http.StatusUnprocessableEntity, res.Status, "a bypass needs a reason")
@@ -207,6 +209,9 @@ func TestAnAdminBypassSkipsTheReviewersAndTheTimerOnly(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.Status, string(res.Raw))
 	assert.Equal(t, "active", w.env.RunJobs(run)["deploy"].State, "the bypass skipped the 30 minute timer")
 	assert.Equal(t, 1, w.env.AuditCount("environment.bypassed"))
+	var severity string
+	require.NoError(t, w.env.Pool.QueryRow(context.Background(), `SELECT "Data"->>'Severity' FROM "AuditEvents" WHERE "Action" = 'environment.bypassed'`).Scan(&severity))
+	assert.Equal(t, "high", severity)
 }
 
 func TestConcurrentApprovalsDecideOnceAndEnqueueOnce(t *testing.T) {
@@ -274,6 +279,8 @@ func TestAnApprovalStopsCountingWhenTheRulesOrTheReviewerChange(t *testing.T) {
 	for _, change := range []string{
 		`UPDATE "Environments" SET "RuleVersion" = "RuleVersion" + 1 WHERE "Id" = $1`,
 		`UPDATE "EnvironmentReviewers" SET "IsDeleted" = true WHERE "EnvironmentId" = $1 AND "UserId" = $2`,
+		`UPDATE "Memberships" SET "IsDeleted" = true WHERE $1::uuid IS NOT NULL AND "UserId" = $2`,
+		`UPDATE "Memberships" SET "Role" = 'viewer' WHERE $1::uuid IS NOT NULL AND "UserId" = $2`,
 	} {
 		w := newWorld(t)
 		env := w.production(t)

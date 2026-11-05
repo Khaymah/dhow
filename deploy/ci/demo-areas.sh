@@ -19,7 +19,7 @@ while IFS= read -r file; do
       demos=true
       e2e=true
       ;;
-    deploy/m3-demo/*) demos=true ;;
+    deploy/m3-demo/* | deploy/m5-demo/*) demos=true ;;
   esac
 done < <(git diff --name-only HEAD^1 HEAD)
 printf 'demos=%s\ne2e=%s\n' "$demos" "$e2e"

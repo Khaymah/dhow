@@ -159,15 +159,18 @@ checkout_image() {
 }
 
 sealed_values() {
-  local name value scope path
-  api "$work/environment" POST "/api/v1/organizations/$org_id/projects/$project_id/environments" \
-    "$(printf '{"Name":"staging","CurrentFactor":{"Method":"password","Password":"%s"}}' "$password")" "${session[@]}" >/dev/null || return 1
+  local name value scope path bytes environment=${sealed_environment:-staging}
+  if [[ ${sealed_creates_environment:-1} == 1 ]]; then
+    api "$work/environment" POST "/api/v1/organizations/$org_id/projects/$project_id/environments" \
+      "$(printf '{"Name":"%s","CurrentFactor":{"Method":"password","Password":"%s"}}' "$environment" "$password")" "${session[@]}" >/dev/null || return 1
+  fi
   for scope in "organization secret:/api/v1/organizations/$org_id" \
     "project secret:/api/v1/organizations/$org_id/projects/$project_id" \
-    "environment secret:/api/v1/organizations/$org_id/projects/$project_id/environments/staging"; do
+    "environment secret:/api/v1/organizations/$org_id/projects/$project_id/environments/$environment"; do
     name=${scope%%:*}
     path=${scope#*:}
-    value="demo-$(od -An -tx1 -N18 /dev/urandom | tr -d ' \n')"
+    case $name in organization*) bytes=16 ;; project*) bytes=18 ;; *) bytes=20 ;; esac
+    value="demo-$(od -An -tx1 -N"$bytes" /dev/urandom | tr -d ' \n')"
     [[ $(api "$work/secret" PUT "$path/secrets/DEMO_${name%% *}_SECRET" "$(printf '{"Value":"%s"}' "$value")" "${session[@]}") == 2?? ]] || return 1
     needle "$name" "$value"
   done
