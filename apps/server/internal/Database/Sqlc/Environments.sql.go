@@ -32,7 +32,7 @@ func (q *Queries) CountEnvironments(ctx context.Context, arg CountEnvironmentsPa
 }
 
 const getEnvironment = `-- name: GetEnvironment :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt", "AllowExtraDeployEgress"
 FROM "Environments"
 WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND "Name" = $3 AND NOT "IsDeleted"
 `
@@ -74,6 +74,7 @@ func (q *Queries) GetEnvironment(ctx context.Context, arg GetEnvironmentParams) 
 		&i.CreatedByUserId,
 		&i.LockedByRunId,
 		&i.LockedAt,
+		&i.AllowExtraDeployEgress,
 	)
 	return i, err
 }
@@ -109,34 +110,35 @@ const insertEnvironment = `-- name: InsertEnvironment :one
 INSERT INTO "Environments" (
     "OrganizationId", "ProjectId", "Name", "Description", "AllowedRefs", "AllowPullRequests", "RequiredApprovals",
     "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation",
-    "AllowAdminBypass", "SupersedePending", "CreatedByUserId", "CreatedAt", "UpdatedAt"
+    "AllowAdminBypass", "SupersedePending", "AllowExtraDeployEgress", "CreatedByUserId", "CreatedAt", "UpdatedAt"
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7,
     $8, $9, $10, $11, $12::text[], $13,
-    $14, $15, $16, $17, $17
+    $14, $15, $16, $17, $18, $18
 )
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt", "AllowExtraDeployEgress"
 `
 
 type InsertEnvironmentParams struct {
-	OrganizationID       uuid.UUID
-	ProjectID            uuid.UUID
-	Name                 string
-	Description          string
-	AllowedRefs          []byte
-	AllowPullRequests    bool
-	RequiredApprovals    int32
-	AllowSelfApproval    bool
-	WaitMinutes          int32
-	ApprovalTimeoutHours int32
-	RequirePinnedImages  bool
-	AllowedPlugins       []string
-	RequiredIsolation    string
-	AllowAdminBypass     bool
-	SupersedePending     bool
-	CreatedByUserID      uuid.UUID
-	Now                  time.Time
+	OrganizationID         uuid.UUID
+	ProjectID              uuid.UUID
+	Name                   string
+	Description            string
+	AllowedRefs            []byte
+	AllowPullRequests      bool
+	RequiredApprovals      int32
+	AllowSelfApproval      bool
+	WaitMinutes            int32
+	ApprovalTimeoutHours   int32
+	RequirePinnedImages    bool
+	AllowedPlugins         []string
+	RequiredIsolation      string
+	AllowAdminBypass       bool
+	SupersedePending       bool
+	AllowExtraDeployEgress bool
+	CreatedByUserID        uuid.UUID
+	Now                    time.Time
 }
 
 func (q *Queries) InsertEnvironment(ctx context.Context, arg InsertEnvironmentParams) (Environment, error) {
@@ -156,6 +158,7 @@ func (q *Queries) InsertEnvironment(ctx context.Context, arg InsertEnvironmentPa
 		arg.RequiredIsolation,
 		arg.AllowAdminBypass,
 		arg.SupersedePending,
+		arg.AllowExtraDeployEgress,
 		arg.CreatedByUserID,
 		arg.Now,
 	)
@@ -188,6 +191,7 @@ func (q *Queries) InsertEnvironment(ctx context.Context, arg InsertEnvironmentPa
 		&i.CreatedByUserId,
 		&i.LockedByRunId,
 		&i.LockedAt,
+		&i.AllowExtraDeployEgress,
 	)
 	return i, err
 }
@@ -255,7 +259,7 @@ func (q *Queries) ListEnvironmentReviewers(ctx context.Context, arg ListEnvironm
 }
 
 const listEnvironments = `-- name: ListEnvironments :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt", "AllowExtraDeployEgress"
 FROM "Environments"
 WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
 ORDER BY "Name"
@@ -311,6 +315,7 @@ func (q *Queries) ListEnvironments(ctx context.Context, arg ListEnvironmentsPara
 			&i.CreatedByUserId,
 			&i.LockedByRunId,
 			&i.LockedAt,
+			&i.AllowExtraDeployEgress,
 		); err != nil {
 			return nil, err
 		}
@@ -323,7 +328,7 @@ func (q *Queries) ListEnvironments(ctx context.Context, arg ListEnvironmentsPara
 }
 
 const lockEnvironment = `-- name: LockEnvironment :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt", "AllowExtraDeployEgress"
 FROM "Environments"
 WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND "Name" = $3 AND NOT "IsDeleted"
 FOR UPDATE
@@ -366,6 +371,7 @@ func (q *Queries) LockEnvironment(ctx context.Context, arg LockEnvironmentParams
 		&i.CreatedByUserId,
 		&i.LockedByRunId,
 		&i.LockedAt,
+		&i.AllowExtraDeployEgress,
 	)
 	return i, err
 }
@@ -375,7 +381,7 @@ UPDATE "Environments"
 SET "PausedAt" = $1::timestamptz, "PausedByUserId" = $2, "PausedReason" = $3,
     "RuleVersion" = "RuleVersion" + 1, "Version" = "Version" + 1, "UpdatedAt" = $1::timestamptz
 WHERE "Id" = $4 AND "OrganizationId" = $5 AND "PausedAt" IS NULL AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt", "AllowExtraDeployEgress"
 `
 
 type PauseEnvironmentParams struct {
@@ -423,6 +429,7 @@ func (q *Queries) PauseEnvironment(ctx context.Context, arg PauseEnvironmentPara
 		&i.CreatedByUserId,
 		&i.LockedByRunId,
 		&i.LockedAt,
+		&i.AllowExtraDeployEgress,
 	)
 	return i, err
 }
@@ -431,7 +438,7 @@ const removeEnvironment = `-- name: RemoveEnvironment :one
 UPDATE "Environments"
 SET "IsDeleted" = true, "Version" = "Version" + 1, "UpdatedAt" = $1
 WHERE "Id" = $2 AND "OrganizationId" = $3 AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt", "AllowExtraDeployEgress"
 `
 
 type RemoveEnvironmentParams struct {
@@ -471,6 +478,7 @@ func (q *Queries) RemoveEnvironment(ctx context.Context, arg RemoveEnvironmentPa
 		&i.CreatedByUserId,
 		&i.LockedByRunId,
 		&i.LockedAt,
+		&i.AllowExtraDeployEgress,
 	)
 	return i, err
 }
@@ -497,7 +505,7 @@ UPDATE "Environments"
 SET "PausedAt" = NULL, "PausedByUserId" = NULL, "PausedReason" = NULL,
     "RuleVersion" = "RuleVersion" + 1, "Version" = "Version" + 1, "UpdatedAt" = $1
 WHERE "Id" = $2 AND "OrganizationId" = $3 AND "PausedAt" IS NOT NULL AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt", "AllowExtraDeployEgress"
 `
 
 type ResumeEnvironmentParams struct {
@@ -537,6 +545,7 @@ func (q *Queries) ResumeEnvironment(ctx context.Context, arg ResumeEnvironmentPa
 		&i.CreatedByUserId,
 		&i.LockedByRunId,
 		&i.LockedAt,
+		&i.AllowExtraDeployEgress,
 	)
 	return i, err
 }
@@ -630,30 +639,31 @@ SET "Description" = $1, "AllowedRefs" = $2, "AllowPullRequests" = $3,
     "RequiredApprovals" = $4, "AllowSelfApproval" = $5, "WaitMinutes" = $6,
     "ApprovalTimeoutHours" = $7, "RequirePinnedImages" = $8,
     "AllowedPlugins" = $9::text[], "RequiredIsolation" = $10, "AllowAdminBypass" = $11,
-    "SupersedePending" = $12,
-    "RuleVersion" = "RuleVersion" + CASE WHEN $13::boolean THEN 1 ELSE 0 END,
-    "Version" = "Version" + 1, "UpdatedAt" = $14
-WHERE "Id" = $15 AND "OrganizationId" = $16 AND NOT "IsDeleted"
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt"
+    "SupersedePending" = $12, "AllowExtraDeployEgress" = $13,
+    "RuleVersion" = "RuleVersion" + CASE WHEN $14::boolean THEN 1 ELSE 0 END,
+    "Version" = "Version" + 1, "UpdatedAt" = $15
+WHERE "Id" = $16 AND "OrganizationId" = $17 AND NOT "IsDeleted"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "Description", "Version", "RuleVersion", "AllowedRefs", "AllowPullRequests", "RequiredApprovals", "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation", "AllowAdminBypass", "SupersedePending", "PausedAt", "PausedByUserId", "PausedReason", "CreatedByUserId", "LockedByRunId", "LockedAt", "AllowExtraDeployEgress"
 `
 
 type UpdateEnvironmentRulesParams struct {
-	Description          string
-	AllowedRefs          []byte
-	AllowPullRequests    bool
-	RequiredApprovals    int32
-	AllowSelfApproval    bool
-	WaitMinutes          int32
-	ApprovalTimeoutHours int32
-	RequirePinnedImages  bool
-	AllowedPlugins       []string
-	RequiredIsolation    string
-	AllowAdminBypass     bool
-	SupersedePending     bool
-	RulesChanged         bool
-	Now                  time.Time
-	ID                   uuid.UUID
-	OrganizationID       uuid.UUID
+	Description            string
+	AllowedRefs            []byte
+	AllowPullRequests      bool
+	RequiredApprovals      int32
+	AllowSelfApproval      bool
+	WaitMinutes            int32
+	ApprovalTimeoutHours   int32
+	RequirePinnedImages    bool
+	AllowedPlugins         []string
+	RequiredIsolation      string
+	AllowAdminBypass       bool
+	SupersedePending       bool
+	AllowExtraDeployEgress bool
+	RulesChanged           bool
+	Now                    time.Time
+	ID                     uuid.UUID
+	OrganizationID         uuid.UUID
 }
 
 func (q *Queries) UpdateEnvironmentRules(ctx context.Context, arg UpdateEnvironmentRulesParams) (Environment, error) {
@@ -670,6 +680,7 @@ func (q *Queries) UpdateEnvironmentRules(ctx context.Context, arg UpdateEnvironm
 		arg.RequiredIsolation,
 		arg.AllowAdminBypass,
 		arg.SupersedePending,
+		arg.AllowExtraDeployEgress,
 		arg.RulesChanged,
 		arg.Now,
 		arg.ID,
@@ -704,6 +715,7 @@ func (q *Queries) UpdateEnvironmentRules(ctx context.Context, arg UpdateEnvironm
 		&i.CreatedByUserId,
 		&i.LockedByRunId,
 		&i.LockedAt,
+		&i.AllowExtraDeployEgress,
 	)
 	return i, err
 }

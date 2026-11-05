@@ -99,6 +99,16 @@ const (
 	EnvironmentResumed  = "environment.resumed"
 	EnvironmentBypassed = "environment.bypassed"
 
+	TargetCreated          = "target.created"
+	TargetUpdated          = "target.updated"
+	TargetRemoved          = "target.removed"
+	TargetKeyGenerated     = "target.key_generated"
+	TargetHostAdded        = "target.host_added"
+	TargetHostUpdated      = "target.host_updated"
+	TargetHostRemoved      = "target.host_removed"
+	TargetHostKeyFetched   = "target.host_key_fetched"
+	TargetHostKeyConfirmed = "target.host_key_confirmed"
+
 	DeploymentApprovalRequested = "deployment.approval_requested"
 	DeploymentApprovalExpired   = "deployment.approval_expired"
 	DeploymentApproved          = "deployment.approved"
@@ -199,6 +209,15 @@ func AuditedEvents() []string {
 		EnvironmentPaused,
 		EnvironmentResumed,
 		EnvironmentBypassed,
+		TargetCreated,
+		TargetUpdated,
+		TargetRemoved,
+		TargetKeyGenerated,
+		TargetHostAdded,
+		TargetHostUpdated,
+		TargetHostRemoved,
+		TargetHostKeyFetched,
+		TargetHostKeyConfirmed,
 		DeploymentApprovalRequested,
 		DeploymentApprovalExpired,
 		DeploymentApproved,

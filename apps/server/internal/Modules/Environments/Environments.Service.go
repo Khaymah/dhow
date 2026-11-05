@@ -18,9 +18,12 @@ import (
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
+	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
+	secretstore "github.com/Khaymah/dhow/apps/server/internal/Core/SecretStore"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments/Models"
+	"github.com/Khaymah/dhow/internal/netguard"
 )
 
 const (
@@ -45,6 +48,8 @@ type Options struct {
 	Bus     Publisher
 	Log     *slog.Logger
 	Now     func() time.Time
+	Dialer  netguard.Dialer
+	Limiter ratelimit.Limiter
 }
 
 type Service struct {
@@ -54,6 +59,9 @@ type Service struct {
 	log     *slog.Logger
 	now     func() time.Time
 	reopen  func(ctx context.Context, run uuid.UUID) error
+	dialer  netguard.Dialer
+	limiter ratelimit.Limiter
+	secrets secretstore.EnvironmentWriter
 }
 
 func NewService(o Options) *Service {
@@ -61,8 +69,10 @@ func NewService(o Options) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{db: o.DB, factors: o.Factors, bus: o.Bus, log: o.Log, now: now}
+	return &Service{db: o.DB, factors: o.Factors, bus: o.Bus, log: o.Log, now: now, dialer: o.Dialer, limiter: o.Limiter}
 }
+
+func (s *Service) UseSecretWriter(w secretstore.EnvironmentWriter) { s.secrets = w }
 
 func (s *Service) queries() *sqlc.Queries { return sqlc.New(s.db) }
 
@@ -88,6 +98,7 @@ func environmentOf(row sqlc.Environment) (models.Environment, error) {
 			AllowSelfApproval: row.AllowSelfApproval, WaitMinutes: int(row.WaitMinutes), ApprovalTimeoutHours: int(row.ApprovalTimeoutHours),
 			RequirePinnedImages: row.RequirePinnedImages, AllowedPlugins: row.AllowedPlugins, RequiredIsolation: row.RequiredIsolation,
 			AllowAdminBypass: row.AllowAdminBypass, SupersedePending: row.SupersedePending,
+			AllowExtraDeployEgress: row.AllowExtraDeployEgress,
 		},
 	}
 	return e, nil
@@ -221,7 +232,8 @@ func (s *Service) Create(ctx context.Context, org, project uuid.UUID, in models.
 			AllowSelfApproval: rules.AllowSelfApproval, WaitMinutes: int32(rules.WaitMinutes), //nolint:gosec // WaitMinutes is validated to fit.
 			ApprovalTimeoutHours: int32(rules.ApprovalTimeoutHours), //nolint:gosec // ApprovalTimeoutHours is validated to fit.
 			RequirePinnedImages:  rules.RequirePinnedImages, AllowedPlugins: rules.AllowedPlugins, RequiredIsolation: rules.RequiredIsolation,
-			AllowAdminBypass: rules.AllowAdminBypass, SupersedePending: rules.SupersedePending, CreatedByUserID: p.UserID, Now: now,
+			AllowAdminBypass: rules.AllowAdminBypass, SupersedePending: rules.SupersedePending,
+			AllowExtraDeployEgress: rules.AllowExtraDeployEgress, CreatedByUserID: p.UserID, Now: now,
 		})
 		if nameTaken(err) {
 			return apperrors.EnvironmentExists()

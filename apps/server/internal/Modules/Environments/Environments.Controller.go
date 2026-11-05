@@ -58,6 +58,7 @@ func rulesInputOf(in *gen.EnvironmentRulesInput) *models.RulesInput {
 		AllowPullRequests: in.AllowPullRequests, RequiredApprovals: in.RequiredApprovals, AllowSelfApproval: in.AllowSelfApproval,
 		WaitMinutes: in.WaitMinutes, ApprovalTimeoutHours: in.ApprovalTimeoutHours, RequirePinnedImages: in.RequirePinnedImages,
 		AllowedPlugins: in.AllowedPlugins, AllowAdminBypass: in.AllowAdminBypass, SupersedePending: in.SupersedePending,
+		AllowExtraDeployEgress: in.AllowExtraDeployEgress,
 	}
 	if in.AllowedRefs != nil {
 		refs := make([]models.Ref, 0, len(*in.AllowedRefs))
@@ -113,7 +114,7 @@ func toGen(ctx context.Context, e models.Environment) gen.Environment {
 			AllowSelfApproval: r.AllowSelfApproval, WaitMinutes: r.WaitMinutes, ApprovalTimeoutHours: r.ApprovalTimeoutHours,
 			RequirePinnedImages: r.RequirePinnedImages, AllowedPlugins: r.AllowedPlugins,
 			RequiredIsolation: gen.EnvironmentIsolation(r.RequiredIsolation), AllowAdminBypass: r.AllowAdminBypass,
-			SupersedePending: r.SupersedePending,
+			SupersedePending: r.SupersedePending, AllowExtraDeployEgress: r.AllowExtraDeployEgress,
 		},
 	}
 	if e.PausedReason != "" {

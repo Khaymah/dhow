@@ -60,7 +60,8 @@ func scalars(r models.Rules) map[string]string {
 		"AllowSelfApproval": strconv.FormatBool(r.AllowSelfApproval), "WaitMinutes": strconv.Itoa(r.WaitMinutes),
 		"ApprovalTimeoutHours": strconv.Itoa(r.ApprovalTimeoutHours), "RequirePinnedImages": strconv.FormatBool(r.RequirePinnedImages),
 		"RequiredIsolation": r.RequiredIsolation, "AllowAdminBypass": strconv.FormatBool(r.AllowAdminBypass),
-		"SupersedePending": strconv.FormatBool(r.SupersedePending),
+		"SupersedePending":       strconv.FormatBool(r.SupersedePending),
+		"AllowExtraDeployEgress": strconv.FormatBool(r.AllowExtraDeployEgress),
 	}
 }
 

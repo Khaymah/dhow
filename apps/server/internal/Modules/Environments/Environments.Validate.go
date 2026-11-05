@@ -33,6 +33,7 @@ const (
 	ruleRequiredIsolation    = "RequiredIsolation"
 	ruleAllowAdminBypass     = "AllowAdminBypass"
 	ruleSupersedePending     = "SupersedePending"
+	ruleAllowExtraEgress     = "AllowExtraDeployEgress"
 
 	messageInvalidValue = "errors.validationFailed"
 	messageReviewerUser = "errors.reviewerNotEligibleUser"
@@ -119,6 +120,7 @@ func Apply(base models.Rules, in *models.RulesInput) models.Rules {
 	setIf(&out.RequiredIsolation, in.RequiredIsolation)
 	setIf(&out.AllowAdminBypass, in.AllowAdminBypass)
 	setIf(&out.SupersedePending, in.SupersedePending)
+	setIf(&out.AllowExtraDeployEgress, in.AllowExtraDeployEgress)
 	return Normalize(out)
 }
 

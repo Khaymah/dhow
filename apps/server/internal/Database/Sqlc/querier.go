@@ -36,6 +36,7 @@ type Querier interface {
 	ClearSecretProjectAccess(ctx context.Context, arg ClearSecretProjectAccessParams) error
 	CloseApproval(ctx context.Context, arg CloseApprovalParams) (int64, error)
 	CompleteInstanceSetup(ctx context.Context, completedAt time.Time) error
+	ConfirmDeployTargetHostKey(ctx context.Context, arg ConfirmDeployTargetHostKeyParams) (DeployTargetHost, error)
 	ConfirmTotpFactor(ctx context.Context, arg ConfirmTotpFactorParams) error
 	ConsumeRecoveryCode(ctx context.Context, arg ConsumeRecoveryCodeParams) (int64, error)
 	ConsumeRegistrationToken(ctx context.Context, arg ConsumeRegistrationTokenParams) (ConsumeRegistrationTokenRow, error)
@@ -102,6 +103,7 @@ type Querier interface {
 	EnsureWebhookPartitions(ctx context.Context, daysAhead int32) (int32, error)
 	EnvironmentAllowsSelfApproval(ctx context.Context, arg EnvironmentAllowsSelfApprovalParams) (bool, error)
 	EnvironmentQueueAhead(ctx context.Context, arg EnvironmentQueueAheadParams) (bool, error)
+	EnvironmentSecretExists(ctx context.Context, arg EnvironmentSecretExistsParams) (bool, error)
 	EraseAllSecretVersions(ctx context.Context, arg EraseAllSecretVersionsParams) (int64, error)
 	EraseExpiredSecretVersions(ctx context.Context, arg EraseExpiredSecretVersionsParams) (int64, error)
 	EraseSecretVersionsBelow(ctx context.Context, arg EraseSecretVersionsBelowParams) (int64, error)
@@ -136,6 +138,7 @@ type Querier interface {
 	GetCheckoutRepository(ctx context.Context, arg GetCheckoutRepositoryParams) (GetCheckoutRepositoryRow, error)
 	GetConfirmedTotp(ctx context.Context, userID uuid.UUID) (GetConfirmedTotpRow, error)
 	GetDataKey(ctx context.Context, id uuid.UUID) (GetDataKeyRow, error)
+	GetDeployTarget(ctx context.Context, arg GetDeployTargetParams) (DeployTarget, error)
 	GetEnvironment(ctx context.Context, arg GetEnvironmentParams) (Environment, error)
 	GetEnvironmentProject(ctx context.Context, arg GetEnvironmentProjectParams) (GetEnvironmentProjectRow, error)
 	GetInstance(ctx context.Context) (Instance, error)
@@ -200,6 +203,8 @@ type Querier interface {
 	InsertAuthChallenge(ctx context.Context, arg InsertAuthChallengeParams) (uuid.UUID, error)
 	InsertCacheEntry(ctx context.Context, arg InsertCacheEntryParams) (uuid.UUID, error)
 	InsertDataKey(ctx context.Context, arg InsertDataKeyParams) (int64, error)
+	InsertDeployTarget(ctx context.Context, arg InsertDeployTargetParams) (DeployTarget, error)
+	InsertDeployTargetHost(ctx context.Context, arg InsertDeployTargetHostParams) (DeployTargetHost, error)
 	InsertDeployment(ctx context.Context, arg InsertDeploymentParams) error
 	InsertEnvironment(ctx context.Context, arg InsertEnvironmentParams) (Environment, error)
 	InsertEnvironmentReviewer(ctx context.Context, arg InsertEnvironmentReviewerParams) error
@@ -256,6 +261,8 @@ type Querier interface {
 	ListBackfills(ctx context.Context) ([]ListBackfillsRow, error)
 	ListDataKeysToRewrap(ctx context.Context, arg ListDataKeysToRewrapParams) ([]ListDataKeysToRewrapRow, error)
 	ListDataKeysToSupersede(ctx context.Context, arg ListDataKeysToSupersedeParams) ([]ListDataKeysToSupersedeRow, error)
+	ListDeployTargetHosts(ctx context.Context, arg ListDeployTargetHostsParams) ([]DeployTargetHost, error)
+	ListDeployTargets(ctx context.Context, arg ListDeployTargetsParams) ([]DeployTarget, error)
 	ListDeployments(ctx context.Context, arg ListDeploymentsParams) ([]Deployment, error)
 	ListDoneBackfills(ctx context.Context, names []string) ([]string, error)
 	ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobsParams) ([]ListDriftedRunJobsRow, error)
@@ -316,6 +323,8 @@ type Querier interface {
 	LockBackfillRow(ctx context.Context, name string) (LockBackfillRowRow, error)
 	LockBlobsShared(ctx context.Context, lockKey int64) error
 	LockConcurrencyGroup(ctx context.Context, arg LockConcurrencyGroupParams) error
+	LockDeployTarget(ctx context.Context, arg LockDeployTargetParams) (DeployTarget, error)
+	LockDeployTargetHost(ctx context.Context, arg LockDeployTargetHostParams) (DeployTargetHost, error)
 	LockEnvironment(ctx context.Context, arg LockEnvironmentParams) (Environment, error)
 	LockGateEnvironment(ctx context.Context, arg LockGateEnvironmentParams) (LockGateEnvironmentRow, error)
 	LockInstance(ctx context.Context) (*time.Time, error)
@@ -414,7 +423,12 @@ type Querier interface {
 	ReleaseStaleEnvironments(ctx context.Context) (int64, error)
 	RemoveAllTeamBindings(ctx context.Context, arg RemoveAllTeamBindingsParams) error
 	RemoveAllTeamMembers(ctx context.Context, arg RemoveAllTeamMembersParams) error
+	RemoveDeployTarget(ctx context.Context, arg RemoveDeployTargetParams) (DeployTarget, error)
+	RemoveDeployTargetHost(ctx context.Context, arg RemoveDeployTargetHostParams) (int64, error)
+	RemoveDeployTargetHosts(ctx context.Context, arg RemoveDeployTargetHostsParams) error
 	RemoveEnvironment(ctx context.Context, arg RemoveEnvironmentParams) (Environment, error)
+	RemoveEnvironmentDeployTargetHosts(ctx context.Context, arg RemoveEnvironmentDeployTargetHostsParams) error
+	RemoveEnvironmentDeployTargets(ctx context.Context, arg RemoveEnvironmentDeployTargetsParams) error
 	RemoveEnvironmentReviewers(ctx context.Context, arg RemoveEnvironmentReviewersParams) error
 	RemoveEnvironmentSecrets(ctx context.Context, arg RemoveEnvironmentSecretsParams) ([]uuid.UUID, error)
 	RemoveEnvironmentVariables(ctx context.Context, arg RemoveEnvironmentVariablesParams) (int64, error)
@@ -492,6 +506,9 @@ type Querier interface {
 	ScanTotpSecrets(ctx context.Context, arg ScanTotpSecretsParams) ([]ScanTotpSecretsRow, error)
 	ScrubOrganizationLogs(ctx context.Context, arg ScrubOrganizationLogsParams) (int64, error)
 	SecretScopeOfJob(ctx context.Context, arg SecretScopeOfJobParams) (SecretScopeOfJobRow, error)
+	SetDeployTargetHostPendingKey(ctx context.Context, arg SetDeployTargetHostPendingKeyParams) (DeployTargetHost, error)
+	SetDeployTargetHostPositions(ctx context.Context, arg SetDeployTargetHostPositionsParams) error
+	SetDeployTargetKey(ctx context.Context, arg SetDeployTargetKeyParams) (DeployTarget, error)
 	SetInvitationEmailStatus(ctx context.Context, arg SetInvitationEmailStatusParams) error
 	SetLocalLockTimeout(ctx context.Context, timeout string) error
 	SetMemberRole(ctx context.Context, arg SetMemberRoleParams) (int64, error)
@@ -509,6 +526,7 @@ type Querier interface {
 	SetUserLocale(ctx context.Context, arg SetUserLocaleParams) error
 	SetUserPassword(ctx context.Context, arg SetUserPasswordParams) error
 	SettleDeployments(ctx context.Context, arg SettleDeploymentsParams) ([]SettleDeploymentsRow, error)
+	ShiftDeployTargetHostPositions(ctx context.Context, arg ShiftDeployTargetHostPositionsParams) error
 	SignInProviderActive(ctx context.Context, arg SignInProviderActiveParams) (bool, error)
 	StartAttempt(ctx context.Context, id uuid.UUID) (JobAttempt, error)
 	StartRun(ctx context.Context, id uuid.UUID) error
@@ -516,11 +534,13 @@ type Querier interface {
 	SupersedeDecidedApproval(ctx context.Context, arg SupersedeDecidedApprovalParams) (int64, error)
 	SupersedeOlderPending(ctx context.Context, arg SupersedeOlderPendingParams) ([]SupersedeOlderPendingRow, error)
 	SupersedeSecretVersions(ctx context.Context, arg SupersedeSecretVersionsParams) error
+	SyncDeployTargetHostPaths(ctx context.Context, arg SyncDeployTargetHostPathsParams) error
 	TakeOidcFlow(ctx context.Context, arg TakeOidcFlowParams) (TakeOidcFlowRow, error)
 	TakeRateLimit(ctx context.Context, arg TakeRateLimitParams) (TakeRateLimitRow, error)
 	TakeWebauthnChallenge(ctx context.Context, arg TakeWebauthnChallengeParams) ([]byte, error)
 	TouchApiToken(ctx context.Context, arg TouchApiTokenParams) error
 	TouchBlob(ctx context.Context, digest []byte) (int64, error)
+	TouchDeployTarget(ctx context.Context, arg TouchDeployTargetParams) (DeployTarget, error)
 	TouchIdentity(ctx context.Context, arg TouchIdentityParams) error
 	TouchMembership(ctx context.Context, arg TouchMembershipParams) error
 	TouchRepositoryDelivery(ctx context.Context, arg TouchRepositoryDeliveryParams) error
@@ -540,6 +560,8 @@ type Querier interface {
 	UnlinkRepository(ctx context.Context, arg UnlinkRepositoryParams) (Repository, error)
 	UnlockKeyRekey(ctx context.Context) (bool, error)
 	UnreadableLogPartitions(ctx context.Context) ([]string, error)
+	UpdateDeployTarget(ctx context.Context, arg UpdateDeployTargetParams) (DeployTarget, error)
+	UpdateDeployTargetHostAddress(ctx context.Context, arg UpdateDeployTargetHostAddressParams) (DeployTargetHost, error)
 	UpdateEnvironmentRules(ctx context.Context, arg UpdateEnvironmentRulesParams) (Environment, error)
 	UpdateInstanceSetting(ctx context.Context, arg UpdateInstanceSettingParams) (int64, error)
 	UpdateOidcProvider(ctx context.Context, arg UpdateOidcProviderParams) (int64, error)

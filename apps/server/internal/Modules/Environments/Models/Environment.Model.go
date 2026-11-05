@@ -50,6 +50,8 @@ type Rules struct {
 	RequiredIsolation    string
 	AllowAdminBypass     bool
 	SupersedePending     bool
+
+	AllowExtraDeployEgress bool
 }
 
 type RulesInput struct {
@@ -65,6 +67,8 @@ type RulesInput struct {
 	RequiredIsolation    *string
 	AllowAdminBypass     *bool
 	SupersedePending     *bool
+
+	AllowExtraDeployEgress *bool
 }
 
 type Environment struct {

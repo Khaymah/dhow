@@ -1,0 +1,56 @@
+package apperrors
+
+import "net/http"
+
+const (
+	CodeTargetExists          = "TARGET_EXISTS"
+	CodeTargetDuplicate       = "TARGET_DUPLICATE"
+	CodeTargetVersionConflict = "TARGET_VERSION_CONFLICT"
+	CodeTargetHostBlocked     = "TARGET_HOST_BLOCKED"
+	CodeTargetHostUnreachable = "TARGET_HOST_UNREACHABLE"
+	CodeTargetKeyNotFound     = "TARGET_KEY_NOT_FOUND"
+	CodeDeployPathInvalid     = "DEPLOY_PATH_INVALID"
+	KeyTargetExists           = "errors.targetExists"
+	KeyTargetDuplicate        = "errors.targetDuplicate"
+	KeyTargetVersionConflict  = "errors.targetVersionConflict"
+	KeyTargetHostBlocked      = "errors.targetHostBlocked"
+	KeyTargetHostUnreachable  = "errors.targetHostUnreachable"
+	KeyTargetKeyNotFound      = "errors.targetKeyNotFound"
+	KeyDeployPathInvalid      = "errors.deployPathInvalid"
+)
+
+func TargetExists() *AppError {
+	return New(http.StatusConflict, CodeTargetExists, KeyTargetExists)
+}
+
+func TargetDuplicate() *AppError {
+	return New(http.StatusConflict, CodeTargetDuplicate, KeyTargetDuplicate)
+}
+
+func TargetVersionConflict() *AppError {
+	return New(http.StatusConflict, CodeTargetVersionConflict, KeyTargetVersionConflict)
+}
+
+func TargetHostBlocked(details ...IErrorDetail) *AppError {
+	e := New(http.StatusUnprocessableEntity, CodeTargetHostBlocked, KeyTargetHostBlocked)
+	e.Details = details
+	return e
+}
+
+func TargetHostUnreachable(err error) *AppError {
+	e := New(http.StatusBadGateway, CodeTargetHostUnreachable, KeyTargetHostUnreachable)
+	e.Err = err
+	return e
+}
+
+func TargetKeyNotFound(details ...IErrorDetail) *AppError {
+	e := New(http.StatusUnprocessableEntity, CodeTargetKeyNotFound, KeyTargetKeyNotFound)
+	e.Details = details
+	return e
+}
+
+func DeployPathInvalid(details ...IErrorDetail) *AppError {
+	e := New(http.StatusUnprocessableEntity, CodeDeployPathInvalid, KeyDeployPathInvalid)
+	e.Details = details
+	return e
+}
