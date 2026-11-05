@@ -46,9 +46,13 @@ check "the bearer token reaches curl on stdin" grep -qF 'header = "Authorization
 check "the body reaches curl from a file" grep -qF '"Password":"password-value-0123456789"' "$work/body"
 check "the body file is removed after the call" test ! -e "$work/call.req"
 check "a quote in a header cannot break out of the curl config" test "$(curl_quote 'a"b\c')" = 'a\"b\\c'
-for pattern in '--user ' 'extraHeader' '-hmac ' '--password '; do
-  check "deploy/m4-demo/run.sh passes no secret with $pattern" absent "$pattern" "$root/deploy/m4-demo/run.sh"
+for script in deploy/m4-demo/run.sh deploy/m4-demo/project.sh deploy/e2e/run.sh deploy/e2e/push.sh; do
+  for pattern in '--user ' 'extraHeader' '-hmac ' '--password '; do
+    check "$script passes no secret with $pattern" absent "$pattern" "$root/$script"
+  done
 done
+check "the Forgejo password reaches curl on stdin" grep -qF 'curl --config - ' "$root/deploy/m4-demo/project.sh"
+check "git reads the Forgejo password through GIT_ASKPASS" grep -qF 'GIT_ASKPASS="$work/askpass"' "$root/deploy/m4-demo/project.sh"
 
 if ((failures > 0)); then
   printf '%d check(s) failed\n' "$failures" >&2

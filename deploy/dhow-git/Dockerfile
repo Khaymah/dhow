@@ -4,9 +4,9 @@ FROM ${BASE}
 RUN apk add --no-cache \
         git=2.49.1-r0 \
         git-init-template=2.49.1-r0 \
-        openssh-client-default=10.0_p1-r10 \
-        openssh-client-common=10.0_p1-r10 \
-        openssh-keygen=10.0_p1-r10 \
+        openssh-client-default=10.0_p1-r11 \
+        openssh-client-common=10.0_p1-r11 \
+        openssh-keygen=10.0_p1-r11 \
         brotli-libs=1.1.1-r0 \
         c-ares=1.34.9-r0 \
         libcurl=8.14.1-r4 \

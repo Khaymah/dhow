@@ -2,6 +2,8 @@
 /bin/
 /dist/
 apps/web/dist/
+apps/web/E2E/Results/
+apps/web/E2E/Report/
 apps/server/internal/App/WebDist/*
 !apps/server/internal/App/WebDist/.keep
 coverage.out
