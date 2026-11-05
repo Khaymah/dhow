@@ -1,0 +1,186 @@
+package deployrelease
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io/fs"
+	"strings"
+	"time"
+)
+
+const (
+	verifiedName = "verified"
+	stateName    = "state.json"
+	lockName     = "lock"
+	ownerName    = "owner"
+	maxSmallFile = 4 << 10
+)
+
+type lockOwner struct {
+	Release   string    `json:"Release"`
+	ExpiresAt time.Time `json:"ExpiresAt"`
+}
+
+type stateFile struct {
+	State    string    `json:"State"`
+	Release  string    `json:"Release"`
+	Previous string    `json:"Previous"`
+	At       time.Time `json:"At"`
+}
+
+func (d *run) preflight(ctx context.Context) *Failure {
+	if err := ctx.Err(); err != nil {
+		return fail(ExitFailed, CauseCanceled, "the deployment was canceled", err)
+	}
+	info, err := d.r.Lstat(d.base)
+	if err != nil || !info.IsDir() {
+		return fail(ExitFailed, CauseOther, "the deploy path is not a directory on the server", err)
+	}
+	free, err := d.r.FreeBytes(d.base)
+	if err != nil {
+		return fail(ExitFailed, CauseOther, "cannot read the free space of the server", err)
+	}
+	if need := uint64(max(d.totals.Bytes, 0)) * 2; free < need { //nolint:gosec // Bytes is never negative.
+		return fail(ExitFailed, CauseOther, "not enough disk space on the server", ErrNoSpace)
+	}
+	if f := d.inspectCurrent(); f != nil {
+		return f
+	}
+	for _, dir := range []string{d.dhow, d.releases, d.base + "/" + sharedName} {
+		if err := d.r.MkdirAll(dir, 0o755); err != nil {
+			return fail(ExitFailed, CauseOther, "cannot create the release directories", err)
+		}
+	}
+	if f := d.lock(); f != nil {
+		return f
+	}
+	return d.choosePrevious()
+}
+
+func (d *run) inspectCurrent() *Failure {
+	info, err := d.r.Lstat(d.current)
+	switch {
+	case isNotExist(err):
+		return nil
+	case err != nil:
+		return fail(ExitFailed, CauseOther, "cannot look at current", err)
+	case !info.IsSymlink():
+		return fail(ExitCurrentNotLink, CauseOther, "current is not a symlink", ErrCurrentNotLink)
+	}
+	link, err := d.r.Readlink(d.current)
+	if err != nil {
+		return fail(ExitFailed, CauseOther, "cannot read current", err)
+	}
+	id, ok := releaseOfLink(d.base, link)
+	if !ok {
+		return fail(ExitCurrentNotLink, CauseOther, "current points outside the releases directory", ErrCurrentNotLink)
+	}
+	d.currentID = id
+	return nil
+}
+
+func (d *run) readSmall(name string) (string, bool) {
+	raw, err := d.r.ReadFile(name, maxSmallFile)
+	if err != nil {
+		return "", false
+	}
+	return strings.TrimSpace(string(raw)), true
+}
+
+func (d *run) releaseExists(id string) bool {
+	info, err := d.r.Lstat(d.releases + "/" + id)
+	return err == nil && info.IsDir()
+}
+
+func (d *run) choosePrevious() *Failure {
+	verified, _ := d.readSmall(d.dhow + "/" + verifiedName)
+	if !validID(verified) || !d.releaseExists(verified) {
+		verified = ""
+	}
+	candidate := d.currentID
+	if verified != "" {
+		if verified != d.currentID {
+			d.e.Log.Warn("current is not the last release that passed its health check, so the rollback goes to the one that did")
+		}
+		candidate = verified
+	}
+	if d.currentID == d.cfg.ReleaseID {
+		d.resumed = true
+		candidate = ""
+		if verified != d.cfg.ReleaseID {
+			candidate = verified
+		}
+	} else if candidate == d.cfg.ReleaseID {
+		candidate = d.currentID
+	}
+	d.previous = candidate
+	if candidate != "" && candidate == verified {
+		d.known = candidate
+	}
+	return nil
+}
+
+func (d *run) lock() *Failure {
+	dir := d.dhow + "/" + lockName
+	for range 2 {
+		err := d.r.Mkdir(dir, 0o700)
+		if err == nil {
+			d.locked = true
+			return d.writeOwner(dir)
+		}
+		if !errors.Is(err, fs.ErrExist) {
+			return fail(ExitFailed, CauseOther, "cannot take the lock of the target", err)
+		}
+		if !d.lockExpired(dir) {
+			return fail(ExitTargetLocked, CauseOther, "another deployment holds the lock of the target", ErrTargetLocked)
+		}
+		d.e.Log.Warn("the lock of the target had expired, so this deployment takes it")
+		if err := d.r.RemoveAll(dir); err != nil {
+			return fail(ExitFailed, CauseOther, "cannot clear the expired lock", err)
+		}
+	}
+	return fail(ExitTargetLocked, CauseOther, "another deployment holds the lock of the target", ErrTargetLocked)
+}
+
+func (d *run) writeOwner(dir string) *Failure {
+	raw, err := json.Marshal(lockOwner{Release: d.cfg.ReleaseID, ExpiresAt: d.now().Add(LockTTL).UTC()})
+	if err == nil {
+		err = WriteFile(d.r, dir+"/"+ownerName, raw, 0o600)
+	}
+	if err != nil {
+		d.unlock()
+		return fail(ExitFailed, CauseOther, "cannot write the owner of the lock", err)
+	}
+	return nil
+}
+
+func (d *run) lockExpired(dir string) bool {
+	raw, err := d.r.ReadFile(dir+"/"+ownerName, maxSmallFile)
+	if err == nil {
+		var o lockOwner
+		return json.Unmarshal(raw, &o) == nil && d.now().After(o.ExpiresAt)
+	}
+	info, statErr := d.r.Lstat(dir)
+	return statErr == nil && d.now().Sub(info.ModTime) > LockTTL
+}
+
+func (d *run) unlock() {
+	if !d.locked {
+		return
+	}
+	d.locked = false
+	if err := d.r.RemoveAll(d.dhow + "/" + lockName); err != nil {
+		d.e.Log.Warn("the lock of the target could not be removed")
+	}
+}
+
+func (d *run) writeState(state, release, previous string) {
+	raw, err := json.Marshal(stateFile{State: state, Release: release, Previous: previous, At: d.now().UTC()})
+	if err == nil {
+		err = WriteFile(d.r, d.dhow+"/"+stateName, raw, 0o644)
+	}
+	if err != nil {
+		d.e.Log.Warn("the state file of the target could not be written")
+	}
+}
