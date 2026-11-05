@@ -244,9 +244,17 @@ func (q *Queries) LockGateEnvironment(ctx context.Context, arg LockGateEnvironme
 }
 
 const releaseEnvironments = `-- name: ReleaseEnvironments :exec
-UPDATE "Environments"
+WITH held AS (
+    SELECT h."Id"
+    FROM "Environments" h
+    WHERE h."LockedByRunId" = $1 AND h."OrganizationId" = $2 AND NOT (h."Name" = ANY($3::text[]))
+    ORDER BY h."Id"
+    FOR UPDATE OF h
+)
+UPDATE "Environments" e
 SET "LockedByRunId" = NULL, "LockedAt" = NULL
-WHERE "LockedByRunId" = $1 AND "OrganizationId" = $2 AND NOT ("Name" = ANY($3::text[]))
+FROM held
+WHERE e."Id" = held."Id"
 `
 
 type ReleaseEnvironmentsParams struct {
@@ -261,13 +269,21 @@ func (q *Queries) ReleaseEnvironments(ctx context.Context, arg ReleaseEnvironmen
 }
 
 const releaseStaleEnvironments = `-- name: ReleaseStaleEnvironments :execrows
+WITH stale AS (
+    SELECT e."Id"
+    FROM "Environments" e
+    WHERE e."LockedByRunId" IS NOT NULL
+      AND NOT EXISTS (SELECT 1
+                      FROM "PipelineRuns" r
+                      WHERE r."Id" = e."LockedByRunId" AND r."OrganizationId" = e."OrganizationId"
+                        AND r."State" IN ('pending', 'queued', 'running') AND NOT r."IsDeleted")
+    ORDER BY e."Id"
+    FOR UPDATE OF e SKIP LOCKED
+)
 UPDATE "Environments" e
 SET "LockedByRunId" = NULL, "LockedAt" = NULL
-WHERE e."LockedByRunId" IS NOT NULL
-  AND NOT EXISTS (SELECT 1
-                  FROM "PipelineRuns" r
-                  WHERE r."Id" = e."LockedByRunId" AND r."OrganizationId" = e."OrganizationId"
-                    AND r."State" IN ('pending', 'queued', 'running') AND NOT r."IsDeleted")
+FROM stale
+WHERE e."Id" = stale."Id"
 `
 
 func (q *Queries) ReleaseStaleEnvironments(ctx context.Context) (int64, error) {

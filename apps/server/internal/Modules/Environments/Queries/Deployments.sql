@@ -34,11 +34,11 @@ WHERE d."RunId" = @run_id AND d."OrganizationId" = @organization_id AND d."State
 
 -- name: ReleaseEnvironments :exec
 WITH held AS (
-    SELECT "Id"
-    FROM "Environments"
-    WHERE "LockedByRunId" = @run_id AND "OrganizationId" = @organization_id AND NOT ("Name" = ANY(@keep::text[]))
-    ORDER BY "Id"
-    FOR UPDATE
+    SELECT h."Id"
+    FROM "Environments" h
+    WHERE h."LockedByRunId" = @run_id AND h."OrganizationId" = @organization_id AND NOT (h."Name" = ANY(@keep::text[]))
+    ORDER BY h."Id"
+    FOR UPDATE OF h
 )
 UPDATE "Environments" e
 SET "LockedByRunId" = NULL, "LockedAt" = NULL
