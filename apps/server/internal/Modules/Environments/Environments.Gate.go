@@ -88,6 +88,9 @@ func (g *Gate) Started(ctx context.Context, q *sqlc.Queries, d deployments.Deplo
 
 func (g *Gate) Settle(ctx context.Context, q *sqlc.Queries, org, run uuid.UUID, keep []string) ([]deployments.Finished, error) {
 	now := g.s.now()
+	if _, err := g.s.SettleReleases(ctx, q, org, run); err != nil {
+		return nil, err
+	}
 	rows, err := q.SettleDeployments(ctx, sqlc.SettleDeploymentsParams{Now: &now, RunID: run, OrganizationID: org})
 	if err != nil {
 		return nil, err
@@ -106,7 +109,12 @@ func (g *Gate) Settle(ctx context.Context, q *sqlc.Queries, org, run uuid.UUID, 
 }
 
 func (g *Gate) ReleaseStale(ctx context.Context, q *sqlc.Queries) (int64, error) {
-	return q.ReleaseStaleEnvironments(ctx)
+	swept, err := g.s.SweepReleases(ctx, q)
+	if err != nil {
+		return 0, err
+	}
+	freed, err := q.ReleaseStaleEnvironments(ctx)
+	return freed + swept, err
 }
 
 type StartCheck struct {

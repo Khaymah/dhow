@@ -51,4 +51,3 @@ func FuzzReportLine(f *testing.F) {
 		}
 	})
 }
-

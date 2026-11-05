@@ -116,6 +116,13 @@ const (
 	DeploymentStarted           = "deployment.started"
 	DeploymentFinished          = "deployment.finished"
 
+	DeploymentReleaseStarted        = "deployment.release_started"
+	DeploymentReleaseSwitched       = "deployment.release_switched"
+	DeploymentReleaseSucceeded      = "deployment.release_succeeded"
+	DeploymentReleaseRolledBack     = "deployment.release_rolled_back"
+	DeploymentReleaseRollbackFailed = "deployment.release_rollback_failed"
+	DeploymentReleaseUnknown        = "deployment.release_unknown"
+
 	SecretCreated             = "secret.created"
 	SecretUpdated             = "secret.updated"
 	SecretVersionRestored     = "secret.version_restored"
@@ -217,6 +224,8 @@ func AuditedEvents() []string {
 		DeploymentRejected,
 		DeploymentStarted,
 		DeploymentFinished,
+		DeploymentReleaseStarted, DeploymentReleaseSwitched, DeploymentReleaseSucceeded,
+		DeploymentReleaseRolledBack, DeploymentReleaseRollbackFailed, DeploymentReleaseUnknown,
 		SecretCreated,
 		SecretUpdated,
 		SecretVersionRestored,

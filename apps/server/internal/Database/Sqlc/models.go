@@ -275,6 +275,52 @@ type DeploymentApproval struct {
 	SupersededByRunId *uuid.UUID
 }
 
+type DeploymentRelease struct {
+	Id                uuid.UUID
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	IsDeleted         bool
+	OrganizationId    uuid.UUID
+	DeploymentId      uuid.UUID
+	RunJobId          uuid.UUID
+	JobId             uuid.UUID
+	LeaseId           uuid.UUID
+	TargetId          uuid.UUID
+	StepIndex         int32
+	Kind              string
+	ReleaseId         string
+	PreviousReleaseId pgtype.Text
+	ArtifactDigest    []byte
+	BatchSize         int32
+	State             string
+	FailedHostId      *uuid.UUID
+	RollbackReason    pgtype.Text
+	Message           pgtype.Text
+	StartedAt         time.Time
+	FinishedAt        *time.Time
+}
+
+type DeploymentReleaseHost struct {
+	Id                uuid.UUID
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	IsDeleted         bool
+	OrganizationId    uuid.UUID
+	ReleaseRowId      uuid.UUID
+	HostId            uuid.UUID
+	ReleaseId         string
+	Position          int32
+	Batch             pgtype.Int4
+	State             string
+	PreviousReleaseId pgtype.Text
+	Health            []byte
+	RollbackReason    pgtype.Text
+	Message           pgtype.Text
+	SwitchedAt        *time.Time
+	RolledBackAt      *time.Time
+	FinishedAt        *time.Time
+}
+
 type Environment struct {
 	Id                     uuid.UUID
 	CreatedAt              time.Time
