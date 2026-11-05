@@ -1,0 +1,14 @@
+Port 22
+HostKey /etc/ssh/ssh_host_ed25519_key
+AllowUsers deploy
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+PermitRootLogin no
+PermitUserEnvironment no
+AllowTcpForwarding no
+X11Forwarding no
+AllowAgentForwarding no
+PermitTTY no
+Subsystem sftp /usr/lib/ssh/sftp-server
+LogLevel VERBOSE

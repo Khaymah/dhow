@@ -176,3 +176,17 @@ func TestACurrentThatIsARealDirectoryIsLeftAlone(t *testing.T) {
 	assert.Equal(t, "old", d.readRemote("current/old.txt"))
 	assert.False(t, d.exists("releases/1-aaaaaaaa-1"))
 }
+
+func TestATermSignalAfterTheSwitchRollsBackToTheLastGoodRelease(t *testing.T) {
+	d := newTarget(t, "term")
+	require.Equal(t, 0, d.deploy("term-1", spec{release: "1-aaaaaaaa-1", files: page("v1", true), health: true}).exit)
+
+	out := d.deploy("term-canceled", spec{release: "2-bbbbbbbb-1", files: page("v2", false), health: true, stopAt: "releases/2-bbbbbbbb-1", retries: 30})
+	assert.Equal(t, deployrelease.ExitRolledBack, out.exit, out.output)
+	assert.Equal(t, "releases/1-aaaaaaaa-1", d.current())
+	assert.Equal(t, "v1", d.served("index.html"))
+	last := out.events[len(out.events)-1]
+	assert.Equal(t, deployrelease.EventRolledBack, last.Event)
+	assert.Equal(t, deployrelease.CauseCanceled, last.Reason)
+	assert.False(t, d.exists(".dhow/lock"))
+}

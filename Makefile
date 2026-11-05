@@ -24,6 +24,7 @@ PROTO_AGAINST         ?= $(shell git rev-parse --git-common-dir 2>/dev/null)\#br
 WEB_DIST              := apps/server/internal/App/WebDist
 IMAGE                 ?= dhow:dev
 GIT_IMAGE             ?= dhow-git:dev
+DEPLOY_SSH_IMAGE      ?= dhow-deploy-ssh:dev
 E2E_BASE              ?= debian:12
 RUNNER_E2E_BASE       ?= debian:13
 DISTRO                ?=
@@ -254,7 +255,8 @@ FUZZ_TARGETS := \
 	Modules/Environments/Test/Edge:FuzzKeySecretName Modules/Secrets/Test/Edge:FuzzSecretName) \
 	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare internal/jobspec:FuzzHealthEndpoints internal/jobspec:FuzzParseEndpoint \
 	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
-	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern internal/archive:FuzzUnpack
+	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern internal/archive:FuzzUnpack internal/archive:FuzzWalk \
+	internal/deployrelease:FuzzRemoteCommand
 
 define fuzz_listed
 	@found=$$(grep -rhoE '^func Fuzz[A-Za-z0-9]+' $(1) --include='*_test.go' | sed 's/^func //' | sort); \
@@ -303,6 +305,14 @@ ISOLATION_BUSYBOX ?= /bin/busybox
 ISOLATION_RUN     ?=
 ISOLATION_GIT_ARCHIVE ?=
 ISOLATION_SSHD    ?=
+
+.PHONY: deploy-e2e
+deploy-e2e: ## Deploy real releases to a real sshd in Docker with the dhow-deploy-ssh plugin (health check, rollback, keep_releases, host key); replays the reports into the server when DHOW_TEST_DATABASE_URL is set
+	bash deploy/e2e-targets/run.sh
+
+.PHONY: deploy-ssh-image
+deploy-ssh-image: ## Build the dhow-deploy-ssh plugin image locally (DEPLOY_SSH_IMAGE=dhow-deploy-ssh:dev)
+	docker build --tag $(DEPLOY_SSH_IMAGE) -f apps/plugins/deploy-ssh/Dockerfile .
 
 .PHONY: runner-isolation
 runner-isolation: ## Run the escape and limits suites on rootless Podman (Podman 5.4+, cgroup v2 delegation, subuids, busybox-static)

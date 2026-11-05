@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -65,6 +67,8 @@ type spec struct {
 	shared     []string
 	knownHosts string
 	archive    string
+	stopAt     string
+	retries    int
 }
 
 type result struct {
@@ -129,7 +133,7 @@ func (d *target) env(s spec, key string, archivePath, digest, report string) []s
 		"DHOW_INPUT_TARGET=prod",
 		"DHOW_INPUT_ARTIFACT_FILE="+archivePath, "DHOW_INPUT_ARTIFACT_DIGEST="+digest, "DHOW_DEPLOY_REPORT="+report,
 		"DHOW_DEPLOY_ALLOW_PRIVATE_CIDRS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
-		"DHOW_INPUT_HEALTH_CHECK_TIMEOUT=2s", "DHOW_INPUT_HEALTH_CHECK_INTERVAL=1s", "DHOW_INPUT_HEALTH_CHECK_RETRIES=3", "DHOW_INPUT_HEALTH_CHECK_STABLE=2",
+		"DHOW_INPUT_HEALTH_CHECK_TIMEOUT=2s", "DHOW_INPUT_HEALTH_CHECK_INTERVAL=1s", fmt.Sprintf("DHOW_INPUT_HEALTH_CHECK_RETRIES=%d", cmp.Or(s.retries, 3)), "DHOW_INPUT_HEALTH_CHECK_STABLE=2",
 	)
 	if s.health {
 		env = append(env, fmt.Sprintf("DHOW_INPUT_HEALTH_CHECK_URL=http://{host}:%d/%s/current/healthz", httpPort, d.name))
@@ -157,7 +161,11 @@ func (d *target) deploy(scenario string, s spec) result {
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	exit := 0
-	if err := cmd.Run(); err != nil {
+	require.NoError(d.t, cmd.Start())
+	if s.stopAt != "" {
+		go d.stopWhenCurrentIs(cmd, s.stopAt)
+	}
+	if err := cmd.Wait(); err != nil {
 		var ee *exec.ExitError
 		require.ErrorAs(d.t, err, &ee)
 		exit = ee.ExitCode()
@@ -244,4 +252,16 @@ func (d *target) readRemote(rel string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(raw))
+}
+
+func (d *target) stopWhenCurrentIs(cmd *exec.Cmd, want string) {
+	deadline := time.Now().Add(60 * time.Second)
+	for time.Now().Before(deadline) {
+		if d.current() == want {
+			_ = cmd.Process.Signal(syscall.SIGTERM)
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	_ = cmd.Process.Kill()
 }
