@@ -13,6 +13,7 @@
 | رؤية البيئات وقواعدها | كل الأعضاء |
 | إيقاف النشر على بيئة | مسؤول المشاريع وأعلى |
 | إنشاء بيئة، وتغيير قواعدها، وإعادة تشغيلها، وحذفها | المدير وصاحب المؤسسة |
+| إنشاء هدف نشر، وتغييره، وتثبيت مفاتيح سيرفراته، وحذفه | المدير وصاحب المؤسسة |
 | الموافقة على نشر أو رفضه | مراجع البيئة، ودوره مطوّر وأعلى |
 | تخطّي المراجعين والانتظار | المدير وصاحب المؤسسة، لو كانت البيئة تسمح بذلك |
 
@@ -44,6 +45,7 @@ POST /api/v1/organizations/{id}/projects/{projectId}/environments
 | `RequiredIsolation` | `container` | القيمة الوحيدة الآن |
 | `AllowAdminBypass`: المدير يتخطّى المراجعين والانتظار | لا | لا يتخطّى الفروع المسموحة ولا الإيقاف |
 | `SupersedePending`: تنفيذ أحدث على نفس الفرع يحل محل تنفيذ ينتظر | نعم | |
+| `AllowExtraDeployEgress`: الـ job الذي ينشر على [هدف](#أهداف-النشر) يصل أيضًا إلى ما يكتبه ملفه في `network.egress` | لا | الـ job الذي ينشر يصل إلى سيرفرات هدفه فقط |
 
 النمط يطابق الاسم القصير للفرع أو الـ tag، و`Kind` يحدد أيهما: اكتب `main`، ولا تكتب `refs/heads/main` أو `heads/main` أو `tags/v1`. `*` و`?` تطابقان داخل الجزء الواحد بين الشرطتين، و`**` وحدها تطابق أي عدد من الأجزاء، حتى صفر، فـ `release/**` تطابق `release` نفسه و`release/1.2` (استخدم `release/*` إذا أردت استبعاد `release`). نرفض النمط الذي فيه `..` أو `//` أو شرطة في أوله أو آخره أو مسافة أو حرف غير مرئي أو `~` أو `^` أو `:` أو أقواس، والنمط الأطول من 256 حرفًا. القائمة الفارغة تعني أن لا شيء ينشر.
 
@@ -147,8 +149,55 @@ POST /api/v1/organizations/{id}/projects/{projectId}/environments/{environmentNa
 
 `.../remove` مع `CurrentFactor` يحذف البيئة ومراجعيها. السجل يبقى في قاعدة البيانات معلَّمًا بأنه محذوف، ويمكن استخدام الاسم مرة أخرى.
 
+## أهداف النشر
+
+الهدف هو المكان الذي يصل إليه النشر: سيرفر واحد أو مجموعة من حتى 10 سيرفرات، ومعها المستخدم ومسار النشر ومفتاح الدخول. الهدف جزء من البيئة، فلا يستطيع أي commit أن يختار سيرفرًا آخر. الـ job يكتب اسم الهدف فقط، والعنوان يأتي من السيرفر. النشر نفسه على الهدف يأتي في إصدار لاحق، والآن تجهّز الهدف وتثبّت مفاتيح سيرفراته.
+
+يقرأ الأهداف كل من يقرأ المشروع. ينشئها ويغيّرها ويحذفها المدير وصاحب المؤسسة فقط، بالخطوة الثانية (`CurrentFactor`).
+
+```http
+POST /api/v1/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets
+{"Name": "web", "Kind": "ssh", "Username": "deploy", "DeployPath": "/srv/shop", "Hosts": [{"Host": "app1.example.com"}, {"Host": "app2.example.com", "Port": 2222}], "CurrentFactor": {"Method": "totp", "Code": "123456"}}
+```
+
+| الحقل | القاعدة |
+|---|---|
+| `Name` | مثل اسم البيئة، ولا يتكرر في البيئة، ولا يتغيّر |
+| `Kind` | `ssh` أو `compose` |
+| `Hosts` | من 1 إلى 10 سيرفرات، وترتيبها هو ترتيب النشر |
+| `Host` | اسم DNS بحروف صغيرة أو عنوان IP. العناوين المحلية وعناوين خدمات السحابة (metadata) مرفوضة بـ `TARGET_HOST_BLOCKED` |
+| `DeployPath` | مسار مطلق من مستويين على الأقل، وليس من مجلدات النظام مثل `/etc` و`/usr` و`/var/lib/docker`، وإلا `DEPLOY_PATH_INVALID` |
+| `Username` | حساب نشر خاص. `root` مرفوض إلا مع `Settings.AllowRoot` |
+| `KeepReleases` | من 2 إلى 50، والافتراضي 5 |
+| `KeySecretName` | اسم سر في البيئة نفسها يحمل المفتاح الخاص، أو اتركه فارغًا ودع داو ينشئ المفتاح |
+
+السيرفر نفسه بنفس المنفذ والمسار لا يظهر في هدفين من المؤسسة: `TARGET_DUPLICATE`. التغيير يرسل `Version` الذي قرأته، وإذا تغيّر الهدف قبلك يرجع `TARGET_VERSION_CONFLICT` ولا يتغيّر شيء. إضافة سيرفر أو حذفه أو تغيير ترتيبه تمر على نفس الشرط، وأقصى عدد 10.
+
+### مفتاح الدخول
+
+`.../targets/{targetName}/generate-key` مع `CurrentFactor` ينشئ مفتاح ed25519 ويحفظ نصفه الخاص كسر في البيئة باسم `<TARGET>_SSH_KEY`، فلا يرى أحد قيمته أبدًا. الرد يحمل المفتاح العام فقط في `PublicKey`، فضعه في `authorized_keys` على كل سيرفر. التوليد مرة ثانية ينشئ مفتاحًا جديدًا وإصدارًا جديدًا من السر نفسه.
+
+### تثبيت مفتاح السيرفر
+
+داو لا يثق بسيرفر لم تؤكد مفتاحه. لكل سيرفر في الهدف مفتاحه، وتثبّته بثلاث خطوات:
+
+1. `.../hosts/{hostId}/fetch-host-key` يجلب المفتاح من السيرفر بمصافحة SSH بلا تسجيل دخول. أو `.../hosts/{hostId}/pending-host-key` تلصق فيه سطر `ssh-keyscan` أو محتوى ملف `.pub`. اللصق هو الطريق الوحيد للسيرفرات على الشبكة الداخلية، لأن الجلب يرفضها بـ `TARGET_HOST_BLOCKED`. والسيرفر الذي لا يرد يرجع `TARGET_HOST_UNREACHABLE`.
+2. قارن البصمة `SHA256:` التي يعرضها الهدف في `PendingHostKeyFingerprint` مع بصمة السيرفر نفسه.
+3. `.../hosts/{hostId}/confirm-host-key` مع البصمة و`CurrentFactor`.
+
+```http
+POST /api/v1/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/confirm-host-key
+{"Fingerprint": "SHA256:...", "CurrentFactor": {"Method": "totp", "Code": "123456"}}
+```
+
+بصمة لا تطابق المفتاح المنتظر ترجع `HOST_KEY_FINGERPRINT_MISMATCH` ولا تثبّت شيئًا. وبلا مفتاح منتظر يرجع `HOST_KEY_NOT_PENDING`. إذا تغيّر مفتاح السيرفر لاحقًا، يبقى الجديد منتظرًا ويبقى المثبّت شغّالًا حتى تؤكد الجديد. وتغيير عنوان سيرفر أو منفذه يمسح مفتاحه المثبّت، وحذف السيرفر يمسحه معه.
+
+الهدف جاهز (`Ready`) عندما يكون لكل سيرفر فيه مفتاح مثبّت وللهدف مفتاح دخول. وإلا يقول `NotReady` السبب: `host_key_unconfirmed` أو `key_missing`.
+
+حذف الهدف يعلّمه محذوفًا هو وسيرفراته، ويبقى سر المفتاح مع البيئة. وحذف البيئة يحذف أهدافها وأسرارها.
+
 ## سجل التدقيق
 
-كل تغيير في سجل التدقيق، ويُكتب في نفس عملية الحفظ، فلا يبقى تغيير بلا سجل: `environment.created` مع القواعد الأولى، و`environment.updated` مع الحقول التي تغيّرت وقيمها القديمة والجديدة، و`environment.removed`، و`environment.paused` مع السبب، و`environment.resumed`. وللنشر: `deployment.approval_requested` و`deployment.approved` و`deployment.rejected` و`deployment.approval_expired` و`environment.bypassed` و`deployment.started` و`deployment.finished`، مع نوع الخطوة الثانية فقط وليس قيمتها.
+كل تغيير في سجل التدقيق، ويُكتب في نفس عملية الحفظ، فلا يبقى تغيير بلا سجل: `environment.created` مع القواعد الأولى، و`environment.updated` مع الحقول التي تغيّرت وقيمها القديمة والجديدة، و`environment.removed`، و`environment.paused` مع السبب، و`environment.resumed`. وللأهداف: `target.created` و`target.updated` و`target.removed` و`target.key_generated` و`target.host_added` و`target.host_updated` و`target.host_removed` و`target.host_key_fetched` و`target.host_key_confirmed`، بأسماء وبصمات فقط، وبصمة المفتاح القديم والجديد عند التثبيت، ولا مفتاح خاص أبدًا. وللنشر: `deployment.approval_requested` و`deployment.approved` و`deployment.rejected` و`deployment.approval_expired` و`environment.bypassed` و`deployment.started` و`deployment.finished`، مع نوع الخطوة الثانية فقط وليس قيمتها.
 
 لكل قاعدة سطر خاص بها. القوائم (`AllowedRefs` و`AllowedPlugins`) فيها دائمًا العدد وبصمة SHA-256 للقيمة القديمة والجديدة، والقيم نفسها فقط إذا كانت أقصر من 256 حرفًا. والمراجعون فيهم المعرّفات المضافة والمحذوفة، والعدد، والبصمة. إذا لم تتسع القيمة، يقول السجل `Truncated: true` ويحتفظ بالبصمة، فيظهر التغيير حتى لو كان مخفيًا داخل قيمة طويلة.
