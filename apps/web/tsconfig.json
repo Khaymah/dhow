@@ -18,5 +18,5 @@
     "types": ["vite/client", "node", "@testing-library/jest-dom/vitest"],
     "paths": { "@/*": ["./Src/*"] }
   },
-  "include": ["Src", "vite.config.ts", "vitest.config.ts"]
+  "include": ["Src", "E2E", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }
