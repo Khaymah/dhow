@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const currentProviderIssuer = `-- name: CurrentProviderIssuer :one
@@ -109,8 +110,8 @@ func (q *Queries) HasIdentityForProvider(ctx context.Context, arg HasIdentityFor
 }
 
 const insertIdentity = `-- name: InsertIdentity :one
-INSERT INTO "UserIdentities" ("UserId", "Provider", "Issuer", "Subject", "Email", "LastUsedAt", "CreatedAt", "UpdatedAt")
-VALUES ($1, $2, $3, $4, $5, $6::timestamptz, $6, $6)
+INSERT INTO "UserIdentities" ("UserId", "Provider", "Issuer", "Subject", "Email", "Login", "LastUsedAt", "CreatedAt", "UpdatedAt")
+VALUES ($1, $2, $3, $4, $5, $6::text, $7::timestamptz, $7, $7)
 ON CONFLICT DO NOTHING
 RETURNING "Id", "Provider", "Email", "CreatedAt", "LastUsedAt"
 `
@@ -121,6 +122,7 @@ type InsertIdentityParams struct {
 	Issuer   string
 	Subject  string
 	Email    string
+	Login    pgtype.Text
 	Now      time.Time
 }
 
@@ -139,6 +141,7 @@ func (q *Queries) InsertIdentity(ctx context.Context, arg InsertIdentityParams) 
 		arg.Issuer,
 		arg.Subject,
 		arg.Email,
+		arg.Login,
 		arg.Now,
 	)
 	var i InsertIdentityRow
@@ -364,17 +367,23 @@ func (q *Queries) TakeOidcFlow(ctx context.Context, arg TakeOidcFlowParams) (Tak
 
 const touchIdentity = `-- name: TouchIdentity :exec
 UPDATE "UserIdentities"
-SET "LastUsedAt" = $1::timestamptz, "Email" = $2, "UpdatedAt" = $1
-WHERE "Id" = $3 AND NOT "IsDeleted"
+SET "LastUsedAt" = $1::timestamptz, "Email" = $2, "Login" = COALESCE($3::text, "Login"), "UpdatedAt" = $1
+WHERE "Id" = $4 AND NOT "IsDeleted"
 `
 
 type TouchIdentityParams struct {
 	Now   time.Time
 	Email string
+	Login pgtype.Text
 	ID    uuid.UUID
 }
 
 func (q *Queries) TouchIdentity(ctx context.Context, arg TouchIdentityParams) error {
-	_, err := q.db.Exec(ctx, touchIdentity, arg.Now, arg.Email, arg.ID)
+	_, err := q.db.Exec(ctx, touchIdentity,
+		arg.Now,
+		arg.Email,
+		arg.Login,
+		arg.ID,
+	)
 	return err
 }

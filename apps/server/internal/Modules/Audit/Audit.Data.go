@@ -28,7 +28,7 @@ var allowedDataKeys = map[string]struct{}{
 	"AllowedPluginsCount": {}, "AllowedPluginsDigest": {}, "AllowedPluginsFrom": {}, "AllowedPluginsTo": {},
 	"ReviewersCount": {}, "ReviewersDigest": {}, "ReviewersAdded": {}, "ReviewersRemoved": {}, "ReasonDigest": {}, "Truncated": {},
 	"KekVersions": {}, "DataKeys": {}, "Superseded": {}, "Resealed": {}, "Destroyed": {},
-	"EnvironmentId": {}, "RestoredFrom": {}, "Delivered": {}, "ForkCacheRestore": {}, "RunId": {}, "AttemptId": {}, "Registries": {},
+	"EnvironmentId": {}, "RestoredFrom": {}, "Delivered": {}, "ForkCacheRestore": {}, "RunId": {}, "AttemptId": {}, "Registries": {}, "ApprovalId": {},
 }
 
 var credentialMarkers = []string{config.APITokenPrefix, config.RunnerAccessTokenPrefix, config.RunnerRegistrationTokenPrefix}

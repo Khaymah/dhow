@@ -66,6 +66,7 @@ func (g *Gate) Lock(ctx context.Context, q *sqlc.Queries, t deployments.Target) 
 		RefAllowed:   RefAllowed(refs, row.AllowPullRequests, t.RefKind, t.RefName, t.PullRequest),
 		HasReviewers: row.HasReviewers, WaitMinutes: int(row.WaitMinutes), RequirePinnedImages: row.RequirePinnedImages,
 		AllowedPlugins: row.AllowedPlugins, Paused: row.Paused, LockedByRunID: row.LockedByRunId,
+		ApprovalTimeoutHours: int(row.ApprovalTimeoutHours), SupersedePending: row.SupersedePending,
 	}, true, nil
 }
 
@@ -79,19 +80,28 @@ func (g *Gate) Started(ctx context.Context, q *sqlc.Queries, d deployments.Deplo
 	sha := pgtype.Text{String: d.Sha, Valid: d.Sha != ""}
 	return q.InsertDeployment(ctx, sqlc.InsertDeploymentParams{
 		OrganizationID: d.OrganizationID, EnvironmentID: d.EnvironmentID, RunID: d.RunID, RunNumber: d.RunNumber,
-		RunJobID: d.RunJobID, JobID: d.JobID, JobKey: d.JobKey, Ref: d.Ref, Sha: sha, RuleVersion: d.RuleVersion, Now: now,
+		RunJobID: d.RunJobID, JobID: d.JobID, JobKey: d.JobKey, Ref: d.Ref, Sha: sha, RuleVersion: d.RuleVersion,
+		ApprovalID: d.ApprovalID, Now: now,
 	})
 }
 
-func (g *Gate) Settle(ctx context.Context, q *sqlc.Queries, org, run uuid.UUID, keep []string) error {
+func (g *Gate) Settle(ctx context.Context, q *sqlc.Queries, org, run uuid.UUID, keep []string) ([]deployments.Finished, error) {
 	now := g.s.now()
-	if err := q.SettleDeployments(ctx, sqlc.SettleDeploymentsParams{Now: &now, RunID: run, OrganizationID: org}); err != nil {
-		return err
+	rows, err := q.SettleDeployments(ctx, sqlc.SettleDeploymentsParams{Now: &now, RunID: run, OrganizationID: org})
+	if err != nil {
+		return nil, err
 	}
 	if keep == nil {
 		keep = []string{}
 	}
-	return q.ReleaseEnvironments(ctx, sqlc.ReleaseEnvironmentsParams{RunID: &run, OrganizationID: org, Keep: keep})
+	if err := q.ReleaseEnvironments(ctx, sqlc.ReleaseEnvironmentsParams{RunID: &run, OrganizationID: org, Keep: keep}); err != nil {
+		return nil, err
+	}
+	out := make([]deployments.Finished, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, deployments.Finished{DeploymentID: r.Id, EnvironmentID: r.EnvironmentId, RunJobID: r.RunJobId, State: r.State})
+	}
+	return out, nil
 }
 
 func (g *Gate) ReleaseStale(ctx context.Context, q *sqlc.Queries) (int64, error) {

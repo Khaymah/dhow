@@ -146,6 +146,7 @@ func runsFor(
 	pipelinesService.UseSecrets(secretsService)
 	pipelinesService.UseVariables(secretsService)
 	pipelinesService.UseGate(envs.Gate())
+	envs.UseReopen(pipelinesService.Reopen)
 	if in.Secrets == nil {
 		secrets.next = &pipelineSecrets{runs: pipelinesService, envs: envs, store: secretsService, logins: secretsService, bus: bus, log: in.Log}
 	}

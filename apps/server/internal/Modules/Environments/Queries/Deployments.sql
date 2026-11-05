@@ -1,6 +1,7 @@
 -- name: LockGateEnvironment :one
 SELECT e."Id", e."Name", e."RuleVersion", e."AllowedRefs", e."AllowPullRequests", e."WaitMinutes", e."RequirePinnedImages",
-       e."AllowedPlugins", (e."PausedAt" IS NOT NULL)::boolean AS "Paused", e."LockedByRunId",
+       e."AllowedPlugins", (e."PausedAt" IS NOT NULL)::boolean AS "Paused", e."LockedByRunId", e."ApprovalTimeoutHours",
+       e."SupersedePending",
        EXISTS (SELECT 1
                FROM "EnvironmentReviewers" r
                WHERE r."EnvironmentId" = e."Id" AND r."OrganizationId" = e."OrganizationId" AND NOT r."IsDeleted")::boolean
@@ -17,20 +18,22 @@ WHERE "Id" = @id AND "OrganizationId" = @organization_id AND ("LockedByRunId" IS
 -- name: InsertDeployment :exec
 INSERT INTO "Deployments" (
     "OrganizationId", "EnvironmentId", "RunId", "RunNumber", "RunJobId", "JobId", "JobKey", "Ref", "Sha", "RuleVersion",
-    "CreatedAt", "UpdatedAt"
+    "ApprovalId", "CreatedAt", "UpdatedAt"
 )
 VALUES (
-    @organization_id, @environment_id, @run_id, @run_number, @run_job_id, @job_id, @job_key, @ref, @sha, @rule_version, @now, @now
+    @organization_id, @environment_id, @run_id, @run_number, @run_job_id, @job_id, @job_key, @ref, @sha, @rule_version,
+    sqlc.narg('approval_id')::uuid, @now, @now
 );
 
--- name: SettleDeployments :exec
+-- name: SettleDeployments :many
 UPDATE "Deployments" d
 SET "State" = CASE rj."State" WHEN 'succeeded' THEN 'succeeded' WHEN 'failed' THEN 'failed' ELSE 'canceled' END,
     "FinishedAt" = @now, "UpdatedAt" = @now
 FROM "RunJobs" rj
 WHERE d."RunId" = @run_id AND d."OrganizationId" = @organization_id AND d."State" IN ('queued', 'running')
   AND rj."Id" = d."RunJobId" AND rj."OrganizationId" = d."OrganizationId"
-  AND rj."State" IN ('succeeded', 'failed', 'canceled', 'skipped');
+  AND rj."State" IN ('succeeded', 'failed', 'canceled', 'skipped')
+RETURNING d."Id", d."EnvironmentId", d."RunJobId", d."State";
 
 -- name: ReleaseEnvironments :exec
 WITH held AS (

@@ -61,6 +61,7 @@ type ErrorResponse struct {
 
 // OrganizationOverview defines model for OrganizationOverview.
 type OrganizationOverview struct {
+	Approvals   *OverviewApprovals   `json:"Approvals"`
 	Invitations *OverviewInvitations `json:"Invitations"`
 	Jobs        *OverviewJobs        `json:"Jobs"`
 	Runners     *OverviewRunners     `json:"Runners"`
@@ -77,6 +78,12 @@ type OrganizationOverviewResponse struct {
 	Message *string   `json:"Message,omitempty"`
 	Meta    *PageMeta `json:"Meta,omitempty"`
 	Success bool      `json:"Success"`
+}
+
+// OverviewApprovals defines model for OverviewApprovals.
+type OverviewApprovals struct {
+	// Pending Deploy approval requests waiting on an environment where you are a reviewer, directly or through a team. The exact list of the ones you may decide is `GET /organizations/{id}/deployment-approvals?Mine=true`.
+	Pending int `json:"Pending"`
 }
 
 // OverviewInvitations defines model for OverviewInvitations.

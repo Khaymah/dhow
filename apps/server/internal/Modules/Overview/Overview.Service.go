@@ -20,6 +20,7 @@ type Counter interface {
 	CountOverviewJobs(ctx context.Context, arg sqlc.CountOverviewJobsParams) (sqlc.CountOverviewJobsRow, error)
 	CountOverviewRunners(ctx context.Context, arg sqlc.CountOverviewRunnersParams) (sqlc.CountOverviewRunnersRow, error)
 	CountOverviewInvitations(ctx context.Context, arg sqlc.CountOverviewInvitationsParams) (int64, error)
+	CountOverviewApprovals(ctx context.Context, arg sqlc.CountOverviewApprovalsParams) (int64, error)
 }
 
 type Options struct {
@@ -73,6 +74,13 @@ func (s *Service) Get(ctx context.Context, org uuid.UUID) (models.Overview, erro
 			return models.Overview{}, fmt.Errorf("count pending invitations: %w", err)
 		}
 		out.Invitations = &models.Invitations{Pending: int(pending)}
+	}
+	if allowed(policy.RunRead) {
+		pending, err := s.counter.CountOverviewApprovals(ctx, sqlc.CountOverviewApprovalsParams{OrganizationID: org, Now: now, UserID: &p.UserID})
+		if err != nil {
+			return models.Overview{}, fmt.Errorf("count pending approvals: %w", err)
+		}
+		out.Approvals = &models.Approvals{Pending: int(pending)}
 	}
 	return out, nil
 }
