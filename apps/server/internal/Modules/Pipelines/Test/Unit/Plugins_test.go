@@ -1,6 +1,7 @@
 package unit_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,5 +31,27 @@ func TestAllowedPluginsMatchWholeNamePartsOnly(t *testing.T) {
 	}
 	for _, c := range cases {
 		assert.Equal(t, c.want, pipelines.PluginAllowed(c.image, c.prefixes), "%s with %v", c.image, c.prefixes)
+	}
+}
+
+func TestOnlyTheExactOfficialNameWithADigestReceivesATarget(t *testing.T) {
+	digest := "@sha256:" + strings.Repeat("a", 64)
+	cases := []struct {
+		image   string
+		allowed []string
+		want    string
+	}{
+		{"ghcr.io/khaymah/dhow-deploy-ssh" + digest, nil, ""},
+		{"ghcr.io/khaymah/dhow-deploy-compose:1" + digest, nil, ""},
+		{"ghcr.io/khaymah/dhow-deploy-ssh/evil" + digest, nil, "TARGET_PLUGIN_NOT_ALLOWED"},
+		{"ghcr.io/khaymah/dhow-deploy-ssh-evil" + digest, nil, "TARGET_PLUGIN_NOT_ALLOWED"},
+		{"ghcr.io/khaymah/dhow-deploy-ssh:1", nil, "TARGET_PLUGIN_NOT_PINNED"},
+		{"ghcr.io/khaymah/dhow-deploy-ssh", nil, "TARGET_PLUGIN_NOT_PINNED"},
+		{"ghcr.io/acme/deploy" + digest, nil, "TARGET_PLUGIN_NOT_ALLOWED"},
+		{"ghcr.io/acme/deploy" + digest, []string{"ghcr.io/acme/"}, ""},
+		{"ghcr.io/acme/deploy:2", []string{"ghcr.io/acme/"}, "TARGET_PLUGIN_NOT_PINNED"},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, pipelines.TargetPluginRefusal(c.image, c.allowed), c.image)
 	}
 }

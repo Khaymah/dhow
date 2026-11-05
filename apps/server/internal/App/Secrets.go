@@ -60,6 +60,9 @@ func (p *pipelineSecrets) Admit(ctx context.Context, req jobs.SecretRequest) err
 	if err := p.checkEnvironment(ctx, req, scope); err != nil {
 		return err
 	}
+	if err := p.checkKeyReferences(ctx, req, scope); err != nil {
+		return err
+	}
 	_, err = p.checkTargets(ctx, req, scope)
 	return err
 }
@@ -77,6 +80,9 @@ func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (
 		return nil, jobs.ErrSecretsUnavailable
 	}
 	if err := p.checkEnvironment(ctx, req, scope); err != nil {
+		return nil, err
+	}
+	if err := p.checkKeyReferences(ctx, req, scope); err != nil {
 		return nil, err
 	}
 	keys, err := p.checkTargets(ctx, req, scope)
@@ -104,6 +110,11 @@ func (p *pipelineSecrets) Resolve(ctx context.Context, req jobs.SecretRequest) (
 	}
 	keyed, err := p.resolveTargetKeys(ctx, req, scope, reserved, keys, out)
 	if err != nil {
+		secretstore.Wipe(keyed)
+		wipeAll(out)
+		return nil, err
+	}
+	if err := p.sameTargets(ctx, req, scope, keys); err != nil {
 		secretstore.Wipe(keyed)
 		wipeAll(out)
 		return nil, err
@@ -213,4 +224,15 @@ func (p *pipelineSecrets) audit(ctx context.Context, req jobs.SecretRequest, sco
 	return p.runs.SecretsDelivered(ctx, pipelines.Delivered{
 		OrganizationID: req.OrganizationID, JobID: req.JobID, AttemptID: req.AttemptID, Scope: scope, Names: value, Truncated: cut, Registries: hosts,
 	})
+}
+
+func (p *pipelineSecrets) sameTargets(ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope, before []environments.TargetPin) error {
+	after, err := p.checkTargets(ctx, req, scope)
+	if err != nil {
+		return err
+	}
+	if !samePins(before, after) {
+		return jobs.ErrTargetChanged
+	}
+	return nil
 }

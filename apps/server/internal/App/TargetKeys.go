@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -14,14 +16,14 @@ import (
 	"github.com/Khaymah/dhow/internal/jobspec"
 )
 
-func (p *pipelineSecrets) checkTargets(ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope) ([]string, error) {
+func (p *pipelineSecrets) checkTargets(ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope) ([]environments.TargetPin, error) {
 	if len(req.Targets) == 0 {
 		return nil, nil
 	}
 	if scope.EnvironmentID == nil || p.envs == nil {
 		return nil, jobs.ErrTargetChanged
 	}
-	keys := make([]string, 0, len(req.Targets))
+	keys := make([]environments.TargetPin, 0, len(req.Targets))
 	for _, t := range req.Targets {
 		hosts := make([]environments.PinnedHost, 0, len(t.GetHosts()))
 		for _, h := range t.GetHosts() {
@@ -35,7 +37,7 @@ func (p *pipelineSecrets) checkTargets(ctx context.Context, req jobs.SecretReque
 		if err != nil {
 			return nil, jobs.ErrTargetChanged
 		}
-		key, err := p.envs.CheckTarget(ctx, environments.TargetCheck{
+		pin, err := p.envs.CheckTarget(ctx, environments.TargetCheck{
 			OrganizationID: req.OrganizationID, EnvironmentID: *scope.EnvironmentID, TargetID: id, Version: t.GetVersion(), Hosts: hosts,
 		})
 		switch {
@@ -48,7 +50,7 @@ func (p *pipelineSecrets) checkTargets(ctx context.Context, req jobs.SecretReque
 		case err != nil:
 			return nil, err
 		}
-		keys = append(keys, key)
+		keys = append(keys, pin)
 	}
 	return keys, nil
 }
@@ -67,16 +69,16 @@ func splitTargetKeys(names []string) ([]string, []string) {
 }
 
 func (p *pipelineSecrets) resolveTargetKeys(
-	ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope, reserved, keys []string, out map[string][]byte,
+	ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope, reserved []string, keys []environments.TargetPin, out map[string][]byte,
 ) ([]secretstore.Secret, error) {
 	var delivered []secretstore.Secret
 	for _, name := range reserved {
 		n, _ := jobspec.ParseTargetKeySecret(name)
-		if n >= len(keys) || keys[n] == "" {
+		if n >= len(keys) || keys[n].Key == "" {
 			return delivered, jobs.ErrTargetChanged
 		}
 		list, err := p.store.Resolve(ctx, secretstore.Request{
-			OrganizationID: req.OrganizationID, ProjectID: scope.ProjectID, EnvironmentID: scope.EnvironmentID, Names: []string{keys[n]},
+			OrganizationID: req.OrganizationID, ProjectID: scope.ProjectID, EnvironmentID: scope.EnvironmentID, Names: []string{keys[n].Key},
 			PullRequest: scope.PullRequest,
 		})
 		if errors.Is(err, secretstore.ErrMissingName) {
@@ -84,6 +86,10 @@ func (p *pipelineSecrets) resolveTargetKeys(
 		}
 		if err != nil {
 			return delivered, err
+		}
+		if len(list) == 1 && list[0].Version != keys[n].Version {
+			secretstore.Wipe(list)
+			return delivered, jobs.ErrTargetChanged
 		}
 		if len(list) != 1 || list[0].Scope != secretsmodels.ScopeEnvironment {
 			secretstore.Wipe(list)
@@ -94,3 +100,22 @@ func (p *pipelineSecrets) resolveTargetKeys(
 	}
 	return delivered, nil
 }
+
+func (p *pipelineSecrets) checkKeyReferences(ctx context.Context, req jobs.SecretRequest, scope pipelines.SecretScope) error {
+	if scope.EnvironmentID == nil || p.envs == nil || len(req.Names) == 0 {
+		return nil
+	}
+	keys, err := p.envs.TargetKeyNames(ctx, req.OrganizationID, *scope.EnvironmentID)
+	if err != nil || len(keys) == 0 {
+		return err
+	}
+	for _, n := range req.Names {
+		if slices.ContainsFunc(keys, func(k string) bool { return strings.EqualFold(k, n) }) {
+			p.log.WarnContext(ctx, "a step of a job names the key secret of a deploy target, so the job gets no secret", "job_id", req.JobID.String())
+			return jobs.ErrTargetKeyUsed
+		}
+	}
+	return nil
+}
+
+func samePins(a, b []environments.TargetPin) bool { return slices.Equal(a, b) }

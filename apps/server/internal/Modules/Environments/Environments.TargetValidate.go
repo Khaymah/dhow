@@ -119,7 +119,7 @@ func validateComposeSettings(c *models.ComposeSettings) []apperrors.IErrorDetail
 	if !projectPattern.MatchString(c.ProjectName) {
 		details = append(details, invalid(settingsPath("Compose", "ProjectName")))
 	}
-	if !composePattern.MatchString(c.ComposeFile) || strings.HasPrefix(c.ComposeFile, "/") || strings.Contains(c.ComposeFile, "..") {
+	if !composePattern.MatchString(c.ComposeFile) || strings.HasPrefix(c.ComposeFile, "/") || strings.HasPrefix(c.ComposeFile, "-") || strings.Contains(c.ComposeFile, "..") {
 		details = append(details, invalid(settingsPath("Compose", "ComposeFile")))
 	}
 	return details

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	deployments "github.com/Khaymah/dhow/apps/server/internal/Core/Deployments"
@@ -80,6 +81,14 @@ func (c candidate) targetSteps() []targetStep {
 
 func (s *Service) attachTargets(ctx context.Context, q *sqlc.Queries, st *step, i int, c candidate, env *deployments.Environment) (denial, error) {
 	steps := c.targetSteps()
+	if len(steps) > 0 && st.run.IsFork {
+		return denial{reason: models.ReasonForkEnvironment}, nil
+	}
+	if env != nil && s.targets != nil {
+		if d, err := s.keysNotReferenced(ctx, q, st, c, env); err != nil || d.reason != "" {
+			return d, err
+		}
+	}
 	if len(steps) == 0 {
 		return denial{}, nil
 	}
@@ -101,7 +110,7 @@ func (s *Service) attachTargets(ctx context.Context, q *sqlc.Queries, st *step, 
 		if err != nil || d.reason != "" {
 			return d, err
 		}
-		health, d := healthOf(c.spec.GetSteps()[ts.index].GetPlugin().GetInputs(), t)
+		health, d := healthOf(c.spec.GetSteps()[ts.index].GetPlugin().GetInputs(), t, env.AllowExtraDeployEgress)
 		if d.reason != "" {
 			return d, nil
 		}
@@ -132,8 +141,8 @@ func (s *Service) checkTarget(
 	if !found {
 		return t, denial{reason: models.ReasonTargetNotFound, names: []string{ts.name}}, nil
 	}
-	if !PluginAllowed(ts.image, append(jobspec.OfficialDeployImages(), t.AllowedImages...)) {
-		return t, denial{reason: models.ReasonTargetPluginNotAllowed, names: []string{ts.name}}, nil
+	if reason := TargetPluginRefusal(ts.image, t.AllowedImages); reason != "" {
+		return t, denial{reason: reason, names: []string{ts.name}}, nil
 	}
 	if unpinned := unpinnedHosts(t); len(unpinned) > 0 {
 		return t, denial{reason: models.ReasonTargetHostKey, names: unpinned}, nil
@@ -142,7 +151,7 @@ func (s *Service) checkTarget(
 		return t, denial{reason: models.ReasonTargetKeyNotFound, names: nonEmpty(t.KeySecretName)}, nil
 	}
 	inputs := c.spec.GetSteps()[ts.index].GetPlugin().GetInputs()
-	if !s.artifactAvailable(st, st.rows[i], inputs[inputArtifact], PluginAllowed(ts.image, jobspec.OfficialDeployImages())) {
+	if !s.artifactAvailable(st, st.rows[i], inputs[inputArtifact], isOfficialDeploy(ts.image)) {
 		return t, denial{reason: models.ReasonTargetArtifact}, nil
 	}
 	return t, denial{}, nil
@@ -189,7 +198,7 @@ func hostEndpoints(t deployments.DeployTarget) []string {
 	return out
 }
 
-func healthOf(inputs map[string]string, t deployments.DeployTarget) ([]string, denial) {
+func healthOf(inputs map[string]string, t deployments.DeployTarget, extra bool) ([]string, denial) {
 	hosts := make([]string, 0, len(t.Hosts))
 	for _, h := range t.Hosts {
 		hosts = append(hosts, h.Host)
@@ -197,6 +206,11 @@ func healthOf(inputs map[string]string, t deployments.DeployTarget) ([]string, d
 	endpoints, err := jobspec.HealthEndpoints(inputs[inputHealthURL], hosts)
 	if errors.Is(err, jobspec.ErrHealthURL) {
 		return nil, denial{reason: models.ReasonHealthURLInvalid}
+	}
+	for _, e := range endpoints {
+		if host, _, ok := jobspec.ParseEndpoint(e); !ok || !jobspec.HealthHostAllowed(host, hosts, extra) {
+			return nil, denial{reason: models.ReasonHealthURLNotAllowed}
+		}
 	}
 	perHost := time.Duration(0)
 	if inputs[inputHealthURL] != "" {
@@ -277,4 +291,44 @@ func (d denial) detail() []byte {
 		return nil
 	}
 	return failureDetail(d.names)
+}
+
+func repositoryOf(image string) string {
+	repo, _, _ := strings.Cut(image, "@")
+	if i := strings.LastIndex(repo, ":"); i > strings.LastIndex(repo, "/") {
+		repo = repo[:i]
+	}
+	return repo
+}
+
+func isOfficialDeploy(image string) bool {
+	return slices.Contains(jobspec.OfficialDeployImages(), repositoryOf(jobspec.QualifyImage(image)))
+}
+
+func TargetPluginRefusal(image string, allowed []string) string {
+	switch {
+	case !isOfficialDeploy(image) && (len(allowed) == 0 || !PluginAllowed(image, allowed)):
+		return models.ReasonTargetPluginNotAllowed
+	case !strings.Contains(image, digestMarker):
+		return models.ReasonTargetPluginNotPinned
+	default:
+		return ""
+	}
+}
+
+func (s *Service) keysNotReferenced(ctx context.Context, q *sqlc.Queries, st *step, c candidate, env *deployments.Environment) (denial, error) {
+	keys, err := s.targets.KeyNames(ctx, q, st.run.OrganizationId, env.ID)
+	if err != nil || len(keys) == 0 {
+		return denial{}, err
+	}
+	var hit []string
+	for _, n := range userSecretNames(c.spec) {
+		if slices.ContainsFunc(keys, func(k string) bool { return strings.EqualFold(k, n) }) && !slices.Contains(hit, n) {
+			hit = append(hit, n)
+		}
+	}
+	if len(hit) == 0 {
+		return denial{}, nil
+	}
+	return denial{reason: models.ReasonTargetKeyReferenced, names: hit}, nil
 }

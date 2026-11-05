@@ -47,7 +47,7 @@ var (
 	releaseIDPattern      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 	sharedNamePattern     = regexp.MustCompile(`^[A-Za-z0-9.][A-Za-z0-9._-]{0,63}$`)
 	composeProjectPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,62}$`)
-	composeFilePattern    = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,100}$`)
+	composeFilePattern    = regexp.MustCompile(`^[A-Za-z0-9._][A-Za-z0-9._/-]{0,99}$`)
 	systemPaths           = []string{
 		"/bin", "/boot", "/dev", "/etc", "/lib", "/lib32", "/lib64", "/proc", "/root", "/run", "/sbin", "/sys", "/usr",
 		"/var/lib/docker", "/var/run",

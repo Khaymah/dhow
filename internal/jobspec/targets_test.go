@@ -100,6 +100,12 @@ func TestATargetSpecIsRefusedWhenItBreaksARule(t *testing.T) {
 		{"a hook with two lines", func(s *runnerv1.JobSpec) { s.Targets[0].Settings.PreSwitchCommand = "a\nb" }, "Targets[0].Settings.PreSwitchCommand", jobspec.ReasonInvalid},
 		{"a shared name with dots", func(s *runnerv1.JobSpec) { s.Targets[0].Settings.Shared = []string{"../x"} }, "Targets[0].Settings.Shared[0]", jobspec.ReasonInvalid},
 		{"compose settings on an ssh target", func(s *runnerv1.JobSpec) { s.Targets[0].Settings.ComposeProject = "web" }, "Targets[0].Settings.ComposeProject", jobspec.ReasonInvalid},
+		{"a compose file that starts with a dash", func(s *runnerv1.JobSpec) {
+			t := s.Targets[0]
+			t.Kind = "compose"
+			t.Settings.Shared, t.Settings.ReloadCommand = nil, ""
+			t.Settings.ComposeProject, t.Settings.ComposeFile = "web", "-f"
+		}, "Targets[0].Settings.ComposeFile", jobspec.ReasonInvalid},
 		{"no settings", func(s *runnerv1.JobSpec) { s.Targets[0].Settings = nil }, "Targets[0].Settings", jobspec.ReasonRequired},
 		{"no key secret", func(s *runnerv1.JobSpec) { s.Secrets = nil }, "Targets[0].Key", jobspec.ReasonRequired},
 		{"a key for every step", func(s *runnerv1.JobSpec) { s.Secrets[0].StepIndexes = nil }, "Secrets[0]", jobspec.ReasonReserved},
@@ -322,4 +328,33 @@ func FuzzParseEndpoint(f *testing.F) {
 			t.Fatalf("%q gave host %q and port %d", entry, host, port)
 		}
 	})
+}
+
+func TestHealthHostAllowed(t *testing.T) {
+	targets := []string{"web-1.example.com", "203.0.113.9"}
+	cases := []struct {
+		host  string
+		extra bool
+		want  bool
+	}{
+		{"web-1.example.com", false, true},
+		{"203.0.113.9", false, true},
+		{"status.example.org", false, false},
+		{"169.254.169.254", false, false},
+		{"status.example.org", true, true},
+		{"198.51.100.7", true, true},
+		{"169.254.169.254", true, false},
+		{"fd00:ec2::254", true, false},
+		{"10.0.0.5", true, false},
+		{"127.0.0.1", true, false},
+		{"::1", true, false},
+		{"localhost", true, false},
+		{"db.internal", true, false},
+		{"printer.local", true, false},
+		{"::ffff:169.254.169.254", true, false},
+		{"0.0.0.0", true, false},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, jobspec.HealthHostAllowed(c.host, targets, c.extra), "%s extra=%v", c.host, c.extra)
+	}
 }

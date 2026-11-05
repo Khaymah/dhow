@@ -141,3 +141,14 @@ SELECT EXISTS (
     WHERE "OrganizationId" = @organization_id AND "EnvironmentId" = @environment_id AND "Scope" = 'environment'
       AND lower("Name") = lower(@name::text) AND NOT "IsDeleted"
 )::boolean;
+
+-- name: EnvironmentSecretVersion :one
+SELECT "CurrentVersion"
+FROM "Secrets"
+WHERE "OrganizationId" = @organization_id AND "EnvironmentId" = @environment_id AND "Scope" = 'environment'
+  AND lower("Name") = lower(@name::text) AND NOT "IsDeleted";
+
+-- name: ListDeployTargetKeyNames :many
+SELECT "KeySecretName"::text
+FROM "DeployTargets"
+WHERE "OrganizationId" = @organization_id AND "EnvironmentId" = @environment_id AND NOT "IsDeleted" AND "KeySecretName" IS NOT NULL;

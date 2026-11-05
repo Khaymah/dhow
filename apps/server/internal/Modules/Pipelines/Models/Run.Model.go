@@ -89,6 +89,9 @@ const (
 	ReasonTargetEgress           = "TARGET_JOB_EGRESS_NOT_ALLOWED"
 	ReasonTargetChanged          = "TARGET_CHANGED"
 	ReasonHealthURLInvalid       = "HEALTH_URL_INVALID"
+	ReasonHealthURLNotAllowed    = "HEALTH_URL_NOT_ALLOWED"
+	ReasonTargetPluginNotPinned  = "TARGET_PLUGIN_NOT_PINNED"
+	ReasonTargetKeyReferenced    = "TARGET_KEY_NOT_REFERENCEABLE"
 	ReasonHealthBudget           = "HEALTH_BUDGET_EXCEEDED"
 	ReasonRollingBudget          = "ROLLING_BUDGET_EXCEEDED"
 )

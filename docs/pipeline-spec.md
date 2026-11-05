@@ -191,11 +191,13 @@ jobs:
 - الـ job يكتب `environment:`، وإلا `TARGET_REQUIRES_ENVIRONMENT`.
 - اسم الهدف نص ثابت في الملف، لا تعبير ولا سر، وإلا `TARGET_NOT_LITERAL`.
 - الهدف موجود في بيئة الـ job، وإلا `TARGET_NOT_FOUND`.
-- إضافات النشر الرسمية وحدها تستلم هدفًا، أو صور يسمح بها الهدف في `AllowedImages`، وإلا `TARGET_PLUGIN_NOT_ALLOWED`.
+- إضافات النشر الرسمية وحدها تستلم هدفًا، بالاسم الكامل بالضبط، أو صور يسمح بها الهدف في `AllowedImages`، وإلا `TARGET_PLUGIN_NOT_ALLOWED`. وتُكتب الصورة ببصمتها `@sha256:`، وإلا `TARGET_PLUGIN_NOT_PINNED`.
+- لا تذكر أي خطوة السر الذي يحمل مفتاح هدف في البيئة، لا خطوة `run:` ولا أي إضافة، وإلا `TARGET_KEY_NOT_REFERENCEABLE`. المفتاح يصل لخطوة النشر وحدها، ويفحص السيرفر هذا عند البدء أيضًا.
+- التشغيل القادم من fork لا ينشر على هدف أبدًا، ويفشل بـ `FORK_PR_NO_ENVIRONMENT`.
 - لكل سيرفر في الهدف مفتاح مثبّت، وإلا `TARGET_HOST_KEY_UNCONFIRMED` مع عناوين السيرفرات.
 - سر مفتاح الدخول موجود في البيئة، وإلا `TARGET_KEY_NOT_FOUND`.
 - `with.artifact` يذكر ملفًا ناتجًا يرفعه تشغيل في `needs`، وإلا `TARGET_ARTIFACT_REQUIRED`.
-- `with.health_check_url` عنوان `http` أو `https` بلا اسم مستخدم، ويمكن أن يحمل `{host}` مكان اسم السيرفر كاملًا ليُفحص كل سيرفر على عنوانه، وإلا `HEALTH_URL_INVALID`.
+- `with.health_check_url` عنوان `http` أو `https` بلا اسم مستخدم، ويمكن أن يحمل `{host}` مكان اسم السيرفر كاملًا ليُفحص كل سيرفر على عنوانه، وإلا `HEALTH_URL_INVALID`. وسيرفر الفحص هو `{host}` أو سيرفر من سيرفرات الهدف نفسها، وإلا `HEALTH_URL_NOT_ALLOWED`. وإذا فتح المدير `AllowExtraDeployEgress` يسمح السيرفر باسم عام آخر، ولا يسمح أبدًا بعنوان محلي أو خاص أو عنوان خدمة السحابة (metadata).
 - فحص الصحة لا يتجاوز 10 دقائق لكل سيرفر (`HEALTH_BUDGET_EXCEEDED`)، والنشر على دفعات لا يتجاوز 60 دقيقة (`ROLLING_BUDGET_EXCEEDED`).
 - الـ job الذي ينشر يصل إلى سيرفرات هدفه وإلى عنوان فحص الصحة فقط. يحسب السيرفر هذه النقاط من الهدف، فلا يستطيع الملف تغييرها. وكل `network.egress` آخر في الـ job مرفوض بـ `TARGET_JOB_EGRESS_NOT_ALLOWED`، إلا إذا فتح المدير `AllowExtraDeployEgress` في البيئة.
 

@@ -206,6 +206,11 @@ func TestEveryTargetRefusalFailsTheJobBeforeTheKeyIsOpened(t *testing.T) {
 		{"a health address that is not http", strings.Replace(deployPipeline, "https://{host}/healthz", "ftp://{host}/healthz", 1), "", "HEALTH_URL_INVALID", ""},
 		{"a health address with a user name", strings.Replace(deployPipeline, "https://{host}/healthz", "https://root@{host}/healthz", 1), "", "HEALTH_URL_INVALID", ""},
 		{"a health address with the host inside the path only", strings.Replace(deployPipeline, "https://{host}/healthz", "https://example.com/{host}", 1), "", "HEALTH_URL_INVALID", ""},
+		{"a health check on the metadata address", strings.Replace(deployPipeline, "https://{host}/healthz", "http://169.254.169.254/", 1), "", "HEALTH_URL_NOT_ALLOWED", ""},
+		{"a health check on a private address", strings.Replace(deployPipeline, "https://{host}/healthz", "http://10.0.0.5/healthz", 1), "", "HEALTH_URL_NOT_ALLOWED", ""},
+		{"a health check on a public host that is not the target", strings.Replace(deployPipeline, "https://{host}/healthz", "https://example.org/healthz", 1), "", "HEALTH_URL_NOT_ALLOWED", ""},
+		{"a plugin whose name only starts with the official one", strings.ReplaceAll(deployPipeline, "uses: PLUGIN", "uses: ghcr.io/khaymah/dhow-deploy-ssh/evil@sha256:"+strings.Repeat("a", 64)), "", "TARGET_PLUGIN_NOT_ALLOWED", "web"},
+		{"a run step that names the key of the target", strings.Replace(deployPipeline, "      - run: ./prepare.sh\n", "      - run: ./prepare.sh\n        env:\n          KEY: ${{ secrets.WEB_SSH_KEY }}\n", 1), "", "TARGET_KEY_NOT_REFERENCEABLE", keySecretName},
 		{"a health check that runs longer than 10 minutes", longHealth, "", "HEALTH_BUDGET_EXCEEDED", ""},
 		{
 			"a rolling deploy that runs longer than 60 minutes", strings.Replace(deployPipeline, "https://{host}/healthz",
@@ -265,10 +270,10 @@ func TestATargetWithAnIPAddressGetsAnExactEndpoint(t *testing.T) {
 	d := newDeployWorld(t)
 	d.sql(t, `UPDATE "DeployTargetHosts" SET "Host" = '203.0.113.7' WHERE "Host" = 'web-1.example.com'`)
 	d.sql(t, `UPDATE "DeployTargetHosts" SET "Port" = 2222 WHERE "Host" = 'web-2.example.com'`)
-	run := d.built(t, strings.Replace(deployPipeline, "https://{host}/healthz", "https://health.example.com/healthz", 1))
+	run := d.built(t, strings.Replace(deployPipeline, "https://{host}/healthz", "https://"+hostThree+"/healthz", 1))
 	require.Equal(t, "active", d.env.RunJobs(run)["deploy"].State)
 	spec := d.leaseDeploy(t).Grant.GetSpec()
-	assert.Equal(t, []string{"203.0.113.7:22", hostTwo + ":2222", hostThree + ":22", "health.example.com:443"}, spec.GetNetwork().GetExactEndpoints())
+	assert.Equal(t, []string{"203.0.113.7:22", hostTwo + ":2222", hostThree + ":22", hostThree + ":443"}, spec.GetNetwork().GetExactEndpoints())
 	assert.Empty(t, spec.GetNetwork().GetEgress(), "an IP address never goes into the egress list")
 	assert.Equal(t, "["+hostTwo+"]:2222 "+d.target.Hosts[1].HostKey, spec.GetTargets()[0].GetHosts()[1].GetKnownHostsLine())
 }
@@ -336,4 +341,120 @@ func TestARunStepNeverReceivesTheKeyOfTheTarget(t *testing.T) {
 		}
 		assert.NotEmpty(t, ref.GetStepIndexes(), "the key never has an empty step list, which would mean every step")
 	}
+}
+
+func TestAnyHostIsRefusedForTheHealthCheckEvenWhenExtraEgressIsOpen(t *testing.T) {
+	cases := map[string]string{
+		"http://169.254.169.254/":     "HEALTH_URL_NOT_ALLOWED",
+		"http://[fd00:ec2::254]/":     "HEALTH_URL_NOT_ALLOWED",
+		"http://10.0.0.5/":            "HEALTH_URL_NOT_ALLOWED",
+		"http://127.0.0.1:8080/":      "HEALTH_URL_NOT_ALLOWED",
+		"http://[::1]/":               "HEALTH_URL_NOT_ALLOWED",
+		"http://localhost/":           "HEALTH_URL_NOT_ALLOWED",
+		"http://db.internal/":         "HEALTH_URL_NOT_ALLOWED",
+		"https://status.example.org/": "",
+		"https://" + hostTwo + "/":    "",
+	}
+	for url, want := range cases {
+		t.Run(url, func(t *testing.T) {
+			d := newDeployWorld(t)
+			d.sql(t, `UPDATE "Environments" SET "AllowExtraDeployEgress" = true, "RuleVersion" = "RuleVersion" + 1 WHERE "Name" = 'production'`)
+			run := d.built(t, strings.Replace(deployPipeline, "https://{host}/healthz", url, 1))
+			deploy := d.env.RunJobs(run)["deploy"]
+			if want == "" {
+				assert.Equal(t, "active", deploy.State)
+				return
+			}
+			assert.Equal(t, []string{"failed", want}, []string{deploy.State, deploy.Reason})
+			d.requireNoKeyOpened(t)
+		})
+	}
+}
+
+const thirdPartyWithKey = `version: 1
+on:
+  push: {}
+jobs:
+  deploy:
+    environment: production
+    steps:
+      - uses: ` + thirdParty + `
+        with:
+          token: ${{ secrets.WEB_SSH_KEY }}
+`
+
+func TestAThirdPartyPluginCannotNameTheKeyOfATarget(t *testing.T) {
+	d := newDeployWorld(t)
+	d.defs.Put(shaA, thirdPartyWithKey)
+	run := d.push("refs/heads/main", shaA)
+	d.env.StartRuns()
+	deploy := d.env.RunJobs(run)["deploy"]
+	assert.Equal(t, []string{"failed", "TARGET_KEY_NOT_REFERENCEABLE"}, []string{deploy.State, deploy.Reason})
+	d.requireNoKeyOpened(t)
+}
+
+const otherKeyPipeline = `version: 1
+on:
+  push: {}
+jobs:
+  deploy:
+    image: IMAGE
+    environment: production
+    steps:
+      - run: ./deploy.sh
+        env:
+          KEY: ${{ secrets.OTHER_KEY }}
+`
+
+func TestAKeyThatBecomesTheKeyOfATargetAfterTheGateIsNotDelivered(t *testing.T) {
+	d := newDeployWorld(t)
+	d.env.SeedSecret(apptest.SecretRef(d.org, &d.project, "production"), "OTHER_KEY", "another-value")
+	d.defs.Put(shaA, pipeline(otherKeyPipeline))
+	run := d.push("refs/heads/main", shaA)
+	d.env.StartRuns()
+	require.Equal(t, "active", d.env.RunJobs(run)["deploy"].State)
+	r, g := d.leaseKey(t, "deploy")
+	d.sql(t, `UPDATE "DeployTargets" SET "KeySecretName" = 'OTHER_KEY', "Version" = "Version" + 1 WHERE "Name" = 'web'`)
+	_, err := r.Start(g)
+	require.Error(t, err)
+	assert.Nil(t, d.lastUsed(d.org, &d.project, "OTHER_KEY"))
+	d.reopen(t)
+	assert.Equal(t, "TARGET_KEY_NOT_REFERENCEABLE", d.env.RunJobs(run)["deploy"].Reason)
+}
+
+func TestAKeyRotatedBeforeStartIsDeliveredAsTheNewVersion(t *testing.T) {
+	d := newDeployWorld(t)
+	run := d.built(t, deployPipeline)
+	require.Equal(t, "active", d.env.RunJobs(run)["deploy"].State)
+	g := d.leaseDeploy(t)
+	d.env.SeedSecret(apptest.SecretRef(d.org, &d.project, "production"), keySecretName, "the-rotated-key-value")
+	start, err := d.runner.Start(g)
+	require.NoError(t, err)
+	assert.Equal(t, "the-rotated-key-value", openStart(t, d.runner, g, start)["dhow.target.0.key"])
+}
+
+const forkTargetPipeline = `version: 1
+on:
+  pull_request: {}
+jobs:
+  deploy:
+    steps:
+      - uses: ` + sshPlugin + `
+        with:
+          artifact: web
+          target: web
+`
+
+func TestAForkRunNeverGetsATarget(t *testing.T) {
+	d := newDeployWorld(t)
+	d.defs.Put(shaA, forkTargetPipeline)
+	d.defs.Put(shaB, forkTargetPipeline)
+	run := d.forkPR()
+	maintainer, _ := d.env.SignedIn(d.org, "maintainer@example.com", "maintainer")
+	d.env.StartRuns()
+	require.Equal(t, 200, d.post(t, maintainer, run, "approve").Status)
+	d.env.StartRuns()
+	deploy := d.env.RunJobs(run)["deploy"]
+	assert.Equal(t, []string{"failed", "FORK_PR_NO_ENVIRONMENT"}, []string{deploy.State, deploy.Reason})
+	d.requireNoKeyOpened(t)
 }

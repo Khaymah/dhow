@@ -46,14 +46,14 @@ func deliverySettings(raw []byte) (deployments.TargetSettings, error) {
 	return out, nil
 }
 
-func deliveryOf(row sqlc.DeployTarget, hosts []sqlc.DeployTargetHost, keyFound bool) (deployments.DeployTarget, error) {
+func deliveryOf(row sqlc.DeployTarget, hosts []sqlc.DeployTargetHost, keyVersion int32) (deployments.DeployTarget, error) {
 	settings, err := deliverySettings(row.Settings)
 	if err != nil {
 		return deployments.DeployTarget{}, err
 	}
 	t := deployments.DeployTarget{
 		ID: row.Id, Name: row.Name, Kind: row.Kind, Username: row.Username, DeployPath: row.DeployPath,
-		KeySecretName: row.KeySecretName.String, KeyFound: keyFound, KeepReleases: int(row.KeepReleases), Version: row.Version,
+		KeySecretName: row.KeySecretName.String, KeyFound: keyVersion > 0, KeyVersion: keyVersion, KeepReleases: int(row.KeepReleases), Version: row.Version,
 		AllowedImages: row.AllowedImages, Settings: settings, Hosts: make([]deployments.TargetHost, 0, len(hosts)),
 	}
 	for _, h := range hosts {
@@ -67,16 +67,16 @@ func (s *Service) deliveryParts(ctx context.Context, q *sqlc.Queries, row sqlc.D
 	if err != nil {
 		return deployments.DeployTarget{}, err
 	}
-	found := false
+	version := int32(0)
 	if row.KeySecretName.Valid {
-		found, err = q.EnvironmentSecretExists(ctx, sqlc.EnvironmentSecretExistsParams{
+		version, err = q.EnvironmentSecretVersion(ctx, sqlc.EnvironmentSecretVersionParams{
 			OrganizationID: row.OrganizationId, EnvironmentID: &row.EnvironmentId, Name: row.KeySecretName.String,
 		})
-		if err != nil {
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return deployments.DeployTarget{}, err
 		}
 	}
-	return deliveryOf(row, hosts, found)
+	return deliveryOf(row, hosts, version)
 }
 
 func (t *Targets) Find(ctx context.Context, q *sqlc.Queries, org, environment uuid.UUID, name string) (deployments.DeployTarget, bool, error) {
@@ -92,6 +92,19 @@ func (t *Targets) Find(ctx context.Context, q *sqlc.Queries, org, environment uu
 	}
 	out, err := t.s.deliveryParts(ctx, q, row)
 	return out, err == nil, err
+}
+
+func (t *Targets) KeyNames(ctx context.Context, q *sqlc.Queries, org, environment uuid.UUID) ([]string, error) {
+	return q.ListDeployTargetKeyNames(ctx, sqlc.ListDeployTargetKeyNamesParams{OrganizationID: org, EnvironmentID: environment})
+}
+
+func (s *Service) TargetKeyNames(ctx context.Context, org, environment uuid.UUID) ([]string, error) {
+	return s.Targets().KeyNames(ctx, s.queries(), org, environment)
+}
+
+type TargetPin struct {
+	Key     string
+	Version int32
 }
 
 type PinnedHost struct {
@@ -123,8 +136,8 @@ func (c TargetCheck) matches(t deployments.DeployTarget) bool {
 	return true
 }
 
-func (s *Service) CheckTarget(ctx context.Context, c TargetCheck) (string, error) {
-	var key string
+func (s *Service) CheckTarget(ctx context.Context, c TargetCheck) (TargetPin, error) {
+	var pin TargetPin
 	err := dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		row, err := q.GetDeployTargetByID(ctx, sqlc.GetDeployTargetByIDParams{ID: c.TargetID, OrganizationID: c.OrganizationID, EnvironmentID: c.EnvironmentID})
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -143,8 +156,8 @@ func (s *Service) CheckTarget(ctx context.Context, c TargetCheck) (string, error
 		if !current.KeyFound {
 			return ErrTargetKeyMissing
 		}
-		key = current.KeySecretName
+		pin = TargetPin{Key: current.KeySecretName, Version: current.KeyVersion}
 		return nil
 	})
-	return key, err
+	return pin, err
 }

@@ -133,6 +133,7 @@ type DeployTarget struct {
 	DeployPath    string
 	KeySecretName string
 	KeyFound      bool
+	KeyVersion    int32
 	KeepReleases  int
 	Version       int64
 	AllowedImages []string
@@ -142,4 +143,5 @@ type DeployTarget struct {
 
 type Targets interface {
 	Find(ctx context.Context, tx *sqlc.Queries, org, environment uuid.UUID, name string) (DeployTarget, bool, error)
+	KeyNames(ctx context.Context, tx *sqlc.Queries, org, environment uuid.UUID) ([]string, error)
 }

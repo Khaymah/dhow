@@ -50,6 +50,7 @@ const (
 	ReasonEnvironmentRule   = "ENVIRONMENT_RULE_CHANGED"
 	ReasonTargetChanged     = "TARGET_CHANGED"
 	ReasonTargetKeyMissing  = "TARGET_KEY_NOT_FOUND"
+	ReasonTargetKeyUsed     = "TARGET_KEY_NOT_REFERENCEABLE"
 	ReasonNoMatchingRunner  = "NO_MATCHING_RUNNER"
 )
 

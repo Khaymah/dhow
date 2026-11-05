@@ -191,11 +191,13 @@ A `uses:` step with `with.target` deploys to a [target](guides/environments.md#d
 - The job writes `environment:`, or `TARGET_REQUIRES_ENVIRONMENT`.
 - The target name is fixed text in the file, not an expression and not a secret, or `TARGET_NOT_LITERAL`.
 - The target exists on the environment of the job, or `TARGET_NOT_FOUND`.
-- Only the official deploy plugins receive a target, or images the target allows in `AllowedImages`, or `TARGET_PLUGIN_NOT_ALLOWED`.
+- Only the official deploy plugins receive a target, by their exact full name, or images the target allows in `AllowedImages`, or `TARGET_PLUGIN_NOT_ALLOWED`. The image is written with its `@sha256:` digest, or `TARGET_PLUGIN_NOT_PINNED`.
+- No step names the secret that holds the key of a target on the environment, neither a `run:` step nor any plugin, or `TARGET_KEY_NOT_REFERENCEABLE`. The key reaches the deploy step only, and the server checks this again at start.
+- A run that comes from a fork never deploys to a target, and fails with `FORK_PR_NO_ENVIRONMENT`.
 - Every server of the target has a pinned key, or `TARGET_HOST_KEY_UNCONFIRMED` with the addresses of the servers.
 - The secret of the access key exists on the environment, or `TARGET_KEY_NOT_FOUND`.
 - `with.artifact` names an artifact that a job in `needs` uploads, or `TARGET_ARTIFACT_REQUIRED`.
-- `with.health_check_url` is an `http` or `https` address without a user name. It may hold `{host}` in place of the whole server name, so each server is checked on its own address. Otherwise `HEALTH_URL_INVALID`.
+- `with.health_check_url` is an `http` or `https` address without a user name. It may hold `{host}` in place of the whole server name, so each server is checked on its own address. Otherwise `HEALTH_URL_INVALID`. The health host is `{host}` or one of the servers of the target itself, or `HEALTH_URL_NOT_ALLOWED`. If an Admin turns on `AllowExtraDeployEgress`, the server also allows another public name, and never a local or private address or a cloud metadata address.
 - A health check does not run longer than 10 minutes for each server (`HEALTH_BUDGET_EXCEEDED`), and a rolling deploy does not run longer than 60 minutes (`ROLLING_BUDGET_EXCEEDED`).
 - A job that deploys reaches the servers of its target and the health check address only. The server computes these endpoints from the target, so the file cannot change them. Any other `network.egress` in the job is refused with `TARGET_JOB_EGRESS_NOT_ALLOWED`, unless an Admin turns on `AllowExtraDeployEgress` on the environment.
 

@@ -79,6 +79,26 @@ func (q *Queries) EnvironmentSecretExists(ctx context.Context, arg EnvironmentSe
 	return column_1, err
 }
 
+const environmentSecretVersion = `-- name: EnvironmentSecretVersion :one
+SELECT "CurrentVersion"
+FROM "Secrets"
+WHERE "OrganizationId" = $1 AND "EnvironmentId" = $2 AND "Scope" = 'environment'
+  AND lower("Name") = lower($3::text) AND NOT "IsDeleted"
+`
+
+type EnvironmentSecretVersionParams struct {
+	OrganizationID uuid.UUID
+	EnvironmentID  *uuid.UUID
+	Name           string
+}
+
+func (q *Queries) EnvironmentSecretVersion(ctx context.Context, arg EnvironmentSecretVersionParams) (int32, error) {
+	row := q.db.QueryRow(ctx, environmentSecretVersion, arg.OrganizationID, arg.EnvironmentID, arg.Name)
+	var CurrentVersion int32
+	err := row.Scan(&CurrentVersion)
+	return CurrentVersion, err
+}
+
 const getDeployTarget = `-- name: GetDeployTarget :one
 SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "EnvironmentId", "Name", "Kind", "Username", "KeySecretName", "PublicKey", "DeployPath", "KeepReleases", "Settings", "AllowedImages", "Version", "CreatedByUserId"
 FROM "DeployTargets"
@@ -313,6 +333,37 @@ func (q *Queries) ListDeployTargetHosts(ctx context.Context, arg ListDeployTarge
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDeployTargetKeyNames = `-- name: ListDeployTargetKeyNames :many
+SELECT "KeySecretName"::text
+FROM "DeployTargets"
+WHERE "OrganizationId" = $1 AND "EnvironmentId" = $2 AND NOT "IsDeleted" AND "KeySecretName" IS NOT NULL
+`
+
+type ListDeployTargetKeyNamesParams struct {
+	OrganizationID uuid.UUID
+	EnvironmentID  uuid.UUID
+}
+
+func (q *Queries) ListDeployTargetKeyNames(ctx context.Context, arg ListDeployTargetKeyNamesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listDeployTargetKeyNames, arg.OrganizationID, arg.EnvironmentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var KeySecretName string
+		if err := rows.Scan(&KeySecretName); err != nil {
+			return nil, err
+		}
+		items = append(items, KeySecretName)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

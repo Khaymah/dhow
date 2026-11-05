@@ -3,11 +3,13 @@ package jobspec
 import (
 	"encoding/json"
 	"errors"
+	"net/netip"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/Khaymah/dhow/internal/netguard"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -152,4 +154,22 @@ func placeholderIsHost(raw string) bool {
 		return false
 	}
 	return !hasPort || !strings.Contains(port, HealthHostPlaceholder)
+}
+
+var internalSuffixes = []string{".localhost", ".local", ".internal", ".localdomain", ".home.arpa"}
+
+func HealthHostAllowed(host string, targetHosts []string, extra bool) bool {
+	if slices.Contains(targetHosts, host) {
+		return true
+	}
+	if !extra {
+		return false
+	}
+	if addr, err := netip.ParseAddr(host); err == nil {
+		return netguard.Policy{}.Denial(addr) == ""
+	}
+	if _, err := ParseEgress(host); err != nil {
+		return false
+	}
+	return !slices.ContainsFunc(internalSuffixes, func(s string) bool { return strings.HasSuffix(host, s) })
 }
