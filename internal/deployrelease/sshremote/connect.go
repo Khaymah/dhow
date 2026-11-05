@@ -2,11 +2,13 @@ package sshremote
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -19,6 +21,7 @@ import (
 const (
 	DefaultConnectTimeout = 15 * time.Second
 	keepAliveEvery        = 15 * time.Second
+	keepAliveLimit        = 15 * time.Second
 	keepAliveRequest      = "keepalive@openssh.com"
 )
 
@@ -37,6 +40,8 @@ type Options struct {
 	KnownHostsLine string
 	Dial           DialFunc
 	ConnectTimeout time.Duration
+	KeepAlive      time.Duration
+	KeepAliveLimit time.Duration
 }
 
 func PinnedKey(host string, port int, line string) (ssh.PublicKey, error) {
@@ -62,6 +67,7 @@ type Client struct {
 	ssh  *ssh.Client
 	sftp *sftp.Client
 	done chan struct{}
+	once sync.Once
 }
 
 func Connect(ctx context.Context, o Options) (*Client, error) {
@@ -110,7 +116,14 @@ func Connect(ctx context.Context, o Options) (*Client, error) {
 		return nil, fmt.Errorf("start the file transfer: %w", err)
 	}
 	c := &Client{ssh: client, sftp: files, done: make(chan struct{})}
-	go c.keepAlive()
+	go c.keepAlive(cmp.Or(o.KeepAlive, keepAliveEvery), cmp.Or(o.KeepAliveLimit, keepAliveLimit))
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = c.Close()
+		case <-c.done:
+		}
+	}()
 	return c, nil
 }
 
@@ -124,16 +137,29 @@ func pinnedCallback(pinned ssh.PublicKey) ssh.HostKeyCallback {
 	}
 }
 
-func (c *Client) keepAlive() {
-	t := time.NewTicker(keepAliveEvery)
+func (c *Client) keepAlive(every, limit time.Duration) {
+	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
 		select {
 		case <-c.done:
 			return
 		case <-t.C:
-			if _, _, err := c.ssh.SendRequest(keepAliveRequest, true, nil); err != nil {
-				_ = c.ssh.Close()
+			answered := make(chan error, 1)
+			go func() {
+				_, _, err := c.ssh.SendRequest(keepAliveRequest, true, nil)
+				answered <- err
+			}()
+			select {
+			case err := <-answered:
+				if err != nil {
+					_ = c.Close()
+					return
+				}
+			case <-time.After(limit):
+				_ = c.Close()
+				return
+			case <-c.done:
 				return
 			}
 		}
@@ -141,11 +167,10 @@ func (c *Client) keepAlive() {
 }
 
 func (c *Client) Close() error {
-	select {
-	case <-c.done:
-		return nil
-	default:
+	var err error
+	c.once.Do(func() {
 		close(c.done)
-	}
-	return errors.Join(c.sftp.Close(), c.ssh.Close())
+		err = errors.Join(c.ssh.Close(), c.sftp.Close())
+	})
+	return err
 }

@@ -21,6 +21,7 @@ import (
 const (
 	maxKeyBytes    = 16 << 10
 	proxyDialLimit = 15 * time.Second
+	cancelGrace    = 15 * time.Second
 )
 
 var codes = map[int]string{
@@ -101,10 +102,13 @@ func Run(ctx context.Context, s config.Settings, log *slog.Logger) int {
 	e := &deployrelease.Engine{
 		Config: s.Deploy, Doer: deployrelease.NewHealthClient(transport), Report: reporter, Log: log, Clock: deployrelease.RealClock(),
 		Connect: func(ctx context.Context) (deployrelease.Remote, error) {
-			c, err := sshremote.Connect(ctx, sshremote.Options{
+			life, end := context.WithCancel(context.WithoutCancel(ctx))
+			context.AfterFunc(ctx, func() { time.AfterFunc(deployrelease.RollbackBudget+cancelGrace, end) })
+			c, err := sshremote.Connect(life, sshremote.Options{
 				Host: host.Host, Port: host.Port, User: s.Step.User, PrivateKey: key, KnownHostsLine: host.KnownHostsLine, Dial: dial,
 			})
 			if err != nil {
+				end()
 				return nil, err
 			}
 			return c, nil

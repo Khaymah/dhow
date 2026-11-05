@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -215,4 +217,80 @@ func TestTheProxyDialerRefusesAnythingButAnHttpProxyAndANon200Answer(t *testing.
 	require.NoError(t, err)
 	_, err = dial(context.Background(), "tcp", "example.com:22")
 	assert.ErrorIs(t, err, sshremote.ErrProxy)
+}
+
+type freezeConn struct {
+	net.Conn
+	frozen atomic.Bool
+	closed chan struct{}
+	once   sync.Once
+}
+
+func (f *freezeConn) Read(p []byte) (int, error) {
+	if f.frozen.Load() {
+		<-f.closed
+		return 0, io.EOF
+	}
+	return f.Conn.Read(p)
+}
+
+func (f *freezeConn) Write(p []byte) (int, error) {
+	if f.frozen.Load() {
+		return len(p), nil
+	}
+	return f.Conn.Write(p)
+}
+
+func (f *freezeConn) Close() error {
+	f.once.Do(func() { close(f.closed) })
+	return f.Conn.Close()
+}
+
+func TestAServerThatStopsAnsweringIsDroppedByTheKeepAliveAndCallsReturn(t *testing.T) {
+	s, key := startServer(t)
+	var fc *freezeConn
+	o := options(s, key)
+	o.KeepAlive, o.KeepAliveLimit = 50*time.Millisecond, 100*time.Millisecond
+	o.Dial = func(ctx context.Context, n, a string) (net.Conn, error) {
+		c, err := direct(ctx, n, a)
+		fc = &freezeConn{Conn: c, closed: make(chan struct{})}
+		return fc, err
+	}
+	c, err := sshremote.Connect(context.Background(), o)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = c.Close() })
+	fc.frozen.Store(true)
+	errc := make(chan error, 1)
+	go func() { _, err := c.Lstat(t.TempDir()); errc <- err }()
+	select {
+	case err := <-errc:
+		assert.Error(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("a call on a server that stopped answering never returned")
+	}
+}
+
+func TestCancelingTheContextClosesTheConnection(t *testing.T) {
+	s, key := startServer(t)
+	var fc *freezeConn
+	o := options(s, key)
+	o.Dial = func(ctx context.Context, n, a string) (net.Conn, error) {
+		c, err := direct(ctx, n, a)
+		fc = &freezeConn{Conn: c, closed: make(chan struct{})}
+		return fc, err
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	c, err := sshremote.Connect(ctx, o)
+	require.NoError(t, err)
+	fc.frozen.Store(true)
+	errc := make(chan error, 1)
+	go func() { _, err := c.Lstat(t.TempDir()); errc <- err }()
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	select {
+	case err := <-errc:
+		assert.Error(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("a call still hangs after the context was canceled")
+	}
 }
