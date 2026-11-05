@@ -23,38 +23,48 @@ totp_code() {
   printf '%s' "$2" | docker compose exec -T tools go run ./deploy/m5-demo/totp "$work/totp-$1" | tr -d '\r\n'
 }
 
+ok_status() {
+  # shellcheck disable=SC2254
+  case $2 in
+    $3) return 0 ;;
+  esac
+  printf '    %s answered %s %s\n' "${1##*/}" "$2" "$(json_field "$1.body" Code)" >&2
+  return 1
+}
+
 session_cookie_of() { sed -n 's/^[Ss]et-[Cc]ookie: \([^=;]*dhow_session=[^;]*\);.*/\1/p' "$1" | tr -d '\r' | head -1; }
 
 invite_reviewer() {
   local link token
-  [[ $(api "$work/invite" POST "/api/v1/organizations/$org_id/invitations" \
-    "$(printf '{"Email":"%s","Role":"developer"}' "$reviewer_email")" "${session[@]}") == 2?? ]] || return 1
+  ok_status "$work/invite" "$(api "$work/invite" POST "/api/v1/organizations/$org_id/invitations" \
+    "$(printf '{"Email":"%s","Role":"developer"}' "$reviewer_email")" "${session[@]}")" '2??' || return 1
   link=$(json_field "$work/invite.body" Link)
   token=${link#*#}
   [[ -n $link && $token != "$link" && -n $token ]] || return 1
   needle "invitation token" "$token"
   needle "reviewer password" "$reviewer_password"
-  [[ $(api "$work/accept" POST /api/v1/invitations/accept \
-    "$(printf '{"Token":"%s","Name":"%s","Password":"%s"}' "$token" "$reviewer_name" "$reviewer_password")") == 200 ]] || return 1
+  ok_status "$work/accept" "$(api "$work/accept" POST /api/v1/invitations/accept \
+    "$(printf '{"Token":"%s","Name":"%s","Password":"%s"}' "$token" "$reviewer_name" "$reviewer_password")")" 200 || return 1
   reviewer_id=$(json_field "$work/accept.body" Id)
   [[ -n $reviewer_id ]]
 }
 
 login_as() {
-  local prefix=$1 email=$2 pass=$3 who=$4 secret=$5 status mfa cookie csrf
+  local name=$1 email=$2 pass=$3 who=$4 secret=$5 status mfa cookie csrf last
   login_session=()
-  status=$(api "$work/$prefix-login" POST /api/v1/sessions "$(printf '{"Email":"%s","Password":"%s"}' "$email" "$pass")")
+  last=$work/$name-login
+  status=$(api "$last" POST /api/v1/sessions "$(printf '{"Email":"%s","Password":"%s"}' "$email" "$pass")")
   if [[ $status == 202 ]]; then
     [[ -n $secret ]] || return 1
-    mfa=$(sed -n 's/^[Ss]et-[Cc]ookie: \([^=;]*dhow_mfa=[^;]*\);.*/\1/p' "$work/$prefix-login.head" | tr -d '\r' | head -1)
+    mfa=$(sed -n 's/^[Ss]et-[Cc]ookie: \([^=;]*dhow_mfa=[^;]*\);.*/\1/p' "$last.head" | tr -d '\r' | head -1)
     [[ -n $mfa ]] || return 1
-    status=$(api "$work/$prefix-mfa" POST /api/v1/sessions/mfa \
+    last=$work/$name-mfa
+    status=$(api "$last" POST /api/v1/sessions/mfa \
       "$(printf '{"Method":"totp","Code":"%s"}' "$(totp_code "$who" "$secret")")" --header "Cookie: $mfa")
-    prefix=$prefix-mfa
   fi
-  [[ $status == 200 ]] || return 1
-  cookie=$(session_cookie_of "$work/$prefix.head")
-  csrf=$(json_field "$work/$prefix.body" CsrfToken)
+  ok_status "$last" "$status" 200 || return 1
+  cookie=$(session_cookie_of "$last.head")
+  csrf=$(json_field "$last.body" CsrfToken)
   [[ -n $cookie && -n $csrf ]] || return 1
   needle "$who session cookie" "${cookie#*=}"
   needle "$who CSRF token" "$csrf"
@@ -65,12 +75,12 @@ enroll_totp() {
   local who=$1 pass=$2 secret factor
   shift 2
   factor=$(printf '{"Method":"password","Password":"%s"}' "$pass")
-  [[ $(api "$work/$who-totp" POST /api/v1/me/totp "$(printf '{"CurrentFactor":%s}' "$factor")" "$@") == 2?? ]] || return 1
+  ok_status "$work/$who-totp" "$(api "$work/$who-totp" POST /api/v1/me/totp "$(printf '{"CurrentFactor":%s}' "$factor")" "$@")" '2??' || return 1
   secret=$(json_field "$work/$who-totp.body" Secret)
   [[ -n $secret ]] || return 1
   needle "$who TOTP secret" "$secret"
-  [[ $(api "$work/$who-totp-confirm" POST /api/v1/me/totp/confirm \
-    "$(printf '{"Code":"%s","CurrentFactor":%s}' "$(totp_code "$who" "$secret")" "$factor")" "$@") == 2?? ]] || return 1
+  ok_status "$work/$who-totp-confirm" "$(api "$work/$who-totp-confirm" POST /api/v1/me/totp/confirm \
+    "$(printf '{"Code":"%s","CurrentFactor":%s}' "$(totp_code "$who" "$secret")" "$factor")" "$@")" '2??' || return 1
   enrolled_secret=$secret
 }
 
@@ -90,9 +100,9 @@ owner_ready() {
 }
 
 production_environment() {
-  [[ $(api "$work/production" POST "$(project_path)/environments" \
+  ok_status "$work/production" "$(api "$work/production" POST "$(project_path)/environments" \
     "$(printf '{"Name":"production","CurrentFactor":{"Method":"password","Password":"%s"},"Rules":{"AllowedRefs":[{"Kind":"branch","Pattern":"main"}],"Reviewers":{"UserIds":["%s"],"TeamIds":[]}}}' \
-      "$password" "$reviewer_id")" "${session[@]}") == 201 ]]
+      "$password" "$reviewer_id")" "${session[@]}")" 201
 }
 
 environment_rules() {
@@ -108,9 +118,9 @@ owner_joins_reviewers() {
   api "$work/environment-read" GET "$(project_path)/environments/production" '' --header "$(bearer)" >/dev/null || return 1
   version=$(json_number "$work/environment-read.body" Version)
   [[ -n $version ]] || return 1
-  [[ $(api "$work/environment-update" PUT "$(project_path)/environments/production" \
+  ok_status "$work/environment-update" "$(api "$work/environment-update" PUT "$(project_path)/environments/production" \
     "$(printf '{"Version":%s,"CurrentFactor":{"Method":"totp","Code":"%s"},"Rules":{"Reviewers":{"UserIds":["%s","%s"],"TeamIds":[]}}}' \
-      "$version" "$(totp_code owner "$owner_totp")" "$reviewer_id" "$owner_id")" "${session[@]}") == 200 ]]
+      "$version" "$(totp_code owner "$owner_totp")" "$reviewer_id" "$owner_id")" "${session[@]}")" 200
 }
 
 push_ref() {
@@ -237,13 +247,13 @@ deployment_recorded() {
 }
 
 manual_run() {
-  [[ $(api "$work/manual" POST "$(project_path)/runs" '{"Ref":"main"}' "${session[@]}") == 201 ]] || return 1
+  ok_status "$work/manual" "$(api "$work/manual" POST "$(project_path)/runs" '{"Ref":"main"}' "${session[@]}")" 201 || return 1
   manual_run_id=$(json_field "$work/manual.body" Id)
   [[ -n $manual_run_id ]]
 }
 
 cancel_run() {
-  [[ $(api "$work/cancel" POST "$(project_path)/runs/$1/cancel" '' "${session[@]}") == 200 ]] || return 1
+  ok_status "$work/cancel" "$(api "$work/cancel" POST "$(project_path)/runs/$1/cancel" '' "${session[@]}")" 200 || return 1
   for _ in $(seq 120); do
     run_detail "$1" || true
     [[ $(run_field State) == canceled ]] && return 0
