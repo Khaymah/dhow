@@ -15,6 +15,7 @@ type Querier interface {
 	AbandonCommitStatuses(ctx context.Context, arg AbandonCommitStatusesParams) (int64, error)
 	ActivateRunJob(ctx context.Context, arg ActivateRunJobParams) (int64, error)
 	AddKeyRekeyProgress(ctx context.Context, arg AddKeyRekeyProgressParams) error
+	AdoptRelease(ctx context.Context, arg AdoptReleaseParams) error
 	AdvanceAttemptLog(ctx context.Context, arg AdvanceAttemptLogParams) error
 	AdvanceBackfill(ctx context.Context, arg AdvanceBackfillParams) error
 	AdvanceTotpStep(ctx context.Context, arg AdvanceTotpStepParams) (int64, error)
@@ -90,6 +91,7 @@ type Querier interface {
 	DisableRunnerAsClone(ctx context.Context, arg DisableRunnerAsCloneParams) (int64, error)
 	DiscardPendingTotp(ctx context.Context, arg DiscardPendingTotpParams) error
 	DiscoveryLog(ctx context.Context, jobID uuid.UUID) ([][]byte, error)
+	DowngradeRelease(ctx context.Context, arg DowngradeReleaseParams) error
 	DropLogPartitions(ctx context.Context, retentionDays int32) (int32, error)
 	DropWebhookPartitions(ctx context.Context, retentionDays int32) (int32, error)
 	EndAttemptStep(ctx context.Context, arg EndAttemptStepParams) (int64, error)
@@ -367,6 +369,7 @@ type Querier interface {
 	LockSecretsProject(ctx context.Context, arg LockSecretsProjectParams) (string, error)
 	LockSecretsScope(ctx context.Context, scopeKey string) error
 	LockStaleRunningReleases(ctx context.Context) ([]DeploymentRelease, error)
+	LockSucceededReleasesOfFailedJobs(ctx context.Context, arg LockSucceededReleasesOfFailedJobsParams) ([]DeploymentRelease, error)
 	LockSupersededDataKeys(ctx context.Context) ([]uuid.UUID, error)
 	LockTeam(ctx context.Context, arg LockTeamParams) (LockTeamRow, error)
 	LockTeamBinding(ctx context.Context, arg LockTeamBindingParams) (LockTeamBindingRow, error)
@@ -434,6 +437,7 @@ type Querier interface {
 	ReissueInvitation(ctx context.Context, arg ReissueInvitationParams) (int64, error)
 	ReleaseBlobSweepLock(ctx context.Context, lockKey int64) (bool, error)
 	ReleaseEnvironments(ctx context.Context, arg ReleaseEnvironmentsParams) error
+	ReleaseExists(ctx context.Context, arg ReleaseExistsParams) (bool, error)
 	ReleaseRetentionLock(ctx context.Context, lockKey int64) (bool, error)
 	ReleaseRunClaim(ctx context.Context, id uuid.UUID) error
 	ReleaseStaleEnvironments(ctx context.Context) (int64, error)
@@ -471,6 +475,7 @@ type Querier interface {
 	RequestJobCancel(ctx context.Context, arg RequestJobCancelParams) (Job, error)
 	RequestRunCancel(ctx context.Context, arg RequestRunCancelParams) error
 	RequeueJob(ctx context.Context, arg RequeueJobParams) (Job, error)
+	ResetReleaseHosts(ctx context.Context, arg ResetReleaseHostsParams) error
 	ResetRunJob(ctx context.Context, id uuid.UUID) error
 	ResetThrottle(ctx context.Context, arg ResetThrottleParams) error
 	ResolveApiToken(ctx context.Context, arg ResolveApiTokenParams) (ResolveApiTokenRow, error)

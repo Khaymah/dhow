@@ -102,3 +102,37 @@ SELECT *
 FROM "DeploymentReleases"
 WHERE "DeploymentId" = @deployment_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"
 ORDER BY "CreatedAt", "Id";
+
+-- name: AdoptRelease :exec
+UPDATE "DeploymentReleases"
+SET "LeaseId" = @lease_id, "DeploymentId" = @deployment_id, "State" = 'running', "FinishedAt" = NULL, "FailedHostId" = NULL,
+    "RollbackReason" = NULL, "Message" = NULL, "PreviousReleaseId" = sqlc.narg('previous_release_id')::text,
+    "ArtifactDigest" = sqlc.narg('artifact_digest')::bytea, "StartedAt" = @now, "UpdatedAt" = @now
+WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "State" IN ('unknown', 'running');
+
+-- name: ResetReleaseHosts :exec
+UPDATE "DeploymentReleaseHosts"
+SET "State" = 'pending', "Batch" = NULL, "PreviousReleaseId" = NULL, "Health" = '{}', "RollbackReason" = NULL, "Message" = NULL,
+    "SwitchedAt" = NULL, "RolledBackAt" = NULL, "FinishedAt" = NULL, "UpdatedAt" = @now
+WHERE "ReleaseRowId" = @release_row_id AND "OrganizationId" = @organization_id;
+
+-- name: ReleaseExists :one
+SELECT EXISTS (SELECT 1
+               FROM "DeploymentReleases"
+               WHERE "TargetId" = @target_id AND "ReleaseId" = @release_id AND "OrganizationId" = @organization_id
+                 AND "State" <> 'running' AND NOT "IsDeleted")::boolean AS "Found";
+
+-- name: LockSucceededReleasesOfFailedJobs :many
+SELECT r.*
+FROM "DeploymentReleases" r
+JOIN "Deployments" d ON d."Id" = r."DeploymentId"
+JOIN "RunJobs" rj ON rj."Id" = r."RunJobId"
+WHERE d."RunId" = @run_id AND r."OrganizationId" = @organization_id AND r."State" = 'succeeded' AND NOT r."IsDeleted"
+  AND rj."State" IN ('failed', 'canceled')
+ORDER BY r."CreatedAt", r."Id"
+FOR UPDATE OF r;
+
+-- name: DowngradeRelease :exec
+UPDATE "DeploymentReleases"
+SET "State" = 'unknown', "UpdatedAt" = @now
+WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "State" = 'succeeded';

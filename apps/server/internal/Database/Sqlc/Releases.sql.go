@@ -13,6 +13,54 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const adoptRelease = `-- name: AdoptRelease :exec
+UPDATE "DeploymentReleases"
+SET "LeaseId" = $1, "DeploymentId" = $2, "State" = 'running', "FinishedAt" = NULL, "FailedHostId" = NULL,
+    "RollbackReason" = NULL, "Message" = NULL, "PreviousReleaseId" = $3::text,
+    "ArtifactDigest" = $4::bytea, "StartedAt" = $5, "UpdatedAt" = $5
+WHERE "Id" = $6 AND "OrganizationId" = $7 AND "State" IN ('unknown', 'running')
+`
+
+type AdoptReleaseParams struct {
+	LeaseID           uuid.UUID
+	DeploymentID      uuid.UUID
+	PreviousReleaseID pgtype.Text
+	ArtifactDigest    []byte
+	Now               time.Time
+	ID                uuid.UUID
+	OrganizationID    uuid.UUID
+}
+
+func (q *Queries) AdoptRelease(ctx context.Context, arg AdoptReleaseParams) error {
+	_, err := q.db.Exec(ctx, adoptRelease,
+		arg.LeaseID,
+		arg.DeploymentID,
+		arg.PreviousReleaseID,
+		arg.ArtifactDigest,
+		arg.Now,
+		arg.ID,
+		arg.OrganizationID,
+	)
+	return err
+}
+
+const downgradeRelease = `-- name: DowngradeRelease :exec
+UPDATE "DeploymentReleases"
+SET "State" = 'unknown', "UpdatedAt" = $1
+WHERE "Id" = $2 AND "OrganizationId" = $3 AND "State" = 'succeeded'
+`
+
+type DowngradeReleaseParams struct {
+	Now            time.Time
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) DowngradeRelease(ctx context.Context, arg DowngradeReleaseParams) error {
+	_, err := q.db.Exec(ctx, downgradeRelease, arg.Now, arg.ID, arg.OrganizationID)
+	return err
+}
+
 const finishRelease = `-- name: FinishRelease :exec
 UPDATE "DeploymentReleases"
 SET "State" = $1, "FailedHostId" = $2::uuid, "RollbackReason" = $3::text,
@@ -500,6 +548,65 @@ func (q *Queries) LockStaleRunningReleases(ctx context.Context) ([]DeploymentRel
 	return items, nil
 }
 
+const lockSucceededReleasesOfFailedJobs = `-- name: LockSucceededReleasesOfFailedJobs :many
+SELECT r."Id", r."CreatedAt", r."UpdatedAt", r."IsDeleted", r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", r."LeaseId", r."TargetId", r."StepIndex", r."Kind", r."ReleaseId", r."PreviousReleaseId", r."ArtifactDigest", r."BatchSize", r."State", r."FailedHostId", r."RollbackReason", r."Message", r."StartedAt", r."FinishedAt"
+FROM "DeploymentReleases" r
+JOIN "Deployments" d ON d."Id" = r."DeploymentId"
+JOIN "RunJobs" rj ON rj."Id" = r."RunJobId"
+WHERE d."RunId" = $1 AND r."OrganizationId" = $2 AND r."State" = 'succeeded' AND NOT r."IsDeleted"
+  AND rj."State" IN ('failed', 'canceled')
+ORDER BY r."CreatedAt", r."Id"
+FOR UPDATE OF r
+`
+
+type LockSucceededReleasesOfFailedJobsParams struct {
+	RunID          uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) LockSucceededReleasesOfFailedJobs(ctx context.Context, arg LockSucceededReleasesOfFailedJobsParams) ([]DeploymentRelease, error) {
+	rows, err := q.db.Query(ctx, lockSucceededReleasesOfFailedJobs, arg.RunID, arg.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DeploymentRelease{}
+	for rows.Next() {
+		var i DeploymentRelease
+		if err := rows.Scan(
+			&i.Id,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsDeleted,
+			&i.OrganizationId,
+			&i.DeploymentId,
+			&i.RunJobId,
+			&i.JobId,
+			&i.LeaseId,
+			&i.TargetId,
+			&i.StepIndex,
+			&i.Kind,
+			&i.ReleaseId,
+			&i.PreviousReleaseId,
+			&i.ArtifactDigest,
+			&i.BatchSize,
+			&i.State,
+			&i.FailedHostId,
+			&i.RollbackReason,
+			&i.Message,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markReleaseDeploymentRunning = `-- name: MarkReleaseDeploymentRunning :exec
 UPDATE "Deployments"
 SET "State" = 'running', "UpdatedAt" = $1
@@ -535,6 +642,44 @@ func (q *Queries) MarkReleaseHostsUnknown(ctx context.Context, arg MarkReleaseHo
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const releaseExists = `-- name: ReleaseExists :one
+SELECT EXISTS (SELECT 1
+               FROM "DeploymentReleases"
+               WHERE "TargetId" = $1 AND "ReleaseId" = $2 AND "OrganizationId" = $3
+                 AND "State" <> 'running' AND NOT "IsDeleted")::boolean AS "Found"
+`
+
+type ReleaseExistsParams struct {
+	TargetID       uuid.UUID
+	ReleaseID      string
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) ReleaseExists(ctx context.Context, arg ReleaseExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, releaseExists, arg.TargetID, arg.ReleaseID, arg.OrganizationID)
+	var Found bool
+	err := row.Scan(&Found)
+	return Found, err
+}
+
+const resetReleaseHosts = `-- name: ResetReleaseHosts :exec
+UPDATE "DeploymentReleaseHosts"
+SET "State" = 'pending', "Batch" = NULL, "PreviousReleaseId" = NULL, "Health" = '{}', "RollbackReason" = NULL, "Message" = NULL,
+    "SwitchedAt" = NULL, "RolledBackAt" = NULL, "FinishedAt" = NULL, "UpdatedAt" = $1
+WHERE "ReleaseRowId" = $2 AND "OrganizationId" = $3
+`
+
+type ResetReleaseHostsParams struct {
+	Now            time.Time
+	ReleaseRowID   uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) ResetReleaseHosts(ctx context.Context, arg ResetReleaseHostsParams) error {
+	_, err := q.db.Exec(ctx, resetReleaseHosts, arg.Now, arg.ReleaseRowID, arg.OrganizationID)
+	return err
 }
 
 const setReleaseFailedHost = `-- name: SetReleaseFailedHost :exec

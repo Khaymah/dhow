@@ -17,16 +17,16 @@ import (
 )
 
 func (sc *reportScope) start(ctx context.Context, ev *runnerv1.DeployEvent) error {
-	targetID := uuid.MustParse(sc.target.GetTargetId())
+	targetID := sc.tid
+	if err := sc.checkPrevious(ctx, ev.GetPreviousReleaseId()); err != nil {
+		return err
+	}
 	existing, err := sc.q.GetReleaseForUpdate(ctx, sqlc.GetReleaseForUpdateParams{
 		TargetID: targetID, ReleaseID: sc.target.GetReleaseId(), OrganizationID: sc.lease.OrganizationId,
 	})
 	switch {
 	case err == nil:
-		if existing.LeaseId == sc.lease.LeaseId && existing.State == groupRunning {
-			return sc.load(ctx)
-		}
-		return reject(connect.CodeFailedPrecondition, CodeReleaseConflict)
+		return sc.adopt(ctx, existing, ev)
 	case !errors.Is(err, pgx.ErrNoRows):
 		return err
 	}
@@ -48,8 +48,7 @@ func (sc *reportScope) start(ctx context.Context, ev *runnerv1.DeployEvent) erro
 	}
 	sc.rel = &rel
 	sc.hosts = make(map[uuid.UUID]*sqlc.DeploymentReleaseHost, len(sc.target.GetHosts()))
-	for i, h := range sc.target.GetHosts() {
-		hid := uuid.MustParse(h.GetHostId())
+	for i, hid := range sc.hids {
 		if err := sc.q.InsertReleaseHost(ctx, sqlc.InsertReleaseHostParams{
 			OrganizationID: rel.OrganizationId, ReleaseRowID: rel.Id, HostID: hid, ReleaseID: rel.ReleaseId, Position: int32(i + 1), Now: sc.now,
 		}); err != nil {
@@ -67,6 +66,43 @@ func (sc *reportScope) start(ctx context.Context, ev *runnerv1.DeployEvent) erro
 		return err
 	}
 	return sc.audit(ctx, eventbus.DeploymentReleaseStarted, map[string]string{"Kind": kind})
+}
+
+func (sc *reportScope) adopt(ctx context.Context, existing sqlc.DeploymentRelease, ev *runnerv1.DeployEvent) error {
+	if existing.LeaseId == sc.lease.LeaseId && existing.State == groupRunning {
+		return sc.load(ctx)
+	}
+	if existing.JobId != sc.lease.JobId || existing.StepIndex != sc.step || existing.DeploymentId != *sc.lease.DeploymentId {
+		return reject(connect.CodeFailedPrecondition, CodeReleaseConflict)
+	}
+	switch existing.State {
+	case groupRunning:
+		if err := sc.retireStaleRunning(ctx, sc.tid); err != nil {
+			return err
+		}
+	case groupUnknown:
+		if err := sc.retireStaleRunning(ctx, sc.tid); err != nil {
+			return err
+		}
+	default:
+		return reject(connect.CodeFailedPrecondition, CodeReleaseConflict)
+	}
+	if err := sc.q.AdoptRelease(ctx, sqlc.AdoptReleaseParams{
+		LeaseID: sc.lease.LeaseId, DeploymentID: *sc.lease.DeploymentId, PreviousReleaseID: text(ev.GetPreviousReleaseId()),
+		ArtifactDigest: sc.digest, Now: sc.now, ID: existing.Id, OrganizationID: existing.OrganizationId,
+	}); err != nil {
+		return err
+	}
+	if err := sc.q.ResetReleaseHosts(ctx, sqlc.ResetReleaseHostsParams{Now: sc.now, ReleaseRowID: existing.Id, OrganizationID: existing.OrganizationId}); err != nil {
+		return err
+	}
+	if err := sc.q.MarkReleaseDeploymentRunning(ctx, sqlc.MarkReleaseDeploymentRunningParams{ID: *sc.lease.DeploymentId, OrganizationID: existing.OrganizationId, Now: sc.now}); err != nil {
+		return err
+	}
+	if err := sc.load(ctx); err != nil {
+		return err
+	}
+	return sc.audit(ctx, eventbus.DeploymentReleaseStarted, map[string]string{"Kind": existing.Kind})
 }
 
 func (sc *reportScope) retireStaleRunning(ctx context.Context, target uuid.UUID) error {
@@ -99,7 +135,10 @@ func (sc *reportScope) moveHost(ctx context.Context, ev *runnerv1.DeployEvent) e
 	if err := sc.knownHost(ev.GetHostId(), false); err != nil {
 		return err
 	}
-	h := sc.hosts[uuid.MustParse(ev.GetHostId())]
+	if err := sc.checkPrevious(ctx, ev.GetPreviousReleaseId()); err != nil {
+		return err
+	}
+	h := sc.hosts[sc.hostKey(ev.GetHostId())]
 	if ev.GetBatch() > 0 {
 		h.Batch = pgtype.Int4{Int32: ev.GetBatch(), Valid: true}
 	}
@@ -107,7 +146,7 @@ func (sc *reportScope) moveHost(ctx context.Context, ev *runnerv1.DeployEvent) e
 		h.PreviousReleaseId = text(ev.GetPreviousReleaseId())
 	}
 	if ev.GetMessage() != "" {
-		h.Message = text(cleanMessage(ev.GetMessage()))
+		h.Message = text(redactMessage(cleanMessage(ev.GetMessage())))
 	}
 	if ev.GetKind() == runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_HEALTH {
 		if !slices.Contains(healthStates, h.State) || ev.GetHealth() == nil {
@@ -191,7 +230,7 @@ func (sc *reportScope) finishGroup(ctx context.Context, ev *runnerv1.DeployEvent
 	}
 	reason := ev.GetReason()
 	if err := sc.q.FinishRelease(ctx, sqlc.FinishReleaseParams{
-		State: verdict.state, FailedHostID: sc.rel.FailedHostId, RollbackReason: text(reason), Message: text(cleanMessage(ev.GetMessage())),
+		State: verdict.state, FailedHostID: sc.rel.FailedHostId, RollbackReason: text(reason), Message: text(redactMessage(cleanMessage(ev.GetMessage()))),
 		Now: &sc.now, ID: sc.rel.Id, OrganizationID: sc.rel.OrganizationId,
 	}); err != nil {
 		return err

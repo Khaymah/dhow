@@ -30,6 +30,8 @@ type reportScope struct {
 	now    time.Time
 	lease  sqlc.LockReleaseLeaseRow
 	target *runnerv1.StepTarget
+	tid    uuid.UUID
+	hids   []uuid.UUID
 	step   int32
 	digest []byte
 	hosts  map[uuid.UUID]*sqlc.DeploymentReleaseHost
@@ -92,6 +94,18 @@ func (s *Service) reportScope(q *sqlc.Queries, row sqlc.LockReleaseLeaseRow, ste
 	if sc.target == nil || row.RunJobId == nil || row.DeploymentId == nil {
 		return nil, reject(connect.CodePermissionDenied, CodeNotTargetStep)
 	}
+	tid, err := uuid.Parse(sc.target.GetTargetId())
+	if err != nil {
+		return nil, errInvalidReport("TargetId")
+	}
+	sc.tid = tid
+	for _, h := range sc.target.GetHosts() {
+		hid, err := uuid.Parse(h.GetHostId())
+		if err != nil {
+			return nil, errInvalidReport("HostId")
+		}
+		sc.hids = append(sc.hids, hid)
+	}
 	if name := spec.GetSteps()[step].GetPlugin().GetInputs()[jobspec.TargetArtifactInput]; name != "" {
 		for _, in := range spec.GetInputs() {
 			if raw, err := hex.DecodeString(in.GetDigest()); err == nil && in.GetName() == name && len(raw) == 32 {
@@ -136,7 +150,7 @@ func (sc *reportScope) load(ctx context.Context) error {
 		return nil
 	}
 	rel, err := sc.q.GetReleaseForUpdate(ctx, sqlc.GetReleaseForUpdateParams{
-		TargetID: uuid.MustParse(sc.target.GetTargetId()), ReleaseID: sc.target.GetReleaseId(), OrganizationID: sc.lease.OrganizationId,
+		TargetID: sc.tid, ReleaseID: sc.target.GetReleaseId(), OrganizationID: sc.lease.OrganizationId,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return reject(connect.CodeFailedPrecondition, CodeReleaseNotStarted)
@@ -156,6 +170,14 @@ func (sc *reportScope) load(ctx context.Context) error {
 	return nil
 }
 
+func (sc *reportScope) hostKey(raw string) uuid.UUID {
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil
+	}
+	return id
+}
+
 func (sc *reportScope) knownHost(raw string, optional bool) error {
 	if raw == "" && optional {
 		return nil
@@ -166,6 +188,23 @@ func (sc *reportScope) knownHost(raw string, optional bool) error {
 	}
 	if _, ok := sc.hosts[id]; !ok {
 		return reject(connect.CodePermissionDenied, CodeUnknownHost)
+	}
+	return nil
+}
+
+func (sc *reportScope) checkPrevious(ctx context.Context, previous string) error {
+	if previous == "" {
+		return nil
+	}
+	if previous == sc.target.GetReleaseId() {
+		return errInvalidReport("PreviousReleaseId")
+	}
+	found, err := sc.q.ReleaseExists(ctx, sqlc.ReleaseExistsParams{TargetID: sc.tid, ReleaseID: previous, OrganizationID: sc.lease.OrganizationId})
+	if err != nil {
+		return err
+	}
+	if !found {
+		return errInvalidReport("PreviousReleaseId")
 	}
 	return nil
 }

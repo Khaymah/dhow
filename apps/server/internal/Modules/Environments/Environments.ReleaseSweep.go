@@ -19,6 +19,10 @@ func (s *Service) markUnknown(ctx context.Context, q *sqlc.Queries, rel sqlc.Dep
 	}); err != nil {
 		return err
 	}
+	return s.auditUnknown(ctx, q, rel)
+}
+
+func (s *Service) auditUnknown(ctx context.Context, q *sqlc.Queries, rel sqlc.DeploymentRelease) error {
 	return s.bus.Publish(ctx, eventbus.Event{Name: eventbus.DeploymentReleaseUnknown, Payload: eventbus.Audited{
 		OrganizationIDs: []uuid.UUID{rel.OrganizationId}, TargetType: targetRelease, TargetID: rel.Id.String(),
 		Data: map[string]string{
@@ -34,7 +38,24 @@ func (s *Service) SettleReleases(ctx context.Context, q *sqlc.Queries, org, run 
 	if err != nil {
 		return 0, err
 	}
-	return s.retire(ctx, q, rows)
+	n, err := s.retire(ctx, q, rows)
+	if err != nil {
+		return 0, err
+	}
+	failed, err := q.LockSucceededReleasesOfFailedJobs(ctx, sqlc.LockSucceededReleasesOfFailedJobsParams{RunID: run, OrganizationID: org})
+	if err != nil {
+		return 0, err
+	}
+	now := s.now()
+	for _, rel := range failed {
+		if err := q.DowngradeRelease(ctx, sqlc.DowngradeReleaseParams{Now: now, ID: rel.Id, OrganizationID: rel.OrganizationId}); err != nil {
+			return 0, err
+		}
+		if err := s.auditUnknown(ctx, q, rel); err != nil {
+			return 0, err
+		}
+	}
+	return n + int64(len(failed)), nil
 }
 
 func (s *Service) SweepReleases(ctx context.Context, q *sqlc.Queries) (int64, error) {

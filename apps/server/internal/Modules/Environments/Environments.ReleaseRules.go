@@ -43,6 +43,7 @@ const (
 
 var (
 	releaseIDShape = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+	secretLike     = regexp.MustCompile(`[A-Za-z0-9+/=_-]{20,}|-----[A-Z ]+-----`)
 	rollbackCauses = []string{"health_check_failed", "reload_failed", "hook_failed", "canceled", "upload_failed", "switch_failed", "other"}
 	healthErrors   = []string{"", "timeout", "refused", "certificate", "status", "other"}
 )
@@ -89,6 +90,10 @@ func cleanMessage(v string) string {
 		v = string([]rune(v)[:MaxReportMessage])
 	}
 	return v
+}
+
+func redactMessage(v string) string {
+	return secretLike.ReplaceAllString(v, "***")
 }
 
 func validEvent(ev *runnerv1.DeployEvent) *rejection {

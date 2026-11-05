@@ -18,6 +18,13 @@ const fakeWorkspaces = "fake-workspaces"
 
 var ErrDriverMissing = errors.New("is not built into this test build; only the fake driver is")
 
+func driverCapabilities(cfg config.Config) sandbox.Capabilities {
+	if cfg.Driver == config.DriverFake {
+		return sandbox.CapabilitiesOf(fake.New(fake.Recording{}, fake.Options{}))
+	}
+	return sandbox.Capabilities{}
+}
+
 func newDriver(_ context.Context, cfg config.Config, _ *slog.Logger) (sandbox.Driver, error) {
 	if cfg.Driver != config.DriverFake {
 		return nil, fmt.Errorf("%s=%s %w", config.EnvDriver, cfg.Driver, ErrDriverMissing)

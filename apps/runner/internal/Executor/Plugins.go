@@ -77,7 +77,7 @@ func (a *attempt) runPlugin(ctx, jobCtx context.Context, idx int32) (result, boo
 	if parseErr != nil {
 		return a.refusePlugin(ctx, idx, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID, parseErr)
 	}
-	defer a.dropArchives(archiveNames(a.grant.GetSpec()))
+	defer a.dropArchives(a.spentArchives(idx))
 	with, env, files := a.pluginEnv(idx, step)
 	inputs, err := m.Env(with)
 	if err != nil {

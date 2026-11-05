@@ -107,6 +107,20 @@ func (a *attempt) inputFiles(names []string) []sandbox.InputFile {
 	return out
 }
 
+func (a *attempt) spentArchives(idx int32) []string {
+	spec := a.grant.GetSpec()
+	name, ok := targetArtifact(spec, idx)
+	if !ok {
+		return nil
+	}
+	for later := idx + 1; int(later) < len(spec.GetSteps()); later++ {
+		if other, ok := targetArtifact(spec, later); ok && other == name {
+			return nil
+		}
+	}
+	return []string{name}
+}
+
 func (a *attempt) dropArchives(names []string) {
 	for _, name := range names {
 		if ar, ok := a.archives[name]; ok {

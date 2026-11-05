@@ -68,6 +68,7 @@ func (j releaseJob) report(t *testing.T, events ...*runnerv1.DeployEvent) {
 
 func (j releaseJob) start(t *testing.T) {
 	t.Helper()
+	j.seedPrevious(t)
 	j.report(t, &runnerv1.DeployEvent{Kind: kindStarted, ReleaseId: j.release, PreviousReleaseId: "11-aaaaaaaa-0"})
 }
 
