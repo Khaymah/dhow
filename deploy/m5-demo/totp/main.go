@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -35,8 +36,8 @@ func code(secret []byte, step int64) string {
 	return fmt.Sprintf("%0*d", digits, value%1000000)
 }
 
-func lastStep(path string) (int64, error) {
-	raw, err := os.ReadFile(path) //nolint:gosec // The demo passes the path of its own state file.
+func lastStep(root *os.Root, name string) (int64, error) {
+	raw, err := root.ReadFile(name)
 	if os.IsNotExist(err) {
 		return noStep, nil
 	}
@@ -78,7 +79,15 @@ func run(args []string, in io.Reader, out io.Writer, now func() time.Time, sleep
 		_, _ = os.Stderr.WriteString("the secret is not base32\n")
 		return 1
 	}
-	last, err := lastStep(args[0])
+	path := filepath.Clean(args[0])
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		_, _ = os.Stderr.WriteString("cannot open the folder of the state file\n")
+		return 1
+	}
+	defer func() { _ = root.Close() }()
+	name := filepath.Base(path)
+	last, err := lastStep(root, name)
 	if err != nil {
 		_, _ = os.Stderr.WriteString(err.Error() + "\n")
 		return 1
@@ -91,7 +100,7 @@ func run(args []string, in io.Reader, out io.Writer, now func() time.Time, sleep
 	if wait > 0 {
 		sleep(wait)
 	}
-	if err := os.WriteFile(args[0], []byte(strconv.FormatInt(step, 10)+"\n"), 0o600); err != nil {
+	if err := root.WriteFile(name, []byte(strconv.FormatInt(step, 10)+"\n"), 0o600); err != nil {
 		_, _ = os.Stderr.WriteString("cannot write the state file\n")
 		return 1
 	}
