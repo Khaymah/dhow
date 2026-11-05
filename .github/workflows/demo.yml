@@ -15,6 +15,10 @@ on:
       - deploy/dhow-git/**
       - deploy/m3-demo/**
       - deploy/m4-demo/**
+      - deploy/e2e/**
+      - deploy/ci/demo-areas.sh
+      - apps/web/**
+      - packages/openapi/**
       - go.mod
       - go.sum
       - .github/workflows/demo.yml
@@ -27,8 +31,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  demo:
+  changes:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    name: Changed areas
+    runs-on: ubuntu-24.04
+    outputs:
+      demos: ${{ steps.scope.outputs.demos }}
+      e2e: ${{ steps.scope.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Decide which demos the change needs
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+        run: deploy/ci/demo-areas.sh "$EVENT" >> "$GITHUB_OUTPUT"
+
+  demo:
+    needs: changes
+    if: needs.changes.outputs.demos == 'true'
     name: ${{ matrix.demo }} on a clean Ubuntu 26.04 with Docker
     runs-on: ubuntu-26.04
     timeout-minutes: 60
@@ -48,3 +71,40 @@ jobs:
         env:
           DEMO: ${{ matrix.demo }}
         run: bash "deploy/$DEMO/run.sh"
+
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    name: Browser tests (Playwright) on a real server, Forgejo and a Podman runner
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Enable pnpm from the packageManager field
+        run: corepack enable
+      - name: Build the web app into the server
+        run: make web
+      - name: Install Chromium for the pinned Playwright
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Let rootless Podman in the runner container make user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Run the browser tests
+        run: bash deploy/e2e/run.sh
+      - name: Keep the traces and screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-results
+          path: |
+            apps/web/E2E/Results
+            apps/web/E2E/Report
+          if-no-files-found: ignore
+          retention-days: 7

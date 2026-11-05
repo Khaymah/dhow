@@ -51,6 +51,11 @@ web: ## Build the web app and copy it into the server embed directory
 	find $(WEB_DIST) -mindepth 1 ! -name .keep -delete
 	cp -R apps/web/dist/. $(WEB_DIST)/
 
+.PHONY: e2e
+e2e: ## Run the browser tests on a real server, Forgejo and a Podman runner in Docker (needs cgroup v2)
+	$(MAKE) web
+	bash deploy/e2e/run.sh
+
 .PHONY: release
 release: ## Build bin/dhow-server with the web app embedded
 	$(MAKE) web
