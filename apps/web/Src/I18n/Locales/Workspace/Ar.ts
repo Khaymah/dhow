@@ -8,6 +8,7 @@ import { PagesAr } from '@/I18n/Locales/Workspace/PagesAr';
 import { ProjectsAr } from '@/I18n/Locales/Workspace/ProjectsAr';
 import { RunnersAr } from '@/I18n/Locales/Workspace/RunnersAr';
 import { RunsAr } from '@/I18n/Locales/Workspace/RunsAr';
+import { SecretsAr } from '@/I18n/Locales/Workspace/SecretsAr';
 import { SettingsAr } from '@/I18n/Locales/Workspace/SettingsAr';
 
 export const WorkspaceAr = {
@@ -403,4 +404,5 @@ export const WorkspaceAr = {
   ...OrgPagesAr,
   ...SettingsAr,
   ...OidcSettingsAr,
+  ...SecretsAr,
 } as const;

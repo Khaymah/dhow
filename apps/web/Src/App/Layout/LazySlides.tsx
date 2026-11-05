@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 
-import { isThemeEditSlide, oidcOf, type TSlideId } from '@/App/Panels';
+import { isThemeEditSlide, oidcOf, secretsTargetOf, type TSlideId } from '@/App/Panels';
 import { lazyComponent, type IPreloadable, type TLazyComponent } from '@/Core/Ui/LazyComponent';
 import { Skeleton } from '@/Core/Ui/Skeleton';
 import { useT } from '@/I18n/useT';
@@ -54,7 +54,20 @@ const TriggerRunBody = lazyComponent(() =>
 );
 const RunnerNewBody = lazyComponent(() => import('@/Modules/Runners/Components/RunnerNewBody').then((module) => module.RunnerNewBody));
 
-type TSlidePart = Exclude<TSlideId, `theme-edit-${string}` | `oidc-edit-${string}`>;
+const SecretFormBody = lazyComponent(() =>
+  import('@/Modules/Secrets/Components/SecretFormBody').then((module) => module.SecretFormBody),
+);
+const VariableFormBody = lazyComponent(() =>
+  import('@/Modules/Secrets/Components/VariableFormBody').then((module) => module.VariableFormBody),
+);
+const RegistryFormBody = lazyComponent(() =>
+  import('@/Modules/Secrets/Components/RegistryFormBody').then((module) => module.RegistryFormBody),
+);
+
+type TSlidePart = Exclude<
+  TSlideId,
+  `theme-edit-${string}` | `oidc-edit-${string}` | `secret-edit-${string}` | `variable-edit-${string}` | `registry-edit-${string}`
+>;
 
 const PARTS: Record<TSlidePart, readonly IPreloadable[]> = {
   'theme-edit': [ThemeEditorBody, ThemeEditorFooter],
@@ -73,11 +86,16 @@ const PARTS: Record<TSlidePart, readonly IPreloadable[]> = {
   'project-new': [ProjectNewBody],
   'repository-link': [RepositoryLinkBody],
   'run-trigger': [TriggerRunBody],
+  'secret-new': [SecretFormBody],
+  'variable-new': [VariableFormBody],
+  'registry-new': [RegistryFormBody],
 };
 
 const partOf = (id: TSlideId): TSlidePart => {
   if (isThemeEditSlide(id)) return 'theme-edit';
   if (oidcOf(id) !== null) return 'oidc-new';
+  const target = secretsTargetOf(id);
+  if (target !== null) return `${target.Kind}-new` as TSlidePart;
   return id as TSlidePart;
 };
 
@@ -131,3 +149,6 @@ export const LazyLeaveBody = withSkeleton(LeaveBody);
 export const LazyProjectNewBody = withSkeleton(ProjectNewBody);
 export const LazyRepositoryLinkBody = withSkeleton(RepositoryLinkBody);
 export const LazyTriggerRunBody = withSkeleton(TriggerRunBody);
+export const LazySecretFormBody = withSkeleton(SecretFormBody);
+export const LazyVariableFormBody = withSkeleton(VariableFormBody);
+export const LazyRegistryFormBody = withSkeleton(RegistryFormBody);

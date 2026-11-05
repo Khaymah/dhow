@@ -76,6 +76,15 @@ const ROUTES: readonly [string, string, readonly string[]][] = [
   ],
   ['/org/invitations', Ar['shell.nav.invitations'], ['GET /api/v1/organizations/{id}/invitations']],
   ['/org/api-keys', Ar['shell.nav.apiKeys'], ['GET /api/v1/organizations/{id}/api-tokens']],
+  [
+    '/org/secrets',
+    Ar['shell.nav.secrets'],
+    [
+      'GET /api/v1/organizations/{id}/secrets',
+      'GET /api/v1/organizations/{id}/variables',
+      'GET /api/v1/organizations/{id}/registry-credentials',
+    ],
+  ],
   ['/org/settings', Ar['shell.nav.orgSettings'], [ORG, 'GET /api/v1/me/mfa']],
   ['/audit', Ar['audit.title'], ['GET /api/v1/organizations/{id}/audit-events', 'GET /api/v1/organizations/{id}/members']],
   ['/system', Ar['status.title'], []],

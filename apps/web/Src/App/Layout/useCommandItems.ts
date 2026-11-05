@@ -27,6 +27,7 @@ const PAGE_COMMANDS: Record<TSectionId, TMessageKey> = {
   teams: 'palette.command.teams',
   invitations: 'palette.command.invitations',
   apiKeys: 'palette.command.organizationTokens',
+  secrets: 'palette.command.secrets',
   orgSettings: 'palette.command.orgSettings',
   audit: 'palette.command.audit',
   system: 'palette.command.systemStatus',

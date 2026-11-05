@@ -42,7 +42,13 @@
 | Deploy key | مفتاح المستودع |
 | Host key | مفتاح سيرفر المستودع (البصمة: fingerprint) |
 | Webhook | الإشعارات (webhook)، والرابط «رابط الإشعارات» والسر «سر الإشعارات» |
-| Secret | سر |
+| Secret | سر (القيمة لا تظهر بعد الحفظ أبدًا) |
+| Secret version | إصدار (السر) |
+| Variable | متغيّر (قيمته ظاهرة لكل من يرى المشروع) |
+| Registry credential | حساب سجل الصور (اسم السجل واسم المستخدم وكلمة المرور) |
+| Override (secret) | «يغطي على سر المؤسسة» |
+| Available to pull requests | متاح لطلبات الدمج |
+| Selected projects | مشاريع مختارة |
 | Rollback | ارجع إلى النسخة السابقة |
 | Approval | موافقة |
 | Workspace / Home | الرئيسية |

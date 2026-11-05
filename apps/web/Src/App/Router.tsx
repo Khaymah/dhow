@@ -49,6 +49,7 @@ const homeRoute = page('/', SHELL_PAGES.home);
 const projectsRoute = page('projects', SHELL_PAGES.projects);
 const projectRoute = page('projects/$projectId', SHELL_PAGES.project);
 const projectSettingsRoute = page('projects/$projectId/settings', SHELL_PAGES.projectSettings);
+const projectSecretsRoute = page('projects/$projectId/secrets', SHELL_PAGES.projectSecrets);
 const runRoute = page('projects/$projectId/runs/$runId', SHELL_PAGES.run);
 const jobsRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -66,6 +67,7 @@ const teamsRoute = page('org/teams', SHELL_PAGES.teams);
 const teamRoute = page('org/teams/$teamId', SHELL_PAGES.team);
 const invitationsRoute = page('org/invitations', SHELL_PAGES.invitations);
 const apiKeysRoute = page('org/api-keys', SHELL_PAGES.apiKeys);
+const orgSecretsRoute = page('org/secrets', SHELL_PAGES.orgSecrets);
 const orgSettingsRoute = page('org/settings', SHELL_PAGES.orgSettings);
 const auditRoute = page('audit', SHELL_PAGES.audit);
 const auditEventRoute = page('audit/$eventId', SHELL_PAGES.auditEvent);
@@ -126,6 +128,7 @@ const routeTree = rootRoute.addChildren([
     projectsRoute,
     projectRoute,
     projectSettingsRoute,
+    projectSecretsRoute,
     runRoute,
     jobsRoute,
     jobRoute,
@@ -137,6 +140,7 @@ const routeTree = rootRoute.addChildren([
     teamRoute,
     invitationsRoute,
     apiKeysRoute,
+    orgSecretsRoute,
     orgSettingsRoute,
     auditRoute,
     auditEventRoute,

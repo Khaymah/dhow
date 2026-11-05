@@ -29,6 +29,9 @@ const TOKEN_MANAGE_ROLES: readonly TRole[] = ['owner', 'admin'];
 const RUNNER_READ_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer', 'developer'];
 const RUNNER_MANAGE_ROLES: readonly TRole[] = ['owner', 'admin'];
 const PROJECT_CREATE_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer'];
+const SECRET_READ_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer', 'developer'];
+const ORGANIZATION_SECRET_MANAGE_ROLES: readonly TRole[] = ['owner', 'admin'];
+const PROJECT_SECRET_MANAGE_ROLES: readonly TRole[] = ['owner', 'admin', 'maintainer'];
 
 export const canReadAudit = (role: TRole | undefined): boolean => role !== undefined && AUDIT_ROLES.includes(role);
 
@@ -49,6 +52,14 @@ export const canManageRunners = (role: TRole | undefined): boolean =>
 
 export const canCreateProjects = (role: TRole | undefined): boolean =>
   role !== undefined && PROJECT_CREATE_ROLES.includes(role);
+
+export const canReadSecrets = (role: TRole | undefined): boolean => role !== undefined && SECRET_READ_ROLES.includes(role);
+
+export const canManageOrganizationSecrets = (role: TRole | undefined): boolean =>
+  role !== undefined && ORGANIZATION_SECRET_MANAGE_ROLES.includes(role);
+
+export const canManageProjectSecrets = (role: TRole | undefined): boolean =>
+  role !== undefined && PROJECT_SECRET_MANAGE_ROLES.includes(role);
 
 export const rankOf = (role: TRole | undefined): number => (role === undefined ? 0 : ROLES.length - ROLES.indexOf(role));
 

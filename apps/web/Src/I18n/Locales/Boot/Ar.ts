@@ -11,6 +11,7 @@ export const BootAr = {
   'shell.nav.teams': 'الفرق',
   'shell.nav.invitations': 'الدعوات',
   'shell.nav.apiKeys': 'مفاتيح API',
+  'shell.nav.secrets': 'الأسرار والمتغيّرات',
   'shell.nav.orgSettings': 'إعدادات المؤسسة',
   'shell.nav.audit': 'سجل الأحداث',
   'shell.nav.system': 'حالة السيرفر',

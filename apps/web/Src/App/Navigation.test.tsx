@@ -32,12 +32,12 @@ afterEach(() => {
 
 const ADMIN_MENU = {
   run: [Ar['shell.nav.projects'], Ar['shell.nav.jobs'], Ar['shell.nav.runners']],
-  org: [Ar['shell.nav.members'], Ar['shell.nav.teams'], Ar['shell.nav.invitations'], Ar['shell.nav.apiKeys'], Ar['shell.nav.orgSettings']],
+  org: [Ar['shell.nav.members'], Ar['shell.nav.teams'], Ar['shell.nav.invitations'], Ar['shell.nav.apiKeys'], Ar['shell.nav.secrets'], Ar['shell.nav.orgSettings']],
   watch: [Ar['shell.nav.audit'], Ar['shell.nav.system']],
 };
 const BUILDER_MENU = {
   run: [Ar['shell.nav.projects'], Ar['shell.nav.jobs'], Ar['shell.nav.runners']],
-  org: [Ar['shell.nav.members'], Ar['shell.nav.teams'], Ar['shell.nav.orgSettings']],
+  org: [Ar['shell.nav.members'], Ar['shell.nav.teams'], Ar['shell.nav.secrets'], Ar['shell.nav.orgSettings']],
   watch: [Ar['shell.nav.system']],
 };
 
