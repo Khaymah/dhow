@@ -24,6 +24,8 @@ type Engine struct {
 	Report  Reporter
 	Log     Logger
 	Clock   Clock
+
+	LockRenew time.Duration
 }
 
 type run struct {
@@ -44,6 +46,7 @@ type run struct {
 	hasFiles   bool
 	started    bool
 	locked     bool
+	stopRenew  func()
 	totals     scan
 }
 

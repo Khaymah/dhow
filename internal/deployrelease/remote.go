@@ -41,6 +41,7 @@ type Remote interface {
 
 func WriteFile(r Remote, name string, data []byte, mode fs.FileMode) error {
 	tmp := name + ".tmp"
+	_ = r.Remove(tmp)
 	w, err := r.Create(tmp, mode)
 	if err != nil {
 		return err

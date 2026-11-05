@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -431,4 +432,48 @@ func digestFile(t *testing.T, path string) string {
 	require.NoError(t, err)
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
+}
+
+func ownerOf(t *testing.T, r *localRemote) (string, time.Time) {
+	t.Helper()
+	var o struct {
+		Release   string
+		ExpiresAt time.Time
+	}
+	require.NoError(t, json.Unmarshal([]byte(r.read("/srv/app/.dhow/lock/owner")), &o))
+	return o.Release, o.ExpiresAt
+}
+
+func TestALongDeployRenewsItsLockWhileItRuns(t *testing.T) {
+	r := newLocalRemote(t)
+	var first, second time.Time
+	r.hook = func([]string) deployrelease.ExecResult {
+		_, first = ownerOf(t, r)
+		time.Sleep(150 * time.Millisecond)
+		_, second = ownerOf(t, r)
+		return deployrelease.ExecResult{}
+	}
+	path, digest := makeArchive(t, map[string]string{"index.html": "v1"})
+	cfg := baseConfig(path, digest, "1-aaaaaaaa-1")
+	cfg.PostSwitch = "./warm.sh"
+	e := &deployrelease.Engine{
+		Config: cfg, Doer: &probe{status: healthy}, Report: &recorder{}, Clock: fastClock(), LockRenew: 10 * time.Millisecond,
+		Connect: func(context.Context) (deployrelease.Remote, error) { return r, nil },
+	}
+	require.Nil(t, e.Run(context.Background()))
+	assert.True(t, second.After(first), "the expiry moved forward while the hook ran")
+	assert.NoDirExists(t, r.path("/srv/app/.dhow/lock"))
+}
+
+func TestALockThatAnotherDeploymentTookOverIsNotRemovedByUs(t *testing.T) {
+	r := newLocalRemote(t)
+	r.hook = func([]string) deployrelease.ExecResult {
+		other := fmt.Sprintf(`{"Release":"9-zzzzzzzz-1","ExpiresAt":%q}`, time.Now().Add(time.Hour).UTC().Format(time.RFC3339))
+		require.NoError(t, os.WriteFile(r.path("/srv/app/.dhow/lock/owner"), []byte(other), 0o600))
+		return deployrelease.ExecResult{}
+	}
+	out := release(t, r, "1-aaaaaaaa-1", "v1", &probe{status: healthy}, func(c *deployrelease.Config) { c.PostSwitch = "./x.sh" })
+	require.Nil(t, out.failure)
+	owner, _ := ownerOf(t, r)
+	assert.Equal(t, "9-zzzzzzzz-1", owner, "the lock and its owner are untouched")
 }
