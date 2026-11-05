@@ -17,6 +17,8 @@ on:
       - deploy/m4-demo/**
       - deploy/m5-demo/**
       - deploy/e2e/**
+      - deploy/e2e-targets/**
+      - apps/plugins/**
       - deploy/ci/demo-areas.sh
       - apps/web/**
       - packages/openapi/**
@@ -39,6 +41,7 @@ jobs:
     outputs:
       demos: ${{ steps.scope.outputs.demos }}
       e2e: ${{ steps.scope.outputs.e2e }}
+      deploy: ${{ steps.scope.outputs.deploy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -72,6 +75,50 @@ jobs:
         env:
           DEMO: ${{ matrix.demo }}
         run: bash "deploy/$DEMO/run.sh"
+
+  deploy-e2e:
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true'
+    name: Deploy to a real sshd with the dhow-deploy-ssh plugin
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: dhow
+          POSTGRES_PASSWORD: dhow-ci-only
+          POSTGRES_DB: dhow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dhow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DHOW_TEST_DATABASE_URL: postgres://dhow:dhow-ci-only@localhost:5432/dhow_test?sslmode=disable # allow-secret
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Build the plugin image from the Dockerfile that is released
+        run: make deploy-ssh-image DEPLOY_SSH_IMAGE=dhow-deploy-ssh:ci
+      - name: Check that the image carries its manifest, runs as the nonroot user and refuses to start without a target
+        run: |
+          docker image inspect dhow-deploy-ssh:ci --format '{{ index .Config.Labels "io.dhow.plugin.manifest" }}' | grep -q '"Mutating":true'
+          test "$(docker image inspect dhow-deploy-ssh:ci --format '{{ .Config.User }}')" = 65532:65532
+          set +e
+          docker run --rm --network none dhow-deploy-ssh:ci 2> stderr.txt
+          code=$?
+          set -e
+          test "$code" = 2
+          grep -q PLUGIN_INPUT_INVALID stderr.txt
+      - name: Deploy to the sshd and replay the reports into the server
+        run: make deploy-e2e
 
   e2e:
     needs: changes
