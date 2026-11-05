@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	app "github.com/Khaymah/dhow/apps/server/internal/App"
@@ -112,42 +114,70 @@ func plainNeedles(t *testing.T, spec keys.Spec, name string, plain []byte) []lea
 		}
 		return out
 	}
+	if len(plain) < leaksweep.MinValueBytes {
+		t.Logf("the %s is shorter than %d bytes; it is not looked for", name, leaksweep.MinValueBytes)
+		return nil
+	}
 	return []leaksweep.Needle{checked{t}.needle(leaksweep.Encoded(name, plain))}
 }
 
-func sealedNeedles(t *testing.T, pool *pgxpool.Pool, secret []byte, provider keys.KeyProvider) []leaksweep.Needle {
+type sealedSet struct {
+	needles []leaksweep.Needle
+	opened  map[string]int
+	plain   map[string]bool
+}
+
+func kindName(spec keys.Spec, owner keys.Owner) string {
+	switch spec.Name() {
+	case "SecretVersions.ValueSealed":
+		switch owner.Kind {
+		case keys.OwnerOrganization:
+			return "organization secret"
+		case keys.OwnerProject:
+			return "project secret"
+		case keys.OwnerEnvironment:
+			return "environment secret"
+		}
+	case "RegistryCredentials.PasswordSealed":
+		return "registry password"
+	}
+	return spec.Name()
+}
+
+func sealedNeedles(t *testing.T, pool *pgxpool.Pool, provider keys.KeyProvider) sealedSet {
 	t.Helper()
 	ctx := context.Background()
 	reg, err := app.ValueRegistry()
 	require.NoError(t, err)
-	values := keys.NewValues(keys.NewEnvelope(keys.NewPostgresStore(pool), provider), secret)
-	var out []leaksweep.Needle
-	opened := map[byte]int{}
+	values := keys.NewValues(keys.NewEnvelope(keys.NewPostgresStore(pool), provider))
+	set := sealedSet{opened: map[string]int{}, plain: map[string]bool{}}
 	for _, l := range reg.Locations() {
 		spec := l.Spec()
 		col, err := values.Column(spec)
 		require.NoError(t, err)
 		var rows []keys.Value
 		require.NoError(t, pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-			rows, err = l.Scan(ctx, tx, "", 1<<20, false)
+			rows, err = l.Scan(ctx, tx, "", 1<<20)
 			return err
 		}))
 		for _, v := range rows {
-			name := spec.Name() + " of row " + v.Key
+			kind := kindName(spec, v.Owner)
+			name := kind + " of row " + v.Key
 			plain, err := col.Open(ctx, v.Owner, v.Context, v.Sealed)
-			require.NoError(t, err, "the sweep cannot open %s with this keyring and server key", name)
-			opened[v.Sealed[0]]++
-			out = append(out, plainNeedles(t, spec, name, plain)...)
+			require.NoError(t, err, "the sweep cannot open %s with this keyring", name)
+			set.opened[kind]++
+			set.plain[string(plain)] = true
+			set.needles = append(set.needles, plainNeedles(t, spec, name, plain)...)
 		}
 	}
-	t.Logf("opened %d values in the envelope format and %d in the format from before the keyring", opened[keys.FormatVersion], opened[keys.LegacyFormat])
-	require.NotEmpty(t, out, "no sealed value was found")
+	t.Logf("opened %d sealed values: %v", len(set.needles), set.opened)
+	require.NotEmpty(t, set.needles, "no sealed value was found")
 	deks, err := apptest.DataKeysInClear(ctx, pool, provider)
 	require.NoError(t, err)
 	for i, dek := range deks {
-		out = append(out, checked{t}.needle(leaksweep.Encoded(fmt.Sprintf("data key %d after unwrapping", i+1), dek)))
+		set.needles = append(set.needles, checked{t}.needle(leaksweep.Encoded(fmt.Sprintf("data key %d after unwrapping", i+1), dek)))
 	}
-	return out
+	return set
 }
 
 func keyringNeedles(t *testing.T, ring *keys.Keyring) []leaksweep.Needle {
@@ -241,7 +271,18 @@ func patterns() []leaksweep.Pattern {
 	}
 }
 
-func TestNoCredentialIsStoredInClear(t *testing.T) {
+var (
+	scopedKinds = []string{"organization secret", "project secret", "environment secret", "registry password"}
+	plantedKind = append([]string{"data key", "keyring key"}, scopedKinds...)
+)
+
+type world struct {
+	secret  []byte
+	needles []leaksweep.Needle
+}
+
+func buildWorld(t *testing.T) world {
+	t.Helper()
 	ctx := context.Background()
 	secret := serverKey(t)
 	pool, err := pgxpool.New(ctx, required(t, envDatabase))
@@ -250,13 +291,31 @@ func TestNoCredentialIsStoredInClear(t *testing.T) {
 	grantKey, err := appcrypto.DeriveKey(secret, config.ArtifactGrantKeyLabel)
 	require.NoError(t, err)
 	ring, provider := readKeyring(t)
-	needles := sealedNeedles(t, pool, secret, provider)
+	sealed := sealedNeedles(t, pool, provider)
+	needles := sealed.needles
 	needles = append(needles, keyringNeedles(t, ring)...)
 	needles = append(needles, checked{t}.needle(leaksweep.Encoded("server secret key", secret)), checked{t}.needle(leaksweep.Encoded("artifact grant key", grantKey)))
-	needles = append(needles, listedNeedles(t, required(t, envNeedles))...)
+	listed := listedNeedles(t, required(t, envNeedles))
+	needles = append(needles, listed...)
 	needles = append(needles, runnerKeys(t, required(t, envIdentity))...)
 	require.Empty(t, uncoveredSealed(t, pool), "the demo made sealed values that no value location covers; register these columns")
+	for _, kind := range scopedKinds {
+		require.Positive(t, sealed.opened[kind], "the demo stored no %s, so the sweep would prove nothing about it", kind)
+		var found bool
+		for _, n := range listed {
+			if n.Name == kind {
+				found = true
+				assert.True(t, sealed.plain[string(n.Forms[0])], "the %s in the needles file is not what the database holds sealed", kind)
+			}
+		}
+		assert.True(t, found, "the needles file has no %s", kind)
+	}
+	return world{secret: secret, needles: needles}
+}
 
+func TestNoCredentialIsStoredInClear(t *testing.T) {
+	w := buildWorld(t)
+	needles := w.needles
 	dirs := strings.Split(required(t, envDirs), ":")
 	hits, stats, err := leaksweep.Sweep(dirs, needles, patterns(), leaksweep.DefaultLimits())
 	require.NoError(t, err, "the sweep cannot vouch for what it could not read")
@@ -275,5 +334,36 @@ func TestNoCredentialIsStoredInClear(t *testing.T) {
 	}
 	for _, h := range hits {
 		t.Errorf("found the %s in clear in %s", h.Name, h.File)
+	}
+}
+
+func TestEachKindOfCredentialIsCaughtWhenPlanted(t *testing.T) {
+	w := buildWorld(t)
+	for _, kind := range plantedKind {
+		t.Run(kind, func(t *testing.T) {
+			var planted *leaksweep.Needle
+			for i, n := range w.needles {
+				if strings.HasPrefix(n.Name, kind) && len(n.Allowed) == 0 {
+					planted = &w.needles[i]
+					break
+				}
+			}
+			require.NotNil(t, planted, "the sweep looks for no %s", kind)
+			dir := t.TempDir()
+			file := filepath.Join(dir, "leak.log")
+			require.NoError(t, os.WriteFile(file, append(append([]byte(`{"msg":"x","value":"`), planted.Forms[0]...), []byte("\"}\n")...), 0o600))
+			hits, _, err := leaksweep.Sweep([]string{dir}, w.needles, nil, leaksweep.DefaultLimits())
+			require.NoError(t, err)
+			require.NotEmpty(t, hits, "a %s planted on purpose is not found", kind)
+			for _, h := range hits {
+				assert.Equal(t, file, h.File)
+				assert.True(t, strings.HasPrefix(h.Name, kind), "found %q while looking for a %s", h.Name, kind)
+			}
+			encoded := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(encoded, "encoded.log"), []byte(base64.StdEncoding.EncodeToString(planted.Forms[0])+"\n"), 0o600))
+			hits, _, err = leaksweep.Sweep([]string{encoded}, w.needles, nil, leaksweep.DefaultLimits())
+			require.NoError(t, err)
+			assert.NotEmpty(t, hits, "a %s planted as base64 is not found", kind)
+		})
 	}
 }
