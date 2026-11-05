@@ -111,6 +111,9 @@ const nanosPerMilliCPU = 1_000_000
 
 func verifyMounts(in *inspection, l layout, add func(bool, string)) {
 	sources := map[string]string{agentMount: l.agentPath, connectMount: l.agentPath, controlMount: l.controlDir, workspacePath: l.workDir}
+	if l.inputsDir != "" {
+		sources[inputsMount] = l.inputsDir
+	}
 	if l.kind == sandbox.KindCheckout {
 		sources[gitSSHMount] = l.agentPath
 		sources[askpassMount] = l.agentPath

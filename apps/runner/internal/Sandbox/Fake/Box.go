@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/url"
 	"slices"
 	"sync"
@@ -26,7 +27,10 @@ type box struct {
 	gone    bool
 	running bool
 	signals chan syscall.Signal
+	egress  net.Listener
 }
+
+func (b *box) EgressListener() net.Listener { return b.egress }
 
 func (b *box) Start(_ context.Context) error {
 	b.mu.Lock()
@@ -65,6 +69,10 @@ func (b *box) Exec(ctx context.Context, spec sandbox.StepSpec) (sandbox.StepResu
 		envNames = append(envNames, k)
 	}
 	slices.Sort(envNames)
+	saw := make(map[string][]byte, len(spec.Files))
+	for k, v := range spec.Files {
+		saw[k] = slices.Clone(v)
+	}
 	fileNames := make([]string, 0, len(spec.Files))
 	fileData := make([][]byte, 0, len(spec.Files))
 	for k, v := range spec.Files {
@@ -78,7 +86,7 @@ func (b *box) Exec(ctx context.Context, spec sandbox.StepSpec) (sandbox.StepResu
 	}
 	b.d.record(Event{
 		Kind: EventExec, AttemptID: b.attempt, Step: spec.Index, EnvNames: envNames, FileNames: fileNames,
-		FileData: fileData, Env: env, Argv: slices.Clone(spec.Argv),
+		FileData: fileData, Saw: saw, Env: env, Argv: slices.Clone(spec.Argv),
 	})
 	if spec.Started != nil {
 		spec.Started()
@@ -151,8 +159,14 @@ func (b *box) finish(i int32, r sandbox.StepResult) sandbox.StepResult {
 
 func writeOutput(spec sandbox.StepSpec, o Output) {
 	w := spec.Stdout
-	if o.Stream == "stderr" {
+	switch o.Stream {
+	case "stderr":
 		w = spec.Stderr
+	case "report":
+		if spec.Report == nil {
+			return
+		}
+		w = spec.Report
 	}
 	data := []byte(o.Data)
 	if o.FromEnv != "" {
@@ -227,6 +241,9 @@ func (b *box) Destroy(ctx context.Context) error {
 		return nil
 	}
 	b.gone = true
+	if b.egress != nil {
+		_ = b.egress.Close()
+	}
 	b.d.record(Event{Kind: EventDestroy, AttemptID: b.attempt})
 	if b.d.rec.DestroySurvivors {
 		return sandbox.ErrSurvivors

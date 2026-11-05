@@ -18,8 +18,8 @@ import (
 
 	runnertest "github.com/Khaymah/dhow/apps/runner/internal/App/Testing"
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
-	archive "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Archive"
 	fake "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Fake"
+	archive "github.com/Khaymah/dhow/internal/archive"
 	"github.com/Khaymah/dhow/internal/cachekey"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )

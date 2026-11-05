@@ -21,6 +21,7 @@ const (
 	ControlSocketPath = "/run/dhow/control/control.sock"
 	SecretsDir        = "/run/dhow/secrets"
 	OutputPath        = sandbox.OutputPath
+	ReportPath        = sandbox.ReportPath
 	Shell             = "/bin/sh"
 	agentVersion      = "1"
 	dialTimeout       = 30 * time.Second
@@ -36,6 +37,7 @@ type Options struct {
 	Sweep        func() error
 	SecretsDir   string
 	OutputPath   string
+	ReportPath   string
 	EgressSocket string
 	EgressAddrs  []string
 	Clock        func() time.Time
@@ -52,6 +54,7 @@ type Agent struct {
 	sweep      func() error
 	secretsDir string
 	outputPath string
+	reportPath string
 	mu         sync.Mutex
 	current    *process
 	input      *os.File
@@ -76,6 +79,9 @@ func Run(ctx context.Context, o Options) error {
 	if o.OutputPath == "" {
 		o.OutputPath = OutputPath
 	}
+	if o.ReportPath == "" {
+		o.ReportPath = ReportPath
+	}
 	if o.EgressSocket == "" {
 		o.EgressSocket = EgressSocketPath
 	}
@@ -98,7 +104,7 @@ func Run(ctx context.Context, o Options) error {
 	if err != nil {
 		return fmt.Errorf("connect to the runner control channel: %w", err)
 	}
-	a := &Agent{conn: wire.NewConn(rwc), harden: o.Harden, sweep: o.Sweep, secretsDir: o.SecretsDir, outputPath: o.OutputPath}
+	a := &Agent{conn: wire.NewConn(rwc), harden: o.Harden, sweep: o.Sweep, secretsDir: o.SecretsDir, outputPath: o.OutputPath, reportPath: o.ReportPath}
 	defer func() { _ = a.conn.Close() }()
 	stopForwarder, err := startForwarder(ctx, o.EgressSocket, o.EgressAddrs)
 	if err != nil {

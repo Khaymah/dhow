@@ -55,6 +55,7 @@ type Client struct {
 	logs         runnerv1connect.LogServiceClient
 	artifacts    runnerv1connect.ArtifactServiceClient
 	cache        runnerv1connect.CacheServiceClient
+	releases     runnerv1connect.ReleaseServiceClient
 	blobBase     string
 	version      string
 	tokens       *tokens
@@ -97,6 +98,7 @@ func New(o Options) (*Client, error) {
 		logs:         runnerv1connect.NewLogServiceClient(hc, base, opts...),
 		artifacts:    runnerv1connect.NewArtifactServiceClient(hc, base, opts...),
 		cache:        runnerv1connect.NewCacheServiceClient(hc, base, opts...),
+		releases:     runnerv1connect.NewReleaseServiceClient(hc, base, opts...),
 		blobBase:     base + "/blobs/",
 		version:      o.Version,
 		log:          o.Log,

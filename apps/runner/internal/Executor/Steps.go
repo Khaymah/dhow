@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"io"
 	"maps"
 	"slices"
 	"strconv"
@@ -35,6 +36,7 @@ type execPlan struct {
 	env      map[string]string
 	files    map[string][]byte
 	allowed  []string
+	report   bool
 	silent   bool
 	isolated bool
 }
@@ -109,9 +111,17 @@ func (a *attempt) runStep(ctx, jobCtx context.Context, idx int32, step *runnerv1
 	}
 	done := make(chan stepEnd, 1)
 	box := a.currentBox()
+	var reports *releaseReporter
+	var sink io.Writer
+	if plan.report {
+		if reports = a.newReporter(ctx, idx); reports != nil {
+			sink = reports
+		}
+	}
 	go func() {
 		res, err := box.Exec(execCtx, sandbox.StepSpec{
 			Index: idx, Name: step.GetName(), Script: step.GetRun(), Argv: plan.argv, Env: env, Files: files, Stdout: stdout, Stderr: stderr,
+			Report: sink,
 		})
 		done <- stepEnd{res: res, err: err, ok: true}
 	}()
@@ -121,6 +131,7 @@ func (a *attempt) runStep(ctx, jobCtx context.Context, idx int32, step *runnerv1
 	}
 	_ = stdout.Close()
 	_ = stderr.Close()
+	reports.Close()
 	for _, v := range files {
 		clear(v)
 	}
@@ -302,7 +313,7 @@ func (a *attempt) stepEnv(idx int32) (map[string]string, map[string][]byte) {
 	env[EnvSecretsDir] = sandbox.SecretsPath
 	files := map[string][]byte{}
 	for _, ref := range spec.GetSecrets() {
-		if ref.GetName() == jobspec.CheckoutSecret {
+		if ref.GetName() == jobspec.CheckoutSecret || foreignTargetKey(spec, ref.GetName(), idx) {
 			continue
 		}
 		if len(ref.GetStepIndexes()) > 0 && !slices.Contains(ref.GetStepIndexes(), idx) {
@@ -316,7 +327,7 @@ func (a *attempt) stepEnv(idx int32) (map[string]string, map[string][]byte) {
 			files[t.AsFile] = append([]byte(nil), v...)
 		}
 	}
-	if len(spec.GetNetwork().GetEgress()) > 0 {
+	if usesProxy(spec) {
 		maps.Copy(env, proxyEnv())
 	}
 	return env, files

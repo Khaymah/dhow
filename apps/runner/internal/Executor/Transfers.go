@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -198,15 +199,27 @@ func (a *attempt) restoreTransfers(ctx, jobCtx context.Context) (result, bool) {
 	if !ok {
 		return failed(runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, 0), false
 	}
+	keep := archiveNames(a.grant.GetSpec())
 	for _, in := range a.grant.GetSpec().GetInputs() {
 		if !jobspec.ValidDigest(in.GetDigest()) {
 			a.pipe.Systemf(nil, "dhow: ARTIFACT_DOWNLOAD_FAILED: the server sent a malformed digest for %s", in.GetName())
 			return failed(runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_DOWNLOAD_FAILED, 0), false
 		}
-		a.pipe.Systemf(nil, "dhow: artifact %s: download and unpack (%s)", in.GetName(), short(in.GetDigest()))
+		verb := "download and unpack"
+		if slices.Contains(keep, in.GetName()) {
+			verb = "download for the deploy step"
+		}
+		a.pipe.Systemf(nil, "dhow: artifact %s: %s (%s)", in.GetName(), verb, short(in.GetDigest()))
 		path, err := a.download(ctx, api, in.GetDigest(), in.GetDownloadToken(), in.GetSizeBytes())
 		if err != nil {
 			return a.leaseError(err, runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_DOWNLOAD_FAILED, "the artifact "+in.GetName()+" could not be downloaded"), false
+		}
+		if slices.Contains(keep, in.GetName()) {
+			if err := a.keepArchive(in, path); err != nil {
+				a.pipe.Systemf(nil, "dhow: ARTIFACT_DOWNLOAD_FAILED: the artifact %s could not be kept for the deploy step", in.GetName())
+				return failed(runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_DOWNLOAD_FAILED, 0), false
+			}
+			continue
 		}
 		r, ok := a.unpack(ctx, jobCtx, path)
 		_ = os.Remove(path)

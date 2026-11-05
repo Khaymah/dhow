@@ -84,7 +84,8 @@ func runnerFeatures(cfg config.Config) []runnerv1.RunnerFeature {
 	features := []runnerv1.RunnerFeature{runnerv1.RunnerFeature_RUNNER_FEATURE_PLUGINS, runnerv1.RunnerFeature_RUNNER_FEATURE_REGISTRY_AUTH}
 	if cfg.CheckoutImage != "" {
 		features = append(features, runnerv1.RunnerFeature_RUNNER_FEATURE_CHECKOUT,
-			runnerv1.RunnerFeature_RUNNER_FEATURE_ARTIFACTS, runnerv1.RunnerFeature_RUNNER_FEATURE_CACHE)
+			runnerv1.RunnerFeature_RUNNER_FEATURE_ARTIFACTS, runnerv1.RunnerFeature_RUNNER_FEATURE_CACHE,
+			runnerv1.RunnerFeature_RUNNER_FEATURE_DEPLOY_TARGETS)
 	}
 	return features
 }

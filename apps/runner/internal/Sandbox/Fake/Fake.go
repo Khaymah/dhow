@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"sync"
 	"syscall"
@@ -77,8 +78,10 @@ type Event struct {
 	EnvNames  []string
 	FileNames []string
 	FileData  [][]byte
+	Saw       map[string][]byte
 	Env       map[string]string
 	Argv      []string
+	Inputs    map[string][]byte
 	Image     string
 	Box       sandbox.Kind
 	Seq       int
@@ -93,6 +96,8 @@ type Driver struct {
 	onEvent  func(Event)
 	levels   []runnerv1.Isolation
 	lastSpec sandbox.PrepareSpec
+	specs    []sandbox.PrepareSpec
+	egress   map[int]string
 	root     string
 }
 
@@ -160,6 +165,7 @@ func (d *Driver) Cleanup(_ context.Context, _ string) error {
 func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox.Sandbox, error) {
 	d.mu.Lock()
 	d.lastSpec = spec
+	d.specs = append(d.specs, spec)
 	d.mu.Unlock()
 	ev := Event{Kind: EventPrepare, AttemptID: spec.AttemptID, Image: spec.Image, Box: spec.Kind, Seq: spec.Seq}
 	if spec.AuthFile != "" {
@@ -168,6 +174,16 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 			return nil, sandbox.ErrImagePull
 		}
 		ev.Auth = raw
+	}
+	if len(spec.Inputs) > 0 {
+		ev.Inputs = map[string][]byte{}
+		for _, in := range spec.Inputs {
+			raw, err := os.ReadFile(in.Path)
+			if err != nil {
+				return nil, sandbox.ErrSandbox
+			}
+			ev.Inputs[in.Name] = raw
+		}
 	}
 	d.record(ev)
 	if spec.Workspace == nil {
@@ -182,7 +198,34 @@ func (d *Driver) Prepare(ctx context.Context, spec sandbox.PrepareSpec) (sandbox
 	case PrepareSandbox:
 		return nil, sandbox.ErrSandbox
 	}
-	return &box{d: d, attempt: spec.AttemptID, labels: d.rec.Images[spec.Image], killed: make(chan struct{})}, nil
+	b := &box{d: d, attempt: spec.AttemptID, labels: d.rec.Images[spec.Image], killed: make(chan struct{})}
+	if len(spec.Egress)+len(spec.Exact) > 0 {
+		var lc net.ListenConfig
+		ln, err := lc.Listen(ctx, "tcp", "127.0.0.1:0")
+		if err != nil {
+			return nil, sandbox.ErrSandbox
+		}
+		b.egress = ln
+		d.mu.Lock()
+		if d.egress == nil {
+			d.egress = map[int]string{}
+		}
+		d.egress[spec.Seq] = ln.Addr().String()
+		d.mu.Unlock()
+	}
+	return b, nil
+}
+
+func (d *Driver) Specs() []sandbox.PrepareSpec {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return append([]sandbox.PrepareSpec(nil), d.specs...)
+}
+
+func (d *Driver) EgressAddr(seq int) string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.egress[seq]
 }
 
 type workspace struct {

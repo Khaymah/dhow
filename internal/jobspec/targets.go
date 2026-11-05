@@ -20,6 +20,7 @@ import (
 const (
 	FeatureDeployTargets = "deploy_targets"
 	TargetInput          = "target"
+	TargetArtifactInput  = "artifact"
 	TargetKindSSH        = "ssh"
 	TargetKindCompose    = "compose"
 	DeploySSHImage       = "ghcr.io/khaymah/dhow-deploy-ssh"

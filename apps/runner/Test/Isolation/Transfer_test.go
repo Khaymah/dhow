@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
-	archive "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Archive"
+	archive "github.com/Khaymah/dhow/internal/archive"
 )
 
 func craftArchive(t *testing.T, entries []tar.Header, bodies map[string]string) []byte {

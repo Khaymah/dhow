@@ -298,6 +298,10 @@ func (h handlers) BeginStep(_ context.Context, req *connect.Request[runnerv1.Beg
 		return nil, rpcError(connect.CodeFailedPrecondition, "CANCEL_REQUESTED")
 	}
 	l.Steps[req.Msg.GetIndex()] = "running"
+	if l.MutatingSteps == nil {
+		l.MutatingSteps = map[int32]bool{}
+	}
+	l.MutatingSteps[req.Msg.GetIndex()] = req.Msg.GetMutating()
 	return connect.NewResponse(&runnerv1.BeginStepResponse{Control: s.control(l)}), nil
 }
 

@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	archive "github.com/Khaymah/dhow/apps/runner/internal/Sandbox/Archive"
+	archive "github.com/Khaymah/dhow/internal/archive"
 )
 
 func write(t *testing.T, dir, name, content string, mode os.FileMode) {

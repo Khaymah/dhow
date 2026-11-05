@@ -254,7 +254,7 @@ FUZZ_TARGETS := \
 	Modules/Environments/Test/Edge:FuzzKeySecretName Modules/Secrets/Test/Edge:FuzzSecretName) \
 	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare internal/jobspec:FuzzHealthEndpoints internal/jobspec:FuzzParseEndpoint \
 	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
-	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern
+	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern internal/archive:FuzzUnpack
 
 define fuzz_listed
 	@found=$$(grep -rhoE '^func Fuzz[A-Za-z0-9]+' $(1) --include='*_test.go' | sed 's/^func //' | sort); \
@@ -331,7 +331,7 @@ runner-chaos: ## Run the chaos scenarios: the real server and runner on Podman, 
 
 RUNNER_FUZZ := $(addprefix apps/runner/internal/,Masking:FuzzMasker Masking:FuzzMaskerKeepsCleanText Logs:FuzzChunker \
 	Logs:FuzzSpillRecords Journal:FuzzJournalOpen Executor:FuzzVerifyGrant Sandbox/Wire:FuzzDecode Executor/Plugin:FuzzManifest \
-	Executor/Plugin:FuzzOutputs Sandbox/Archive:FuzzUnpack Egress:FuzzProxyRequest)
+	Executor/Plugin:FuzzOutputs Egress:FuzzProxyRequest Egress:FuzzExactEndpoints Executor:FuzzReportLine)
 
 .PHONY: fuzz-runner
 fuzz-runner: ## Fuzz every runner target for FUZZTIME each (default 10s; the M3.5 bar is 60s, the nightly run 30m)

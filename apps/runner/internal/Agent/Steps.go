@@ -41,6 +41,7 @@ type job struct {
 	script  string
 	shell   bool
 	stdin   bool
+	report  bool
 	input   *os.File
 	env     map[string]string
 	secrets []*agentv1.SecretFile
@@ -51,7 +52,7 @@ func stepOf(s *agentv1.RunStep) job {
 }
 
 func execOf(e *agentv1.RunExec) job {
-	return job{index: e.GetIndex(), argv: e.GetArgv(), env: e.GetEnv(), secrets: e.GetSecretFiles(), stdin: e.GetStdin()}
+	return job{index: e.GetIndex(), argv: e.GetArgv(), env: e.GetEnv(), secrets: e.GetSecretFiles(), stdin: e.GetStdin(), report: e.GetReport()}
 }
 
 func (a *Agent) runStep(ctx context.Context, step job) (*agentv1.Frame, error) {
@@ -66,6 +67,10 @@ func (a *Agent) runStep(ctx context.Context, step job) (*agentv1.Frame, error) {
 		return stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_SECRET_FILES, nil), nil
 	}
 	if !clearOutput(a.outputPath) {
+		wipeSecretFiles(a.secretsDir, secrets)
+		return stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_OUTPUTS, nil), nil
+	}
+	if step.report && !clearReport(a.reportPath) {
 		wipeSecretFiles(a.secretsDir, secrets)
 		return stepExit(step.index, 1, 0, agentv1.StepFailure_STEP_FAILURE_OUTPUTS, nil), nil
 	}
@@ -111,6 +116,10 @@ func (a *Agent) runProcess(ctx context.Context, step job) (int32, int32, agentv1
 		return 1, 0, startFailure(startErr), nil
 	}
 	a.setCurrent(&process{cmd: cmd})
+	if step.report {
+		stopReport := a.tailReport(step.index)
+		defer stopReport()
+	}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go a.pump(&wg, step.index, agentv1.OutputStream_OUTPUT_STREAM_STDOUT, outR)
