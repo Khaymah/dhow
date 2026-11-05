@@ -20,6 +20,7 @@ import (
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Sources/Models"
 	"github.com/Khaymah/dhow/internal/gitsource"
+	"github.com/Khaymah/dhow/internal/sshhostkey"
 )
 
 const credentialSSHKey = "ssh_key"
@@ -80,20 +81,9 @@ func (s *Service) newDeployKey(ctx context.Context, q *sqlc.Queries, project, re
 	return deployKey{public: public, sealed: sealed}, nil
 }
 
-func fingerprintOf(authorized string) string {
-	if authorized == "" {
-		return ""
-	}
-	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(authorized))
-	if err != nil {
-		return ""
-	}
-	return ssh.FingerprintSHA256(key)
-}
+func fingerprintOf(authorized string) string { return sshhostkey.Fingerprint(authorized) }
 
-func authorizedLine(key ssh.PublicKey) string {
-	return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key)))
-}
+func authorizedLine(key ssh.PublicKey) string { return sshhostkey.AuthorizedLine(key) }
 
 func (s *Service) deployKeyFor(ctx context.Context, repo models.Repository) ([]byte, error) {
 	row, err := s.queries().GetRepositoryByProject(ctx, sqlc.GetRepositoryByProjectParams{
