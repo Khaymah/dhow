@@ -87,8 +87,10 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - name: Enable pnpm from the packageManager field
-        run: corepack enable
+      - name: Enable pnpm from the packageManager field, also outside apps/web
+        run: |
+          corepack enable
+          corepack install --global "$(node -p "require('./apps/web/package.json').packageManager")"
       - name: Build the web app into the server
         run: make web
       - name: Install Chromium for the pinned Playwright
