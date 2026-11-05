@@ -11,12 +11,12 @@ WHERE p."Id" = @project_id AND p."OrganizationId" = @organization_id AND NOT p."
 INSERT INTO "Environments" (
     "OrganizationId", "ProjectId", "Name", "Description", "AllowedRefs", "AllowPullRequests", "RequiredApprovals",
     "AllowSelfApproval", "WaitMinutes", "ApprovalTimeoutHours", "RequirePinnedImages", "AllowedPlugins", "RequiredIsolation",
-    "AllowAdminBypass", "SupersedePending", "CreatedByUserId", "CreatedAt", "UpdatedAt"
+    "AllowAdminBypass", "SupersedePending", "AllowExtraDeployEgress", "CreatedByUserId", "CreatedAt", "UpdatedAt"
 )
 VALUES (
     @organization_id, @project_id, @name, @description, @allowed_refs, @allow_pull_requests, @required_approvals,
     @allow_self_approval, @wait_minutes, @approval_timeout_hours, @require_pinned_images, @allowed_plugins::text[], @required_isolation,
-    @allow_admin_bypass, @supersede_pending, @created_by_user_id, @now, @now
+    @allow_admin_bypass, @supersede_pending, @allow_extra_deploy_egress, @created_by_user_id, @now, @now
 )
 RETURNING *;
 
@@ -49,7 +49,7 @@ SET "Description" = @description, "AllowedRefs" = @allowed_refs, "AllowPullReque
     "RequiredApprovals" = @required_approvals, "AllowSelfApproval" = @allow_self_approval, "WaitMinutes" = @wait_minutes,
     "ApprovalTimeoutHours" = @approval_timeout_hours, "RequirePinnedImages" = @require_pinned_images,
     "AllowedPlugins" = @allowed_plugins::text[], "RequiredIsolation" = @required_isolation, "AllowAdminBypass" = @allow_admin_bypass,
-    "SupersedePending" = @supersede_pending,
+    "SupersedePending" = @supersede_pending, "AllowExtraDeployEgress" = @allow_extra_deploy_egress,
     "RuleVersion" = "RuleVersion" + CASE WHEN @rules_changed::boolean THEN 1 ELSE 0 END,
     "Version" = "Version" + 1, "UpdatedAt" = @now
 WHERE "Id" = @id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"

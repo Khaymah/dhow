@@ -15,6 +15,9 @@ import (
 const (
 	environmentsPath = "/organizations/{id}/projects/{projectId}/environments"
 	environmentPath  = environmentsPath + "/{environmentName}"
+	targetsPath      = environmentPath + "/targets"
+	targetPath       = targetsPath + "/{targetName}"
+	hostPath         = targetPath + "/hosts/{hostId}"
 	approvalsPath    = "/organizations/{id}/projects/{projectId}/runs/{runId}/approvals"
 	approvalPath     = approvalsPath + "/{approvalId}"
 	orgParam         = "id"
@@ -37,6 +40,19 @@ func Policies() []policy.Rule {
 		policy.Project(http.MethodPost, environmentPath+"/pause", policy.EnvironmentPause, orgParam, projectParam),
 		policy.Project(http.MethodPost, environmentPath+"/resume", policy.EnvironmentManage, orgParam, projectParam),
 		policy.Project(http.MethodGet, environmentPath+"/deployments", policy.RunRead, orgParam, projectParam).AllowTokens(),
+		policy.Project(http.MethodGet, targetsPath, policy.ProjectRead, orgParam, projectParam).AllowTokens(),
+		policy.Project(http.MethodPost, targetsPath, policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodGet, targetPath, policy.ProjectRead, orgParam, projectParam).AllowTokens(),
+		policy.Project(http.MethodPut, targetPath, policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodPost, targetPath+"/remove", policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodPost, targetPath+"/generate-key", policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodPost, targetPath+"/hosts", policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodPut, targetPath+"/hosts-order", policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodPut, hostPath, policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodPost, hostPath+"/remove", policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodPost, hostPath+"/fetch-host-key", policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodPut, hostPath+"/pending-host-key", policy.EnvironmentManage, orgParam, projectParam),
+		policy.Project(http.MethodPost, hostPath+"/confirm-host-key", policy.EnvironmentManage, orgParam, projectParam),
 		policy.Project(http.MethodGet, approvalsPath, policy.RunRead, orgParam, projectParam).AllowTokens(),
 		policy.Project(http.MethodPost, approvalPath+"/approve", policy.DeploymentApprove, orgParam, projectParam),
 		policy.Project(http.MethodPost, approvalPath+"/reject", policy.DeploymentApprove, orgParam, projectParam),

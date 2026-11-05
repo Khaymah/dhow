@@ -112,7 +112,7 @@ func (s *Service) PutSecret(ctx context.Context, ref models.Ref, name string, in
 		if err := checkSecretInput(t.Scope, in); err != nil {
 			return err
 		}
-		res, err := s.writeSecret(ctx, q, p, t, name, in)
+		res, err := s.writeSecret(ctx, q, p, t, name, in, []byte(in.Value))
 		if err != nil {
 			return err
 		}
@@ -128,7 +128,7 @@ func (s *Service) PutSecret(ctx context.Context, ref models.Ref, name string, in
 	return out, err
 }
 
-func (s *Service) writeSecret(ctx context.Context, q *sqlc.Queries, p auth.Principal, t models.Target, name string, in models.PutSecretInput) (writeResult, error) {
+func (s *Service) writeSecret(ctx context.Context, q *sqlc.Queries, p auth.Principal, t models.Target, name string, in models.PutSecretInput, value []byte) (writeResult, error) {
 	if err := q.LockSecretsScope(ctx, lockKey("secret", t)); err != nil {
 		return writeResult{}, err
 	}
@@ -154,10 +154,11 @@ func (s *Service) writeSecret(ctx context.Context, q *sqlc.Queries, p auth.Princ
 			return writeResult{}, err
 		}
 	}
-	if err := s.storeVersion(ctx, q, p, row, []byte(in.Value)); err != nil {
+	size := int32(len(value)) //nolint:gosec // the value is at most 32 KiB.
+	if err := s.storeVersion(ctx, q, p, row, value); err != nil {
 		return writeResult{}, err
 	}
-	return writeResult{row: row, size: int32(len(in.Value)), created: created}, nil //nolint:gosec // the value is at most 32 KiB.
+	return writeResult{row: row, size: size, created: created}, nil
 }
 
 func (s *Service) insertSecret(ctx context.Context, q *sqlc.Queries, p auth.Principal, t models.Target, name string, in models.PutSecretInput) (sqlc.Secret, error) {

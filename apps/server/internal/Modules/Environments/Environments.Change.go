@@ -46,6 +46,7 @@ func compare(old, updated models.Environment) diff {
 	d.add(ruleRequiredIsolation, o.RequiredIsolation != n.RequiredIsolation, true)
 	d.add(ruleAllowAdminBypass, o.AllowAdminBypass != n.AllowAdminBypass, true)
 	d.add(ruleSupersedePending, o.SupersedePending != n.SupersedePending, true)
+	d.add(ruleAllowExtraEgress, o.AllowExtraDeployEgress != n.AllowExtraDeployEgress, true)
 	return d
 }
 
@@ -130,7 +131,8 @@ func (s *Service) save(ctx context.Context, q *sqlc.Queries, row sqlc.Environmen
 		AllowSelfApproval: r.AllowSelfApproval, WaitMinutes: int32(r.WaitMinutes), //nolint:gosec // WaitMinutes is validated to fit.
 		ApprovalTimeoutHours: int32(r.ApprovalTimeoutHours), //nolint:gosec // ApprovalTimeoutHours is validated to fit.
 		RequirePinnedImages:  r.RequirePinnedImages, AllowedPlugins: r.AllowedPlugins, RequiredIsolation: r.RequiredIsolation,
-		AllowAdminBypass: r.AllowAdminBypass, SupersedePending: r.SupersedePending, RulesChanged: rules, Now: now,
+		AllowAdminBypass: r.AllowAdminBypass, SupersedePending: r.SupersedePending, AllowExtraDeployEgress: r.AllowExtraDeployEgress,
+		RulesChanged: rules, Now: now,
 	})
 	if err != nil {
 		return models.Environment{}, err
@@ -168,6 +170,9 @@ func (s *Service) Remove(ctx context.Context, org, project uuid.UUID, name strin
 		}
 		out = current
 		if err := q.RemoveEnvironmentReviewers(ctx, sqlc.RemoveEnvironmentReviewersParams{OrganizationID: org, EnvironmentID: row.Id, Now: now}); err != nil {
+			return err
+		}
+		if err := s.removeTargetsOf(ctx, q, org, row.Id, now); err != nil {
 			return err
 		}
 		return s.audit(ctx, q, p, eventbus.EnvironmentRemoved, out, auditData{"Version": versionOf(out)})

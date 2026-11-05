@@ -82,6 +82,11 @@ tags:
       them. Served by the Environments module. Only `environment.manage` (Admin and Owner, or an Admin binding on the
       project) creates, changes or removes one; a Maintainer may pause one. Until the deploy gate arrives (M5.6), a job
       with `environment:` is still skipped with `ENVIRONMENTS_UNAVAILABLE`.
+  - name: targets
+    description: >-
+      Deploy targets of an environment (M6.1): the hosts a pipeline may deploy to, each with its own pinned SSH host key, and the
+      deploy key that Dhow makes and keeps as an environment secret. Served by the Environments module. Only
+      `environment.manage` changes one. A pipeline file names a target and never gives an address.
   - name: overview
     description: >-
       Counts for the home page and the sidebar, in one request. Served by the Overview module, which reads the jobs,
@@ -2591,6 +2596,434 @@ paths:
                 $ref: "#/components/schemas/DeploymentListResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets:
+    get:
+      operationId: listDeployTargets
+      tags: [targets]
+      summary: List the deploy targets of an environment
+      description: >-
+        Needs `project.read` on the project. Each target shows its hosts, whether every host key is pinned (`Ready`) and the public half
+        of its deploy key. No private key, and no secret value, is ever in an answer.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of targets.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createDeployTarget
+      tags: [targets]
+      summary: Create a deploy target
+      description: >-
+        Needs `environment.manage` on the project and a fresh `CurrentFactor`. A target has 1 to 10 hosts in deploy order. A host key is
+        pinned later, per host, by `confirm-host-key`; a target with an unpinned host is not `Ready`. `KeySecretName` names a secret of this
+        environment (422 `TARGET_KEY_NOT_FOUND` if it is missing); leave it out and use `generate-key` instead. A bad field is 422
+        `VALIDATION_FAILED`, a forbidden path is 422 `DEPLOY_PATH_INVALID`, an address Dhow never connects to is 422
+        `TARGET_HOST_BLOCKED`, a name used twice in the environment is 409 `TARGET_EXISTS`, and the same host, port and path in another
+        target of the organization is 409 `TARGET_DUPLICATE`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeployTargetRequest"
+      responses:
+        "201":
+          description: The new target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}:
+    get:
+      operationId: getDeployTarget
+      tags: [targets]
+      summary: Read a deploy target
+      description: >-
+        N
+        e
+        e
+        d
+        s
+         
+        `
+        p
+        r
+        o
+        j
+        e
+        c
+        t
+        .
+        r
+        e
+        a
+        d
+        `
+         
+        o
+        n
+         
+        t
+        h
+        e
+         
+        p
+        r
+        o
+        j
+        e
+        c
+        t
+        .
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateDeployTarget
+      tags: [targets]
+      summary: Change a deploy target
+      description: >-
+        Needs `environment.manage` and a fresh `CurrentFactor`. Changes only the fields that are sent. `Version` is the one the caller read:
+        an older one is 409 `TARGET_VERSION_CONFLICT` and changes nothing. The name and the kind never change.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDeployTargetRequest"
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/remove:
+    post:
+      operationId: removeDeployTarget
+      tags: [targets]
+      summary: Remove a deploy target
+      description: >-
+        Needs `environment.manage` and a fresh `CurrentFactor`. The target and its hosts are marked deleted. The secret of its key stays with
+        the environment.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
+      responses:
+        "200":
+          description: The removed target, as it was.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/generate-key:
+    post:
+      operationId: generateDeployTargetKey
+      tags: [targets]
+      summary: Make the deploy key of a target
+      description: >-
+        Needs `environment.manage` and a fresh `CurrentFactor`. Dhow makes an ed25519 key pair and keeps the private half as the secret
+        `<TARGET>_SSH_KEY` of the environment. The answer carries only the public half in `PublicKey`, to put in `authorized_keys` on every
+        host. Doing it again makes a new key and a new version of that secret. If the environment already has a secret with that name that this target did not make, the answer is 409 `TARGET_KEY_NAME_TAKEN` and nothing is written.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
+      responses:
+        "200":
+          description: The target, with the public key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts:
+    post:
+      operationId: addDeployTargetHost
+      tags: [targets]
+      summary: Add a host to a target
+      description: >-
+        Needs `environment.manage`, a fresh `CurrentFactor` and the `Version` the caller read. The host goes last. A target has at most 10
+        hosts: the 11th is 422 `VALIDATION_FAILED` on `Hosts`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddDeployTargetHostRequest"
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts-order:
+    put:
+      operationId: reorderDeployTargetHosts
+      tags: [targets]
+      summary: Change the deploy order of the hosts
+      description: >-
+        Needs `environment.manage`, a fresh `CurrentFactor` and the `Version`. `HostIds` lists every host of the target once, in the new order.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderDeployTargetHostsRequest"
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}:
+    put:
+      operationId: updateDeployTargetHost
+      tags: [targets]
+      summary: Change the address of a host
+      description: >-
+        Needs `environment.manage`, a fresh `CurrentFactor` and the `Version`. A new `Host` or `Port` drops the pinned host key and the
+        pending one, because they belong to the old address.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+        - $ref: "#/components/parameters/TargetHostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDeployTargetHostRequest"
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/remove:
+    post:
+      operationId: removeDeployTargetHost
+      tags: [targets]
+      summary: Remove a host from a target
+      description: >-
+        Needs `environment.manage`, a fresh `CurrentFactor` and the `Version`. The host and its keys are dropped. The last host of a target
+        cannot be removed.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+        - $ref: "#/components/parameters/TargetHostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoveDeployTargetHostRequest"
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/fetch-host-key:
+    post:
+      operationId: fetchDeployTargetHostKey
+      tags: [targets]
+      summary: Fetch the host key from the server
+      description: >-
+        Needs `environment.manage`. Dhow makes an SSH handshake with the host, without any login, and keeps the key it presents as the
+        pending key of that host. It pins nothing. A private, loopback or cloud metadata address is 422 `TARGET_HOST_BLOCKED`: paste the key
+        instead. A host that does not answer is 502 `TARGET_HOST_UNREACHABLE`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+        - $ref: "#/components/parameters/TargetHostId"
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/pending-host-key:
+    put:
+      operationId: setDeployTargetPendingHostKey
+      tags: [targets]
+      summary: Paste the host key of a host
+      description: >-
+        Needs `environment.manage`. `HostKey` is a line of `ssh-keyscan` or the content of a `.pub` file. It becomes the pending key of the
+        host and pins nothing. Only ssh-ed25519, ecdsa and ssh-rsa keys are accepted, and ed25519 is chosen when several are pasted.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+        - $ref: "#/components/parameters/TargetHostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetDeployTargetPendingHostKeyRequest"
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/confirm-host-key:
+    post:
+      operationId: confirmDeployTargetHostKey
+      tags: [targets]
+      summary: Pin the pending host key of a host
+      description: >-
+        Needs `environment.manage` and a fresh `CurrentFactor`. `Fingerprint` must be the `SHA256:` one of the pending key, as the target
+        showed it, or the answer is 409 `HOST_KEY_FINGERPRINT_MISMATCH`. Without a pending key it is 409 `HOST_KEY_NOT_PENDING`. A key that
+        changes on the server stays pending while the pinned key keeps working. Dhow never pins a key by itself.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+        - $ref: "#/components/parameters/TargetHostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmDeployTargetHostKeyRequest"
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/projects/{projectId}/runs/{runId}/approvals:
     get:
       operationId: listRunApprovals
@@ -4541,6 +4974,20 @@ components:
       schema:
         type: string
         pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+    TargetName:
+      name: targetName
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+    TargetHostId:
+      name: hostId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     Page:
       name: Page
       in: query
@@ -5132,7 +5579,9 @@ components:
             `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`,
             `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`,
             `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`,
-            `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT` or `REVIEWER_NOT_ELIGIBLE`.
+            `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT`, `REVIEWER_NOT_ELIGIBLE`, `TARGET_EXISTS`, `TARGET_DUPLICATE`,
+            `TARGET_VERSION_CONFLICT`, `TARGET_HOST_BLOCKED`, `TARGET_HOST_UNREACHABLE`, `TARGET_KEY_NOT_FOUND`,
+            `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
           example: INTERNAL
         Message:
           type: string
@@ -7484,6 +7933,7 @@ components:
         - RequiredIsolation
         - AllowAdminBypass
         - SupersedePending
+        - AllowExtraDeployEgress
       properties:
         AllowedRefs:
           type: array
@@ -7533,6 +7983,11 @@ components:
         SupersedePending:
           type: boolean
           description: A newer run on the same ref replaces an older run still waiting for approval.
+        AllowExtraDeployEgress:
+          type: boolean
+          description: >-
+            A job that deploys to a target may also reach hosts its pipeline file lists under `network.egress`. Off by
+            default: such a job reaches the hosts of its target and nothing else.
     EnvironmentRulesInput:
       type: object
       additionalProperties: false
@@ -7575,6 +8030,8 @@ components:
         AllowAdminBypass:
           type: boolean
         SupersedePending:
+          type: boolean
+        AllowExtraDeployEgress:
           type: boolean
     Environment:
       type: object
@@ -7636,6 +8093,365 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/Environment"
+    DeployTargetKind:
+      type: string
+      enum: [ssh, compose]
+    DeployTargetRolling:
+      type: object
+      additionalProperties: false
+      properties:
+        BatchSize:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: How many hosts switch together. At most the number of hosts of the target.
+        BatchPauseSeconds:
+          type: integer
+          minimum: 0
+          maximum: 600
+    DeployTargetSshSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        ReloadCommand:
+          type: string
+          maxLength: 1024
+          description: A single line that runs on the host after the switch. Written by an admin only.
+        PreSwitchCommand:
+          type: string
+          maxLength: 1024
+        PostSwitchCommand:
+          type: string
+          maxLength: 1024
+        Shared:
+          type: array
+          maxItems: 20
+          description: Names of files and folders kept in `shared/` and linked into each release.
+          items:
+            type: string
+            pattern: "^[A-Za-z0-9.][A-Za-z0-9._-]{0,63}$"
+    DeployTargetComposeSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        ProjectName:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{0,62}$"
+        ComposeFile:
+          type: string
+          maxLength: 100
+          description: A relative path inside the release. Defaults to `compose.yaml`.
+        AllowUnsafeCompose:
+          type: boolean
+    DeployTargetSettings:
+      type: object
+      additionalProperties: false
+      description: >-
+        Only the block of the target's kind may be sent: `Ssh` for `ssh`, `Compose` for `compose`. At most 4 KiB.
+      properties:
+        Rolling:
+          $ref: "#/components/schemas/DeployTargetRolling"
+        AllowRoot:
+          type: boolean
+          description: Lets `Username` be `root`. A warning, not a recommendation.
+        Ssh:
+          $ref: "#/components/schemas/DeployTargetSshSettings"
+        Compose:
+          $ref: "#/components/schemas/DeployTargetComposeSettings"
+    DeployTargetNotReady:
+      type: string
+      enum: [host_key_unconfirmed, key_missing]
+    DeployTargetHost:
+      type: object
+      additionalProperties: false
+      required: [Id, Position, Host, Port, KeyPinned]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        Position:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: The deploy order, from 1.
+        Host:
+          type: string
+          description: A DNS name or an IP address.
+        Port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        KeyPinned:
+          type: boolean
+        HostKeyFingerprint:
+          type: string
+          description: The `SHA256:` fingerprint of the pinned host key.
+        HostKeyConfirmedAt:
+          type: string
+          format: date-time
+        HostKeyConfirmedByUserId:
+          type: string
+          format: uuid
+        PendingHostKeyFingerprint:
+          type: string
+          description: The `SHA256:` fingerprint of a key that was fetched or pasted and is not confirmed yet.
+    DeployTarget:
+      type: object
+      additionalProperties: false
+      required:
+        - Id
+        - EnvironmentId
+        - Name
+        - Kind
+        - Username
+        - DeployPath
+        - KeepReleases
+        - Settings
+        - AllowedImages
+        - Hosts
+        - Ready
+        - NotReady
+        - Version
+        - CreatedAt
+        - UpdatedAt
+      properties:
+        Id:
+          type: string
+          format: uuid
+        EnvironmentId:
+          type: string
+          format: uuid
+        Name:
+          type: string
+        Kind:
+          $ref: "#/components/schemas/DeployTargetKind"
+        Username:
+          type: string
+        KeySecretName:
+          type: string
+          description: The name of the environment secret that holds the private key. Never its value.
+        PublicKey:
+          type: string
+          description: The public half of the key Dhow made. Put it in `authorized_keys` on every host.
+        DeployPath:
+          type: string
+        KeepReleases:
+          type: integer
+          minimum: 2
+          maximum: 50
+        Settings:
+          $ref: "#/components/schemas/DeployTargetSettings"
+        AllowedImages:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+        Hosts:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/DeployTargetHost"
+        Ready:
+          type: boolean
+          description: Every host has a pinned key and the deploy key is set.
+        NotReady:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeployTargetNotReady"
+        Version:
+          type: integer
+          format: int64
+          description: Rises with every change that a deploy depends on. Send it back to change the target.
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+    DeployTargetResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/DeployTarget"
+    DeployTargetListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/DeployTarget"
+    DeployTargetHostInput:
+      type: object
+      additionalProperties: false
+      required: [Host]
+      properties:
+        Host:
+          type: string
+          minLength: 1
+          maxLength: 253
+        Port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          description: Defaults to 22.
+    CreateDeployTargetRequest:
+      type: object
+      additionalProperties: false
+      required: [Name, Kind, Username, DeployPath, Hosts, CurrentFactor]
+      properties:
+        Name:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+        Kind:
+          $ref: "#/components/schemas/DeployTargetKind"
+        Username:
+          type: string
+          maxLength: 32
+        KeySecretName:
+          type: string
+          maxLength: 64
+        DeployPath:
+          type: string
+          maxLength: 201
+        KeepReleases:
+          type: integer
+          minimum: 2
+          maximum: 50
+        Settings:
+          $ref: "#/components/schemas/DeployTargetSettings"
+        AllowedImages:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        Hosts:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/DeployTargetHostInput"
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    UpdateDeployTargetRequest:
+      type: object
+      additionalProperties: false
+      required: [Version, CurrentFactor]
+      properties:
+        Version:
+          type: integer
+          format: int64
+        Username:
+          type: string
+          maxLength: 32
+        KeySecretName:
+          type: string
+          maxLength: 64
+        DeployPath:
+          type: string
+          maxLength: 201
+        KeepReleases:
+          type: integer
+          minimum: 2
+          maximum: 50
+        Settings:
+          $ref: "#/components/schemas/DeployTargetSettings"
+        AllowedImages:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    AddDeployTargetHostRequest:
+      type: object
+      additionalProperties: false
+      required: [Version, Host, CurrentFactor]
+      properties:
+        Version:
+          type: integer
+          format: int64
+        Host:
+          type: string
+          minLength: 1
+          maxLength: 253
+        Port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    UpdateDeployTargetHostRequest:
+      type: object
+      additionalProperties: false
+      required: [Version, CurrentFactor]
+      properties:
+        Version:
+          type: integer
+          format: int64
+        Host:
+          type: string
+          minLength: 1
+          maxLength: 253
+        Port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    RemoveDeployTargetHostRequest:
+      type: object
+      additionalProperties: false
+      required: [Version, CurrentFactor]
+      properties:
+        Version:
+          type: integer
+          format: int64
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    ReorderDeployTargetHostsRequest:
+      type: object
+      additionalProperties: false
+      required: [Version, HostIds, CurrentFactor]
+      properties:
+        Version:
+          type: integer
+          format: int64
+        HostIds:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: string
+            format: uuid
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    SetDeployTargetPendingHostKeyRequest:
+      type: object
+      additionalProperties: false
+      required: [HostKey]
+      properties:
+        HostKey:
+          type: string
+          minLength: 1
+          maxLength: 8192
+    ConfirmDeployTargetHostKeyRequest:
+      type: object
+      additionalProperties: false
+      required: [Fingerprint, CurrentFactor]
+      properties:
+        Fingerprint:
+          type: string
+          pattern: "^SHA256:[A-Za-z0-9+/]{43}$"
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
     DeploymentApprovalState:
       type: string
       enum: [pending, approved, rejected, expired, superseded, canceled, bypassed]

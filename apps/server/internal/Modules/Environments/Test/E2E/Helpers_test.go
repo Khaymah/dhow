@@ -37,15 +37,16 @@ type environmentView struct {
 			UserCount, TeamCount int
 			IdsShown             bool
 		}
-		RequiredApprovals    int
-		AllowSelfApproval    bool
-		WaitMinutes          int
-		ApprovalTimeoutHours int
-		RequirePinnedImages  bool
-		AllowedPlugins       []string
-		RequiredIsolation    string
-		AllowAdminBypass     bool
-		SupersedePending     bool
+		RequiredApprovals      int
+		AllowSelfApproval      bool
+		WaitMinutes            int
+		ApprovalTimeoutHours   int
+		RequirePinnedImages    bool
+		AllowedPlugins         []string
+		RequiredIsolation      string
+		AllowAdminBypass       bool
+		SupersedePending       bool
+		AllowExtraDeployEgress bool
 	}
 }
 

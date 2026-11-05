@@ -193,6 +193,46 @@ type DataKey struct {
 	SupersededAt   *time.Time
 }
 
+type DeployTarget struct {
+	Id              uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	IsDeleted       bool
+	OrganizationId  uuid.UUID
+	ProjectId       uuid.UUID
+	EnvironmentId   uuid.UUID
+	Name            string
+	Kind            string
+	Username        string
+	KeySecretName   pgtype.Text
+	PublicKey       pgtype.Text
+	DeployPath      string
+	KeepReleases    int32
+	Settings        []byte
+	AllowedImages   []string
+	Version         int64
+	CreatedByUserId uuid.UUID
+}
+
+type DeployTargetHost struct {
+	Id                 uuid.UUID
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	IsDeleted          bool
+	OrganizationId     uuid.UUID
+	TargetId           uuid.UUID
+	Position           int32
+	Host               string
+	Port               int32
+	DeployPath         string
+	HostKey            pgtype.Text
+	HostKeyFingerprint pgtype.Text
+	HostKeyConfirmedAt *time.Time
+	HostKeyConfirmedBy *uuid.UUID
+	PendingHostKey     pgtype.Text
+	PendingFingerprint pgtype.Text
+}
+
 type Deployment struct {
 	Id             uuid.UUID
 	CreatedAt      time.Time
@@ -236,33 +276,34 @@ type DeploymentApproval struct {
 }
 
 type Environment struct {
-	Id                   uuid.UUID
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	IsDeleted            bool
-	OrganizationId       uuid.UUID
-	ProjectId            uuid.UUID
-	Name                 string
-	Description          string
-	Version              int64
-	RuleVersion          int64
-	AllowedRefs          []byte
-	AllowPullRequests    bool
-	RequiredApprovals    int32
-	AllowSelfApproval    bool
-	WaitMinutes          int32
-	ApprovalTimeoutHours int32
-	RequirePinnedImages  bool
-	AllowedPlugins       []string
-	RequiredIsolation    string
-	AllowAdminBypass     bool
-	SupersedePending     bool
-	PausedAt             *time.Time
-	PausedByUserId       *uuid.UUID
-	PausedReason         pgtype.Text
-	CreatedByUserId      uuid.UUID
-	LockedByRunId        *uuid.UUID
-	LockedAt             *time.Time
+	Id                     uuid.UUID
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	IsDeleted              bool
+	OrganizationId         uuid.UUID
+	ProjectId              uuid.UUID
+	Name                   string
+	Description            string
+	Version                int64
+	RuleVersion            int64
+	AllowedRefs            []byte
+	AllowPullRequests      bool
+	RequiredApprovals      int32
+	AllowSelfApproval      bool
+	WaitMinutes            int32
+	ApprovalTimeoutHours   int32
+	RequirePinnedImages    bool
+	AllowedPlugins         []string
+	RequiredIsolation      string
+	AllowAdminBypass       bool
+	SupersedePending       bool
+	PausedAt               *time.Time
+	PausedByUserId         *uuid.UUID
+	PausedReason           pgtype.Text
+	CreatedByUserId        uuid.UUID
+	LockedByRunId          *uuid.UUID
+	LockedAt               *time.Time
+	AllowExtraDeployEgress bool
 }
 
 type EnvironmentReviewer struct {

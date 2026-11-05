@@ -17,6 +17,42 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for DeployTargetKind.
+const (
+	Compose DeployTargetKind = "compose"
+	Ssh     DeployTargetKind = "ssh"
+)
+
+// Valid indicates whether the value is a known member of the DeployTargetKind enum.
+func (e DeployTargetKind) Valid() bool {
+	switch e {
+	case Compose:
+		return true
+	case Ssh:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeployTargetNotReady.
+const (
+	HostKeyUnconfirmed DeployTargetNotReady = "host_key_unconfirmed"
+	KeyMissing         DeployTargetNotReady = "key_missing"
+)
+
+// Valid indicates whether the value is a known member of the DeployTargetNotReady enum.
+func (e DeployTargetNotReady) Valid() bool {
+	switch e {
+	case HostKeyUnconfirmed:
+		return true
+	case KeyMissing:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeploymentApprovalState.
 const (
 	DeploymentApprovalStateApproved   DeploymentApprovalState = "approved"
@@ -134,11 +170,45 @@ func (e FactorMethod) Valid() bool {
 	}
 }
 
+// AddDeployTargetHostRequest defines model for AddDeployTargetHostRequest.
+type AddDeployTargetHostRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+	Host          string        `json:"Host"`
+	Port          *int          `json:"Port,omitempty"`
+	Version       int64         `json:"Version"`
+}
+
 // BypassDeploymentRequest defines model for BypassDeploymentRequest.
 type BypassDeploymentRequest struct {
 	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
 	CurrentFactor CurrentFactor `json:"CurrentFactor"`
 	Reason        string        `json:"Reason"`
+}
+
+// ConfirmDeployTargetHostKeyRequest defines model for ConfirmDeployTargetHostKeyRequest.
+type ConfirmDeployTargetHostKeyRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+	Fingerprint   string        `json:"Fingerprint"`
+}
+
+// CreateDeployTargetRequest defines model for CreateDeployTargetRequest.
+type CreateDeployTargetRequest struct {
+	AllowedImages *[]string `json:"AllowedImages,omitempty"`
+
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor           `json:"CurrentFactor"`
+	DeployPath    string                  `json:"DeployPath"`
+	Hosts         []DeployTargetHostInput `json:"Hosts"`
+	KeepReleases  *int                    `json:"KeepReleases,omitempty"`
+	KeySecretName *string                 `json:"KeySecretName,omitempty"`
+	Kind          DeployTargetKind        `json:"Kind"`
+	Name          string                  `json:"Name"`
+
+	// Settings Only the block of the target's kind may be sent: `Ssh` for `ssh`, `Compose` for `compose`. At most 4 KiB.
+	Settings *DeployTargetSettings `json:"Settings,omitempty"`
+	Username string                `json:"Username"`
 }
 
 // CreateEnvironmentRequest defines model for CreateEnvironmentRequest.
@@ -178,6 +248,135 @@ type DecideDeploymentRequest struct {
 
 	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
 	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+}
+
+// DeployTarget defines model for DeployTarget.
+type DeployTarget struct {
+	AllowedImages []string           `json:"AllowedImages"`
+	CreatedAt     time.Time          `json:"CreatedAt"`
+	DeployPath    string             `json:"DeployPath"`
+	EnvironmentId openapi_types.UUID `json:"EnvironmentId"`
+	Hosts         []DeployTargetHost `json:"Hosts"`
+	Id            openapi_types.UUID `json:"Id"`
+	KeepReleases  int                `json:"KeepReleases"`
+
+	// KeySecretName The name of the environment secret that holds the private key. Never its value.
+	KeySecretName *string                `json:"KeySecretName,omitempty"`
+	Kind          DeployTargetKind       `json:"Kind"`
+	Name          string                 `json:"Name"`
+	NotReady      []DeployTargetNotReady `json:"NotReady"`
+
+	// PublicKey The public half of the key Dhow made. Put it in `authorized_keys` on every host.
+	PublicKey *string `json:"PublicKey,omitempty"`
+
+	// Ready Every host has a pinned key and the deploy key is set.
+	Ready bool `json:"Ready"`
+
+	// Settings Only the block of the target's kind may be sent: `Ssh` for `ssh`, `Compose` for `compose`. At most 4 KiB.
+	Settings  DeployTargetSettings `json:"Settings"`
+	UpdatedAt time.Time            `json:"UpdatedAt"`
+	Username  string               `json:"Username"`
+
+	// Version Rises with every change that a deploy depends on. Send it back to change the target.
+	Version int64 `json:"Version"`
+}
+
+// DeployTargetComposeSettings defines model for DeployTargetComposeSettings.
+type DeployTargetComposeSettings struct {
+	AllowUnsafeCompose *bool `json:"AllowUnsafeCompose,omitempty"`
+
+	// ComposeFile A relative path inside the release. Defaults to `compose.yaml`.
+	ComposeFile *string `json:"ComposeFile,omitempty"`
+	ProjectName *string `json:"ProjectName,omitempty"`
+}
+
+// DeployTargetHost defines model for DeployTargetHost.
+type DeployTargetHost struct {
+	// Host A DNS name or an IP address.
+	Host                     string              `json:"Host"`
+	HostKeyConfirmedAt       *time.Time          `json:"HostKeyConfirmedAt,omitempty"`
+	HostKeyConfirmedByUserId *openapi_types.UUID `json:"HostKeyConfirmedByUserId,omitempty"`
+
+	// HostKeyFingerprint The `SHA256:` fingerprint of the pinned host key.
+	HostKeyFingerprint *string            `json:"HostKeyFingerprint,omitempty"`
+	Id                 openapi_types.UUID `json:"Id"`
+	KeyPinned          bool               `json:"KeyPinned"`
+
+	// PendingHostKeyFingerprint The `SHA256:` fingerprint of a key that was fetched or pasted and is not confirmed yet.
+	PendingHostKeyFingerprint *string `json:"PendingHostKeyFingerprint,omitempty"`
+	Port                      int     `json:"Port"`
+
+	// Position The deploy order, from 1.
+	Position int `json:"Position"`
+}
+
+// DeployTargetHostInput defines model for DeployTargetHostInput.
+type DeployTargetHostInput struct {
+	Host string `json:"Host"`
+
+	// Port Defaults to 22.
+	Port *int `json:"Port,omitempty"`
+}
+
+// DeployTargetKind defines model for DeployTargetKind.
+type DeployTargetKind string
+
+// DeployTargetListResponse defines model for DeployTargetListResponse.
+type DeployTargetListResponse struct {
+	Data  *[]DeployTarget `json:"Data,omitempty"`
+	Error *ErrorDetail    `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// DeployTargetNotReady defines model for DeployTargetNotReady.
+type DeployTargetNotReady string
+
+// DeployTargetResponse defines model for DeployTargetResponse.
+type DeployTargetResponse struct {
+	Data  *DeployTarget `json:"Data,omitempty"`
+	Error *ErrorDetail  `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// DeployTargetRolling defines model for DeployTargetRolling.
+type DeployTargetRolling struct {
+	BatchPauseSeconds *int `json:"BatchPauseSeconds,omitempty"`
+
+	// BatchSize How many hosts switch together. At most the number of hosts of the target.
+	BatchSize *int `json:"BatchSize,omitempty"`
+}
+
+// DeployTargetSettings Only the block of the target's kind may be sent: `Ssh` for `ssh`, `Compose` for `compose`. At most 4 KiB.
+type DeployTargetSettings struct {
+	// AllowRoot Lets `Username` be `root`. A warning, not a recommendation.
+	AllowRoot *bool                        `json:"AllowRoot,omitempty"`
+	Compose   *DeployTargetComposeSettings `json:"Compose,omitempty"`
+	Rolling   *DeployTargetRolling         `json:"Rolling,omitempty"`
+	Ssh       *DeployTargetSshSettings     `json:"Ssh,omitempty"`
+}
+
+// DeployTargetSshSettings defines model for DeployTargetSshSettings.
+type DeployTargetSshSettings struct {
+	PostSwitchCommand *string `json:"PostSwitchCommand,omitempty"`
+	PreSwitchCommand  *string `json:"PreSwitchCommand,omitempty"`
+
+	// ReloadCommand A single line that runs on the host after the switch. Written by an admin only.
+	ReloadCommand *string `json:"ReloadCommand,omitempty"`
+
+	// Shared Names of files and folders kept in `shared/` and linked into each release.
+	Shared *[]string `json:"Shared,omitempty"`
 }
 
 // Deployment defines model for Deployment.
@@ -365,6 +564,9 @@ type EnvironmentRules struct {
 	// AllowAdminBypass An Admin may skip the reviewers and the timer, with a reason and a second factor.
 	AllowAdminBypass bool `json:"AllowAdminBypass"`
 
+	// AllowExtraDeployEgress A job that deploys to a target may also reach hosts its pipeline file lists under `network.egress`. Off by default: such a job reaches the hosts of its target and nothing else.
+	AllowExtraDeployEgress bool `json:"AllowExtraDeployEgress"`
+
 	// AllowPullRequests Pull requests from the same repository may deploy here. Pull requests from forks never do.
 	AllowPullRequests bool `json:"AllowPullRequests"`
 
@@ -395,23 +597,24 @@ type EnvironmentRules struct {
 
 // EnvironmentRulesInput Any subset of the rules. A field left out keeps its current value, or its default on create.
 type EnvironmentRulesInput struct {
-	AllowAdminBypass     *bool                 `json:"AllowAdminBypass,omitempty"`
-	AllowPullRequests    *bool                 `json:"AllowPullRequests,omitempty"`
-	AllowSelfApproval    *bool                 `json:"AllowSelfApproval,omitempty"`
-	AllowedPlugins       *[]string             `json:"AllowedPlugins,omitempty"`
-	AllowedRefs          *[]EnvironmentRef     `json:"AllowedRefs,omitempty"`
-	ApprovalTimeoutHours *int                  `json:"ApprovalTimeoutHours,omitempty"`
-	RequirePinnedImages  *bool                 `json:"RequirePinnedImages,omitempty"`
-	RequiredApprovals    *int                  `json:"RequiredApprovals,omitempty"`
-	RequiredIsolation    *EnvironmentIsolation `json:"RequiredIsolation,omitempty"`
-	Reviewers            *EnvironmentReviewers `json:"Reviewers,omitempty"`
-	SupersedePending     *bool                 `json:"SupersedePending,omitempty"`
-	WaitMinutes          *int                  `json:"WaitMinutes,omitempty"`
+	AllowAdminBypass       *bool                 `json:"AllowAdminBypass,omitempty"`
+	AllowExtraDeployEgress *bool                 `json:"AllowExtraDeployEgress,omitempty"`
+	AllowPullRequests      *bool                 `json:"AllowPullRequests,omitempty"`
+	AllowSelfApproval      *bool                 `json:"AllowSelfApproval,omitempty"`
+	AllowedPlugins         *[]string             `json:"AllowedPlugins,omitempty"`
+	AllowedRefs            *[]EnvironmentRef     `json:"AllowedRefs,omitempty"`
+	ApprovalTimeoutHours   *int                  `json:"ApprovalTimeoutHours,omitempty"`
+	RequirePinnedImages    *bool                 `json:"RequirePinnedImages,omitempty"`
+	RequiredApprovals      *int                  `json:"RequiredApprovals,omitempty"`
+	RequiredIsolation      *EnvironmentIsolation `json:"RequiredIsolation,omitempty"`
+	Reviewers              *EnvironmentReviewers `json:"Reviewers,omitempty"`
+	SupersedePending       *bool                 `json:"SupersedePending,omitempty"`
+	WaitMinutes            *int                  `json:"WaitMinutes,omitempty"`
 }
 
 // ErrorDetail defines model for ErrorDetail.
 type ErrorDetail struct {
-	// Code Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`, `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT` or `REVIEWER_NOT_ELIGIBLE`.
+	// Code Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`, `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT`, `REVIEWER_NOT_ELIGIBLE`, `TARGET_EXISTS`, `TARGET_DUPLICATE`, `TARGET_VERSION_CONFLICT`, `TARGET_HOST_BLOCKED`, `TARGET_HOST_UNREACHABLE`, `TARGET_KEY_NOT_FOUND`, `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
 	//
 	// Example: INTERNAL
 	Code    string              `json:"Code"`
@@ -457,6 +660,51 @@ type PauseEnvironmentRequest struct {
 	Reason string `json:"Reason"`
 }
 
+// RemoveDeployTargetHostRequest defines model for RemoveDeployTargetHostRequest.
+type RemoveDeployTargetHostRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+	Version       int64         `json:"Version"`
+}
+
+// ReorderDeployTargetHostsRequest defines model for ReorderDeployTargetHostsRequest.
+type ReorderDeployTargetHostsRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor        `json:"CurrentFactor"`
+	HostIds       []openapi_types.UUID `json:"HostIds"`
+	Version       int64                `json:"Version"`
+}
+
+// SetDeployTargetPendingHostKeyRequest defines model for SetDeployTargetPendingHostKeyRequest.
+type SetDeployTargetPendingHostKeyRequest struct {
+	HostKey string `json:"HostKey"`
+}
+
+// UpdateDeployTargetHostRequest defines model for UpdateDeployTargetHostRequest.
+type UpdateDeployTargetHostRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+	Host          *string       `json:"Host,omitempty"`
+	Port          *int          `json:"Port,omitempty"`
+	Version       int64         `json:"Version"`
+}
+
+// UpdateDeployTargetRequest defines model for UpdateDeployTargetRequest.
+type UpdateDeployTargetRequest struct {
+	AllowedImages *[]string `json:"AllowedImages,omitempty"`
+
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+	DeployPath    *string       `json:"DeployPath,omitempty"`
+	KeepReleases  *int          `json:"KeepReleases,omitempty"`
+	KeySecretName *string       `json:"KeySecretName,omitempty"`
+
+	// Settings Only the block of the target's kind may be sent: `Ssh` for `ssh`, `Compose` for `compose`. At most 4 KiB.
+	Settings *DeployTargetSettings `json:"Settings,omitempty"`
+	Username *string               `json:"Username,omitempty"`
+	Version  int64                 `json:"Version"`
+}
+
 // UpdateEnvironmentRequest defines model for UpdateEnvironmentRequest.
 type UpdateEnvironmentRequest struct {
 	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
@@ -492,6 +740,12 @@ type ProjectId = openapi_types.UUID
 // RunId defines model for RunId.
 type RunId = openapi_types.UUID
 
+// TargetHostId defines model for TargetHostId.
+type TargetHostId = openapi_types.UUID
+
+// TargetName defines model for TargetName.
+type TargetName = string
+
 // Error defines model for Error.
 type Error = ErrorResponse
 
@@ -512,6 +766,12 @@ type ListDeploymentsParams struct {
 	Limit *Limit `form:"Limit,omitempty" json:"Limit,omitempty"`
 }
 
+// ListDeployTargetsParams defines parameters for ListDeployTargets.
+type ListDeployTargetsParams struct {
+	Page  *Page  `form:"Page,omitempty" json:"Page,omitempty"`
+	Limit *Limit `form:"Limit,omitempty" json:"Limit,omitempty"`
+}
+
 // CreateEnvironmentJSONRequestBody defines body for CreateEnvironment for application/json ContentType.
 type CreateEnvironmentJSONRequestBody = CreateEnvironmentRequest
 
@@ -526,6 +786,36 @@ type RemoveEnvironmentJSONRequestBody = CurrentFactorRequest
 
 // ResumeEnvironmentJSONRequestBody defines body for ResumeEnvironment for application/json ContentType.
 type ResumeEnvironmentJSONRequestBody = CurrentFactorRequest
+
+// CreateDeployTargetJSONRequestBody defines body for CreateDeployTarget for application/json ContentType.
+type CreateDeployTargetJSONRequestBody = CreateDeployTargetRequest
+
+// UpdateDeployTargetJSONRequestBody defines body for UpdateDeployTarget for application/json ContentType.
+type UpdateDeployTargetJSONRequestBody = UpdateDeployTargetRequest
+
+// GenerateDeployTargetKeyJSONRequestBody defines body for GenerateDeployTargetKey for application/json ContentType.
+type GenerateDeployTargetKeyJSONRequestBody = CurrentFactorRequest
+
+// AddDeployTargetHostJSONRequestBody defines body for AddDeployTargetHost for application/json ContentType.
+type AddDeployTargetHostJSONRequestBody = AddDeployTargetHostRequest
+
+// ReorderDeployTargetHostsJSONRequestBody defines body for ReorderDeployTargetHosts for application/json ContentType.
+type ReorderDeployTargetHostsJSONRequestBody = ReorderDeployTargetHostsRequest
+
+// UpdateDeployTargetHostJSONRequestBody defines body for UpdateDeployTargetHost for application/json ContentType.
+type UpdateDeployTargetHostJSONRequestBody = UpdateDeployTargetHostRequest
+
+// ConfirmDeployTargetHostKeyJSONRequestBody defines body for ConfirmDeployTargetHostKey for application/json ContentType.
+type ConfirmDeployTargetHostKeyJSONRequestBody = ConfirmDeployTargetHostKeyRequest
+
+// SetDeployTargetPendingHostKeyJSONRequestBody defines body for SetDeployTargetPendingHostKey for application/json ContentType.
+type SetDeployTargetPendingHostKeyJSONRequestBody = SetDeployTargetPendingHostKeyRequest
+
+// RemoveDeployTargetHostJSONRequestBody defines body for RemoveDeployTargetHost for application/json ContentType.
+type RemoveDeployTargetHostJSONRequestBody = RemoveDeployTargetHostRequest
+
+// RemoveDeployTargetJSONRequestBody defines body for RemoveDeployTarget for application/json ContentType.
+type RemoveDeployTargetJSONRequestBody = CurrentFactorRequest
 
 // ApproveDeploymentJSONRequestBody defines body for ApproveDeployment for application/json ContentType.
 type ApproveDeploymentJSONRequestBody = DecideDeploymentRequest
@@ -565,6 +855,45 @@ type ServerInterface interface {
 	// ResumeEnvironment Allow deploys to a paused environment again
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/resume)
 	ResumeEnvironment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName)
+	// ListDeployTargets List the deploy targets of an environment
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets)
+	ListDeployTargets(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, params ListDeployTargetsParams)
+	// CreateDeployTarget Create a deploy target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets)
+	CreateDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName)
+	// GetDeployTarget Read a deploy target
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName})
+	GetDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
+	// UpdateDeployTarget Change a deploy target
+	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName})
+	UpdateDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
+	// GenerateDeployTargetKey Make the deploy key of a target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/generate-key)
+	GenerateDeployTargetKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
+	// AddDeployTargetHost Add a host to a target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts)
+	AddDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
+	// ReorderDeployTargetHosts Change the deploy order of the hosts
+	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts-order)
+	ReorderDeployTargetHosts(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
+	// UpdateDeployTargetHost Change the address of a host
+	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId})
+	UpdateDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId)
+	// ConfirmDeployTargetHostKey Pin the pending host key of a host
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/confirm-host-key)
+	ConfirmDeployTargetHostKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId)
+	// FetchDeployTargetHostKey Fetch the host key from the server
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/fetch-host-key)
+	FetchDeployTargetHostKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId)
+	// SetDeployTargetPendingHostKey Paste the host key of a host
+	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/pending-host-key)
+	SetDeployTargetPendingHostKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId)
+	// RemoveDeployTargetHost Remove a host from a target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/remove)
+	RemoveDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId)
+	// RemoveDeployTarget Remove a deploy target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/remove)
+	RemoveDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
 	// ListRunApprovals List the approval requests of a run
 	// (GET /organizations/{id}/projects/{projectId}/runs/{runId}/approvals)
 	ListRunApprovals(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId)
@@ -634,6 +963,84 @@ func (_ Unimplemented) RemoveEnvironment(w http.ResponseWriter, r *http.Request,
 // ResumeEnvironment Allow deploys to a paused environment again
 // (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/resume)
 func (_ Unimplemented) ResumeEnvironment(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListDeployTargets List the deploy targets of an environment
+// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets)
+func (_ Unimplemented) ListDeployTargets(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, params ListDeployTargetsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateDeployTarget Create a deploy target
+// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets)
+func (_ Unimplemented) CreateDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetDeployTarget Read a deploy target
+// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName})
+func (_ Unimplemented) GetDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateDeployTarget Change a deploy target
+// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName})
+func (_ Unimplemented) UpdateDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GenerateDeployTargetKey Make the deploy key of a target
+// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/generate-key)
+func (_ Unimplemented) GenerateDeployTargetKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// AddDeployTargetHost Add a host to a target
+// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts)
+func (_ Unimplemented) AddDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ReorderDeployTargetHosts Change the deploy order of the hosts
+// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts-order)
+func (_ Unimplemented) ReorderDeployTargetHosts(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateDeployTargetHost Change the address of a host
+// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId})
+func (_ Unimplemented) UpdateDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ConfirmDeployTargetHostKey Pin the pending host key of a host
+// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/confirm-host-key)
+func (_ Unimplemented) ConfirmDeployTargetHostKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// FetchDeployTargetHostKey Fetch the host key from the server
+// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/fetch-host-key)
+func (_ Unimplemented) FetchDeployTargetHostKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetDeployTargetPendingHostKey Paste the host key of a host
+// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/pending-host-key)
+func (_ Unimplemented) SetDeployTargetPendingHostKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// RemoveDeployTargetHost Remove a host from a target
+// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/remove)
+func (_ Unimplemented) RemoveDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// RemoveDeployTarget Remove a deploy target
+// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/remove)
+func (_ Unimplemented) RemoveDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1104,6 +1511,751 @@ func (siw *ServerInterfaceWrapper) ResumeEnvironment(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListDeployTargets operation middleware
+func (siw *ServerInterfaceWrapper) ListDeployTargets(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDeployTargetsParams
+
+	// ------------- Optional query parameter "Page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "Page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "Page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "Limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "Limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "Limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeployTargets(w, r, id, projectId, environmentName, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDeployTarget operation middleware
+func (siw *ServerInterfaceWrapper) CreateDeployTarget(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDeployTarget(w, r, id, projectId, environmentName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDeployTarget operation middleware
+func (siw *ServerInterfaceWrapper) GetDeployTarget(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDeployTarget(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDeployTarget operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDeployTarget(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDeployTarget(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GenerateDeployTargetKey operation middleware
+func (siw *ServerInterfaceWrapper) GenerateDeployTargetKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GenerateDeployTargetKey(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddDeployTargetHost operation middleware
+func (siw *ServerInterfaceWrapper) AddDeployTargetHost(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddDeployTargetHost(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReorderDeployTargetHosts operation middleware
+func (siw *ServerInterfaceWrapper) ReorderDeployTargetHosts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReorderDeployTargetHosts(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDeployTargetHost operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDeployTargetHost(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "hostId" -------------
+	var hostId TargetHostId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "hostId", chi.URLParam(r, "hostId"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "hostId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDeployTargetHost(w, r, id, projectId, environmentName, targetName, hostId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfirmDeployTargetHostKey operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmDeployTargetHostKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "hostId" -------------
+	var hostId TargetHostId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "hostId", chi.URLParam(r, "hostId"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "hostId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmDeployTargetHostKey(w, r, id, projectId, environmentName, targetName, hostId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// FetchDeployTargetHostKey operation middleware
+func (siw *ServerInterfaceWrapper) FetchDeployTargetHostKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "hostId" -------------
+	var hostId TargetHostId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "hostId", chi.URLParam(r, "hostId"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "hostId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FetchDeployTargetHostKey(w, r, id, projectId, environmentName, targetName, hostId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetDeployTargetPendingHostKey operation middleware
+func (siw *ServerInterfaceWrapper) SetDeployTargetPendingHostKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "hostId" -------------
+	var hostId TargetHostId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "hostId", chi.URLParam(r, "hostId"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "hostId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetDeployTargetPendingHostKey(w, r, id, projectId, environmentName, targetName, hostId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveDeployTargetHost operation middleware
+func (siw *ServerInterfaceWrapper) RemoveDeployTargetHost(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "hostId" -------------
+	var hostId TargetHostId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "hostId", chi.URLParam(r, "hostId"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "hostId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveDeployTargetHost(w, r, id, projectId, environmentName, targetName, hostId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveDeployTarget operation middleware
+func (siw *ServerInterfaceWrapper) RemoveDeployTarget(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveDeployTarget(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListRunApprovals operation middleware
 func (siw *ServerInterfaceWrapper) ListRunApprovals(w http.ResponseWriter, r *http.Request) {
 
@@ -1443,6 +2595,45 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/deployments", wrapper.ListDeployments)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets", wrapper.ListDeployTargets)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets", wrapper.CreateDeployTarget)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}", wrapper.GetDeployTarget)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}", wrapper.UpdateDeployTarget)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/remove", wrapper.RemoveDeployTarget)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/generate-key", wrapper.GenerateDeployTargetKey)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts", wrapper.AddDeployTargetHost)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts-order", wrapper.ReorderDeployTargetHosts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}", wrapper.UpdateDeployTargetHost)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/remove", wrapper.RemoveDeployTargetHost)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/fetch-host-key", wrapper.FetchDeployTargetHostKey)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/pending-host-key", wrapper.SetDeployTargetPendingHostKey)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/confirm-host-key", wrapper.ConfirmDeployTargetHostKey)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/runs/{runId}/approvals", wrapper.ListRunApprovals)
@@ -1838,6 +3029,566 @@ func (response ResumeEnvironmentdefaultJSONResponse) VisitResumeEnvironmentRespo
 	return err
 }
 
+type ListDeployTargetsRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	Params          ListDeployTargetsParams
+}
+
+type ListDeployTargetsResponseObject interface {
+	VisitListDeployTargetsResponse(w http.ResponseWriter) error
+}
+
+type ListDeployTargets200JSONResponse DeployTargetListResponse
+
+func (response ListDeployTargets200JSONResponse) VisitListDeployTargetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeployTargetsdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response ListDeployTargetsdefaultJSONResponse) VisitListDeployTargetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDeployTargetRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	Body            *CreateDeployTargetJSONRequestBody
+}
+
+type CreateDeployTargetResponseObject interface {
+	VisitCreateDeployTargetResponse(w http.ResponseWriter) error
+}
+
+type CreateDeployTarget201JSONResponse DeployTargetResponse
+
+func (response CreateDeployTarget201JSONResponse) VisitCreateDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDeployTargetdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response CreateDeployTargetdefaultJSONResponse) VisitCreateDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDeployTargetRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+}
+
+type GetDeployTargetResponseObject interface {
+	VisitGetDeployTargetResponse(w http.ResponseWriter) error
+}
+
+type GetDeployTarget200JSONResponse DeployTargetResponse
+
+func (response GetDeployTarget200JSONResponse) VisitGetDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDeployTargetdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response GetDeployTargetdefaultJSONResponse) VisitGetDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDeployTargetRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	Body            *UpdateDeployTargetJSONRequestBody
+}
+
+type UpdateDeployTargetResponseObject interface {
+	VisitUpdateDeployTargetResponse(w http.ResponseWriter) error
+}
+
+type UpdateDeployTarget200JSONResponse DeployTargetResponse
+
+func (response UpdateDeployTarget200JSONResponse) VisitUpdateDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDeployTargetdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response UpdateDeployTargetdefaultJSONResponse) VisitUpdateDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateDeployTargetKeyRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	Body            *GenerateDeployTargetKeyJSONRequestBody
+}
+
+type GenerateDeployTargetKeyResponseObject interface {
+	VisitGenerateDeployTargetKeyResponse(w http.ResponseWriter) error
+}
+
+type GenerateDeployTargetKey200JSONResponse DeployTargetResponse
+
+func (response GenerateDeployTargetKey200JSONResponse) VisitGenerateDeployTargetKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateDeployTargetKeydefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response GenerateDeployTargetKeydefaultJSONResponse) VisitGenerateDeployTargetKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDeployTargetHostRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	Body            *AddDeployTargetHostJSONRequestBody
+}
+
+type AddDeployTargetHostResponseObject interface {
+	VisitAddDeployTargetHostResponse(w http.ResponseWriter) error
+}
+
+type AddDeployTargetHost200JSONResponse DeployTargetResponse
+
+func (response AddDeployTargetHost200JSONResponse) VisitAddDeployTargetHostResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDeployTargetHostdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response AddDeployTargetHostdefaultJSONResponse) VisitAddDeployTargetHostResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderDeployTargetHostsRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	Body            *ReorderDeployTargetHostsJSONRequestBody
+}
+
+type ReorderDeployTargetHostsResponseObject interface {
+	VisitReorderDeployTargetHostsResponse(w http.ResponseWriter) error
+}
+
+type ReorderDeployTargetHosts200JSONResponse DeployTargetResponse
+
+func (response ReorderDeployTargetHosts200JSONResponse) VisitReorderDeployTargetHostsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderDeployTargetHostsdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response ReorderDeployTargetHostsdefaultJSONResponse) VisitReorderDeployTargetHostsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDeployTargetHostRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	HostId          TargetHostId    `json:"hostId"`
+	Body            *UpdateDeployTargetHostJSONRequestBody
+}
+
+type UpdateDeployTargetHostResponseObject interface {
+	VisitUpdateDeployTargetHostResponse(w http.ResponseWriter) error
+}
+
+type UpdateDeployTargetHost200JSONResponse DeployTargetResponse
+
+func (response UpdateDeployTargetHost200JSONResponse) VisitUpdateDeployTargetHostResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDeployTargetHostdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response UpdateDeployTargetHostdefaultJSONResponse) VisitUpdateDeployTargetHostResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmDeployTargetHostKeyRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	HostId          TargetHostId    `json:"hostId"`
+	Body            *ConfirmDeployTargetHostKeyJSONRequestBody
+}
+
+type ConfirmDeployTargetHostKeyResponseObject interface {
+	VisitConfirmDeployTargetHostKeyResponse(w http.ResponseWriter) error
+}
+
+type ConfirmDeployTargetHostKey200JSONResponse DeployTargetResponse
+
+func (response ConfirmDeployTargetHostKey200JSONResponse) VisitConfirmDeployTargetHostKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmDeployTargetHostKeydefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response ConfirmDeployTargetHostKeydefaultJSONResponse) VisitConfirmDeployTargetHostKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FetchDeployTargetHostKeyRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	HostId          TargetHostId    `json:"hostId"`
+}
+
+type FetchDeployTargetHostKeyResponseObject interface {
+	VisitFetchDeployTargetHostKeyResponse(w http.ResponseWriter) error
+}
+
+type FetchDeployTargetHostKey200JSONResponse DeployTargetResponse
+
+func (response FetchDeployTargetHostKey200JSONResponse) VisitFetchDeployTargetHostKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FetchDeployTargetHostKeydefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response FetchDeployTargetHostKeydefaultJSONResponse) VisitFetchDeployTargetHostKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetDeployTargetPendingHostKeyRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	HostId          TargetHostId    `json:"hostId"`
+	Body            *SetDeployTargetPendingHostKeyJSONRequestBody
+}
+
+type SetDeployTargetPendingHostKeyResponseObject interface {
+	VisitSetDeployTargetPendingHostKeyResponse(w http.ResponseWriter) error
+}
+
+type SetDeployTargetPendingHostKey200JSONResponse DeployTargetResponse
+
+func (response SetDeployTargetPendingHostKey200JSONResponse) VisitSetDeployTargetPendingHostKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetDeployTargetPendingHostKeydefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response SetDeployTargetPendingHostKeydefaultJSONResponse) VisitSetDeployTargetPendingHostKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDeployTargetHostRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	HostId          TargetHostId    `json:"hostId"`
+	Body            *RemoveDeployTargetHostJSONRequestBody
+}
+
+type RemoveDeployTargetHostResponseObject interface {
+	VisitRemoveDeployTargetHostResponse(w http.ResponseWriter) error
+}
+
+type RemoveDeployTargetHost200JSONResponse DeployTargetResponse
+
+func (response RemoveDeployTargetHost200JSONResponse) VisitRemoveDeployTargetHostResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDeployTargetHostdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response RemoveDeployTargetHostdefaultJSONResponse) VisitRemoveDeployTargetHostResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDeployTargetRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	Body            *RemoveDeployTargetJSONRequestBody
+}
+
+type RemoveDeployTargetResponseObject interface {
+	VisitRemoveDeployTargetResponse(w http.ResponseWriter) error
+}
+
+type RemoveDeployTarget200JSONResponse DeployTargetResponse
+
+func (response RemoveDeployTarget200JSONResponse) VisitRemoveDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDeployTargetdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response RemoveDeployTargetdefaultJSONResponse) VisitRemoveDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListRunApprovalsRequestObject struct {
 	Id        Id        `json:"id"`
 	ProjectId ProjectId `json:"projectId"`
@@ -2037,6 +3788,45 @@ type StrictServerInterface interface {
 	// ResumeEnvironment Allow deploys to a paused environment again
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/resume)
 	ResumeEnvironment(ctx context.Context, request ResumeEnvironmentRequestObject) (ResumeEnvironmentResponseObject, error)
+	// ListDeployTargets List the deploy targets of an environment
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets)
+	ListDeployTargets(ctx context.Context, request ListDeployTargetsRequestObject) (ListDeployTargetsResponseObject, error)
+	// CreateDeployTarget Create a deploy target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets)
+	CreateDeployTarget(ctx context.Context, request CreateDeployTargetRequestObject) (CreateDeployTargetResponseObject, error)
+	// GetDeployTarget Read a deploy target
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName})
+	GetDeployTarget(ctx context.Context, request GetDeployTargetRequestObject) (GetDeployTargetResponseObject, error)
+	// UpdateDeployTarget Change a deploy target
+	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName})
+	UpdateDeployTarget(ctx context.Context, request UpdateDeployTargetRequestObject) (UpdateDeployTargetResponseObject, error)
+	// GenerateDeployTargetKey Make the deploy key of a target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/generate-key)
+	GenerateDeployTargetKey(ctx context.Context, request GenerateDeployTargetKeyRequestObject) (GenerateDeployTargetKeyResponseObject, error)
+	// AddDeployTargetHost Add a host to a target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts)
+	AddDeployTargetHost(ctx context.Context, request AddDeployTargetHostRequestObject) (AddDeployTargetHostResponseObject, error)
+	// ReorderDeployTargetHosts Change the deploy order of the hosts
+	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts-order)
+	ReorderDeployTargetHosts(ctx context.Context, request ReorderDeployTargetHostsRequestObject) (ReorderDeployTargetHostsResponseObject, error)
+	// UpdateDeployTargetHost Change the address of a host
+	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId})
+	UpdateDeployTargetHost(ctx context.Context, request UpdateDeployTargetHostRequestObject) (UpdateDeployTargetHostResponseObject, error)
+	// ConfirmDeployTargetHostKey Pin the pending host key of a host
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/confirm-host-key)
+	ConfirmDeployTargetHostKey(ctx context.Context, request ConfirmDeployTargetHostKeyRequestObject) (ConfirmDeployTargetHostKeyResponseObject, error)
+	// FetchDeployTargetHostKey Fetch the host key from the server
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/fetch-host-key)
+	FetchDeployTargetHostKey(ctx context.Context, request FetchDeployTargetHostKeyRequestObject) (FetchDeployTargetHostKeyResponseObject, error)
+	// SetDeployTargetPendingHostKey Paste the host key of a host
+	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/pending-host-key)
+	SetDeployTargetPendingHostKey(ctx context.Context, request SetDeployTargetPendingHostKeyRequestObject) (SetDeployTargetPendingHostKeyResponseObject, error)
+	// RemoveDeployTargetHost Remove a host from a target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/remove)
+	RemoveDeployTargetHost(ctx context.Context, request RemoveDeployTargetHostRequestObject) (RemoveDeployTargetHostResponseObject, error)
+	// RemoveDeployTarget Remove a deploy target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/remove)
+	RemoveDeployTarget(ctx context.Context, request RemoveDeployTargetRequestObject) (RemoveDeployTargetResponseObject, error)
 	// ListRunApprovals List the approval requests of a run
 	// (GET /organizations/{id}/projects/{projectId}/runs/{runId}/approvals)
 	ListRunApprovals(ctx context.Context, request ListRunApprovalsRequestObject) (ListRunApprovalsResponseObject, error)
@@ -2369,6 +4159,457 @@ func (sh *strictHandler) ResumeEnvironment(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ResumeEnvironmentResponseObject); ok {
 		if err := validResponse.VisitResumeEnvironmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeployTargets operation middleware
+func (sh *strictHandler) ListDeployTargets(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, params ListDeployTargetsParams) {
+	var request ListDeployTargetsRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDeployTargets(ctx, request.(ListDeployTargetsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeployTargets")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeployTargetsResponseObject); ok {
+		if err := validResponse.VisitListDeployTargetsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDeployTarget operation middleware
+func (sh *strictHandler) CreateDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName) {
+	var request CreateDeployTargetRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+
+	var body CreateDeployTargetJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDeployTarget(ctx, request.(CreateDeployTargetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDeployTarget")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDeployTargetResponseObject); ok {
+		if err := validResponse.VisitCreateDeployTargetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDeployTarget operation middleware
+func (sh *strictHandler) GetDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request GetDeployTargetRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDeployTarget(ctx, request.(GetDeployTargetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDeployTarget")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDeployTargetResponseObject); ok {
+		if err := validResponse.VisitGetDeployTargetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDeployTarget operation middleware
+func (sh *strictHandler) UpdateDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request UpdateDeployTargetRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	var body UpdateDeployTargetJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDeployTarget(ctx, request.(UpdateDeployTargetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDeployTarget")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDeployTargetResponseObject); ok {
+		if err := validResponse.VisitUpdateDeployTargetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GenerateDeployTargetKey operation middleware
+func (sh *strictHandler) GenerateDeployTargetKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request GenerateDeployTargetKeyRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	var body GenerateDeployTargetKeyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GenerateDeployTargetKey(ctx, request.(GenerateDeployTargetKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GenerateDeployTargetKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GenerateDeployTargetKeyResponseObject); ok {
+		if err := validResponse.VisitGenerateDeployTargetKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddDeployTargetHost operation middleware
+func (sh *strictHandler) AddDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request AddDeployTargetHostRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	var body AddDeployTargetHostJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddDeployTargetHost(ctx, request.(AddDeployTargetHostRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddDeployTargetHost")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddDeployTargetHostResponseObject); ok {
+		if err := validResponse.VisitAddDeployTargetHostResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReorderDeployTargetHosts operation middleware
+func (sh *strictHandler) ReorderDeployTargetHosts(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request ReorderDeployTargetHostsRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	var body ReorderDeployTargetHostsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReorderDeployTargetHosts(ctx, request.(ReorderDeployTargetHostsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReorderDeployTargetHosts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReorderDeployTargetHostsResponseObject); ok {
+		if err := validResponse.VisitReorderDeployTargetHostsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDeployTargetHost operation middleware
+func (sh *strictHandler) UpdateDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	var request UpdateDeployTargetHostRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+	request.HostId = hostId
+
+	var body UpdateDeployTargetHostJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDeployTargetHost(ctx, request.(UpdateDeployTargetHostRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDeployTargetHost")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDeployTargetHostResponseObject); ok {
+		if err := validResponse.VisitUpdateDeployTargetHostResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConfirmDeployTargetHostKey operation middleware
+func (sh *strictHandler) ConfirmDeployTargetHostKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	var request ConfirmDeployTargetHostKeyRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+	request.HostId = hostId
+
+	var body ConfirmDeployTargetHostKeyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmDeployTargetHostKey(ctx, request.(ConfirmDeployTargetHostKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmDeployTargetHostKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmDeployTargetHostKeyResponseObject); ok {
+		if err := validResponse.VisitConfirmDeployTargetHostKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// FetchDeployTargetHostKey operation middleware
+func (sh *strictHandler) FetchDeployTargetHostKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	var request FetchDeployTargetHostKeyRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+	request.HostId = hostId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.FetchDeployTargetHostKey(ctx, request.(FetchDeployTargetHostKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "FetchDeployTargetHostKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(FetchDeployTargetHostKeyResponseObject); ok {
+		if err := validResponse.VisitFetchDeployTargetHostKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetDeployTargetPendingHostKey operation middleware
+func (sh *strictHandler) SetDeployTargetPendingHostKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	var request SetDeployTargetPendingHostKeyRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+	request.HostId = hostId
+
+	var body SetDeployTargetPendingHostKeyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetDeployTargetPendingHostKey(ctx, request.(SetDeployTargetPendingHostKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetDeployTargetPendingHostKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetDeployTargetPendingHostKeyResponseObject); ok {
+		if err := validResponse.VisitSetDeployTargetPendingHostKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveDeployTargetHost operation middleware
+func (sh *strictHandler) RemoveDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId) {
+	var request RemoveDeployTargetHostRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+	request.HostId = hostId
+
+	var body RemoveDeployTargetHostJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveDeployTargetHost(ctx, request.(RemoveDeployTargetHostRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveDeployTargetHost")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveDeployTargetHostResponseObject); ok {
+		if err := validResponse.VisitRemoveDeployTargetHostResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveDeployTarget operation middleware
+func (sh *strictHandler) RemoveDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request RemoveDeployTargetRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	var body RemoveDeployTargetJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveDeployTarget(ctx, request.(RemoveDeployTargetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveDeployTarget")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveDeployTargetResponseObject); ok {
+		if err := validResponse.VisitRemoveDeployTargetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

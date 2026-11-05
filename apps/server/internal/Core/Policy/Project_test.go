@@ -181,6 +181,10 @@ func TestEnvironmentActionsFollowTheProjectRole(t *testing.T) {
 		{"a developer may approve a deployment", member(policy.RoleDeveloper), policy.DeploymentApprove, on(project), true},
 		{"a viewer may not approve a deployment", member(policy.RoleViewer), policy.DeploymentApprove, on(project), false},
 		{"a maintainer may not bypass the rules", member(policy.RoleMaintainer), policy.EnvironmentBypass, on(project), false},
+		{"a maintainer may roll back a deployment", member(policy.RoleMaintainer), policy.DeploymentRollback, on(project), true},
+		{"a developer may not roll back a deployment", member(policy.RoleDeveloper), policy.DeploymentRollback, on(project), false},
+		{"a viewer may not roll back a deployment", member(policy.RoleViewer), policy.DeploymentRollback, on(project), false},
+		{"a maintainer binding on its project grants a rollback", member(policy.RoleDeveloper), policy.DeploymentRollback, on(project, policy.RoleMaintainer), true},
 		{"an admin binding grants manage on its project", member(policy.RoleDeveloper), policy.EnvironmentManage, on(project, policy.RoleAdmin), true},
 		{"an admin binding grants bypass on its project", member(policy.RoleMaintainer), policy.EnvironmentBypass, on(project, policy.RoleAdmin), true},
 		{"an admin binding grants nothing on another project", member(policy.RoleDeveloper), policy.EnvironmentManage, on(other), false},
@@ -196,12 +200,12 @@ func TestEnvironmentActionsFollowTheProjectRole(t *testing.T) {
 			assert.Equal(t, tt.want, policy.Can(tt.subject, tt.action, tt.resource))
 		})
 	}
-	for _, a := range []policy.Action{policy.EnvironmentManage, policy.EnvironmentPause, policy.EnvironmentBypass, policy.DeploymentApprove} {
+	for _, a := range []policy.Action{policy.EnvironmentManage, policy.EnvironmentPause, policy.EnvironmentBypass, policy.DeploymentApprove, policy.DeploymentRollback} {
 		assert.True(t, policy.IsProjectAction(a), "%s", a)
 		assert.False(t, policy.IsTokenAction(a), "%s", a)
 		assert.Contains(t, policy.Actions(), a)
 	}
-	for _, a := range []policy.Action{policy.EnvironmentManage, policy.EnvironmentBypass, policy.DeploymentApprove} {
+	for _, a := range []policy.Action{policy.EnvironmentManage, policy.EnvironmentBypass, policy.DeploymentApprove, policy.DeploymentRollback} {
 		assert.True(t, policy.IsSensitive(a), "%s", a)
 	}
 	assert.False(t, policy.IsSensitive(policy.EnvironmentPause), "pausing during an incident never waits for a second factor")

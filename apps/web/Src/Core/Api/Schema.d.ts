@@ -1652,6 +1652,242 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the deploy targets of an environment
+         * @description Needs `project.read` on the project. Each target shows its hosts, whether every host key is pinned (`Ready`) and the public half of its deploy key. No private key, and no secret value, is ever in an answer.
+         */
+        get: operations["listDeployTargets"];
+        put?: never;
+        /**
+         * Create a deploy target
+         * @description Needs `environment.manage` on the project and a fresh `CurrentFactor`. A target has 1 to 10 hosts in deploy order. A host key is pinned later, per host, by `confirm-host-key`; a target with an unpinned host is not `Ready`. `KeySecretName` names a secret of this environment (422 `TARGET_KEY_NOT_FOUND` if it is missing); leave it out and use `generate-key` instead. A bad field is 422 `VALIDATION_FAILED`, a forbidden path is 422 `DEPLOY_PATH_INVALID`, an address Dhow never connects to is 422 `TARGET_HOST_BLOCKED`, a name used twice in the environment is 409 `TARGET_EXISTS`, and the same host, port and path in another target of the organization is 409 `TARGET_DUPLICATE`.
+         */
+        post: operations["createDeployTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a deploy target
+         * @description N e e d s
+         *
+         *     ` p r o j e c t . r e a d `
+         *
+         *     o n
+         *
+         *     t h e
+         *
+         *     p r o j e c t .
+         */
+        get: operations["getDeployTarget"];
+        /**
+         * Change a deploy target
+         * @description Needs `environment.manage` and a fresh `CurrentFactor`. Changes only the fields that are sent. `Version` is the one the caller read: an older one is 409 `TARGET_VERSION_CONFLICT` and changes nothing. The name and the kind never change.
+         */
+        put: operations["updateDeployTarget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a deploy target
+         * @description Needs `environment.manage` and a fresh `CurrentFactor`. The target and its hosts are marked deleted. The secret of its key stays with the environment.
+         */
+        post: operations["removeDeployTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/generate-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the deploy key of a target
+         * @description Needs `environment.manage` and a fresh `CurrentFactor`. Dhow makes an ed25519 key pair and keeps the private half as the secret `<TARGET>_SSH_KEY` of the environment. The answer carries only the public half in `PublicKey`, to put in `authorized_keys` on every host. Doing it again makes a new key and a new version of that secret. If the environment already has a secret with that name that this target did not make, the answer is 409 `TARGET_KEY_NAME_TAKEN` and nothing is written.
+         */
+        post: operations["generateDeployTargetKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a host to a target
+         * @description Needs `environment.manage`, a fresh `CurrentFactor` and the `Version` the caller read. The host goes last. A target has at most 10 hosts: the 11th is 422 `VALIDATION_FAILED` on `Hosts`.
+         */
+        post: operations["addDeployTargetHost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change the deploy order of the hosts
+         * @description Needs `environment.manage`, a fresh `CurrentFactor` and the `Version`. `HostIds` lists every host of the target once, in the new order.
+         */
+        put: operations["reorderDeployTargetHosts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change the address of a host
+         * @description Needs `environment.manage`, a fresh `CurrentFactor` and the `Version`. A new `Host` or `Port` drops the pinned host key and the pending one, because they belong to the old address.
+         */
+        put: operations["updateDeployTargetHost"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a host from a target
+         * @description Needs `environment.manage`, a fresh `CurrentFactor` and the `Version`. The host and its keys are dropped. The last host of a target cannot be removed.
+         */
+        post: operations["removeDeployTargetHost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/fetch-host-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch the host key from the server
+         * @description Needs `environment.manage`. Dhow makes an SSH handshake with the host, without any login, and keeps the key it presents as the pending key of that host. It pins nothing. A private, loopback or cloud metadata address is 422 `TARGET_HOST_BLOCKED`: paste the key instead. A host that does not answer is 502 `TARGET_HOST_UNREACHABLE`.
+         */
+        post: operations["fetchDeployTargetHostKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/pending-host-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Paste the host key of a host
+         * @description Needs `environment.manage`. `HostKey` is a line of `ssh-keyscan` or the content of a `.pub` file. It becomes the pending key of the host and pins nothing. Only ssh-ed25519, ecdsa and ssh-rsa keys are accepted, and ed25519 is chosen when several are pasted.
+         */
+        put: operations["setDeployTargetPendingHostKey"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/confirm-host-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin the pending host key of a host
+         * @description Needs `environment.manage` and a fresh `CurrentFactor`. `Fingerprint` must be the `SHA256:` one of the pending key, as the target showed it, or the answer is 409 `HOST_KEY_FINGERPRINT_MISMATCH`. Without a pending key it is 409 `HOST_KEY_NOT_PENDING`. A key that changes on the server stays pending while the pinned key keeps working. Dhow never pins a key by itself.
+         */
+        post: operations["confirmDeployTargetHostKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/projects/{projectId}/runs/{runId}/approvals": {
         parameters: {
             query?: never;
@@ -3085,7 +3321,7 @@ export interface components {
         };
         ErrorDetail: {
             /**
-             * @description Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`, `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT` or `REVIEWER_NOT_ELIGIBLE`.
+             * @description Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`, `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT`, `REVIEWER_NOT_ELIGIBLE`, `TARGET_EXISTS`, `TARGET_DUPLICATE`, `TARGET_VERSION_CONFLICT`, `TARGET_HOST_BLOCKED`, `TARGET_HOST_UNREACHABLE`, `TARGET_KEY_NOT_FOUND`, `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
              * @example INTERNAL
              */
             Code: string;
@@ -4258,6 +4494,8 @@ export interface components {
             AllowAdminBypass: boolean;
             /** @description A newer run on the same ref replaces an older run still waiting for approval. */
             SupersedePending: boolean;
+            /** @description A job that deploys to a target may also reach hosts its pipeline file lists under `network.egress`. Off by default: such a job reaches the hosts of its target and nothing else. */
+            AllowExtraDeployEgress: boolean;
         };
         /** @description Any subset of the rules. A field left out keeps its current value, or its default on create. */
         EnvironmentRulesInput: {
@@ -4273,6 +4511,7 @@ export interface components {
             RequiredIsolation?: components["schemas"]["EnvironmentIsolation"];
             AllowAdminBypass?: boolean;
             SupersedePending?: boolean;
+            AllowExtraDeployEgress?: boolean;
         };
         Environment: {
             /** Format: uuid */
@@ -4310,6 +4549,151 @@ export interface components {
         };
         EnvironmentListResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["Environment"][];
+        };
+        /** @enum {string} */
+        DeployTargetKind: "ssh" | "compose";
+        DeployTargetRolling: {
+            /** @description How many hosts switch together. At most the number of hosts of the target. */
+            BatchSize?: number;
+            BatchPauseSeconds?: number;
+        };
+        DeployTargetSshSettings: {
+            /** @description A single line that runs on the host after the switch. Written by an admin only. */
+            ReloadCommand?: string;
+            PreSwitchCommand?: string;
+            PostSwitchCommand?: string;
+            /** @description Names of files and folders kept in `shared/` and linked into each release. */
+            Shared?: string[];
+        };
+        DeployTargetComposeSettings: {
+            ProjectName?: string;
+            /** @description A relative path inside the release. Defaults to `compose.yaml`. */
+            ComposeFile?: string;
+            AllowUnsafeCompose?: boolean;
+        };
+        /** @description Only the block of the target's kind may be sent: `Ssh` for `ssh`, `Compose` for `compose`. At most 4 KiB. */
+        DeployTargetSettings: {
+            Rolling?: components["schemas"]["DeployTargetRolling"];
+            /** @description Lets `Username` be `root`. A warning, not a recommendation. */
+            AllowRoot?: boolean;
+            Ssh?: components["schemas"]["DeployTargetSshSettings"];
+            Compose?: components["schemas"]["DeployTargetComposeSettings"];
+        };
+        /** @enum {string} */
+        DeployTargetNotReady: "host_key_unconfirmed" | "key_missing";
+        DeployTargetHost: {
+            /** Format: uuid */
+            Id: string;
+            /** @description The deploy order, from 1. */
+            Position: number;
+            /** @description A DNS name or an IP address. */
+            Host: string;
+            Port: number;
+            KeyPinned: boolean;
+            /** @description The `SHA256:` fingerprint of the pinned host key. */
+            HostKeyFingerprint?: string;
+            /** Format: date-time */
+            HostKeyConfirmedAt?: string;
+            /** Format: uuid */
+            HostKeyConfirmedByUserId?: string;
+            /** @description The `SHA256:` fingerprint of a key that was fetched or pasted and is not confirmed yet. */
+            PendingHostKeyFingerprint?: string;
+        };
+        DeployTarget: {
+            /** Format: uuid */
+            Id: string;
+            /** Format: uuid */
+            EnvironmentId: string;
+            Name: string;
+            Kind: components["schemas"]["DeployTargetKind"];
+            Username: string;
+            /** @description The name of the environment secret that holds the private key. Never its value. */
+            KeySecretName?: string;
+            /** @description The public half of the key Dhow made. Put it in `authorized_keys` on every host. */
+            PublicKey?: string;
+            DeployPath: string;
+            KeepReleases: number;
+            Settings: components["schemas"]["DeployTargetSettings"];
+            AllowedImages: string[];
+            Hosts: components["schemas"]["DeployTargetHost"][];
+            /** @description Every host has a pinned key and the deploy key is set. */
+            Ready: boolean;
+            NotReady: components["schemas"]["DeployTargetNotReady"][];
+            /**
+             * Format: int64
+             * @description Rises with every change that a deploy depends on. Send it back to change the target.
+             */
+            Version: number;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            UpdatedAt: string;
+        };
+        DeployTargetResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DeployTarget"];
+        };
+        DeployTargetListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DeployTarget"][];
+        };
+        DeployTargetHostInput: {
+            Host: string;
+            /** @description Defaults to 22. */
+            Port?: number;
+        };
+        CreateDeployTargetRequest: {
+            Name: string;
+            Kind: components["schemas"]["DeployTargetKind"];
+            Username: string;
+            KeySecretName?: string;
+            DeployPath: string;
+            KeepReleases?: number;
+            Settings?: components["schemas"]["DeployTargetSettings"];
+            AllowedImages?: string[];
+            Hosts: components["schemas"]["DeployTargetHostInput"][];
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        UpdateDeployTargetRequest: {
+            /** Format: int64 */
+            Version: number;
+            Username?: string;
+            KeySecretName?: string;
+            DeployPath?: string;
+            KeepReleases?: number;
+            Settings?: components["schemas"]["DeployTargetSettings"];
+            AllowedImages?: string[];
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        AddDeployTargetHostRequest: {
+            /** Format: int64 */
+            Version: number;
+            Host: string;
+            Port?: number;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        UpdateDeployTargetHostRequest: {
+            /** Format: int64 */
+            Version: number;
+            Host?: string;
+            Port?: number;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        RemoveDeployTargetHostRequest: {
+            /** Format: int64 */
+            Version: number;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        ReorderDeployTargetHostsRequest: {
+            /** Format: int64 */
+            Version: number;
+            HostIds: string[];
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        SetDeployTargetPendingHostKeyRequest: {
+            HostKey: string;
+        };
+        ConfirmDeployTargetHostKeyRequest: {
+            Fingerprint: string;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
         };
         /** @enum {string} */
         DeploymentApprovalState: "pending" | "approved" | "rejected" | "expired" | "superseded" | "canceled" | "bypassed";
@@ -4851,6 +5235,8 @@ export interface components {
         RegistryCredentialId: string;
         ApprovalId: string;
         EnvironmentName: string;
+        TargetName: string;
+        TargetHostId: string;
         Page: number;
         Limit: number;
     };
@@ -7355,6 +7741,390 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeploymentListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listDeployTargets: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of targets. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createDeployTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeployTargetRequest"];
+            };
+        };
+        responses: {
+            /** @description The new target. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getDeployTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The target. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateDeployTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDeployTargetRequest"];
+            };
+        };
+        responses: {
+            /** @description The target. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeDeployTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CurrentFactorRequest"];
+            };
+        };
+        responses: {
+            /** @description The removed target, as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    generateDeployTargetKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CurrentFactorRequest"];
+            };
+        };
+        responses: {
+            /** @description The target, with the public key. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    addDeployTargetHost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddDeployTargetHostRequest"];
+            };
+        };
+        responses: {
+            /** @description The target. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    reorderDeployTargetHosts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderDeployTargetHostsRequest"];
+            };
+        };
+        responses: {
+            /** @description The target. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateDeployTargetHost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+                hostId: components["parameters"]["TargetHostId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDeployTargetHostRequest"];
+            };
+        };
+        responses: {
+            /** @description The target. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeDeployTargetHost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+                hostId: components["parameters"]["TargetHostId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveDeployTargetHostRequest"];
+            };
+        };
+        responses: {
+            /** @description The target. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    fetchDeployTargetHostKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+                hostId: components["parameters"]["TargetHostId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The target. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    setDeployTargetPendingHostKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+                hostId: components["parameters"]["TargetHostId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetDeployTargetPendingHostKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description The target. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    confirmDeployTargetHostKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+                hostId: components["parameters"]["TargetHostId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmDeployTargetHostKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description The target. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetResponse"];
                 };
             };
             default: components["responses"]["Error"];

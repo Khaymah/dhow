@@ -53,7 +53,7 @@ func (r SecondFactorRule) Covers(role Role) bool {
 func SensitiveActions() []Action {
 	return []Action{
 		OrgUpdate, OrgTransfer, OrgSecurity, MemberManage, RunnerManage, JobCreate, TokenCreate, ProjectManage, RunApprove,
-		EnvironmentManage, EnvironmentBypass, DeploymentApprove, SecretManage, OrgSecretManage,
+		EnvironmentManage, EnvironmentBypass, DeploymentApprove, DeploymentRollback, SecretManage, OrgSecretManage,
 	}
 }
 
