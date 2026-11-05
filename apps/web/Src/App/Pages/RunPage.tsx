@@ -72,7 +72,7 @@ const RunView = ({ view, runId }: { view: IProjectView; runId: string }) => {
               projectId={projectId}
               gate={gate}
               leader={isLeader(jobs, job)}
-              environmentHref={(environment) => `/projects/${projectId}/environments/${environment}`}
+              environmentHref={(environment) => `/projects/${projectId}/environments/${encodeURIComponent(environment)}`}
               onOpenEnvironment={(environmentName) => {
                 void navigate({ to: '/projects/$projectId/environments/$environmentName', params: { projectId, environmentName } });
               }}

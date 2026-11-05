@@ -1,4 +1,4 @@
-import { configure, screen, waitFor, within } from '@testing-library/react';
+import { configure, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { useToastStore } from '@/Core/Store/useToastStore';
@@ -341,5 +341,29 @@ describe('bypassing the rules', () => {
     const second = await screen.findByRole('dialog', { name: Ar['approvals.decide.bypass.title'] });
     expect(within(second).getByLabelText(Ar['approvals.decide.reason'])).toHaveValue('');
     expect(await within(second).findByLabelText(Ar['factor.method.totp'])).toHaveValue('');
+  });
+});
+
+describe('the decision slide itself', () => {
+  it('names the ref and the round of the request it decides', async () => {
+    const view = mountRun({ role: 'developer' });
+    const dialog = await openSlide(view, Ar['approvals.gate.approve'], Ar['approvals.decide.approve.title']);
+    expect(within(dialog).getByText(Ar['approvals.decide.ref'])).toBeInTheDocument();
+    expect(within(dialog).getByText('refs/heads/main')).toBeInTheDocument();
+    expect(within(dialog).getByText(Ar['approvals.decide.round'])).toBeInTheDocument();
+    expect(within(dialog).getByText(Ar['approvals.decide.expires'])).toBeInTheDocument();
+  });
+
+  it('sends one decision when the form is sent twice before the answer', async () => {
+    const view = mountRun({ role: 'developer' });
+    const dialog = await openSlide(view, Ar['approvals.gate.approve'], Ar['approvals.decide.approve.title']);
+    await enterCode(view, dialog);
+    const form = within(dialog).getByRole('button', { name: Ar['approvals.decide.approve.submit'] }).closest('form') ?? dialog;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(view.state.writes).toHaveLength(1);
   });
 });

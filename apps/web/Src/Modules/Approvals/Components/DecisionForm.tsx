@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { TFactorMethod } from '@/Core/Auth/Factor';
 import { formatClock } from '@/Core/Format/TimeFormat';
 import { byteLength } from '@/Core/Forms/ByteLength';
 import { useFactorAction } from '@/Core/Hooks/useFactorAction';
+import { useRelativeTime } from '@/Core/Hooks/useRelativeTime';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Button } from '@/Core/Ui/Button';
 import { Field } from '@/Core/Ui/Field';
@@ -29,6 +30,7 @@ export interface IDecisionFormProps {
 
 const DecisionSummary = ({ approval }: { approval: TApproval }) => {
   const t = useT();
+  const time = useRelativeTime();
   return (
     <dl className="m-0 grid grid-cols-2 gap-3 rounded-md border border-line bg-surface-inset p-3">
       <div className="grid gap-0.5">
@@ -43,11 +45,38 @@ const DecisionSummary = ({ approval }: { approval: TApproval }) => {
         <dt className="text-body-sm text-tertiary">{t('approvals.decide.run')}</dt>
         <dd className="m-0 text-body-sm text-primary">{t('runs.row.number', { number: approval.RunNumber })}</dd>
       </div>
+      <div className="grid gap-0.5">
+        <dt className="text-body-sm text-tertiary">{t('approvals.decide.ref')}</dt>
+        <dd className="m-0 text-body-sm text-primary">
+          <bdi dir="ltr" className="font-mono">
+            {approval.Ref}
+          </bdi>
+        </dd>
+      </div>
+      <div className="grid gap-0.5">
+        <dt className="text-body-sm text-tertiary">{t('approvals.decide.round')}</dt>
+        <dd className="m-0 text-body-sm text-primary">{approval.Round}</dd>
+      </div>
+      <div className="col-span-2 grid gap-0.5">
+        <dt className="text-body-sm text-tertiary">{t('approvals.decide.expires')}</dt>
+        <dd className="m-0 text-body-sm text-primary">{time.full(approval.ExpiresAt)}</dd>
+      </div>
     </dl>
   );
 };
 
 const ICONS = { approve: 'check', reject: 'close', bypass: 'alert' } as const;
+
+const DecisionButton = ({ decision, label, disabled }: { decision: TDecision; label: string; disabled: boolean }) =>
+  decision === 'approve' ? (
+    <Button type="submit" variant="primary" iconStart={ICONS[decision]} className="justify-self-start" disabled={disabled}>
+      {label}
+    </Button>
+  ) : (
+    <Button type="submit" variant="danger" iconStart={ICONS[decision]} className="justify-self-start" disabled={disabled}>
+      {label}
+    </Button>
+  );
 
 export const DecisionForm = ({ organizationId, projectId, runId, approval, decision, methods, onDecided, onDone }: IDecisionFormProps) => {
   const t = useT();
@@ -55,7 +84,17 @@ export const DecisionForm = ({ organizationId, projectId, runId, approval, decis
   const Push = useToastStore((state) => state.Push);
   const [Text, setText] = useState('');
   const [Problem, setProblem] = useState<string | null>(null);
+  const sending = useRef(false);
+  const mounted = useRef(true);
   const bypass = decision === 'bypass';
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   const max = bypass ? REASON_MAX_BYTES : COMMENT_MAX_BYTES;
 
   const action = useFactorAction<TApproval>(methods, async (proof) => {
@@ -74,15 +113,19 @@ export const DecisionForm = ({ organizationId, projectId, runId, approval, decis
   };
 
   const HandleSubmit = () => {
+    if (sending.current || action.Busy || action.Countdown.Remaining > 0) return;
     const problem = problemOf();
     setProblem(problem);
     if (problem !== null) return;
+    sending.current = true;
     void action.Run().then((decided) => {
+      sending.current = false;
       if (decided === null) return;
-      setText('');
-      action.Reset();
       refresh();
       onDecided();
+      if (!mounted.current) return;
+      setText('');
+      action.Reset();
       Push({
         Id: `approval-${decision}-${decided.Id}`,
         Accent: decision === 'reject' ? 'awaiting' : 'live',
@@ -128,15 +171,7 @@ export const DecisionForm = ({ organizationId, projectId, runId, approval, decis
       <div className="grid gap-3 border-t border-line pt-4">
         <p className="m-0 text-body-sm text-secondary">{t('approvals.factor.about')}</p>
         <FactorFields methods={methods} draft={action.Draft} onChange={action.SetDraft} disabled={action.Busy} />
-        {decision === 'approve' ? (
-          <Button type="submit" variant="primary" iconStart={ICONS[decision]} className="justify-self-start" disabled={action.Busy || locked}>
-            {label}
-          </Button>
-        ) : (
-          <Button type="submit" variant="danger" iconStart={ICONS[decision]} className="justify-self-start" disabled={action.Busy || locked}>
-            {label}
-          </Button>
-        )}
+        <DecisionButton decision={decision} label={label} disabled={action.Busy || locked} />
       </div>
     </form>
   );
