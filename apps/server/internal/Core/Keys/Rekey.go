@@ -312,7 +312,7 @@ func (r *rekeyer) resealLocation(ctx context.Context, l Location, col *Column, r
 	for {
 		var rows int
 		err := dbtx.RunTx(ctx, r.conn, func(tx pgx.Tx) error {
-			values, err := l.Scan(ctx, tx, after, r.opts.Batch, false)
+			values, err := l.Scan(ctx, tx, after, r.opts.Batch)
 			if err != nil {
 				return fmt.Errorf("read the values of %s: %w", l.Spec().Name(), err)
 			}

@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"io/fs"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,10 +22,9 @@ import (
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
-	backfill "github.com/Khaymah/dhow/apps/server/internal/Core/Backfill"
-	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	instancesettings "github.com/Khaymah/dhow/apps/server/internal/Core/Settings"
+	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 )
 
@@ -94,30 +95,6 @@ func (w sealedWorld) seedSettings(t *testing.T) {
 	require.NoError(t, w.env.Wired.Settings.Load(ctx))
 }
 
-func makeLegacy(t *testing.T, env *apptest.Env) int {
-	t.Helper()
-	ctx := t.Context()
-	n := 0
-	all := env.AllValues(t)
-	for _, l := range env.Registry().Locations() {
-		col, err := env.Wired.Values.Column(l.Spec())
-		require.NoError(t, err)
-		legacy, err := appcrypto.NewSealer(env.Config.SecretKey, l.Spec().Label)
-		require.NoError(t, err)
-		for _, v := range all[l.Spec().Name()] {
-			plain, err := col.Open(ctx, v.Owner, v.Context, v.Sealed)
-			require.NoError(t, err, "%s row %s", l.Spec().Name(), v.Key)
-			old, err := legacy.Seal(plain, v.Context)
-			require.NoError(t, err)
-			ok, err := l.Replace(ctx, env.Pool, v, old)
-			require.NoError(t, err)
-			require.True(t, ok)
-			n++
-		}
-	}
-	return n
-}
-
 func formats(t *testing.T, env *apptest.Env) map[byte]int {
 	t.Helper()
 	out := map[byte]int{}
@@ -158,74 +135,15 @@ func (w sealedWorld) everyValueWorks(t *testing.T, env *apptest.Env) {
 	assert.Equal(t, oidcSecret, p.Config.ClientSecret)
 }
 
-func drainBackfills(t *testing.T, env *apptest.Env) *backfill.Runner {
-	t.Helper()
-	runner, err := app.NewBackfills(env.Pool, env.Wired.Values, nil)
-	require.NoError(t, err)
-	require.NoError(t, runner.Drain(t.Context()))
-	require.NoError(t, backfill.RequireDone(t.Context(), env.Pool, runner.Names()...))
-	return runner
-}
-
-func TestValuesSealedBeforeTheKeyringReadThenMoveToTheEnvelopeAndSurviveANewServerKey(t *testing.T) {
+func TestEveryValueWorksAfterTheServerSecretKeyChanges(t *testing.T) {
 	w := newSealedWorld(t)
-	assert.Equal(t, map[byte]int{keys.FormatVersion: 7}, formats(t, w.env), "new values use the envelope format")
-	assert.Equal(t, 7, makeLegacy(t, w.env))
-	require.Equal(t, map[byte]int{keys.LegacyFormat: 7}, formats(t, w.env))
-	w.everyValueWorks(t, w.env)
-
-	runner := drainBackfills(t, w.env)
-	assert.Len(t, runner.Names(), len(w.env.Registry().Locations()), "one backfill per column")
-	assert.Equal(t, map[byte]int{keys.FormatVersion: 7}, formats(t, w.env))
+	assert.Equal(t, map[byte]int{keys.FormatVersion: 7}, formats(t, w.env), "every value uses the envelope format")
 	w.everyValueWorks(t, w.env)
 
 	moved := apptest.NewWithOptions(t, apptest.Options{Pool: w.env.Pool, Triggers: &apptest.FakeTriggers{}})
 	require.NotEqual(t, w.env.Config.SecretKey, moved.Config.SecretKey)
 	moved.Clock.Advance(w.env.Clock.Now().Sub(moved.Clock.Now()))
 	w.everyValueWorks(t, moved)
-}
-
-func TestTheValueBackfillResumesAfterAnInterruption(t *testing.T) {
-	w := newSealedWorld(t)
-	makeLegacy(t, w.env)
-	runner, err := app.NewBackfills(w.env.Pool, w.env.Wired.Values, nil)
-	require.NoError(t, err)
-	jobs, err := w.env.Registry().BackfillJobs(w.env.Wired.Values, nil)
-	require.NoError(t, err)
-	for _, job := range jobs[:3] {
-		_, err := runner.Step(t.Context(), job)
-		require.NoError(t, err)
-	}
-	half := formats(t, w.env)
-	assert.Positive(t, half[keys.LegacyFormat])
-	assert.Positive(t, half[keys.FormatVersion])
-	w.everyValueWorks(t, w.env)
-
-	drainBackfills(t, w.env)
-	assert.Equal(t, map[byte]int{keys.FormatVersion: 7}, formats(t, w.env))
-	list, err := backfill.List(t.Context(), w.env.Pool)
-	require.NoError(t, err)
-	var converted int64
-	for _, p := range list {
-		converted += p.Processed
-	}
-	assert.EqualValues(t, 7, converted, "every value converted once")
-	w.everyValueWorks(t, w.env)
-}
-
-func TestAValueThatCannotBeOpenedStaysAndKeepsItsBackfillOpen(t *testing.T) {
-	w := newSealedWorld(t)
-	makeLegacy(t, w.env)
-	_, err := w.env.Pool.Exec(t.Context(), `UPDATE "TotpFactors" SET "SecretSealed" = set_byte("SecretSealed", 20, get_byte("SecretSealed", 20) # 255)`)
-	require.NoError(t, err)
-	runner, err := app.NewBackfills(w.env.Pool, w.env.Wired.Values, nil)
-	require.NoError(t, err)
-	require.NoError(t, runner.Drain(t.Context()))
-	name := keys.BackfillName(w.env.Registry().Locations()[0].Spec())
-	assert.Equal(t, "keys.envelope.TotpFactors.SecretSealed", name)
-	err = backfill.RequireDone(t.Context(), w.env.Pool, runner.Names()...)
-	require.ErrorContains(t, err, name)
-	assert.Equal(t, 1, formats(t, w.env)[keys.LegacyFormat])
 }
 
 var notSealed = map[string]string{
@@ -327,25 +245,40 @@ func TestTheLargestRealValuesFitTheirColumns(t *testing.T) {
 	}
 }
 
-func TestAnOldValuePlantedAfterTheBackfillIsRefused(t *testing.T) {
+func TestAnOldValueCannotBePlantedAndIsRefusedEvenWithoutTheConstraint(t *testing.T) {
 	w := newSealedWorld(t)
-	drainBackfills(t, w.env)
-	legacy, err := appcrypto.NewSealer(w.env.Config.SecretKey, config.TotpSealLabel)
-	require.NoError(t, err)
-	planted := make([]byte, auth.TotpSecretBytes)
-	planted[0] = 7
 	user := uuid.MustParse(w.userID(t))
-	old, err := legacy.Seal(planted, []byte("totp:"+user.String()))
-	require.NoError(t, err)
-	_, err = w.env.Pool.Exec(t.Context(), `UPDATE "TotpFactors" SET "SecretSealed" = $1 WHERE "UserId" = $2`, old, user)
-	require.NoError(t, err)
+	planted := append([]byte{1}, make([]byte, 60)...)
+	_, err := w.env.Pool.Exec(t.Context(), `UPDATE "TotpFactors" SET "SecretSealed" = $1 WHERE "UserId" = $2`, planted, user)
+	var pgErr *pgconn.PgError
+	require.ErrorAs(t, err, &pgErr)
+	assert.Equal(t, "23514", pgErr.Code, "the database refuses a value that is not in the envelope format")
 
-	for _, env := range []*apptest.Env{w.env, apptest.NewWithOptions(t, apptest.Options{Pool: w.env.Pool})} {
-		env.Clock.Advance(w.env.Clock.Now().Sub(env.Clock.Now()) + 31*time.Second)
-		cookie := env.StartMfa(w.details.Email, w.details.Password)
-		_, res := env.CompleteMfa(cookie, map[string]any{"Method": "totp", "Code": env.TotpCode(planted, 0)}, nil)
-		assert.NotEqual(t, http.StatusOK, res.Status, "a TOTP secret planted in the old format does not sign in")
+	_, err = w.env.Pool.Exec(t.Context(), `ALTER TABLE "TotpFactors" DROP CONSTRAINT "CK_TotpFactors_SecretSealed_Envelope"`)
+	require.NoError(t, err)
+	_, err = w.env.Pool.Exec(t.Context(), `UPDATE "TotpFactors" SET "SecretSealed" = $1 WHERE "UserId" = $2`, planted, user)
+	require.NoError(t, err)
+	w.env.Clock.Advance(31 * time.Second)
+	cookie := w.env.StartMfa(w.details.Email, w.details.Password)
+	_, res := w.env.CompleteMfa(cookie, map[string]any{"Method": "totp", "Code": w.env.TotpCode(w.totp.Secret, 0)}, nil)
+	assert.NotEqual(t, http.StatusOK, res.Status, "a TOTP secret in the old format does not sign in")
+}
+
+func TestTheSealedFormatContractCoversEveryRegisteredColumn(t *testing.T) {
+	contract, err := fs.ReadFile(migrations.FS, "00065_sealed_format_contract.sql")
+	require.NoError(t, err)
+	validate, err := fs.ReadFile(migrations.FS, "00066_sealed_format_contract_validate.sql")
+	require.NoError(t, err)
+	reg, err := app.ValueRegistry()
+	require.NoError(t, err)
+	for _, l := range reg.Locations() {
+		spec := l.Spec()
+		constraint := `"CK_` + spec.Table + "_" + spec.Column + `_Envelope"`
+		assert.Contains(t, string(contract), "'"+keys.BackfillName(spec)+"'", "%s: the contract waits for its backfill", spec.Name())
+		assert.Contains(t, string(contract), "ADD CONSTRAINT "+constraint, "%s: the contract adds the CHECK", spec.Name())
+		assert.Contains(t, string(validate), "VALIDATE CONSTRAINT "+constraint, "%s: the next migration validates it", spec.Name())
 	}
+	assert.Equal(t, len(reg.Locations()), strings.Count(string(contract), "ADD CONSTRAINT"))
 }
 
 func (w sealedWorld) userID(t *testing.T) string {

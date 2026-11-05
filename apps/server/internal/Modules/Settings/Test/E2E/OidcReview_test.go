@@ -146,6 +146,7 @@ func TestAnUnreadableSecretBlocksWritesButNotItsOwnRepair(t *testing.T) {
 		junk := make([]byte, 48)
 		_, err := rand.Read(junk)
 		require.NoError(t, err)
+		junk[0] = 3
 		_, err = o.env.Pool.Exec(t.Context(), `UPDATE "OidcProviders" SET "Secret" = $1 WHERE "ProviderId" = $2 AND NOT "IsDeleted"`, junk, id)
 		require.NoError(t, err)
 	}

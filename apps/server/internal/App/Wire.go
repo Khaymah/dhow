@@ -218,12 +218,7 @@ func valuesAndSettings(ctx context.Context, in Infra) (*keys.Values, *instancese
 	if in.Keys == nil {
 		return nil, nil, errors.New("the keyring is not loaded; every sealed value needs it")
 	}
-	values := keys.NewValues(in.Keys.Envelope(), in.Config.SecretKey)
-	if in.Pool != nil {
-		if err := values.LoadLegacyState(ctx, in.Pool); err != nil {
-			return nil, nil, err
-		}
-	}
+	values := keys.NewValues(in.Keys.Envelope())
 	store, err := settingsStore(ctx, in, values)
 	return values, store, err
 }

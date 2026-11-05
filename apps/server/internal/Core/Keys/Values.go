@@ -5,15 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
-	"sync"
 
-	backfill "github.com/Khaymah/dhow/apps/server/internal/Core/Backfill"
-	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 )
-
-const LegacyFormat = byte(1)
 
 var ErrWrongOwnerKind = errors.New("this column belongs to another kind of owner")
 
@@ -53,44 +47,10 @@ func (s Spec) Valid() error {
 
 type Values struct {
 	envelope *Envelope
-	legacy   []byte
-	mu       sync.RWMutex
-	closed   map[string]bool
 }
 
-func NewValues(envelope *Envelope, legacySecret []byte) *Values {
-	return &Values{envelope: envelope, legacy: append([]byte(nil), legacySecret...), closed: map[string]bool{}}
-}
-
-func (v *Values) CloseLegacy(column string) {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.closed[column] = true
-}
-
-func (v *Values) LegacyClosed(column string) bool {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
-	return v.closed[column]
-}
-
-func (v *Values) BackfillDone(name string) {
-	if column, ok := strings.CutPrefix(name, BackfillPrefix); ok {
-		v.CloseLegacy(column)
-	}
-}
-
-func (v *Values) LoadLegacyState(ctx context.Context, db sqlc.DBTX) error {
-	list, err := backfill.List(ctx, db)
-	if err != nil {
-		return err
-	}
-	for _, p := range list {
-		if p.Done() {
-			v.BackfillDone(p.Name)
-		}
-	}
-	return nil
+func NewValues(envelope *Envelope) *Values {
+	return &Values{envelope: envelope}
 }
 
 func (v *Values) Envelope() *Envelope { return v.envelope }
@@ -99,23 +59,12 @@ func (v *Values) Column(spec Spec) (*Column, error) {
 	if err := spec.Valid(); err != nil {
 		return nil, err
 	}
-	c := &Column{spec: spec, envelope: v.envelope, values: v}
-	if len(v.legacy) == 0 {
-		return c, nil
-	}
-	legacy, err := appcrypto.NewSealer(v.legacy, spec.Label)
-	if err != nil {
-		return nil, fmt.Errorf("%s: open the legacy format: %w", spec.Name(), err)
-	}
-	c.legacy = legacy
-	return c, nil
+	return &Column{spec: spec, envelope: v.envelope}, nil
 }
 
 type Column struct {
 	spec     Spec
 	envelope *Envelope
-	values   *Values
-	legacy   *appcrypto.Sealer
 }
 
 func (c *Column) Spec() Spec { return c.spec }
@@ -134,23 +83,10 @@ func (c *Column) Open(ctx context.Context, owner Owner, rowContext, sealed []byt
 	if !c.spec.Allows(owner.Kind) {
 		return nil, ErrWrongOwnerKind
 	}
-	if len(sealed) == 0 {
+	if len(sealed) == 0 || sealed[0] != FormatVersion {
 		return nil, ErrSealed
 	}
-	switch sealed[0] {
-	case FormatVersion:
-		return c.envelope.Open(ctx, owner, c.spec.Label, rowContext, sealed)
-	case LegacyFormat:
-		if c.legacy == nil || len(rowContext) == 0 || c.values.LegacyClosed(c.spec.Name()) {
-			return nil, ErrSealed
-		}
-		plain, err := c.legacy.Open(sealed, rowContext)
-		if err != nil {
-			return nil, ErrSealed
-		}
-		return plain, nil
-	}
-	return nil, ErrSealed
+	return c.envelope.Open(ctx, owner, c.spec.Label, rowContext, sealed)
 }
 
 func (c *Column) Reseal(ctx context.Context, q *sqlc.Queries, owner Owner, rowContext, sealed []byte) ([]byte, error) {
@@ -161,5 +97,3 @@ func (c *Column) Reseal(ctx context.Context, q *sqlc.Queries, owner Owner, rowCo
 	defer clear(plain)
 	return c.envelope.sealIn(ctx, q, owner, c.spec.Label, rowContext, plain, false)
 }
-
-func IsLegacy(sealed []byte) bool { return len(sealed) > 0 && sealed[0] == LegacyFormat }

@@ -38,15 +38,18 @@ class NewSealerRule(unittest.TestCase):
             src = "package x\n\nfunc f() {\n" + line + "}\n"
             self.assertIsNotNone(edit(SERVER + "Modules/Sources/Sources.Keys.go", src), line)
 
-    def test_the_crypto_package_and_the_legacy_reader_may_make_sealers(self):
+    def test_only_the_crypto_package_may_make_sealers(self):
         self.assertIsNone(edit(SERVER + "Core/Crypto/Sealer.go",
                                "package appcrypto\n\nfunc NewSealer(secret []byte, label string) (*Sealer, error) {\n\treturn nil, nil\n}\n"))
-        self.assertIsNone(edit(SERVER + "Core/Keys/Values.go", CALL))
+        self.assertIsNone(edit(SERVER + "Core/Crypto/Sealer_test.go", CALL))
 
-    def test_tests_may_seal_old_values_to_prove_they_still_read(self):
-        self.assertIsNone(edit(SERVER + "App/SealedValues_test.go", CALL))
-        self.assertIsNone(edit(SERVER + "Modules/Settings/Test/E2E/Reload_test.go", CALL))
-        self.assertIsNone(edit(SERVER + "Modules/Session/Test/E2E/Helpers.go", CALL))
+    def test_nothing_reads_the_old_format_any_more(self):
+        for rel in (SERVER + "Core/Keys/Values.go", SERVER + "Core/Keys/Values_test.go", SERVER + "App/SealedValues_test.go",
+                    SERVER + "Modules/Settings/Test/E2E/Reload_test.go", SERVER + "Modules/Session/Test/E2E/Helpers.go",
+                    SERVER + "App/LeakSweep/LeakSweep_test.go"):
+            reason = edit(rel, CALL)
+            self.assertIsNotNone(reason, rel)
+            self.assertIn("0088", reason)
 
     def test_other_crypto_helpers_and_unchanged_lines_pass(self):
         self.assertIsNone(edit(SERVER + "Core/Auth/ApiToken.go",

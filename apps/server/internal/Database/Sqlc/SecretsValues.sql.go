@@ -11,28 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const countLegacyRegistryPasswords = `-- name: CountLegacyRegistryPasswords :one
-SELECT count(*)::bigint FROM "RegistryCredentials" WHERE "PasswordSealed" IS NOT NULL AND get_byte("PasswordSealed", 0) = 1
-`
-
-func (q *Queries) CountLegacyRegistryPasswords(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countLegacyRegistryPasswords)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const countLegacySecretValues = `-- name: CountLegacySecretValues :one
-SELECT count(*)::bigint FROM "SecretVersions" WHERE "ValueSealed" IS NOT NULL AND get_byte("ValueSealed", 0) = 1
-`
-
-func (q *Queries) CountLegacySecretValues(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countLegacySecretValues)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const countRegistryPasswordsUnder = `-- name: CountRegistryPasswordsUnder :one
 SELECT count(*)::bigint
 FROM "RegistryCredentials"
@@ -98,16 +76,15 @@ func (q *Queries) ReplaceSecretValue(ctx context.Context, arg ReplaceSecretValue
 const scanRegistryPasswords = `-- name: ScanRegistryPasswords :many
 SELECT "Id", "OrganizationId", "ProjectId", "PasswordSealed" AS "Sealed"
 FROM "RegistryCredentials"
-WHERE "PasswordSealed" IS NOT NULL AND "Id" > $1::uuid AND (NOT $2::boolean OR get_byte("PasswordSealed", 0) = 1)
+WHERE "PasswordSealed" IS NOT NULL AND "Id" > $1::uuid
 ORDER BY "Id"
-LIMIT $3
+LIMIT $2
 FOR UPDATE SKIP LOCKED
 `
 
 type ScanRegistryPasswordsParams struct {
-	After      uuid.UUID
-	LegacyOnly bool
-	Batch      int32
+	After uuid.UUID
+	Batch int32
 }
 
 type ScanRegistryPasswordsRow struct {
@@ -118,7 +95,7 @@ type ScanRegistryPasswordsRow struct {
 }
 
 func (q *Queries) ScanRegistryPasswords(ctx context.Context, arg ScanRegistryPasswordsParams) ([]ScanRegistryPasswordsRow, error) {
-	rows, err := q.db.Query(ctx, scanRegistryPasswords, arg.After, arg.LegacyOnly, arg.Batch)
+	rows, err := q.db.Query(ctx, scanRegistryPasswords, arg.After, arg.Batch)
 	if err != nil {
 		return nil, err
 	}
@@ -146,16 +123,15 @@ const scanSecretValues = `-- name: ScanSecretValues :many
 SELECT v."Id", v."SecretId", v."Version", s."Scope", s."OrganizationId", s."ProjectId", s."EnvironmentId", v."ValueSealed" AS "Sealed"
 FROM "SecretVersions" v
 JOIN "Secrets" s ON s."Id" = v."SecretId"
-WHERE v."ValueSealed" IS NOT NULL AND v."Id" > $1::uuid AND (NOT $2::boolean OR get_byte(v."ValueSealed", 0) = 1)
+WHERE v."ValueSealed" IS NOT NULL AND v."Id" > $1::uuid
 ORDER BY v."Id"
-LIMIT $3
+LIMIT $2
 FOR UPDATE OF v SKIP LOCKED
 `
 
 type ScanSecretValuesParams struct {
-	After      uuid.UUID
-	LegacyOnly bool
-	Batch      int32
+	After uuid.UUID
+	Batch int32
 }
 
 type ScanSecretValuesRow struct {
@@ -170,7 +146,7 @@ type ScanSecretValuesRow struct {
 }
 
 func (q *Queries) ScanSecretValues(ctx context.Context, arg ScanSecretValuesParams) ([]ScanSecretValuesRow, error) {
-	rows, err := q.db.Query(ctx, scanSecretValues, arg.After, arg.LegacyOnly, arg.Batch)
+	rows, err := q.db.Query(ctx, scanSecretValues, arg.After, arg.Batch)
 	if err != nil {
 		return nil, err
 	}

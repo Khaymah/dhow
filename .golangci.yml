@@ -27,7 +27,7 @@ linters:
       forbid:
         - pattern: '^(\w+\.)?NewSealer$'
           pkg: '^github\.com/Khaymah/dhow/apps/server/internal/Core/Crypto$'
-          msg: seal new values with Core/Keys (keys.Values.Column); NewSealer only reads the old format in Core/Keys/Values.go (ADR-0082)
+          msg: seal new values with Core/Keys (keys.Values.Column); NewSealer stays in Core/Crypto, nothing reads the old format any more (ADR-0088)
     gosec:
       excludes: []
     nolintlint:
@@ -50,8 +50,8 @@ linters:
       - comments
     rules:
       - path: _test\.go
-        linters: [gosec, unparam, noctx, forbidigo]
-      - path: apps/server/internal/Core/(Crypto/|Keys/Values\.go)
+        linters: [gosec, unparam, noctx]
+      - path: apps/server/internal/Core/Crypto/
         linters: [forbidigo]
 
 formatters:

@@ -17,7 +17,7 @@ import (
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	settingspec "github.com/Khaymah/dhow/apps/server/internal/Config/Settings"
-	appcrypto "github.com/Khaymah/dhow/apps/server/internal/Core/Crypto"
+	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	dbtest "github.com/Khaymah/dhow/apps/server/internal/Database/Testing"
 	"github.com/Khaymah/dhow/internal/buildinfo"
@@ -90,14 +90,9 @@ func ptr[T any](v T) *T { return &v }
 
 func TestAnInvalidSavedValueStopsTheStart(t *testing.T) {
 	secret := randomKey(t)
-	other := randomKey(t)
-	sealedWith := func(key []byte) []byte {
-		s, err := appcrypto.NewSealer(key, config.InstanceSettingsSealLabel)
-		require.NoError(t, err)
-		out, err := s.Seal([]byte(`{"Password":"relay-credential"}`), []byte("instance-settings:mail"))
-		require.NoError(t, err)
-		return out
-	}
+	unopenable := append([]byte{keys.FormatVersion}, randomKey(t)...)
+	unopenable = append(unopenable, randomKey(t)...)
+	unopenable = append(unopenable, randomKey(t)...)
 	tests := []struct {
 		name    string
 		group   string
@@ -111,7 +106,7 @@ func TestAnInvalidSavedValueStopsTheStart(t *testing.T) {
 		{"a host without a sender", "mail", `{"Host": "smtp.example.com"}`, nil, nil, "DHOW_SMTP_FROM"},
 		{"an unknown field", "logs", `{"Nope": 1}`, nil, nil, "logs.Nope"},
 		{"an unknown group", "colors", `{}`, nil, nil, "colors"},
-		{"a secret sealed with another key", "mail", `{}`, sealedWith(other), nil, "cannot be decrypted"},
+		{"a secret sealed under a data key this keyring does not hold", "mail", `{}`, unopenable, nil, "cannot be decrypted"},
 		{"a valid row", "mail", `{"Host": "smtp.example.com", "From": "dhow@example.com"}`, nil, nil, ""},
 		{"the environment completes a saved row", "mail", `{"Host": "smtp.example.com"}`, nil, settingspec.Raw{settingspec.EnvSMTPFrom: "dhow@example.com"}, ""},
 		{"the environment does not hide a broken saved value", "logs", `{"RetentionDays": 0}`, nil, settingspec.Raw{settingspec.EnvLogRetentionDays: "7"}, "DHOW_LOG_RETENTION_DAYS (from the database)"},

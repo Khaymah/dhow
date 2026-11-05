@@ -42,7 +42,7 @@ func rowContext(id string) []byte { return []byte("test-secret:" + id) }
 
 func (l tableLocation) Spec() keys.Spec { return l.spec }
 
-func (l tableLocation) Scan(ctx context.Context, db sqlc.DBTX, after string, limit int32, legacyOnly bool) ([]keys.Value, error) {
+func (l tableLocation) Scan(ctx context.Context, db sqlc.DBTX, after string, limit int32) ([]keys.Value, error) {
 	if after != "" {
 		if hook := l.beforeScan.Swap(nil); hook != nil {
 			(*hook)()
@@ -53,7 +53,7 @@ func (l tableLocation) Scan(ctx context.Context, db sqlc.DBTX, after string, lim
 		start = uuid.MustParse(after)
 	}
 	rows, err := db.Query(ctx, `SELECT "Id", "ProjectId", "Sealed" FROM "TestSecrets"
-		WHERE "Id" > $1 AND (NOT $2 OR get_byte("Sealed", 0) = 1) ORDER BY "Id" LIMIT $3 FOR UPDATE SKIP LOCKED`, start, legacyOnly, limit)
+		WHERE "Id" > $1 ORDER BY "Id" LIMIT $2 FOR UPDATE SKIP LOCKED`, start, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -79,12 +79,6 @@ func (l tableLocation) Replace(ctx context.Context, db sqlc.DBTX, v keys.Value, 
 	}
 	tag, err := db.Exec(ctx, `UPDATE "TestSecrets" SET "Sealed" = $1 WHERE "Id" = $2 AND "Sealed" = $3`, sealed, uuid.MustParse(v.Key), v.Sealed)
 	return tag.RowsAffected() == 1, err
-}
-
-func (l tableLocation) CountLegacy(ctx context.Context, db sqlc.DBTX) (int64, error) {
-	var n int64
-	err := db.QueryRow(ctx, `SELECT count(*) FROM "TestSecrets" WHERE get_byte("Sealed", 0) = 1`).Scan(&n)
-	return n, err
 }
 
 func (l tableLocation) CountUnder(ctx context.Context, db sqlc.DBTX, ids [][]byte) (int64, error) {
@@ -113,7 +107,7 @@ func newRekeyFixture(t *testing.T, provider keys.KeyProvider, projects, perProje
 	loc := newTableLocation(t, pool)
 	reg, err := keys.NewRegistry(loc)
 	require.NoError(t, err)
-	values := keys.NewValues(m.Envelope(), nil)
+	values := keys.NewValues(m.Envelope())
 	col, err := values.Column(loc.Spec())
 	require.NoError(t, err)
 	f := &rekeyFixture{pool: pool, manager: m, column: col, location: loc, registry: reg, values: values, plain: map[uuid.UUID][]byte{}}
@@ -236,7 +230,7 @@ func TestAnOldKeyringWithACopyFromBeforeTheRekeyOpensNoCurrentValue(t *testing.T
 	require.NoError(t, err)
 	_, err = m.Rewrap(t.Context())
 	require.NoError(t, err)
-	values := keys.NewValues(m.Envelope(), nil)
+	values := keys.NewValues(m.Envelope())
 	_, err = m.Rekey(t.Context(), f.pool, values, f.registry, keys.RekeyOptions{Wait: noWait})
 	require.NoError(t, err)
 	current, err := values.Column(f.location.Spec())
@@ -244,10 +238,10 @@ func TestAnOldKeyringWithACopyFromBeforeTheRekeyOpensNoCurrentValue(t *testing.T
 	f.openAll(t, current)
 
 	stolen := keys.NewEnvelope(copyOfDataKeys, oldProvider)
-	stolenColumn, err := keys.NewValues(stolen, nil).Column(f.location.Spec())
+	stolenColumn, err := keys.NewValues(stolen).Column(f.location.Spec())
 	require.NoError(t, err)
 	withCurrentKeys := keys.NewEnvelope(keys.NewPostgresStore(f.pool), oldProvider)
-	currentColumn, err := keys.NewValues(withCurrentKeys, nil).Column(f.location.Spec())
+	currentColumn, err := keys.NewValues(withCurrentKeys).Column(f.location.Spec())
 	require.NoError(t, err)
 	owners := f.owners(t)
 	for id, sealed := range f.rows(t) {
@@ -378,7 +372,7 @@ func TestAReplacedKeyIsRewrappedOnRotationAndShreddedWithItsOwner(t *testing.T) 
 	require.NoError(t, err)
 	assert.Equal(t, 4, res.Rewrapped, "two replaced and two new data keys move to the new KEK")
 	assert.Equal(t, []int32{1}, res.Retired)
-	values := keys.NewValues(m.Envelope(), nil)
+	values := keys.NewValues(m.Envelope())
 	current, err := values.Column(f.location.Spec())
 	require.NoError(t, err)
 	f.openAll(t, current)
