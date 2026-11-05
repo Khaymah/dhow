@@ -7,6 +7,7 @@ import {
   canReadAudit,
   canReadMembers,
   canReadRunners,
+  canReadSecrets,
 } from '@/Core/Auth/AuthTypes';
 
 export const SHELL_PAGES = {
@@ -35,6 +36,11 @@ export const SHELL_PAGES = {
     canManageMembers,
   ),
   apiKeys: lazyPage(() => import('@/App/Pages/ApiKeysPage').then((module) => module.ApiKeysPage), canManageTokens),
+  orgSecrets: lazyPage(() => import('@/App/Pages/OrgSecretsPage').then((module) => module.OrgSecretsPage), canReadSecrets),
+  projectSecrets: lazyPage(
+    () => import('@/App/Pages/ProjectSecretsPage').then((module) => module.ProjectSecretsPage),
+    member,
+  ),
   orgSettings: lazyPage(
     () => import('@/App/Pages/OrgSettingsPage').then((module) => module.OrgSettingsPage),
     member,

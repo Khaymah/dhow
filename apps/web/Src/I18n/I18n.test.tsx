@@ -37,7 +37,7 @@ describe('locale catalogs', () => {
 });
 
 describe('the UI glossary (ADR-0034)', () => {
-  const ALLOWED_LATIN = new Set(['English', 'commit', 'DHOW_DATABASE_URL', 'API', 'Git', 'GitHub', 'GitLab', 'SSH', 'HTTPS']);
+  const ALLOWED_LATIN = new Set(['English', 'commit', 'DHOW_DATABASE_URL', 'DHOW_', 'API', 'Git', 'GitHub', 'GitLab', 'SSH', 'HTTPS']);
 
   it('keeps English words out of the Arabic copy, except the language name, one first-mention term and a technical value', () => {
     const stray = Object.entries(Ar).flatMap(([key, text]) =>

@@ -6,6 +6,8 @@ import { PageGroup } from '@/App/Layout/PageGroup';
 import { useSlide } from '@/App/Navigation/useSlide';
 import { isUuid } from '@/App/Pages/Params';
 import { ProjectNav } from '@/App/Pages/ProjectNav';
+import { RegistryGroup } from '@/App/Pages/SecretsGroups';
+import { canManageProjectSecrets, canReadSecrets } from '@/Core/Auth/AuthTypes';
 import { useT } from '@/I18n/useT';
 import { ProjectDangerZone } from '@/Modules/Projects/Components/ProjectDangerZone';
 import { ProjectGate } from '@/Modules/Projects/Components/ProjectGate';
@@ -26,7 +28,7 @@ export const ProjectSettingsPage = () => {
         const manager = canOnProject(role, 'project.manage');
         const active = project.State === 'active';
         return (
-          <Page title={project.Name} lead={t('projects.settings.lead')} nav={<ProjectNav projectId={projectId} current="settings" />}>
+          <Page title={project.Name} lead={t('projects.settings.lead')} nav={<ProjectNav projectId={projectId} current="settings" role={role} />}>
             <PageGroup title={t('projects.group.general')} icon="settings">
               <ProjectSettingsCard organizationId={organizationId} project={project} manager={manager} allowAutomatic={canRunForksWithoutApproval(role)} />
             </PageGroup>
@@ -41,6 +43,9 @@ export const ProjectSettingsPage = () => {
               />
               {manager && active && project.RepositoryLinked ? <RepositoryActions organizationId={organizationId} projectId={projectId} /> : null}
             </PageGroup>
+            {canReadSecrets(role) ? (
+              <RegistryGroup scope={{ OrganizationId: organizationId, ProjectId: projectId }} writable={canManageProjectSecrets(role) && active} />
+            ) : null}
             {manager && active ? (
               <PageGroup title={t('projects.danger.title')} lead={t('projects.danger.lead')} icon="alert" danger>
                 <ProjectDangerZone organizationId={organizationId} project={project} />

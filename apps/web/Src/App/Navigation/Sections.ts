@@ -6,6 +6,7 @@ import {
   canReadAudit,
   canReadMembers,
   canReadRunners,
+  canReadSecrets,
   type TRole,
 } from '@/Core/Auth/AuthTypes';
 import type { TIconName } from '@/Core/Ui/Icons';
@@ -23,6 +24,7 @@ export type TSectionId =
   | 'teams'
   | 'invitations'
   | 'apiKeys'
+  | 'secrets'
   | 'orgSettings'
   | 'audit'
   | 'system'
@@ -43,6 +45,7 @@ export type TSectionPath =
   | '/org/teams'
   | '/org/invitations'
   | '/org/api-keys'
+  | '/org/secrets'
   | '/org/settings'
   | '/audit'
   | '/system'
@@ -144,6 +147,7 @@ export const SECTIONS: readonly ISection[] = [
   },
   { id: 'invitations', path: '/org/invitations', label: 'shell.nav.invitations', icon: 'mail', group: 'org', menu: true, allow: canManageMembers },
   { id: 'apiKeys', path: '/org/api-keys', label: 'shell.nav.apiKeys', icon: 'key', group: 'org', menu: true, allow: canManageTokens },
+  { id: 'secrets', path: '/org/secrets', label: 'shell.nav.secrets', icon: 'shield', group: 'org', menu: true, allow: canReadSecrets },
   { id: 'orgSettings', path: '/org/settings', label: 'shell.nav.orgSettings', icon: 'settings', group: 'org', menu: true, allow: member },
   {
     id: 'audit',

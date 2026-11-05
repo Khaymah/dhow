@@ -9,8 +9,10 @@ import {
   LazyPasswordBody,
   LazyPasswordFooter,
   LazyProjectNewBody,
+  LazyRegistryFormBody,
   LazyRepositoryLinkBody,
   LazyRunnerNewBody,
+  LazySecretFormBody,
   LazyTeamNewBody,
   LazyThemeEditorBody,
   LazyThemeEditorFooter,
@@ -19,8 +21,9 @@ import {
   LazyTotpFooter,
   LazyTransferBody,
   LazyTriggerRunBody,
+  LazyVariableFormBody,
 } from '@/App/Layout/LazySlides';
-import { oidcOf, themeOf, type TSlideId, type TStaticSlideId } from '@/App/Panels';
+import { oidcOf, secretsTargetOf, themeOf, type ISecretsEditTarget, type TSlideId, type TStaticSlideId } from '@/App/Panels';
 import type { ICustomTheme } from '@/Core/Theme/ThemeTokens';
 import type { ISlide } from '@/Core/Ui/SlideStack';
 import type { TTranslate } from '@/I18n/I18nContext';
@@ -123,6 +126,21 @@ const BUILDERS: Record<Exclude<TStaticSlideId, 'theme-edit'>, TBuilder> = {
       />
     ),
   }),
+  'secret-new': ({ t, close, projectId }) => ({
+    title: t('secrets.new.title'),
+    subtitle: <span>{t('secrets.new.subtitle')}</span>,
+    children: <LazySecretFormBody projectId={projectId} onDone={close} />,
+  }),
+  'variable-new': ({ t, close, projectId }) => ({
+    title: t('variables.new.title'),
+    subtitle: <span>{t('variables.new.subtitle')}</span>,
+    children: <LazyVariableFormBody projectId={projectId} onDone={close} />,
+  }),
+  'registry-new': ({ t, close, projectId }) => ({
+    title: t('registry.new.title'),
+    subtitle: <span>{t('registry.new.subtitle')}</span>,
+    children: <LazyRegistryFormBody projectId={projectId} onDone={close} />,
+  }),
   'account-token-new': ({ t, close }) => ({
     title: t('tokens.slide.title'),
     subtitle: <span>{t('tokens.slide.subtitle')}</span>,
@@ -150,10 +168,37 @@ const oidcEditSlide = (id: TSlideId, providerId: string, { t, close }: ISlideCon
   children: <LazyOidcProviderBody providerId={providerId} onDone={close} />,
 });
 
+const secretsEditSlide = (id: TSlideId, target: ISecretsEditTarget, { t, close, projectId }: ISlideContext): ISlide => {
+  if (target.Kind === 'secret') {
+    return {
+      id,
+      title: t('secrets.edit.title', { name: target.Key }),
+      subtitle: <span>{t('secrets.edit.subtitle')}</span>,
+      children: <LazySecretFormBody projectId={projectId} name={target.Key} onDone={close} />,
+    };
+  }
+  if (target.Kind === 'variable') {
+    return {
+      id,
+      title: t('variables.edit.title', { name: target.Key }),
+      subtitle: <span>{t('variables.edit.subtitle')}</span>,
+      children: <LazyVariableFormBody projectId={projectId} name={target.Key} onDone={close} />,
+    };
+  }
+  return {
+    id,
+    title: t('registry.edit.title'),
+    subtitle: <span>{t('registry.edit.subtitle')}</span>,
+    children: <LazyRegistryFormBody projectId={projectId} credentialId={target.Key} onDone={close} />,
+  };
+};
+
 export const buildSlide = (id: TSlideId, context: ISlideContext): ISlide => {
   if (id === 'theme-edit' || themeOf(id) !== null) return themeEditSlide(id, context);
   const providerId = oidcOf(id);
   if (providerId !== null) return oidcEditSlide(id, providerId, context);
+  const target = secretsTargetOf(id);
+  if (target !== null) return secretsEditSlide(id, target, context);
   const builder = Object.hasOwn(BUILDERS, id) ? BUILDERS[id as keyof typeof BUILDERS] : undefined;
   return builder ? { id, ...builder(context) } : themeEditSlide(id, context);
 };

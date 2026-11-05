@@ -38,6 +38,7 @@ const GATES: readonly IGateCase[] = [
   { url: `/org/teams/${ID}`, title: Ar['shell.nav.teams'], endpoint: /\/teams/, allowed: BUILDERS },
   { url: '/org/invitations', title: Ar['shell.nav.invitations'], endpoint: /\/invitations/, allowed: ADMINS },
   { url: '/org/api-keys', title: Ar['shell.nav.apiKeys'], endpoint: /\/organizations\/[^/]+\/api-tokens/, allowed: ADMINS },
+  { url: '/org/secrets', title: Ar['shell.nav.secrets'], endpoint: /\/organizations\/[^/]+\/secrets/, allowed: BUILDERS },
   { url: '/org/settings', title: Ar['shell.nav.orgSettings'], endpoint: /^$/, allowed: EVERYONE },
   { url: '/audit', title: Ar['audit.title'], endpoint: /\/audit-events/, allowed: ADMINS },
   { url: `/audit/${ID}`, title: Ar['audit.detail.title'], endpoint: /\/audit-events/, allowed: ADMINS },

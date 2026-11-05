@@ -35,7 +35,7 @@ const SectionLinks = ({ label, ids, className }: ISectionNavsProps) => {
   return <SectionNav label={t(label)} items={items} className={className} />;
 };
 
-const ORG_IDS: readonly TSectionId[] = ['members', 'teams', 'invitations', 'apiKeys', 'orgSettings'];
+const ORG_IDS: readonly TSectionId[] = ['members', 'teams', 'invitations', 'apiKeys', 'secrets', 'orgSettings'];
 const ACCOUNT_IDS: readonly TSectionId[] = ['profile', 'security', 'preferences'];
 const RUNNER_IDS: readonly TSectionId[] = ['runners', 'runnerTokens'];
 

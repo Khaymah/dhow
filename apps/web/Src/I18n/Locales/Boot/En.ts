@@ -13,6 +13,7 @@ export const BootEn: TBootMessages = {
   'shell.nav.teams': 'Teams',
   'shell.nav.invitations': 'Invitations',
   'shell.nav.apiKeys': 'API keys',
+  'shell.nav.secrets': 'Secrets and variables',
   'shell.nav.orgSettings': 'Organization settings',
   'shell.nav.audit': 'Audit log',
   'shell.nav.system': 'Server status',

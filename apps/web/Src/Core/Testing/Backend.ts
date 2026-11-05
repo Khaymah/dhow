@@ -262,7 +262,7 @@ const organizationReply = async (request: Request, url: URL, options: IBackendOp
   if (pathname.endsWith('/audit-events')) return pageOf(options.audit ?? [], url);
   if (pathname.endsWith('/members')) return pageOf(options.members ?? membersFixture(), url);
   if (request.method === 'GET' && /\/(runners|jobs|runner-registration-tokens)$/.test(pathname)) return pageOf([], url);
-  if (request.method === 'GET' && /\/(teams|invitations|api-tokens)$/.test(pathname)) return envelope({ Success: true, Data: [] });
+  if (request.method === 'GET' && /\/(teams|invitations|api-tokens|secrets|variables|registry-credentials)$/.test(pathname)) return envelope({ Success: true, Data: [] });
   if (request.method === 'PATCH') {
     if (options.renameReply) return options.renameReply();
     const body = (await request.clone().json()) as { Name: string };
