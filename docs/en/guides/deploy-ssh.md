@@ -122,7 +122,9 @@ Pruning never touches `current` or the previous release, and it orders the relea
 | `DHOW_RELEASE_ID` | The release id |
 | `DHOW_PREVIOUS_RELEASE` | The id of the release before it, or empty |
 
-The commands are sent to the server exactly as written, as one argument, and they are never joined with the path or the release id. The values reach the command above as environment variables, so read them inside the command (`"$DHOW_RELEASE_PATH"`). Each command has a limit of two minutes. The pre-switch command runs before any change, and its failure stops the deploy without a rollback because nothing changed. A failure of any other command after the switch brings the previous release back.
+The commands are sent to the server exactly as written, as one argument, and they are never joined with the path or the release id. The values reach the command above as environment variables, so read them inside the command (`"$DHOW_RELEASE_PATH"`). Each command has a limit of two minutes, which the server also enforces with the `timeout` command when it has one (`timeout -s KILL`); otherwise Dhow cuts the session from its side only. The pre-switch command runs before any change, and its failure stops the deploy without a rollback because nothing changed. A failure of any other command after the switch brings the previous release back.
+
+What a command prints goes into the log of the job, and Dhow masks only the secrets that are registered. Do not print in a command the value of a secret that you did not register in Dhow.
 
 On a rollback `ReloadCommand` runs again, and the variables of the command describe the release we went back to.
 
