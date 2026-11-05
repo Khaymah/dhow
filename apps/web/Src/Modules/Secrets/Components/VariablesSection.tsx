@@ -25,7 +25,8 @@ interface IVariableRowProps {
 
 const VariableRow = ({ variable, writable, removal, onEdit }: IVariableRowProps) => {
   const t = useT();
-  const covers = variable.Overrides.includes('organization');
+  const coversOrganization = variable.Overrides.includes('organization');
+  const coversProject = variable.Overrides.includes('project');
 
   return (
     <li className="grid min-w-0 gap-3 border-t border-line px-4 py-3 first:border-t-0">
@@ -35,7 +36,8 @@ const VariableRow = ({ variable, writable, removal, onEdit }: IVariableRowProps)
           {variable.Name}
         </bdi>
         <span className="flex flex-wrap items-center gap-1.5">
-          {covers ? <Badge tone="info">{t('variables.overrides.organization')}</Badge> : null}
+          {coversOrganization ? <Badge tone="info">{t('variables.overrides.organization')}</Badge> : null}
+          {coversProject ? <Badge tone="info">{t('variables.overrides.project')}</Badge> : null}
           {writable ? (
             <>
               <Button

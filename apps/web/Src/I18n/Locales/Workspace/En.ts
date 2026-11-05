@@ -1,4 +1,5 @@
 import { AuditEn } from '@/I18n/Locales/Workspace/AuditEn';
+import { EnvironmentsEn } from '@/I18n/Locales/Workspace/EnvironmentsEn';
 import { HomeEn } from '@/I18n/Locales/Workspace/HomeEn';
 import { JobsEn } from '@/I18n/Locales/Workspace/JobsEn';
 import { OrganizationEn } from '@/I18n/Locales/Workspace/OrganizationEn';
@@ -406,4 +407,5 @@ export const WorkspaceEn: TWorkspaceMessages = {
   ...SettingsEn,
   ...OidcSettingsEn,
   ...SecretsEn,
+  ...EnvironmentsEn,
 };

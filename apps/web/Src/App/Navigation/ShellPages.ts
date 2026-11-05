@@ -18,6 +18,11 @@ export const SHELL_PAGES = {
     () => import('@/App/Pages/ProjectSettingsPage').then((module) => module.ProjectSettingsPage),
     member,
   ),
+  projectEnvironments: lazyPage(
+    () => import('@/App/Pages/ProjectEnvironmentsPage').then((module) => module.ProjectEnvironmentsPage),
+    member,
+  ),
+  environment: lazyPage(() => import('@/App/Pages/EnvironmentPage').then((module) => module.EnvironmentPage), member),
   run: lazyPage(() => import('@/App/Pages/RunPage').then((module) => module.RunPage), member),
   jobs: lazyPage(() => import('@/App/Pages/JobsPage').then((module) => module.JobsPage), member),
   job: lazyPage(() => import('@/App/Pages/JobPage').then((module) => module.JobPage), member),

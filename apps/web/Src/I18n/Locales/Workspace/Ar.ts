@@ -1,4 +1,5 @@
 import { AuditAr } from '@/I18n/Locales/Workspace/AuditAr';
+import { EnvironmentsAr } from '@/I18n/Locales/Workspace/EnvironmentsAr';
 import { HomeAr } from '@/I18n/Locales/Workspace/HomeAr';
 import { JobsAr } from '@/I18n/Locales/Workspace/JobsAr';
 import { OrganizationAr } from '@/I18n/Locales/Workspace/OrganizationAr';
@@ -405,4 +406,5 @@ export const WorkspaceAr = {
   ...SettingsAr,
   ...OidcSettingsAr,
   ...SecretsAr,
+  ...EnvironmentsAr,
 } as const;

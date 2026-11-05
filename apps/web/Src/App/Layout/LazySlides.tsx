@@ -64,6 +64,10 @@ const RegistryFormBody = lazyComponent(() =>
   import('@/Modules/Secrets/Components/RegistryFormBody').then((module) => module.RegistryFormBody),
 );
 
+const EnvironmentNewBody = lazyComponent(() =>
+  import('@/Modules/Environments/Components/EnvironmentNewBody').then((module) => module.EnvironmentNewBody),
+);
+
 type TSlidePart = Exclude<
   TSlideId,
   `theme-edit-${string}` | `oidc-edit-${string}` | `secret-edit-${string}` | `variable-edit-${string}` | `registry-edit-${string}`
@@ -89,6 +93,7 @@ const PARTS: Record<TSlidePart, readonly IPreloadable[]> = {
   'secret-new': [SecretFormBody],
   'variable-new': [VariableFormBody],
   'registry-new': [RegistryFormBody],
+  'environment-new': [EnvironmentNewBody],
 };
 
 const partOf = (id: TSlideId): TSlidePart => {
@@ -152,3 +157,4 @@ export const LazyTriggerRunBody = withSkeleton(TriggerRunBody);
 export const LazySecretFormBody = withSkeleton(SecretFormBody);
 export const LazyVariableFormBody = withSkeleton(VariableFormBody);
 export const LazyRegistryFormBody = withSkeleton(RegistryFormBody);
+export const LazyEnvironmentNewBody = withSkeleton(EnvironmentNewBody);

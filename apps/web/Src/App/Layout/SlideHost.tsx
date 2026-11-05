@@ -3,7 +3,7 @@ import { useEffect, useEffectEvent, useState } from 'react';
 
 import { buildSlide } from '@/App/Layout/SlideCatalog';
 import { useSlide } from '@/App/Navigation/useSlide';
-import { isUuid } from '@/App/Pages/Params';
+import { isEnvironmentName, isUuid } from '@/App/Pages/Params';
 import { isThemeEditSlide, slideAllowed, themeOf, type TSlideId } from '@/App/Panels';
 import { useCurrentMembership } from '@/Core/Auth/useMe';
 import type { ICustomTheme } from '@/Core/Theme/ThemeTokens';
@@ -22,7 +22,7 @@ export const SlideHost = () => {
   const t = useT();
   const navigate = useNavigate();
   const { slide, invalid, close, discard } = useSlide();
-  const { memberId, projectId } = useParams({ strict: false });
+  const { memberId, projectId, environmentName } = useParams({ strict: false });
   const role = useCurrentMembership()?.Role;
   const draftName = useThemeStore((state) => state.Draft?.Name);
   const customThemes = useThemeStore((state) => state.CustomThemes);
@@ -82,6 +82,10 @@ export const SlideHost = () => {
             projectId: isUuid(projectId) ? projectId : undefined,
             openProject: (id) => {
               void navigate({ to: '/projects/$projectId', params: { projectId: id } });
+            },
+            environmentName: isEnvironmentName(environmentName) ? environmentName : undefined,
+            openEnvironment: (id, name) => {
+              void navigate({ to: '/projects/$projectId/environments/$environmentName', params: { projectId: id, environmentName: name } });
             },
             openRun: (id, runId) => {
               void navigate({ to: '/projects/$projectId/runs/$runId', params: { projectId: id, runId } });

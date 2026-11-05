@@ -23,6 +23,7 @@ const STATIC_SLIDES = [
   'secret-new',
   'variable-new',
   'registry-new',
+  'environment-new',
 ] as const;
 const THEME_EDIT_PREFIX = 'theme-edit-';
 const OIDC_EDIT_PREFIX = 'oidc-edit-';
@@ -111,6 +112,7 @@ const SLIDE_GATES: Partial<Record<TStaticSlideId, (role: TRole | undefined) => b
   'secret-new': (role) => role !== undefined,
   'variable-new': (role) => role !== undefined,
   'registry-new': (role) => role !== undefined,
+  'environment-new': (role) => role !== undefined,
 };
 
 const isStaticSlide = (id: TSlideId): id is TStaticSlideId => STATIC_SLIDES.some((slide) => slide === id);

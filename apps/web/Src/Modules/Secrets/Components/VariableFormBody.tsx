@@ -14,6 +14,7 @@ import { byteLength, NAME_PATTERN, VARIABLE_MAX_BYTES } from '@/Modules/Secrets/
 
 export interface IVariableFormBodyProps {
   projectId?: string;
+  environmentName?: string;
   name?: string;
   onDone: () => void;
 }
@@ -92,8 +93,8 @@ const ExistingVariable = ({ scope, name, onDone }: { scope: ISecretScope; name: 
   );
 };
 
-export const VariableFormBody = ({ projectId, name, onDone }: IVariableFormBodyProps) => (
-  <FormGate projectId={projectId}>
+export const VariableFormBody = ({ projectId, environmentName, name, onDone }: IVariableFormBodyProps) => (
+  <FormGate projectId={projectId} environmentName={environmentName}>
     {(scope) =>
       name === undefined ? (
         <VariableForm key={scope.OrganizationId} scope={scope} existing={undefined} onDone={onDone} />
