@@ -21,6 +21,23 @@ func shippedComposeManifest(t *testing.T) Manifest {
 	return parsed
 }
 
+func TestTheComposePluginDeclaresAReasonForEveryExitCodeItHas(t *testing.T) {
+	m := shippedComposeManifest(t)
+	want := map[int32]string{
+		1: "DEPLOY_FAILED", 2: "PLUGIN_INPUT_INVALID", 10: "DEPLOY_ROLLED_BACK", 11: "DEPLOY_HEALTH_FAILED", 12: "DEPLOY_ROLLBACK_FAILED",
+		13: "HOST_KEY_MISMATCH", 14: "ARTIFACT_UNSAFE", 15: "TARGET_LOCKED", 16: "CURRENT_NOT_A_SYMLINK", 17: "TARGET_HOST_UNREACHABLE",
+		18: "TARGET_STATE_CORRUPT", 30: "ARTIFACT_UNSAFE",
+	}
+	for code, name := range want {
+		got, ok := m.ExitReason(code)
+		assert.True(t, ok, code)
+		assert.Equal(t, name, got, code)
+	}
+	_, ok := m.ExitReason(137)
+	assert.False(t, ok, "a code the plugin does not declare stays a failed step")
+	assert.Len(t, m.ExitReasons, len(want), "every exit code of the plugin is declared and nothing else")
+}
+
 func TestTheManifestOfTheComposePluginIsOneTheRunnerAcceptsAndTheServerCanRelyOn(t *testing.T) {
 	m := shippedComposeManifest(t)
 	assert.Equal(t, []string{"/dhow-deploy-compose"}, m.Entrypoint)

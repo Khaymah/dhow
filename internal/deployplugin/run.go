@@ -21,7 +21,7 @@ import (
 const (
 	maxKeyBytes    = 16 << 10
 	proxyDialLimit = 15 * time.Second
-	cancelGrace    = 15 * time.Second
+	cancelGrace    = jobspec.DeployConnGrace
 )
 
 var codes = map[int]string{
@@ -35,6 +35,7 @@ var codes = map[int]string{
 	deployrelease.ExitTargetLocked:    "TARGET_LOCKED",
 	deployrelease.ExitCurrentNotLink:  "CURRENT_NOT_A_SYMLINK",
 	deployrelease.ExitConnect:         "TARGET_HOST_UNREACHABLE",
+	deployrelease.ExitStateCorrupt:    "TARGET_STATE_CORRUPT",
 }
 
 func Code(exit int) string {

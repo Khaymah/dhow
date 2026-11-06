@@ -40,6 +40,8 @@ func TestOnlyAFullyPinnedOfficialImageIsAcceptedAsTheBakedPlugin(t *testing.T) {
 	digest := "@sha256:" + strings.Repeat("a", 64)
 	for image, want := range map[string]bool{
 		"ghcr.io/khaymah/dhow-deploy-ssh" + digest:        true,
+		"ghcr.io/khaymah/dhow-deploy-compose" + digest:    true,
+		"ghcr.io/khaymah/dhow-deploy-compose:1" + digest:  false,
 		"ghcr.io/khaymah/dhow-deploy-ssh":                 false,
 		"ghcr.io/khaymah/dhow-deploy-ssh:1.0":             false,
 		"ghcr.io/khaymah/dhow-deploy-ssh@sha256:abc":      false,

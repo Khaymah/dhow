@@ -241,7 +241,7 @@ volumes:
 
 | الرمز | الرقم | المعنى |
 |---|---|---|
-| `COMPOSE_*` | 30 | رُفض ملف Compose قبل أي اتصال. الرمز الكامل (مثل `COMPOSE_UNSAFE_PRIVILEGED`) في سجل الخطوة |
+| `COMPOSE_*` | 30 | رُفض ملف Compose قبل أي اتصال. الرمز الكامل (مثل `COMPOSE_UNSAFE_PRIVILEGED`) في سجل الخطوة. سبب فشل الـ job هو `ARTIFACT_UNSAFE` |
 
 ## أخطاء شائعة
 

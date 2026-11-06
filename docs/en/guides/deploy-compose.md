@@ -241,7 +241,7 @@ The same SSH codes for `DEPLOY_ROLLED_BACK` (10), `DEPLOY_HEALTH_FAILED` (11), `
 
 | Code | Number | Meaning |
 |---|---|---|
-| `COMPOSE_*` | 30 | The Compose file was refused before any connection. The full code (such as `COMPOSE_UNSAFE_PRIVILEGED`) is in the step log |
+| `COMPOSE_*` | 30 | The Compose file was refused before any connection. The full code (such as `COMPOSE_UNSAFE_PRIVILEGED`) is in the step log. The failure reason of the job is `ARTIFACT_UNSAFE` |
 
 ## Common errors
 

@@ -57,6 +57,8 @@ func TestANonOfficialPluginDoesNotGetDeployReasons(t *testing.T) {
 	assert.False(t, jobspec.IsOfficialDeployImage("ghcr.io/khaymah/dhow-deploy-ssh-evil@sha256:"+zeros))
 	assert.False(t, jobspec.IsOfficialDeployImage("ghcr.io/acme/deploy@sha256:"+zeros))
 	assert.True(t, jobspec.IsOfficialDeployImage(deployImage))
+	assert.True(t, jobspec.IsOfficialDeployImage("ghcr.io/khaymah/dhow-deploy-compose@sha256:"+zeros), "the compose plugin gets the deploy reasons and the long cancel grace like the ssh plugin")
+	assert.False(t, jobspec.IsOfficialDeployImage("ghcr.io/khaymah/dhow-deploy-compose-evil@sha256:"+zeros))
 }
 
 const zeros = "0000000000000000000000000000000000000000000000000000000000000000"
