@@ -50,8 +50,12 @@ func (e *Env) SeedIngestToken(project, creator uuid.UUID, seed IngestSeed) Inges
 	body := base64.RawURLEncoding.EncodeToString(raw)
 	value := IngestTokenPrefix + body
 	sum := sha256.Sum256([]byte(value))
-	var org, id uuid.UUID
-	require.NoError(e.T, e.Pool.QueryRow(context.Background(), `SELECT "OrganizationId" FROM "Projects" WHERE "Id" = $1`, project).Scan(&org))
+	var org, id, owner uuid.UUID
+	require.NoError(e.T, e.Pool.QueryRow(context.Background(),
+		`SELECT "OrganizationId", "CreatedByUserId" FROM "Projects" WHERE "Id" = $1`, project).Scan(&org, &owner))
+	if creator == uuid.Nil {
+		creator = owner
+	}
 	now := e.Clock.Now()
 	require.NoError(e.T, e.Pool.QueryRow(context.Background(),
 		`INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId")

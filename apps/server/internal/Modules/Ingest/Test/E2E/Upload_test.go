@@ -153,16 +153,14 @@ func TestEveryRefusalHasItsCodeAndLeavesNothingBehind(t *testing.T) {
 		status int
 		code   string
 	}{
-		{"a wrong digest", good, func(u *apptest.IngestUpload) { u.Digest = apptest.DigestHex([]byte("something else")) },
-			http.StatusUnprocessableEntity, "DIGEST_MISMATCH"},
+		{"a wrong digest", good, func(u *apptest.IngestUpload) { u.Digest = apptest.DigestHex([]byte("other")) }, http.StatusUnprocessableEntity, "DIGEST_MISMATCH"},
 		{"a path with ../", traversal, nil, http.StatusUnprocessableEntity, "ARCHIVE_UNSAFE"},
 		{"a link that leaves the folder", bomb, nil, http.StatusUnprocessableEntity, "ARCHIVE_UNSAFE"},
 		{"bytes that are not a tar.gz", notGzip, nil, http.StatusUnprocessableEntity, "ARCHIVE_UNSAFE"},
 		{"a file over the limit", huge, nil, http.StatusRequestEntityTooLarge, "ARTIFACT_TOO_LARGE"},
 		{"a revoked token", good, func(u *apptest.IngestUpload) { u.Token = revoked.Value }, http.StatusUnauthorized, "INGEST_TOKEN_REVOKED"},
 		{"an expired token", good, func(u *apptest.IngestUpload) { u.Token = expired.Value }, http.StatusUnauthorized, "INGEST_TOKEN_EXPIRED"},
-		{"an unknown token", good, func(u *apptest.IngestUpload) { u.Token = apptest.IngestTokenPrefix + strings.Repeat("a", 43) },
-			http.StatusUnauthorized, "INGEST_TOKEN_INVALID"},
+		{"an unknown token", good, func(u *apptest.IngestUpload) { u.Token = apptest.IngestTokenPrefix + strings.Repeat("a", 43) }, http.StatusUnauthorized, "INGEST_TOKEN_INVALID"},
 		{"a ref outside the patterns", good, func(u *apptest.IngestUpload) { u.Ref = "dev" }, http.StatusForbidden, "REF_NOT_ALLOWED_FOR_TOKEN"},
 		{"a name that is a path", good, func(u *apptest.IngestUpload) { u.Name = "../web" }, http.StatusUnprocessableEntity, "VALIDATION_FAILED"},
 		{"a commit that is not a sha", good, func(u *apptest.IngestUpload) { u.Sha = "main" }, http.StatusUnprocessableEntity, "VALIDATION_FAILED"},

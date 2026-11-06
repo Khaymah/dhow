@@ -1,3 +1,3 @@
-testdata/unknown-key.dhow.yml:4:3: error TRIGGER_NOT_SUPPORTED_YET at on.schedule: this trigger is not supported yet (schedule comes after the first release, artifact with M6)
+testdata/unknown-key.dhow.yml:4:3: error TRIGGER_NOT_SUPPORTED_YET at on.schedule: this trigger is not supported yet (schedule comes after the first release)
 testdata/unknown-key.dhow.yml:8:5: error UNKNOWN_KEY at jobs.build.stepz: this key is not part of the pipeline spec
 testdata/unknown-key.dhow.yml: errors: 2, warnings: 0. The server refuses this pipeline.

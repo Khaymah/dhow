@@ -116,7 +116,7 @@ export const AUDIT_ACTIONS: Readonly<Record<string, IAuditAction>> = {
   'registry_credential.removed': { Icon: 'trash', Bad: true },
   'ingest_token.created': { Icon: 'key', Bad: false },
   'ingest_token.revoked': { Icon: 'trash', Bad: true },
-  'artifact.ingested': { Icon: 'upload', Bad: false },
+  'artifact.ingested': { Icon: 'layers', Bad: false },
   'ingest.rejected': { Icon: 'shield', Bad: true },
   'job.secrets_delivered': { Icon: 'key', Bad: false },
   'system.instance.setupCompleted': { Icon: 'shield', Bad: false },

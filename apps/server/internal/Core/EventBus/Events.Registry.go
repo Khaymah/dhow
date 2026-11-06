@@ -144,6 +144,7 @@ const (
 	IngestRejected     = "ingest.rejected"
 )
 
+//nolint:funlen // A flat list of event names.
 func AuditedEvents() []string {
 	return []string{
 		SystemInstanceSetupCompleted,

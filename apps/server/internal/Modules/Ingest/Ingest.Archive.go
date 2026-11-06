@@ -20,7 +20,7 @@ func startArchiveCheck(limits archive.Limits) *archiveCheck {
 		if err == nil {
 			_, err = io.Copy(io.Discard, pr)
 		}
-		pr.CloseWithError(err)
+		_ = pr.CloseWithError(err)
 		c.done <- err
 	}()
 	return c

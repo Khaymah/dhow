@@ -54,6 +54,7 @@ func projectRequest(rule policy.Rule, org, project uuid.UUID, env *apptest.Env) 
 	}
 	path = secretsPath(env, path, org, seeded)
 	path = targetsPath(env, path, seeded)
+	path = ingestPath(env, path, seeded, uuid.Nil)
 	req := apptest.Request{Method: rule.Method, Path: path}
 	switch {
 	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/projects/{projectId}/runs":
@@ -63,7 +64,7 @@ func projectRequest(rule policy.Rule, org, project uuid.UUID, env *apptest.Env) 
 	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/projects":
 		req.Body = map[string]string{"Name": "Bound project", "Slug": "bp-" + randomSuffix(env.T)}
 	}
-	if body := targetsBody(env, rule); body != nil {
+	if body := ingestBody(env, rule); body != nil {
 		req.Body = body
 	}
 	return req

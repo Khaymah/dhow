@@ -153,14 +153,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		PublicURL: in.Config.PublicURL.String(), Limiter: limiter, Limits: limits, Log: in.Log, Now: in.Now,
 	})
 
-	runnersService := runners.NewService(runners.Options{
-		DB: in.Pool, Keys: runnerKeys, Bus: bus, Origin: auth.OriginOf(in.Config.PublicURL), PublicURL: in.Config.PublicURL.String(),
-		Dev: in.Config.Dev, Log: in.Log, Now: in.Now,
-	})
-	tokensService := tokens.NewService(tokens.Options{
-		DB: in.Pool, Tokens: external.apiTokens, Factors: sessionService, Bus: bus, Log: in.Log, Now: in.Now,
-	})
-	gate := runnerauth.NewGate(runnerauth.GateOptions{Verifier: runnersService, Log: in.Log, Now: in.Now})
+	runnersService, tokensService, gate := accessFor(in, runnerKeys, bus, external.apiTokens, sessionService)
 	secrets := newCheckoutSecrets(in)
 	jobsService, logPool, err := buildJobs(ctx, in, runnerKeys, bus, store, secrets)
 	if err != nil {
@@ -420,4 +413,18 @@ func secretsFor(in Infra, values *keys.Values, bus *eventbus.Bus, runs *pipeline
 	secretsmodule.Subscribe(bus, s)
 	runs.UseLogins(s)
 	return s, nil
+}
+
+func accessFor(
+	in Infra, keys *runnerauth.Keys, bus *eventbus.Bus, apiTokens *auth.APITokens, factors auth.FactorConfirmer,
+) (*runners.Service, *tokens.Service, *runnerauth.Gate) {
+	runnersService := runners.NewService(runners.Options{
+		DB: in.Pool, Keys: keys, Bus: bus, Origin: auth.OriginOf(in.Config.PublicURL), PublicURL: in.Config.PublicURL.String(),
+		Dev: in.Config.Dev, Log: in.Log, Now: in.Now,
+	})
+	tokensService := tokens.NewService(tokens.Options{
+		DB: in.Pool, Tokens: apiTokens, Factors: factors, Bus: bus, Log: in.Log, Now: in.Now,
+	})
+	gate := runnerauth.NewGate(runnerauth.GateOptions{Verifier: runnersService, Log: in.Log, Now: in.Now})
+	return runnersService, tokensService, gate
 }

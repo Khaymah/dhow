@@ -154,6 +154,7 @@ var notSealed = map[string]string{
 	"Artifacts.Digest": "digest", "BlobOwners.Digest": "digest", "BlobUploads.Digest": "digest", "Blobs.Digest": "digest",
 	"CacheEntries.Digest": "digest", "JobAttempts.CompletionDigest": "digest", "Jobs.SpecDigest": "digest", "Leases.GrantDigest": "digest",
 	"PipelineRuns.DefinitionDigest": "digest", "WebhookDeliveries.PayloadDigest": "digest", "DeploymentReleases.ArtifactDigest": "digest",
+	"IngestTokens.TokenHash": "hash", "IngestedArtifacts.Digest": "digest",
 	"Passkeys.Aaguid": "public", "Passkeys.CredentialId": "public", "Passkeys.PublicKey": "public key", "Users.WebauthnHandle": "public",
 	"Runners.EncryptionPublicKey": "public key", "Runners.SigningPublicKey": "public key", "RunnerSessions.ChallengeNonce": "public nonce",
 	"LogChunks.Data":   "job logs, masked by the runner",

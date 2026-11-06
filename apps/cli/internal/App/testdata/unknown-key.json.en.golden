@@ -12,7 +12,7 @@
       "Path": "on.schedule",
       "Line": 4,
       "Column": 3,
-      "Message": "this trigger is not supported yet (schedule comes after the first release, artifact with M6)"
+      "Message": "this trigger is not supported yet (schedule comes after the first release)"
     },
     {
       "Code": "UNKNOWN_KEY",

@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	CodeIngestTokenInvalid = "INGEST_TOKEN_INVALID" //nolint:gosec // A public error code, not a credential.
-	CodeIngestTokenRevoked = "INGEST_TOKEN_REVOKED" //nolint:gosec // A public error code, not a credential.
-	CodeIngestTokenExpired = "INGEST_TOKEN_EXPIRED" //nolint:gosec // A public error code, not a credential.
-	CodeIngestTokenLimit   = "INGEST_TOKEN_LIMIT"   //nolint:gosec // A public error code, not a credential.
-	CodeIngestTokenName    = "INGEST_TOKEN_NAME_TAKEN"
+	CodeIngestTokenInvalid = "INGEST_TOKEN_INVALID"    //nolint:gosec // A public error code, not a credential.
+	CodeIngestTokenRevoked = "INGEST_TOKEN_REVOKED"    //nolint:gosec // A public error code, not a credential.
+	CodeIngestTokenExpired = "INGEST_TOKEN_EXPIRED"    //nolint:gosec // A public error code, not a credential.
+	CodeIngestTokenLimit   = "INGEST_TOKEN_LIMIT"      //nolint:gosec // A public error code, not a credential.
+	CodeIngestTokenName    = "INGEST_TOKEN_NAME_TAKEN" //nolint:gosec // A public error code, not a credential.
 	CodeRefNotAllowed      = "REF_NOT_ALLOWED_FOR_TOKEN"
 	CodeDigestMismatch     = "DIGEST_MISMATCH"
 	CodeArchiveUnsafe      = "ARCHIVE_UNSAFE"

@@ -12,8 +12,8 @@ import (
 
 const (
 	messageTokensListed    = "ingest.tokens.listed"
-	messageTokenCreated    = "ingest.token.created"
-	messageTokenRevoked    = "ingest.token.revoked"
+	messageTokenCreated    = "ingest.token.created" //nolint:gosec // An i18n key, not a credential.
+	messageTokenRevoked    = "ingest.token.revoked" //nolint:gosec // An i18n key, not a credential.
 	messageArtifactsListed = "ingest.artifacts.listed"
 )
 

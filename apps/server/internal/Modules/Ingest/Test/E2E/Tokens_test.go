@@ -30,7 +30,9 @@ func (w world) createToken(body map[string]any) apptest.Response {
 	return w.owner.Do(apptest.Request{Method: http.MethodPost, Path: w.tokensPath(""), Body: body})
 }
 
-func mainOnly() []map[string]string { return []map[string]string{{"Kind": "branch", "Pattern": "main"}} }
+func mainOnly() []map[string]string {
+	return []map[string]string{{"Kind": "branch", "Pattern": "main"}}
+}
 
 func TestATokenIsShownOnceAndOnlyItsHashIsKept(t *testing.T) {
 	w := newWorld(t)
@@ -163,8 +165,8 @@ func TestTheListOfUploadedFilesShowsWhatTheUploaderDeclared(t *testing.T) {
 	require.Equal(t, http.StatusOK, list.Status, string(list.Raw))
 	var items []struct {
 		Name, Digest, Ref, Sha, RefKind, TokenName, RunId string
-		Provenance                                      map[string]string
-		ProvenanceVerified                              bool
+		Provenance                                        map[string]string
+		ProvenanceVerified                                bool
 	}
 	list.Decode(t, &items)
 	require.Len(t, items, 1)
