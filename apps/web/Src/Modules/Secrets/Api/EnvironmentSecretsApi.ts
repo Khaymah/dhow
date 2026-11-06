@@ -37,10 +37,11 @@ export const putEnvironmentSecret = (
     }),
   );
 
-export const removeEnvironmentSecret = (scope: IEnvironmentScope, name: string): Promise<TSchemas['Secret']> =>
+export const removeEnvironmentSecret = (scope: IEnvironmentScope, name: string, factor?: TCurrentFactor): Promise<TSchemas['Secret']> =>
   request(() =>
     ApiClient.POST('/organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets/{secretName}/remove', {
       params: { path: { ...base(scope), secretName: name } },
+      ...(factor === undefined ? {} : { body: { CurrentFactor: factor } }),
     }),
   );
 

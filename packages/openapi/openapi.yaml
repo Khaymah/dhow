@@ -3946,7 +3946,9 @@ paths:
       summary: Remove a secret of an environment
       description: >-
         Needs `environment.manage`. Marks the secret deleted and erases the values of all its versions in the same
-        transaction. The name can be used again.
+        transaction. The name can be used again. The body is optional: when the secret is the key of a deploy target
+        of the environment, it needs a fresh `CurrentFactor` like writing a value (403 `TARGET_KEY_NEEDS_FACTOR`
+        without one, `INVALID_CURRENT_FACTOR` with a wrong one) and nothing is removed.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -3955,6 +3957,12 @@ paths:
         - $ref: "#/components/parameters/ProjectId"
         - $ref: "#/components/parameters/EnvironmentName"
         - $ref: "#/components/parameters/SecretName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
       responses:
         "200":
           description: The removed secret, as it was.

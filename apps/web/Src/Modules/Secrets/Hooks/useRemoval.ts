@@ -11,7 +11,8 @@ export interface IRemoval {
   Notice: string | null;
   Ask: (key: string) => void;
   Cancel: () => void;
-  Confirm: (key: string, run: () => Promise<unknown>, done: string) => void;
+  Confirm: (key: string, run: () => Promise<unknown>, done: string, handled?: (error: unknown) => boolean) => void;
+  Succeed: (key: string, done: string) => Promise<void>;
 }
 
 export const useRemoval = (): IRemoval => {
@@ -22,7 +23,14 @@ export const useRemoval = (): IRemoval => {
   const [Busy, setBusy] = useState(false);
   const [Notice, setNotice] = useState<string | null>(null);
 
+  const Succeed = async (key: string, done: string) => {
+    setOpen(null);
+    await client.invalidateQueries({ queryKey: ALL_SECRETS_KEY });
+    Push({ Id: `secrets-removed-${key}`, Accent: 'live', Title: done });
+  };
+
   return {
+    Succeed,
     Open,
     Busy,
     Notice,
@@ -33,17 +41,13 @@ export const useRemoval = (): IRemoval => {
     Cancel: () => {
       setOpen(null);
     },
-    Confirm: (key, run, done) => {
+    Confirm: (key, run, done, handled) => {
       setBusy(true);
       setNotice(null);
       run()
-        .then(async () => {
-          setOpen(null);
-          await client.invalidateQueries({ queryKey: ALL_SECRETS_KEY });
-          Push({ Id: `secrets-removed-${key}`, Accent: 'live', Title: done });
-        })
+        .then(() => Succeed(key, done))
         .catch((error: unknown) => {
-          setNotice(errorText(error));
+          if (handled?.(error) !== true) setNotice(errorText(error));
         })
         .finally(() => {
           setBusy(false);

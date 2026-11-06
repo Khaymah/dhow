@@ -97,6 +97,13 @@ func secretInput(body *gen.PutSecretRequest) (models.PutSecretInput, error) {
 	return in, nil
 }
 
+func removalFactor(body *gen.RemoveEnvironmentSecretJSONRequestBody) *auth.Factor {
+	if body == nil {
+		return nil
+	}
+	return factorOf(&body.CurrentFactor)
+}
+
 func versionOf(body *gen.RestoreSecretVersionRequest) (int, *auth.Factor, error) {
 	if body == nil {
 		return 0, nil, apperrors.BadRequest()
@@ -142,8 +149,8 @@ func secretResponse(s models.Secret, message string) gen.SecretResponse {
 	return gen.SecretResponse{Success: true, Message: ptrOf(message), Data: &data}
 }
 
-func (c *Controller) removeSecret(ctx context.Context, ref models.Ref, name string) (gen.SecretResponse, error) {
-	s, err := c.service.RemoveSecret(ctx, ref, name)
+func (c *Controller) removeSecret(ctx context.Context, ref models.Ref, name string, factor *auth.Factor) (gen.SecretResponse, error) {
+	s, err := c.service.RemoveSecret(ctx, ref, name, factor)
 	return secretResponse(s, messageRemoved), err
 }
 
@@ -164,7 +171,7 @@ func (c *Controller) PutOrganizationSecret(ctx context.Context, req gen.PutOrgan
 }
 
 func (c *Controller) RemoveOrganizationSecret(ctx context.Context, req gen.RemoveOrganizationSecretRequestObject) (gen.RemoveOrganizationSecretResponseObject, error) {
-	out, err := c.removeSecret(ctx, orgRef(req.Id), req.SecretName)
+	out, err := c.removeSecret(ctx, orgRef(req.Id), req.SecretName, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +203,7 @@ func (c *Controller) PutProjectSecret(ctx context.Context, req gen.PutProjectSec
 }
 
 func (c *Controller) RemoveProjectSecret(ctx context.Context, req gen.RemoveProjectSecretRequestObject) (gen.RemoveProjectSecretResponseObject, error) {
-	out, err := c.removeSecret(ctx, projectRef(req.Id, req.ProjectId), req.SecretName)
+	out, err := c.removeSecret(ctx, projectRef(req.Id, req.ProjectId), req.SecretName, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +235,7 @@ func (c *Controller) PutEnvironmentSecret(ctx context.Context, req gen.PutEnviro
 }
 
 func (c *Controller) RemoveEnvironmentSecret(ctx context.Context, req gen.RemoveEnvironmentSecretRequestObject) (gen.RemoveEnvironmentSecretResponseObject, error) {
-	out, err := c.removeSecret(ctx, envRef(req.Id, req.ProjectId, req.EnvironmentName), req.SecretName)
+	out, err := c.removeSecret(ctx, envRef(req.Id, req.ProjectId, req.EnvironmentName), req.SecretName, removalFactor(req.Body))
 	if err != nil {
 		return nil, err
 	}

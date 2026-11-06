@@ -2511,7 +2511,7 @@ export interface paths {
         put?: never;
         /**
          * Remove a secret of an environment
-         * @description Needs `environment.manage`. Marks the secret deleted and erases the values of all its versions in the same transaction. The name can be used again.
+         * @description Needs `environment.manage`. Marks the secret deleted and erases the values of all its versions in the same transaction. The name can be used again. The body is optional: when the secret is the key of a deploy target of the environment, it needs a fresh `CurrentFactor` like writing a value (403 `TARGET_KEY_NEEDS_FACTOR` without one, `INVALID_CURRENT_FACTOR` with a wrong one) and nothing is removed.
          */
         post: operations["removeEnvironmentSecret"];
         delete?: never;
@@ -9339,7 +9339,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CurrentFactorRequest"];
+            };
+        };
         responses: {
             /** @description The removed secret, as it was. */
             200: {

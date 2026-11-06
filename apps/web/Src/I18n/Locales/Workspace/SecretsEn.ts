@@ -74,6 +74,8 @@ export const SecretsEn: Record<keyof typeof SecretsAr, string> = {
   'secrets.saved': 'Saved the secret {name}',
   'secrets.factor.question': 'This secret is the key of a deploy target. Confirm it is you to save the new value.',
   'secrets.factor.confirm': 'Confirm and save',
+  'secrets.factor.remove.question': 'This secret is the key of a deploy target. Confirm it is you to remove it. Deploys to the target stop until a new key is made.',
+  'secrets.factor.remove.confirm': 'Confirm and remove',
   'secrets.removed': 'Removed the secret {name}',
 
   'secrets.danger.title': 'Danger zone',

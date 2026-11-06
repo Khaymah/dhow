@@ -27,6 +27,7 @@ const mount = (needsFactor: boolean) => {
   const route: TRouteHandler = (request, url) => {
     const base = `/environments/${ENVIRONMENT}/secrets`;
     if (request.method === 'GET' && url.pathname.endsWith(base)) return ok([secretFixture({ Name: TARGET_KEY, Scope: 'environment' })]);
+    if (request.method === 'POST' && url.pathname.endsWith(`${base}/${TARGET_KEY}/remove`)) return request.json().catch(() => ({})).then((body) => answer(body as IWrite['Body']));
     if (request.method === 'PUT' && url.pathname.endsWith(`${base}/${TARGET_KEY}`)) return request.json().then((body) => answer(body as IWrite['Body']));
     return undefined;
   };
@@ -97,5 +98,35 @@ describe('overwriting the secret that is the key of a deploy target', () => {
     });
     expect(screen.queryByText(Ar['secrets.factor.question'])).not.toBeInTheDocument();
     expect(view.writes).toHaveLength(1);
+  });
+});
+
+describe('removing the secret that is the key of a deploy target', () => {
+  const openRemoval = async (view: ReturnType<typeof mount>) => {
+    await view.user.click(await screen.findByRole('button', { name: Ar['secrets.remove'] }));
+    await view.user.click(await screen.findByRole('button', { name: Ar['secrets.remove.confirm'] }));
+  };
+
+  it('asks for the second step after the server says so, then removes with it', async () => {
+    const view = mount(true);
+    await openRemoval(view);
+    const password = await screen.findByLabelText(Ar['factor.method.password']);
+    expect(screen.getByText(Ar['secrets.factor.remove.question'])).toBeInTheDocument();
+    expect(view.writes).toHaveLength(1);
+    await view.user.type(password, GOOD_PASSWORD);
+    await view.user.click(screen.getByRole('button', { name: Ar['secrets.factor.remove.confirm'] }));
+    await waitFor(() => {
+      expect(view.onDone).toHaveBeenCalledOnce();
+    });
+    expect(view.writes[1]?.Body).toMatchObject({ CurrentFactor: { Method: 'password', Password: GOOD_PASSWORD } });
+  });
+
+  it('removes a secret that is not a key without any question', async () => {
+    const view = mount(false);
+    await openRemoval(view);
+    await waitFor(() => {
+      expect(view.onDone).toHaveBeenCalledOnce();
+    });
+    expect(screen.queryByText(Ar['secrets.factor.remove.question'])).not.toBeInTheDocument();
   });
 });

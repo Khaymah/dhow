@@ -120,9 +120,9 @@ export const putSecret = (scope: ISecretScope, name: string, input: ISecretInput
   );
 };
 
-export const removeSecret = (scope: ISecretScope, name: string): Promise<TSecret> => {
+export const removeSecret = (scope: ISecretScope, name: string, factor?: TCurrentFactor): Promise<TSecret> => {
   const environment = environmentOf(scope);
-  if (environment !== null) return removeEnvironmentSecret(environment, name);
+  if (environment !== null) return removeEnvironmentSecret(environment, name, factor);
   return scope.ProjectId === null
     ? request(() =>
         ApiClient.POST('/organizations/{id}/secrets/{secretName}/remove', {

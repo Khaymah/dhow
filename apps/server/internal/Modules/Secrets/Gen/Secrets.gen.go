@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -97,6 +98,12 @@ type CurrentFactor struct {
 	Credential *WebAuthnJson `json:"Credential,omitempty"`
 	Method     FactorMethod  `json:"Method"`
 	Password   *string       `json:"Password,omitempty"`
+}
+
+// CurrentFactorRequest defines model for CurrentFactorRequest.
+type CurrentFactorRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
 }
 
 // Envelope defines model for Envelope.
@@ -398,6 +405,9 @@ type ListOrganizationVariablesParams struct {
 
 // PutEnvironmentSecretJSONRequestBody defines body for PutEnvironmentSecret for application/json ContentType.
 type PutEnvironmentSecretJSONRequestBody = PutSecretRequest
+
+// RemoveEnvironmentSecretJSONRequestBody defines body for RemoveEnvironmentSecret for application/json ContentType.
+type RemoveEnvironmentSecretJSONRequestBody = CurrentFactorRequest
 
 // RestoreEnvironmentSecretVersionJSONRequestBody defines body for RestoreEnvironmentSecretVersion for application/json ContentType.
 type RestoreEnvironmentSecretVersionJSONRequestBody = RestoreSecretVersionRequest
@@ -2391,6 +2401,7 @@ type RemoveEnvironmentSecretRequestObject struct {
 	ProjectId       ProjectId       `json:"projectId"`
 	EnvironmentName EnvironmentName `json:"environmentName"`
 	SecretName      SecretName      `json:"secretName"`
+	Body            *RemoveEnvironmentSecretJSONRequestBody
 }
 
 type RemoveEnvironmentSecretResponseObject interface {
@@ -3700,6 +3711,16 @@ func (sh *strictHandler) RemoveEnvironmentSecret(w http.ResponseWriter, r *http.
 	request.ProjectId = projectId
 	request.EnvironmentName = environmentName
 	request.SecretName = secretName
+
+	var body RemoveEnvironmentSecretJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.RemoveEnvironmentSecret(ctx, request.(RemoveEnvironmentSecretRequestObject))

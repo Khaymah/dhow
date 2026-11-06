@@ -123,3 +123,28 @@ func TestTheRefusalIsTranslatedByTheServer(t *testing.T) {
 		assertNoValue(t, res.Raw, firstKeyValue)
 	}
 }
+
+func TestRemovingTheKeyOfADeployTargetNeedsAFreshFactorToo(t *testing.T) {
+	w := newWorld(t)
+	w.env.SeedEnvironment(w.project, "production")
+	for _, name := range []string{targetKeyName, "DATABASE_URL"} {
+		status, _, _ := w.putKey(t, name, map[string]any{"Value": firstKeyValue}, nil)
+		require.Equal(t, http.StatusOK, status)
+	}
+	w.attachKey(t, targetKeyName)
+	path := w.envPath("production", "/secrets/"+targetKeyName+"/remove")
+
+	requireError(t, post(w.owner, path, nil), http.StatusForbidden, "TARGET_KEY_NEEDS_FACTOR")
+	requireError(t, post(w.owner, path, map[string]any{"CurrentFactor": map[string]any{"Method": "password", "Password": "not the password"}}),
+		http.StatusForbidden, "INVALID_CURRENT_FACTOR")
+	listed := w.owner.Do(apptestRequest(http.MethodGet, w.envPath("production", "/secrets"), nil, nil))
+	assert.Contains(t, string(listed.Raw), targetKeyName, "a refused removal must remove nothing")
+
+	res := post(w.owner, path, map[string]any{"CurrentFactor": w.factor()})
+	assert.Equal(t, targetKeyName, secretOf(t, res, http.StatusOK).Name)
+	listed = w.owner.Do(apptestRequest(http.MethodGet, w.envPath("production", "/secrets"), nil, nil))
+	assert.NotContains(t, string(listed.Raw), targetKeyName)
+
+	other := post(w.owner, w.envPath("production", "/secrets/DATABASE_URL/remove"), nil)
+	assert.Equal(t, http.StatusOK, other.Status, "a secret nobody uses as a key needs no factor: %s", other.Raw)
+}

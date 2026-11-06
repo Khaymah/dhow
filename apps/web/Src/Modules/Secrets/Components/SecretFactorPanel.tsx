@@ -6,11 +6,12 @@ import { useT } from '@/I18n/useT';
 
 export interface ISecretFactorPanelProps {
   run: (factor: TCurrentFactor) => Promise<unknown>;
+  removal?: boolean;
   onDone: () => void;
   onCancel: () => void;
 }
 
-const Panel = ({ methods, run, onDone, onCancel }: ISecretFactorPanelProps & { methods: readonly TFactorMethod[] }) => {
+const Panel = ({ methods, run, removal = false, onDone, onCancel }: ISecretFactorPanelProps & { methods: readonly TFactorMethod[] }) => {
   const t = useT();
   const action = useFactorAction<boolean>(methods, async (proof) => {
     await run(await proof());
@@ -19,8 +20,8 @@ const Panel = ({ methods, run, onDone, onCancel }: ISecretFactorPanelProps & { m
 
   return (
     <ConfirmPanel
-      question={t('secrets.factor.question')}
-      confirm={t('secrets.factor.confirm')}
+      question={t(removal ? 'secrets.factor.remove.question' : 'secrets.factor.question')}
+      confirm={t(removal ? 'secrets.factor.remove.confirm' : 'secrets.factor.confirm')}
       icon="check"
       methods={methods}
       action={action}
