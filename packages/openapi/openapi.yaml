@@ -4486,7 +4486,7 @@ paths:
                 $ref: "#/components/schemas/CreatedIngestTokenResponse"
         default:
           $ref: "#/components/responses/Error"
-  /organizations/{id}/projects/{projectId}/ingest-tokens/{tokenId}/revoke:
+  /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/revoke:
     post:
       operationId: revokeIngestToken
       tags: [ingest]
@@ -5110,7 +5110,7 @@ components:
         type: string
         format: uuid
     IngestTokenId:
-      name: tokenId
+      name: ingestTokenId
       in: path
       required: true
       schema:

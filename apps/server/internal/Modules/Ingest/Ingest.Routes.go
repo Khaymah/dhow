@@ -29,7 +29,7 @@ func Policies() []policy.Rule {
 	return []policy.Rule{
 		policy.Project(http.MethodGet, tokensPath, policy.IngestManage, "id", "projectId"),
 		policy.Project(http.MethodPost, tokensPath, policy.IngestManage, "id", "projectId"),
-		policy.Project(http.MethodPost, tokensPath+"/{tokenId}/revoke", policy.IngestManage, "id", "projectId"),
+		policy.Project(http.MethodPost, tokensPath+"/{ingestTokenId}/revoke", policy.IngestManage, "id", "projectId"),
 		policy.Project(http.MethodGet, artifactsPath, policy.ArtifactRead, "id", "projectId"),
 	}
 }

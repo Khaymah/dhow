@@ -32,9 +32,10 @@ var allowedDataKeys = map[string]struct{}{
 	"AllowExtraDeployEgress": {}, "Kind": {}, "Username": {}, "DeployPath": {}, "Hosts": {}, "KeyName": {}, "PreviousKeyName": {},
 	"HostId": {}, "Address": {}, "Position": {}, "DroppedFingerprint": {}, "Source": {}, "PinnedFingerprint": {},
 	"PreviousFingerprint": {}, "Environment": {}, "DeploymentId": {}, "ReleaseId": {}, "Step": {}, "TargetId": {},
+	"Patterns": {}, "RejectCode": {}, "Digest": {}, "SizeBytes": {}, "Uploader": {}, "UploaderId": {}, "Triggered": {}, "RunNumber": {},
 }
 
-var credentialMarkers = []string{config.APITokenPrefix, config.RunnerAccessTokenPrefix, config.RunnerRegistrationTokenPrefix}
+var credentialMarkers = []string{config.APITokenPrefix, config.RunnerAccessTokenPrefix, config.RunnerRegistrationTokenPrefix, config.IngestTokenPrefix}
 
 func AllowedDataKeys() []string {
 	out := make([]string, 0, len(allowedDataKeys))

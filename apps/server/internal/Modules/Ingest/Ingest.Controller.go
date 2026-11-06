@@ -107,7 +107,7 @@ func (c *Controller) RevokeIngestToken(ctx context.Context, req gen.RevokeIngest
 	if req.Body == nil {
 		return nil, apperrors.BadRequest()
 	}
-	t, err := c.service.RevokeToken(ctx, req.Id, req.ProjectId, req.TokenId, factorOf(req.Body.CurrentFactor))
+	t, err := c.service.RevokeToken(ctx, req.Id, req.ProjectId, req.IngestTokenId, factorOf(req.Body.CurrentFactor))
 	if err != nil {
 		return nil, err
 	}

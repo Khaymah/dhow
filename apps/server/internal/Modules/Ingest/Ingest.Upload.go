@@ -223,7 +223,7 @@ func (s *Service) auditRejected(ctx context.Context, tok tokenAuth, code string)
 	}
 	err := s.audit(context.WithoutCancel(ctx), auditEntry{
 		name: eventbus.IngestRejected, org: tok.row.OrganizationId, target: targetIngestToken, targetID: tok.row.Id,
-		data: map[string]string{"Code": code, "Name": tok.row.Name, "ProjectId": tok.row.ProjectId.String()},
+		data: map[string]string{"RejectCode": code, "Name": tok.row.Name, "ProjectId": tok.row.ProjectId.String()},
 	})
 	if err != nil {
 		s.log.ErrorContext(ctx, "an ingest rejection was not recorded", "token_id", tok.row.Id.String(), "error", err)

@@ -330,8 +330,8 @@ type ServerInterface interface {
 	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens)
 	CreateIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId)
 	// RevokeIngestToken Revoke an ingest token
-	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{tokenId}/revoke)
-	RevokeIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, tokenId IngestTokenId)
+	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/revoke)
+	RevokeIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, ingestTokenId IngestTokenId)
 	// ListIngestedArtifacts List the artifacts an outside CI uploaded
 	// (GET /organizations/{id}/projects/{projectId}/ingested-artifacts)
 	ListIngestedArtifacts(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, params ListIngestedArtifactsParams)
@@ -354,8 +354,8 @@ func (_ Unimplemented) CreateIngestToken(w http.ResponseWriter, r *http.Request,
 }
 
 // RevokeIngestToken Revoke an ingest token
-// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{tokenId}/revoke)
-func (_ Unimplemented) RevokeIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, tokenId IngestTokenId) {
+// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/revoke)
+func (_ Unimplemented) RevokeIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, ingestTokenId IngestTokenId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -497,17 +497,17 @@ func (siw *ServerInterfaceWrapper) RevokeIngestToken(w http.ResponseWriter, r *h
 		return
 	}
 
-	// ------------- Path parameter "tokenId" -------------
-	var tokenId IngestTokenId
+	// ------------- Path parameter "ingestTokenId" -------------
+	var ingestTokenId IngestTokenId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "tokenId", chi.URLParam(r, "tokenId"), &tokenId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "ingestTokenId", chi.URLParam(r, "ingestTokenId"), &ingestTokenId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tokenId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ingestTokenId", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RevokeIngestToken(w, r, id, projectId, tokenId)
+		siw.Handler.RevokeIngestToken(w, r, id, projectId, ingestTokenId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -701,7 +701,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/ingest-tokens", wrapper.CreateIngestToken)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/ingest-tokens/{tokenId}/revoke", wrapper.RevokeIngestToken)
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/revoke", wrapper.RevokeIngestToken)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/ingested-artifacts", wrapper.ListIngestedArtifacts)
@@ -795,10 +795,10 @@ func (response CreateIngestTokendefaultJSONResponse) VisitCreateIngestTokenRespo
 }
 
 type RevokeIngestTokenRequestObject struct {
-	Id        Id            `json:"id"`
-	ProjectId ProjectId     `json:"projectId"`
-	TokenId   IngestTokenId `json:"tokenId"`
-	Body      *RevokeIngestTokenJSONRequestBody
+	Id            Id            `json:"id"`
+	ProjectId     ProjectId     `json:"projectId"`
+	IngestTokenId IngestTokenId `json:"ingestTokenId"`
+	Body          *RevokeIngestTokenJSONRequestBody
 }
 
 type RevokeIngestTokenResponseObject interface {
@@ -886,7 +886,7 @@ type StrictServerInterface interface {
 	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens)
 	CreateIngestToken(ctx context.Context, request CreateIngestTokenRequestObject) (CreateIngestTokenResponseObject, error)
 	// RevokeIngestToken Revoke an ingest token
-	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{tokenId}/revoke)
+	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/revoke)
 	RevokeIngestToken(ctx context.Context, request RevokeIngestTokenRequestObject) (RevokeIngestTokenResponseObject, error)
 	// ListIngestedArtifacts List the artifacts an outside CI uploaded
 	// (GET /organizations/{id}/projects/{projectId}/ingested-artifacts)
@@ -995,12 +995,12 @@ func (sh *strictHandler) CreateIngestToken(w http.ResponseWriter, r *http.Reques
 }
 
 // RevokeIngestToken operation middleware
-func (sh *strictHandler) RevokeIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, tokenId IngestTokenId) {
+func (sh *strictHandler) RevokeIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, ingestTokenId IngestTokenId) {
 	var request RevokeIngestTokenRequestObject
 
 	request.Id = id
 	request.ProjectId = projectId
-	request.TokenId = tokenId
+	request.IngestTokenId = ingestTokenId
 
 	var body RevokeIngestTokenJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {

@@ -179,7 +179,7 @@ func (s *Service) trigger(ctx context.Context, q *sqlc.Queries, tok tokenAuth, m
 func (s *Service) auditStored(ctx context.Context, q *sqlc.Queries, tok tokenAuth, row sqlc.IngestedArtifact, out models.Received) error {
 	data := map[string]string{
 		"Name": row.Name, "Digest": hexOf(row.Digest), "SizeBytes": strconv.FormatInt(row.SizeBytes, 10), "Ref": row.Ref, "Sha": row.Sha,
-		"ProjectId": row.ProjectId.String(), "Token": tok.row.Name, "TokenId": tok.row.Id.String(), "Triggered": strconv.FormatBool(out.Triggered),
+		"ProjectId": row.ProjectId.String(), "Uploader": tok.row.Name, "UploaderId": tok.row.Id.String(), "Triggered": strconv.FormatBool(out.Triggered),
 	}
 	if out.Run != nil {
 		data["RunNumber"] = strconv.FormatInt(out.Run.Number, 10)
