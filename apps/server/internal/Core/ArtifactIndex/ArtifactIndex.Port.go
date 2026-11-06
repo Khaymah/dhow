@@ -8,13 +8,17 @@ import (
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 )
 
-const ReasonUntrustedForDeploy = "ARTIFACT_UNTRUSTED"
+const (
+	ReasonUntrustedForDeploy = "ARTIFACT_UNTRUSTED"
+	ReasonIngestedGone       = "INGESTED_ARTIFACT_GONE"
+)
 
 type Request struct {
 	OrganizationID uuid.UUID
 	RunID          uuid.UUID
 	RunJobID       uuid.UUID
 	Needs          []string
+	Ingested       []string
 	FeedsDeploy    bool
 }
 

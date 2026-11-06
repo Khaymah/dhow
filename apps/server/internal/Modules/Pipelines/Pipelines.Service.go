@@ -182,7 +182,8 @@ func (s *Service) auditByUser(ctx context.Context, name string, run sqlc.Pipelin
 }
 
 func (s *Service) recordStatus(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, state string) error {
-	if s.statuses == nil || run.RepositoryId == nil || !run.Sha.Valid || !run.Provider.Valid || run.Provider.String == "generic" {
+	if s.statuses == nil || run.RepositoryId == nil || !run.Sha.Valid || !run.Provider.Valid || run.Provider.String == "generic" ||
+		run.Trigger == triggers.EventArtifact {
 		return nil
 	}
 	return s.statuses.Record(ctx, q, commitstatus.Desired{

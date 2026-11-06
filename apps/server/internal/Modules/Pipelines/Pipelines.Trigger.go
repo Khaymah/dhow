@@ -59,6 +59,8 @@ type newRun struct {
 	repoID    *uuid.UUID
 	provider  string
 	awaitsYou bool
+
+	definitionSha string
 }
 
 func (s *Service) insertRun(ctx context.Context, q *sqlc.Queries, n newRun) (sqlc.PipelineRun, error) {
@@ -71,7 +73,10 @@ func (s *Service) insertRun(ctx context.Context, q *sqlc.Queries, n newRun) (sql
 		state = models.RunAwaitingApproval
 	}
 	definitionSha := n.sha
-	if n.isFork {
+	switch {
+	case n.definitionSha != "":
+		definitionSha = n.definitionSha
+	case n.isFork:
 		definitionSha = n.baseSha
 	}
 	if len(n.actor) > maxActorBytes {
@@ -132,6 +137,9 @@ func fromFork(t triggers.Trigger) bool {
 }
 
 func (s *Service) Deliver(ctx context.Context, q *sqlc.Queries, t triggers.Trigger) (triggers.Accepted, error) {
+	if t.Event == triggers.EventArtifact {
+		return s.deliverArtifact(ctx, q, t)
+	}
 	if err := checkTrigger(t); err != nil {
 		return triggers.Accepted{}, err
 	}

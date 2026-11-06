@@ -724,6 +724,28 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (PipelineR
 	return i, err
 }
 
+const insertRunIngestedArtifact = `-- name: InsertRunIngestedArtifact :exec
+INSERT INTO "RunIngestedArtifacts" ("OrganizationId", "RunId", "Name", "IngestedArtifactId")
+VALUES ($1, $2, $3, $4)
+`
+
+type InsertRunIngestedArtifactParams struct {
+	OrganizationID     uuid.UUID
+	RunID              uuid.UUID
+	Name               string
+	IngestedArtifactID uuid.UUID
+}
+
+func (q *Queries) InsertRunIngestedArtifact(ctx context.Context, arg InsertRunIngestedArtifactParams) error {
+	_, err := q.db.Exec(ctx, insertRunIngestedArtifact,
+		arg.OrganizationID,
+		arg.RunID,
+		arg.Name,
+		arg.IngestedArtifactID,
+	)
+	return err
+}
+
 const insertRunJob = `-- name: InsertRunJob :one
 INSERT INTO "RunJobs" ("OrganizationId", "RunId", "Kind", "Key", "JobName", "JobId", "Matrix", "Needs", "Position", "Digest")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, $10)
@@ -1097,6 +1119,37 @@ func (q *Queries) ListRunCancellations(ctx context.Context, batch int32) ([]List
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunIngestedNames = `-- name: ListRunIngestedNames :many
+SELECT "Name"
+FROM "RunIngestedArtifacts"
+WHERE "RunId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+`
+
+type ListRunIngestedNamesParams struct {
+	RunID          uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) ListRunIngestedNames(ctx context.Context, arg ListRunIngestedNamesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listRunIngestedNames, arg.RunID, arg.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var Name string
+		if err := rows.Scan(&Name); err != nil {
+			return nil, err
+		}
+		items = append(items, Name)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

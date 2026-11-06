@@ -14,12 +14,14 @@ const (
 	EventPullRequest = "pull_request"
 	EventManual      = "manual"
 	EventAPI         = "api"
+	EventArtifact    = "artifact"
 )
 
 const (
 	ProviderGitHub  = "github"
 	ProviderGitLab  = "gitlab"
 	ProviderGeneric = "generic"
+	ProviderIngest  = "ingest"
 )
 
 type PullOrigin uint8
@@ -44,11 +46,25 @@ type Trigger struct {
 	PrNumber       int
 	Origin         PullOrigin
 	Actor          string
+	Artifacts      []IngestedRef
 }
+
+type IngestedRef struct {
+	ID   uuid.UUID
+	Name string
+}
+
+const (
+	ReasonRepositoryNotLinked  = "REPOSITORY_NOT_LINKED"
+	ReasonDefaultBranchUnknown = "DEFAULT_BRANCH_UNKNOWN"
+	ReasonProjectArchived      = "PROJECT_ARCHIVED"
+	ReasonNoArtifactTrigger    = "NO_ARTIFACT_TRIGGER"
+)
 
 type Accepted struct {
 	RunID   uuid.UUID
 	Created bool
+	Reason  string
 }
 
 type Sink interface {

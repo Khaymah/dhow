@@ -192,6 +192,7 @@ WHERE "Id" IN (SELECT b."Id"
                WHERE NOT b."IsDeleted" AND b."LastUsedAt" < @before
                  AND NOT EXISTS (SELECT 1 FROM "Artifacts" a WHERE a."Digest" = b."Digest" AND NOT a."IsDeleted")
                  AND NOT EXISTS (SELECT 1 FROM "CacheEntries" c WHERE c."Digest" = b."Digest" AND NOT c."IsDeleted")
+                 AND NOT EXISTS (SELECT 1 FROM "IngestedArtifacts" i WHERE i."Digest" = b."Digest" AND NOT i."IsDeleted")
                ORDER BY b."LastUsedAt"
                LIMIT @batch
                FOR UPDATE SKIP LOCKED)

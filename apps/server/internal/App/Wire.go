@@ -34,6 +34,7 @@ import (
 	audit "github.com/Khaymah/dhow/apps/server/internal/Modules/Audit"
 	environments "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments"
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
+	ingest "github.com/Khaymah/dhow/apps/server/internal/Modules/Ingest"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	overview "github.com/Khaymah/dhow/apps/server/internal/Modules/Overview"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
@@ -92,6 +93,7 @@ type Wired struct {
 	Sources       *sources.Service
 	Pipelines     *pipelines.Service
 	Artifacts     *artifacts.Service
+	Ingest        *ingest.Service
 	LogPool       *pgxpool.Pool
 	Retention     *retention.Runner
 	Alerts        *alerts.Service
@@ -169,6 +171,11 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		return nil, err
 	}
 
+	ingestService, err := ingestFor(in, runs, bus, limiter, sessionService)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := Options{
 		Config: in.Config,
 		Log:    in.Log,
@@ -187,6 +194,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Sources:   runs.sources,
 		Pipelines: runs.pipelines,
 		Artifacts: runs.artifacts,
+		Ingest:    ingestService,
 		Overview:  overview.NewService(overview.Options{Counter: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
 		Tokens:    tokensService,
 		Prefs:     preferences.NewService(in.Pool, in.Log, in.Now),
@@ -202,7 +210,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	}
 	wired := &Wired{
 		Options: opts, Handler: NewRouter(opts), Identity: identityService, Jobs: jobsService, JobQueue: jobsService.Queue(),
-		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
+		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, Ingest: ingestService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
 		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now}),
 	}
 	if in.Config.RunnerPlaneSeparate() {

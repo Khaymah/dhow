@@ -15,6 +15,7 @@ const (
 	ScopeRunner
 	ScopeProject
 	ScopeWebhook
+	ScopeIngest
 )
 
 const RunnerBlobPrefix = "/blobs/"
@@ -88,6 +89,8 @@ func (r Rule) Valid() bool {
 		return r.validProject()
 	case ScopeWebhook:
 		return r.validWebhook()
+	case ScopeIngest:
+		return r.validIngest()
 	case ScopeInstance:
 		return IsInstanceAction(r.Action) && r.OrgParam == "" && r.Runner == 0
 	case ScopeRunner:

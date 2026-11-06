@@ -48,6 +48,8 @@ func enabled(on *pipelinespec.Triggers, run sqlc.PipelineRun) bool {
 		return on.Manual != nil
 	case triggers.EventAPI:
 		return on.API != nil
+	case triggers.EventArtifact:
+		return artifactEnabled(on.Artifact, run.Ref)
 	default:
 		return false
 	}

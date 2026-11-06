@@ -39,6 +39,7 @@ type analysis struct {
 	group       value
 	runJobCount int
 	budget      *exprBudget
+	ingestNames map[string]bool
 }
 
 func Check(src []byte) (*Spec, []Issue) {
@@ -81,7 +82,7 @@ func validText(v string) bool {
 
 func (a *analysis) triggers() {
 	on := a.spec.On
-	if on == nil || (on.Push == nil && on.Tag == nil && on.PullRequest == nil && on.Manual == nil && on.API == nil) {
+	if on == nil || (on.Push == nil && on.Tag == nil && on.PullRequest == nil && on.Manual == nil && on.API == nil && on.Artifact == nil) {
 		a.issues.add(CodeTriggersRequired, "on")
 		return
 	}
@@ -97,6 +98,7 @@ func (a *analysis) triggers() {
 		a.patterns(on.Tag.Patterns, "on.tag.patterns")
 	}
 	a.inputs = map[string]*cel.Type{}
+	a.artifactTrigger()
 	if on.Manual != nil {
 		a.manualInputs(on.Manual.Inputs, "on.manual.inputs")
 	}
@@ -268,6 +270,7 @@ func (a *analysis) allJobs() {
 		a.job(a.jobs[id])
 	}
 	a.artifactNames()
+	a.ingestedClashes()
 }
 
 func (a *analysis) needs(needs []string, path string) []string {

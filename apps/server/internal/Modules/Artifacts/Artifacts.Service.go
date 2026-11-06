@@ -83,7 +83,7 @@ func decodeSpec(raw []byte) (*runnerv1.JobSpec, error) {
 
 func (s *Service) Prepare(ctx context.Context, tx *sqlc.Queries, r artifactindex.Request) (artifactindex.Prepared, error) {
 	out := artifactindex.Prepared{ArtifactMaxBytes: s.cfg.MaxBytes, CacheMaxBytes: s.cfg.CacheMaxBytes}
-	if len(r.Needs) == 0 {
+	if len(r.Needs) == 0 && len(r.Ingested) == 0 {
 		return out, nil
 	}
 	rows, err := tx.ListRunJobArtifacts(ctx, sqlc.ListRunJobArtifactsParams{
@@ -106,8 +106,10 @@ func (s *Service) Prepare(ctx context.Context, tx *sqlc.Queries, r artifactindex
 			DownloadToken: s.grants.issue(grantInput, r.RunJobID, d, expires),
 		})
 	}
-	return out, nil
+	return s.addIngested(ctx, tx, r, expires, out)
 }
+
+func (s *Service) Store() blob.Store { return s.store }
 
 func (s *Service) SeedBlob(ctx context.Context, d blob.Digest, body io.Reader, size int64) error {
 	pending, err := s.store.Stage(ctx, blob.Put{Digest: d, Size: size, MaxBytes: max(size, 1), Body: body})

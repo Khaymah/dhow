@@ -19,11 +19,17 @@ type Spec struct {
 }
 
 type Triggers struct {
-	Push        *BranchFilter `yaml:"push"`
-	Tag         *TagFilter    `yaml:"tag"`
-	PullRequest *BranchFilter `yaml:"pull_request"`
-	Manual      *Manual       `yaml:"manual"`
-	API         *API          `yaml:"api"`
+	Push        *BranchFilter    `yaml:"push"`
+	Tag         *TagFilter       `yaml:"tag"`
+	PullRequest *BranchFilter    `yaml:"pull_request"`
+	Manual      *Manual          `yaml:"manual"`
+	API         *API             `yaml:"api"`
+	Artifact    *ArtifactTrigger `yaml:"artifact"`
+}
+
+type ArtifactTrigger struct {
+	Names []string `yaml:"names"`
+	Refs  []string `yaml:"refs"`
 }
 
 type BranchFilter struct {
@@ -67,6 +73,7 @@ type Concurrency struct {
 type Job struct {
 	Name        string            `yaml:"name"`
 	Needs       []string          `yaml:"needs"`
+	Ingested    []string          `yaml:"ingested"`
 	If          string            `yaml:"if"`
 	Image       string            `yaml:"image"`
 	Runner      *Runner           `yaml:"runner"`

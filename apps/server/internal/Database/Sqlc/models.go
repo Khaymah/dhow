@@ -411,6 +411,44 @@ type GitSetupFlow struct {
 	ConsumedAt     *time.Time
 }
 
+type IngestToken struct {
+	Id              uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	IsDeleted       bool
+	OrganizationId  uuid.UUID
+	ProjectId       uuid.UUID
+	Name            string
+	TokenHash       []byte
+	Prefix          string
+	RefPatterns     []byte
+	ExpiresAt       time.Time
+	LastUsedAt      *time.Time
+	RevokedAt       *time.Time
+	RevokedByUserId *uuid.UUID
+	CreatedByUserId uuid.UUID
+}
+
+type IngestedArtifact struct {
+	Id                 uuid.UUID
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	IsDeleted          bool
+	OrganizationId     uuid.UUID
+	ProjectId          uuid.UUID
+	TokenId            uuid.UUID
+	Name               string
+	Digest             []byte
+	SizeBytes          int64
+	Ref                string
+	RefKind            string
+	Sha                string
+	Provenance         []byte
+	ProvenanceVerified bool
+	ExpiresAt          time.Time
+	PinnedUntil        *time.Time
+}
+
 type Instance struct {
 	Id               int16
 	CreatedAt        time.Time
@@ -804,6 +842,17 @@ type RoleBinding struct {
 	ProjectId      *uuid.UUID
 	EnvironmentId  *uuid.UUID
 	Role           string
+}
+
+type RunIngestedArtifact struct {
+	Id                 uuid.UUID
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	IsDeleted          bool
+	OrganizationId     uuid.UUID
+	RunId              uuid.UUID
+	Name               string
+	IngestedArtifactId uuid.UUID
 }
 
 type RunJob struct {

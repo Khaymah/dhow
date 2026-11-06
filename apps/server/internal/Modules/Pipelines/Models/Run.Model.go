@@ -76,6 +76,8 @@ const (
 	ReasonShaNotOnRef             = "SHA_NOT_ON_REF"
 	ReasonArtifactUntrusted       = "ARTIFACT_UNTRUSTED"
 	ReasonArtifactsUnavailable    = "ARTIFACTS_UNAVAILABLE"
+	ReasonIngestedGone            = "INGESTED_ARTIFACT_GONE"
+	ReasonIngestedMissing         = "INGESTED_ARTIFACT_NOT_IN_RUN"
 )
 
 const (

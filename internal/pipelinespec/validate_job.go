@@ -115,6 +115,7 @@ func (a *analysis) job(ja *jobAnalysis) {
 		a.egress(job.Network.Egress, p+".network.egress")
 	}
 	ja.resources = a.resources(job.Resources, p+".resources")
+	a.ingested(ja)
 	a.steps(ja)
 	a.image(ja)
 	a.artifacts(ja)

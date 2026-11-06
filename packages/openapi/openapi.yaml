@@ -70,6 +70,10 @@ tags:
       SHA-256. Served by the Artifacts module. Runners upload and download them on /runner-api/, bound to their lease;
       this API lists and downloads them. Artifacts of a run from a fork's pull request are marked `Untrusted` and can
       never feed a deploy. The cache is never readable here.
+  - name: ingest
+    description: >-
+      Ingest tokens and the artifacts an outside CI uploaded with them. Served by the Ingest module. The upload itself
+      is `PUT /ingest/v1/artifacts/{sha256}`, outside this API, with an ingest token instead of a session.
   - name: secrets
     description: >-
       Secrets, variables and private registry credentials of an organization, a project or an environment. Served by
@@ -4427,6 +4431,115 @@ paths:
                 format: binary
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/ingest-tokens:
+    get:
+      operationId: listIngestTokens
+      tags: [ingest]
+      summary: List the ingest tokens of a project
+      description: >-
+        Needs `ingest.manage` on the project (Maintainer and above) and a session: an API token never reads or makes ingest
+        tokens. A token shows its name, its first characters (`Prefix`), the ref patterns it allows and its state. The
+        value is never shown again after it was made.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of ingest tokens, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestTokenListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createIngestToken
+      tags: [ingest]
+      summary: Make an ingest token
+      description: >-
+        Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts
+        to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer
+        only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409
+        `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIngestTokenRequest"
+      responses:
+        "201":
+          description: The token and its value, shown once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedIngestTokenResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/ingest-tokens/{tokenId}/revoke:
+    post:
+      operationId: revokeIngestToken
+      tags: [ingest]
+      summary: Revoke an ingest token
+      description: >-
+        Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The next upload with the token is 401
+        `INGEST_TOKEN_REVOKED`. Files it already uploaded stay.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/IngestTokenId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
+      responses:
+        "200":
+          description: The revoked token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestTokenResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/ingested-artifacts:
+    get:
+      operationId: listIngestedArtifacts
+      tags: [ingest]
+      summary: List the artifacts an outside CI uploaded
+      description: >-
+        Needs `artifact.read` on the project. Each file shows the ref and commit its uploader declared, what the CI said
+        about itself (`Provenance`, declared and not verified), and the run it started, if any.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of uploaded artifacts, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestedArtifactListResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/projects/{projectId}/manual-inputs:
     get:
       operationId: getManualInputs
@@ -4991,6 +5104,13 @@ components:
         format: uuid
     ArtifactId:
       name: artifactId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IngestTokenId:
+      name: tokenId
       in: path
       required: true
       schema:
@@ -9087,6 +9207,179 @@ components:
         ExpiresAt:
           type: string
           format: date-time
+    IngestRefKind:
+      type: string
+      enum: [branch, tag]
+    IngestRefPattern:
+      type: object
+      additionalProperties: false
+      required: [Kind, Pattern]
+      properties:
+        Kind:
+          $ref: "#/components/schemas/IngestRefKind"
+        Pattern:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: A branch or tag name pattern. `*` stays inside one `/` part, `**` crosses parts, `?` is one character.
+    IngestTokenStatus:
+      type: string
+      enum: [active, expired, revoked]
+    IngestToken:
+      type: object
+      additionalProperties: false
+      required: [Id, ProjectId, Name, Prefix, RefPatterns, Status, CreatedAt, ExpiresAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        ProjectId:
+          type: string
+          format: uuid
+        Name:
+          type: string
+        Prefix:
+          type: string
+          description: The first characters of the token, to tell tokens apart. Not enough to use it.
+        RefPatterns:
+          type: array
+          items:
+            $ref: "#/components/schemas/IngestRefPattern"
+        Status:
+          $ref: "#/components/schemas/IngestTokenStatus"
+        CreatedAt:
+          type: string
+          format: date-time
+        ExpiresAt:
+          type: string
+          format: date-time
+        LastUsedAt:
+          type: string
+          format: date-time
+        RevokedAt:
+          type: string
+          format: date-time
+        CreatedByUserId:
+          type: string
+          format: uuid
+    CreateIngestTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [Name, RefPatterns, CurrentFactor]
+      properties:
+        Name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        RefPatterns:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/IngestRefPattern"
+        ExpiresInDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          default: 90
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    CreatedIngestToken:
+      type: object
+      additionalProperties: false
+      required: [Token, Value]
+      properties:
+        Token:
+          $ref: "#/components/schemas/IngestToken"
+        Value:
+          type: string
+          description: The token (`dhow_ing_...`). Shown in this answer only.
+    CreatedIngestTokenResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/CreatedIngestToken"
+    IngestTokenResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/IngestToken"
+    IngestTokenListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/IngestToken"
+    IngestedArtifact:
+      type: object
+      additionalProperties: false
+      required: [Id, Name, Digest, SizeBytes, Ref, RefKind, Sha, Provenance, ProvenanceVerified, TokenName, CreatedAt, ExpiresAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        Name:
+          type: string
+        Digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: The SHA-256 of the archive, in hex. Dhow computed it itself.
+        SizeBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        Ref:
+          type: string
+          description: The full ref the uploader declared, such as `refs/heads/main`.
+        RefKind:
+          $ref: "#/components/schemas/IngestRefKind"
+        Sha:
+          type: string
+          description: >-
+            The commit the uploader declared. It is a hint, and Dhow did not check it against the repository.
+        Provenance:
+          type: object
+          additionalProperties:
+            type: string
+          description: What the CI said about itself. Declared by the uploader, not verified by Dhow.
+        ProvenanceVerified:
+          type: boolean
+        TokenName:
+          type: string
+        RunId:
+          type: string
+          format: uuid
+        RunNumber:
+          type: integer
+          format: int64
+        RunState:
+          type: string
+        CreatedAt:
+          type: string
+          format: date-time
+        ExpiresAt:
+          type: string
+          format: date-time
+        PinnedUntil:
+          type: string
+          format: date-time
+          description: Set while a release that succeeded on a deploy target still uses this file, so a rollback needs no rebuild.
+    IngestedArtifactListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/IngestedArtifact"
     ArtifactListResponse:
       allOf:
         - $ref: "#/components/schemas/Envelope"
