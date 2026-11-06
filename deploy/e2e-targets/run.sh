@@ -3,8 +3,10 @@ set -euo pipefail
 
 usage() {
   printf 'usage: %s\n' "$0" >&2
-  printf 'Deploys real releases to a real sshd in Docker with the dhow-deploy-ssh plugin: a healthy deploy, a failed\n' >&2
-  printf 'health check that rolls back, keep_releases, a wrong host key, an unsafe archive, hooks and shared paths.\n' >&2
+  printf 'Deploys real releases to real sshd containers in Docker with the dhow-deploy-ssh plugin: a healthy deploy, a failed\n' >&2
+  printf 'health check that rolls back, keep_releases, a wrong host key, an unsafe archive, hooks and shared paths; and on a\n' >&2
+  printf 'group of three servers: rolling deploys in batches, a failure in the middle that rolls back every switched server,\n' >&2
+  printf 'a failed rollback, an unreachable server, a wrong host key on one server and a cancel during the rollout.\n' >&2
   printf 'Then it replays the reports the plugin wrote into the server (needs DHOW_TEST_DATABASE_URL).\n' >&2
   printf 'Needs Docker and Go. It does not need Podman, a runner or a server. Settings: DHOW_E2E_CA_BUNDLE (a CA file\n' >&2
   printf 'for the apk downloads behind a TLS-inspecting proxy), DHOW_E2E_KEEP=1 keeps the temporary directory.\n' >&2

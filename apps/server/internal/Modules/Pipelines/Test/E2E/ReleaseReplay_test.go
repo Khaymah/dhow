@@ -30,7 +30,19 @@ var replayKinds = map[string]runnerv1.DeployEventKind{
 	deployrelease.EventRollbackFailed: kindRbFailed,
 	deployrelease.EventPruned:         kindPruned,
 	deployrelease.EventFailed:         kindFailed,
+	deployrelease.EventSkipped:        kindSkipped,
+	deployrelease.EventBatchPassed:    kindBatch,
 }
+
+var hostStateOfEvent = map[string]string{
+	deployrelease.EventVerified:       "verified",
+	deployrelease.EventFailed:         "failed",
+	deployrelease.EventSkipped:        "skipped",
+	deployrelease.EventRolledBack:     "rolled_back",
+	deployrelease.EventRollbackFailed: "rollback_failed",
+}
+
+const groupScenarioPrefix = "rolling-"
 
 func (d deployWorld) releasingOneHost(t *testing.T) releaseJob {
 	t.Helper()
@@ -107,36 +119,69 @@ func TestTheReportsOfTheRealPluginRunAreAcceptedByTheServerAndEndInTheSameState(
 			exit, err := strconv.Atoi(strings.TrimSpace(string(rawExit)))
 			require.NoError(t, err)
 
-			j := newDeployWorld(t).releasingOneHost(t)
+			world := newDeployWorld(t)
+			var j releaseJob
+			if strings.HasPrefix(name, groupScenarioPrefix) {
+				j = world.releasing(t)
+			} else {
+				j = world.releasingOneHost(t)
+			}
 			j.seedPrevious(t)
-			host := j.hosts()[0]
+			hosts := j.hosts()
 			lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
 			require.NotEmpty(t, lines)
+			last := map[uuid.UUID]string{}
 			for _, line := range lines {
-				j.report(t, j.replayEvent(t, decodeStrict(t, line), host))
+				e := decodeStrict(t, line)
+				var host uuid.UUID
+				if e.HostID != "" {
+					host = hosts[int(e.HostID[len(e.HostID)-1]-'1')]
+					if state, ok := hostStateOfEvent[e.Event]; ok {
+						last[host] = state
+					}
+				}
+				j.report(t, j.replayEvent(t, e, host))
 			}
 			assert.Equal(t, expectedGroup(exit), j.releaseState(t), "the server ends the release in the state the plugin exited with")
-			assertHealthKept(t, j, lines)
+			assertHostsAgree(t, j, last, exit)
+			assertHealthKept(t, j, hosts, lines)
 		})
 	}
 }
 
-func assertHealthKept(t *testing.T, j releaseJob, lines []string) {
+func assertHostsAgree(t *testing.T, j releaseJob, last map[uuid.UUID]string, exit int) {
 	t.Helper()
-	for _, line := range lines {
-		e := decodeStrict(t, line)
-		if e.Event != deployrelease.EventHealth {
-			continue
+	got := j.hostStates(t)
+	for host, want := range last {
+		if exit == deployrelease.ExitRollbackFailed && want == "verified" {
+			want = "unknown"
 		}
+		assert.Equal(t, want, got[host], "the server keeps the last state the plugin reported for host %s", host)
+	}
+	for host, state := range got {
+		assert.NotContains(t, []string{"pending", "uploaded", "switched"}, state, "host %s is left open after the release ended", host)
+	}
+}
+
+func assertHealthKept(t *testing.T, j releaseJob, hosts []uuid.UUID, lines []string) {
+	t.Helper()
+	latest := map[string]deployrelease.Event{}
+	for _, line := range lines {
+		if e := decodeStrict(t, line); e.Event == deployrelease.EventHealth {
+			latest[e.HostID] = e
+		}
+	}
+	for id, e := range latest {
+		host := hosts[int(id[len(id)-1]-'1')]
 		var stored string
 		require.NoError(t, j.env.Pool.QueryRow(context.Background(),
-			`SELECT COALESCE("Health"::text, '') FROM "DeploymentReleaseHosts" WHERE "ReleaseId" = $1`, j.release).Scan(&stored))
+			`SELECT COALESCE("Health"::text, '') FROM "DeploymentReleaseHosts" WHERE "ReleaseId" = $1 AND "HostId" = $2`, j.release, host).Scan(&stored))
 		var got struct {
 			Passed     bool
 			LastStatus int
 		}
 		require.NoError(t, json.Unmarshal([]byte(stored), &got), stored)
-		assert.Equal(t, e.Health.Passed, got.Passed, "the health result of the failed check is what the server keeps")
+		assert.Equal(t, e.Health.Passed, got.Passed, "the health result of the last check is what the server keeps")
 		assert.Equal(t, e.Health.LastStatus, got.LastStatus)
 	}
 }
