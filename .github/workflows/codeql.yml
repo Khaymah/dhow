@@ -19,6 +19,7 @@ jobs:
     outputs:
       code: ${{ steps.scope.outputs.code }}
       web: ${{ steps.scope.outputs.web }}
+      actions: ${{ steps.scope.outputs.actions }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,17 +43,35 @@ jobs:
       matrix:
         language: [go, actions, javascript-typescript]
     steps:
+      - name: Decide whether this language changed
+        id: lang
+        env:
+          LANGUAGE: ${{ matrix.language }}
+          CODE: ${{ needs.changes.outputs.code }}
+          WEB: ${{ needs.changes.outputs.web }}
+          ACTIONS: ${{ needs.changes.outputs.actions }}
+        run: |
+          case "$LANGUAGE" in
+            go) run=$CODE ;;
+            javascript-typescript) run=$WEB ;;
+            actions) run=$ACTIONS ;;
+            *) run=true ;;
+          esac
+          printf 'run=%s\n' "$run" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.lang.outputs.run == 'true'
         with:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: matrix.language == 'go'
+        if: steps.lang.outputs.run == 'true' && matrix.language == 'go'
         with:
           go-version-file: go.mod
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        if: steps.lang.outputs.run == 'true'
         with:
           languages: ${{ matrix.language }}
           queries: security-extended
       - uses: github/codeql-action/autobuild@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        if: matrix.language == 'go'
+        if: steps.lang.outputs.run == 'true' && matrix.language == 'go'
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        if: steps.lang.outputs.run == 'true'
