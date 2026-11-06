@@ -143,7 +143,7 @@ recorded_digest_matches() {
 run_has_the_digest() {
   local run=${EXPECTED_RUN_ID:?EXPECTED_RUN_ID is not set} want=${EXPECTED_DIGEST:?EXPECTED_DIGEST is not set}
   artifacts_of_project || return 1
-  tr '{' '\n' <"$work/artifacts.body" | grep -F "\"Digest\":\"$want\"" | grep -qF "\"RunId\":\"$run\"" || {
+  jq -e --arg digest "$want" --arg run "$run" 'any(.Data[]; .Digest == $digest and .RunId == $run)' "$work/artifacts.body" >/dev/null || {
     why "no ingested artifact with the digest $want and the run $run"
     return 1
   }
