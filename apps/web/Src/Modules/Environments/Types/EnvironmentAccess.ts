@@ -9,3 +9,5 @@ export const canManageEnvironments = (role: TRole | undefined): boolean => role 
 export const canPauseEnvironments = (role: TRole | undefined): boolean => role !== undefined && PAUSE_ROLES.includes(role);
 
 export const canReadEnvironmentSecrets = (role: TRole | undefined): boolean => role !== undefined && SECRET_READ_ROLES.includes(role);
+
+export const canActOnTargets = (role: TRole | undefined): boolean => role !== undefined && PAUSE_ROLES.includes(role);

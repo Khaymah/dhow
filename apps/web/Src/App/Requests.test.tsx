@@ -234,6 +234,7 @@ describe('API requests of the environment pages', () => {
         PROJECT,
         ENVIRONMENT,
         `${ENVIRONMENT}/deployments`,
+        `${ENVIRONMENT}/targets`,
         `${ENVIRONMENT}/secrets`,
         `${ENVIRONMENT}/variables`,
         'GET /api/v1/me/mfa',
@@ -241,7 +242,11 @@ describe('API requests of the environment pages', () => {
         'GET /api/v1/organizations/{id}/teams',
       ],
     ],
-    [`/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}`, 'viewer', [PROJECT, ENVIRONMENT, `${ENVIRONMENT}/deployments`]],
+    [
+      `/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}`,
+      'viewer',
+      [PROJECT, ENVIRONMENT, `${ENVIRONMENT}/deployments`, `${ENVIRONMENT}/targets`],
+    ],
   ] as const)('opens %s cold as a %s with only what the page shows, each once', async (url, role, own) => {
     const view = mountEnvironments(url, role);
     await screen.findByRole('heading', { level: 1, name: url.endsWith('environments') ? 'Web app' : ENVIRONMENT_NAME });
