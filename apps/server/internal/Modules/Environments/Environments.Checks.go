@@ -65,6 +65,11 @@ func (sc *reportScope) checked(ctx context.Context, ev *runnerv1.DeployEvent) er
 	if err != nil {
 		return err
 	}
+	if err := sc.q.SupersedeOlderHostChecks(ctx, sqlc.SupersedeOlderHostChecksParams{
+		TargetID: sc.tid, HostID: hid, OrganizationID: sc.lease.OrganizationId, ID: id, Now: sc.now,
+	}); err != nil {
+		return err
+	}
 	repaired, err := sc.repair(ctx, hid, ev)
 	if err != nil {
 		return err
@@ -81,6 +86,9 @@ func (sc *reportScope) checked(ctx context.Context, ev *runnerv1.DeployEvent) er
 }
 
 func (sc *reportScope) repair(ctx context.Context, host uuid.UUID, ev *runnerv1.DeployEvent) (bool, error) {
+	if ev.GetReason() != checkOK {
+		return false, nil
+	}
 	return sc.writeTruth(ctx, host, ev.GetCurrentReleaseId(), ev.GetVerifiedReleaseId())
 }
 

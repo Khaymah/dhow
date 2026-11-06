@@ -1186,9 +1186,10 @@ func (q *Queries) LockJobByID(ctx context.Context, id uuid.UUID) (Job, error) {
 
 const lockLeaseForCompletion = `-- name: LockLeaseForCompletion :one
 SELECT l."Id", l."AttemptId", l."JobId", l."State", (l."ExpiresAt" > now())::boolean AS "Live",
-       a."State" AS "AttemptState", a."CompletionDigest"
+       a."State" AS "AttemptState", a."CompletionDigest", j."Spec"
 FROM "Leases" l
 JOIN "JobAttempts" a ON a."Id" = l."AttemptId"
+JOIN "Jobs" j ON j."Id" = l."JobId"
 WHERE l."Id" = $1 AND l."FencingToken" = $2 AND l."RunnerId" = $3 AND NOT l."IsDeleted"
 FOR UPDATE OF l
 `
@@ -1207,6 +1208,7 @@ type LockLeaseForCompletionRow struct {
 	Live             bool
 	AttemptState     string
 	CompletionDigest []byte
+	Spec             []byte
 }
 
 func (q *Queries) LockLeaseForCompletion(ctx context.Context, arg LockLeaseForCompletionParams) (LockLeaseForCompletionRow, error) {
@@ -1220,6 +1222,7 @@ func (q *Queries) LockLeaseForCompletion(ctx context.Context, arg LockLeaseForCo
 		&i.Live,
 		&i.AttemptState,
 		&i.CompletionDigest,
+		&i.Spec,
 	)
 	return i, err
 }

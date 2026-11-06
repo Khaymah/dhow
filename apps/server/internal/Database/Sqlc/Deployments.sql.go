@@ -15,8 +15,9 @@ import (
 
 const countDeployments = `-- name: CountDeployments :one
 SELECT count(*)
-FROM "Deployments"
-WHERE "EnvironmentId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+FROM "Deployments" d
+WHERE d."EnvironmentId" = $1 AND d."OrganizationId" = $2 AND NOT d."IsDeleted"
+  AND NOT EXISTS (SELECT 1 FROM "PipelineRuns" r WHERE r."Id" = d."RunId" AND r."Trigger" = 'check')
 `
 
 type CountDeploymentsParams struct {
@@ -142,6 +143,7 @@ const listDeployments = `-- name: ListDeployments :many
 SELECT d."Id", d."CreatedAt", d."UpdatedAt", d."IsDeleted", d."OrganizationId", d."EnvironmentId", d."RunId", d."RunNumber", d."RunJobId", d."JobId", d."JobKey", d."Ref", d."Sha", d."RuleVersion", d."State", d."FinishedAt", d."ApprovalId"
 FROM "Deployments" d
 WHERE d."EnvironmentId" = $1 AND d."OrganizationId" = $2 AND NOT d."IsDeleted"
+  AND NOT EXISTS (SELECT 1 FROM "PipelineRuns" r WHERE r."Id" = d."RunId" AND r."Trigger" = 'check')
 ORDER BY d."CreatedAt" DESC, d."Id" DESC
 LIMIT $4 OFFSET $3
 `

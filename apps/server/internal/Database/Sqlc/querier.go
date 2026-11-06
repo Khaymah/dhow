@@ -118,6 +118,7 @@ type Querier interface {
 	ExtendLease(ctx context.Context, arg ExtendLeaseParams) (time.Time, error)
 	FailMfaChallenge(ctx context.Context, arg FailMfaChallengeParams) error
 	FailTimedOutQueuedJobs(ctx context.Context, batch int32) ([]Job, error)
+	FindActiveCheckRun(ctx context.Context, arg FindActiveCheckRunParams) (PipelineRun, error)
 	FindCacheEntry(ctx context.Context, arg FindCacheEntryParams) (CacheEntry, error)
 	FindCommitRun(ctx context.Context, arg FindCommitRunParams) (uuid.UUID, error)
 	FindIdentityOwner(ctx context.Context, arg FindIdentityOwnerParams) (FindIdentityOwnerRow, error)
@@ -339,6 +340,7 @@ type Querier interface {
 	LockAuditChain(ctx context.Context, chainKey string) error
 	LockBackfillRow(ctx context.Context, name string) (LockBackfillRowRow, error)
 	LockBlobsShared(ctx context.Context, lockKey int64) error
+	LockCheckRequests(ctx context.Context, key string) error
 	LockConcurrencyGroup(ctx context.Context, arg LockConcurrencyGroupParams) error
 	LockDeployTarget(ctx context.Context, arg LockDeployTargetParams) (DeployTarget, error)
 	LockDeployTargetHost(ctx context.Context, arg LockDeployTargetHostParams) (DeployTargetHost, error)
@@ -562,6 +564,7 @@ type Querier interface {
 	StartRun(ctx context.Context, id uuid.UUID) error
 	SupersedeDataKey(ctx context.Context, id uuid.UUID) (int64, error)
 	SupersedeDecidedApproval(ctx context.Context, arg SupersedeDecidedApprovalParams) (int64, error)
+	SupersedeOlderHostChecks(ctx context.Context, arg SupersedeOlderHostChecksParams) error
 	SupersedeOlderPending(ctx context.Context, arg SupersedeOlderPendingParams) ([]SupersedeOlderPendingRow, error)
 	SupersedeSecretVersions(ctx context.Context, arg SupersedeSecretVersionsParams) error
 	SyncDeployTargetHostPaths(ctx context.Context, arg SyncDeployTargetHostPathsParams) error

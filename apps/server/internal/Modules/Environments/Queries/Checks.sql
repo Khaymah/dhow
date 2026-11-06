@@ -47,3 +47,8 @@ WHERE "ReleaseRowId" = @release_row_id AND "OrganizationId" = @organization_id A
 UPDATE "DeploymentReleases"
 SET "State" = @state, "Message" = @message, "UpdatedAt" = @now
 WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "State" = 'unknown';
+
+-- name: SupersedeOlderHostChecks :exec
+UPDATE "DeploymentHostChecks"
+SET "IsDeleted" = true, "UpdatedAt" = @now
+WHERE "TargetId" = @target_id AND "HostId" = @host_id AND "OrganizationId" = @organization_id AND "Id" <> @id AND NOT "IsDeleted";

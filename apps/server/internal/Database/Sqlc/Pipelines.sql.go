@@ -256,6 +256,67 @@ func (q *Queries) EnvironmentQueueAhead(ctx context.Context, arg EnvironmentQueu
 	return column_1, err
 }
 
+const findActiveCheckRun = `-- name: FindActiveCheckRun :one
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt", "Round"
+FROM "PipelineRuns"
+WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND "Trigger" = 'check' AND "DefinitionSource" = $3
+  AND "State" NOT IN ('succeeded', 'failed', 'canceled', 'skipped') AND NOT "IsDeleted"
+ORDER BY "CreatedAt" DESC, "Id" DESC
+LIMIT 1
+`
+
+type FindActiveCheckRunParams struct {
+	ProjectID        uuid.UUID
+	OrganizationID   uuid.UUID
+	DefinitionSource pgtype.Text
+}
+
+func (q *Queries) FindActiveCheckRun(ctx context.Context, arg FindActiveCheckRunParams) (PipelineRun, error) {
+	row := q.db.QueryRow(ctx, findActiveCheckRun, arg.ProjectID, arg.OrganizationID, arg.DefinitionSource)
+	var i PipelineRun
+	err := row.Scan(
+		&i.Id,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.OrganizationId,
+		&i.ProjectId,
+		&i.RepositoryId,
+		&i.Provider,
+		&i.Number,
+		&i.Trigger,
+		&i.Ref,
+		&i.BaseRef,
+		&i.Sha,
+		&i.BaseSha,
+		&i.IsFork,
+		&i.PrNumber,
+		&i.Actor,
+		&i.Inputs,
+		&i.DefinitionPath,
+		&i.DefinitionSha,
+		&i.DefinitionDigest,
+		&i.DefinitionSource,
+		&i.ImagePins,
+		&i.Issues,
+		&i.State,
+		&i.FailureReason,
+		&i.ConcurrencyGroup,
+		&i.CancelInProgress,
+		&i.DeliveryId,
+		&i.TriggeredByUserId,
+		&i.ApprovedByUserId,
+		&i.ApprovedAt,
+		&i.CancelRequestedAt,
+		&i.CancelRequestedBy,
+		&i.ClaimedUntil,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Round,
+	)
+	return i, err
+}
+
 const findCommitRun = `-- name: FindCommitRun :one
 SELECT "Id"
 FROM "PipelineRuns"
@@ -808,6 +869,7 @@ const latestEnvironmentRef = `-- name: LatestEnvironmentRef :one
 SELECT d."Ref"
 FROM "Deployments" d
 WHERE d."EnvironmentId" = $1 AND d."OrganizationId" = $2 AND NOT d."IsDeleted"
+  AND NOT EXISTS (SELECT 1 FROM "PipelineRuns" r WHERE r."Id" = d."RunId" AND r."Trigger" = 'check')
 ORDER BY d."CreatedAt" DESC, d."Id" DESC
 LIMIT 1
 `
@@ -1254,6 +1316,15 @@ func (q *Queries) ListUnsettledRuns(ctx context.Context, arg ListUnsettledRunsPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockCheckRequests = `-- name: LockCheckRequests :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
+`
+
+func (q *Queries) LockCheckRequests(ctx context.Context, key string) error {
+	_, err := q.db.Exec(ctx, lockCheckRequests, key)
+	return err
 }
 
 const lockConcurrencyGroup = `-- name: LockConcurrencyGroup :exec

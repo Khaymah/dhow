@@ -1,17 +1,19 @@
 -- dhow:phase expand
 -- +goose Up
-ALTER TABLE "PipelineRuns" DROP CONSTRAINT "PipelineRuns_Trigger_check";
+ALTER TABLE "PipelineRuns" DROP CONSTRAINT IF EXISTS "PipelineRuns_Trigger_check";
+ALTER TABLE "PipelineRuns" DROP CONSTRAINT IF EXISTS "CK_PipelineRuns_Trigger";
 ALTER TABLE "PipelineRuns" ADD CONSTRAINT "CK_PipelineRuns_Trigger"
     CHECK ("Trigger" IN ('push', 'tag', 'pull_request', 'manual', 'api', 'check')) NOT VALID;
-ALTER TABLE "PipelineRuns" DROP CONSTRAINT "PipelineRuns_check3";
+ALTER TABLE "PipelineRuns" DROP CONSTRAINT IF EXISTS "PipelineRuns_check3";
+ALTER TABLE "PipelineRuns" DROP CONSTRAINT IF EXISTS "CK_PipelineRuns_Source";
 ALTER TABLE "PipelineRuns" ADD CONSTRAINT "CK_PipelineRuns_Source"
     CHECK ("Trigger" IN ('manual', 'api', 'check') OR ("Sha" IS NOT NULL AND "RepositoryId" IS NOT NULL)) NOT VALID;
 
-ALTER TABLE "RunJobs" DROP CONSTRAINT "CK_RunJobs_Gate";
+ALTER TABLE "RunJobs" DROP CONSTRAINT IF EXISTS "CK_RunJobs_Gate";
 ALTER TABLE "RunJobs" ADD CONSTRAINT "CK_RunJobs_Gate"
     CHECK ("Gate" IS NULL OR "Gate" IN ('approval', 'timer', 'paused', 'environment_busy', 'target_busy')) NOT VALID;
 
-CREATE TABLE "DeploymentHostChecks" (
+CREATE TABLE IF NOT EXISTS "DeploymentHostChecks" (
     "Id"                uuid PRIMARY KEY DEFAULT uuidv7(),
     "CreatedAt"         timestamptz NOT NULL DEFAULT now(),
     "UpdatedAt"         timestamptz NOT NULL DEFAULT now(),
@@ -38,14 +40,8 @@ CREATE UNIQUE INDEX "UX_DeploymentHostChecks_RunJob_Host" ON "DeploymentHostChec
 CREATE INDEX "IX_DeploymentHostChecks_Target" ON "DeploymentHostChecks" ("TargetId", "CheckedAt" DESC) WHERE NOT "IsDeleted";
 
 -- +goose Down
-DROP TABLE "DeploymentHostChecks";
-ALTER TABLE "RunJobs" DROP CONSTRAINT "CK_RunJobs_Gate";
+DROP TABLE IF EXISTS "DeploymentHostChecks";
+ALTER TABLE "RunJobs" DROP CONSTRAINT IF EXISTS "CK_RunJobs_Gate";
 UPDATE "RunJobs" SET "Gate" = 'environment_busy' WHERE "Gate" = 'target_busy';
 ALTER TABLE "RunJobs" ADD CONSTRAINT "CK_RunJobs_Gate"
     CHECK ("Gate" IS NULL OR "Gate" IN ('approval', 'timer', 'paused', 'environment_busy'));
-ALTER TABLE "PipelineRuns" DROP CONSTRAINT "CK_PipelineRuns_Source";
-ALTER TABLE "PipelineRuns" ADD CONSTRAINT "PipelineRuns_check3"
-    CHECK ("Trigger" IN ('manual', 'api') OR ("Sha" IS NOT NULL AND "RepositoryId" IS NOT NULL));
-ALTER TABLE "PipelineRuns" DROP CONSTRAINT "CK_PipelineRuns_Trigger";
-ALTER TABLE "PipelineRuns" ADD CONSTRAINT "PipelineRuns_Trigger_check"
-    CHECK ("Trigger" IN ('push', 'tag', 'pull_request', 'manual', 'api'));

@@ -215,6 +215,31 @@ func (q *Queries) RepairReleaseHost(ctx context.Context, arg RepairReleaseHostPa
 	return err
 }
 
+const supersedeOlderHostChecks = `-- name: SupersedeOlderHostChecks :exec
+UPDATE "DeploymentHostChecks"
+SET "IsDeleted" = true, "UpdatedAt" = $1
+WHERE "TargetId" = $2 AND "HostId" = $3 AND "OrganizationId" = $4 AND "Id" <> $5 AND NOT "IsDeleted"
+`
+
+type SupersedeOlderHostChecksParams struct {
+	Now            time.Time
+	TargetID       uuid.UUID
+	HostID         uuid.UUID
+	OrganizationID uuid.UUID
+	ID             uuid.UUID
+}
+
+func (q *Queries) SupersedeOlderHostChecks(ctx context.Context, arg SupersedeOlderHostChecksParams) error {
+	_, err := q.db.Exec(ctx, supersedeOlderHostChecks,
+		arg.Now,
+		arg.TargetID,
+		arg.HostID,
+		arg.OrganizationID,
+		arg.ID,
+	)
+	return err
+}
+
 const upsertHostCheck = `-- name: UpsertHostCheck :one
 INSERT INTO "DeploymentHostChecks" (
     "OrganizationId", "TargetId", "HostId", "DeploymentId", "RunJobId", "Reason", "Message", "CurrentReleaseId", "VerifiedReleaseId",
