@@ -1,8 +1,10 @@
 import { useNavigate, useParams } from '@tanstack/react-router';
+import type { ReactElement } from 'react';
 
 import { NotFoundPage } from '@/App/Layout/NotFoundPage';
 import { Page } from '@/App/Layout/Page';
 import { PageGroup } from '@/App/Layout/PageGroup';
+import { NewTargetPage } from '@/App/Pages/NewTargetPage';
 import { isEnvironmentName, isTargetName, isUuid } from '@/App/Pages/Params';
 import { ProjectNav } from '@/App/Pages/ProjectNav';
 import { isApiError } from '@/Core/Api/ApiError';
@@ -145,7 +147,7 @@ const TargetView = ({ view, environmentName, targetName }: { view: IProjectView;
   );
 };
 
-export const TargetPage = () => {
+const TargetDetailPage = () => {
   const t = useT();
   const navigate = useNavigate();
   const { projectId, environmentName, targetName } = useParams({ strict: false });
@@ -174,4 +176,9 @@ export const TargetPage = () => {
       )}
     </ProjectGate>
   );
+};
+
+export const TargetPage = (): ReactElement => {
+  const { targetName } = useParams({ strict: false });
+  return targetName === undefined ? <NewTargetPage /> : <TargetDetailPage />;
 };
