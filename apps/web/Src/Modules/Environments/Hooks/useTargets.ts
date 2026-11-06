@@ -3,10 +3,12 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { ApiError } from '@/Core/Api/ApiError';
 import type { IPage } from '@/Core/Api/Client';
 import {
+  getTarget,
   getTargetCheck,
   listTargetReleases,
   listTargets,
   targetCheckKey,
+  targetKey,
   targetReleasesKey,
   targetsKey,
   type TTarget,
@@ -43,4 +45,10 @@ export const useTargetReleases = (
   useQuery<TTargetReleases, ApiError>({
     queryKey: targetReleasesKey(organizationId, projectId, environmentName, name),
     queryFn: () => listTargetReleases(organizationId, projectId, environmentName, name),
+  });
+
+export const useTarget = (organizationId: string, projectId: string, environmentName: string, name: string): UseQueryResult<TTarget, ApiError> =>
+  useQuery<TTarget, ApiError>({
+    queryKey: targetKey(organizationId, projectId, environmentName, name),
+    queryFn: () => getTarget(organizationId, projectId, environmentName, name),
   });

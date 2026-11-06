@@ -22,12 +22,22 @@ export const targetCheckKey = (organizationId: string, projectId: string, enviro
 export const targetReleasesKey = (organizationId: string, projectId: string, environmentName: string, name: string) =>
   [...targetsKey(organizationId, projectId, environmentName), 'releases', name] as const;
 
+export const targetKey = (organizationId: string, projectId: string, environmentName: string, name: string) =>
+  [...targetsKey(organizationId, projectId, environmentName), 'one', name] as const;
+
 const targetPath = (id: string, projectId: string, environmentName: string, targetName: string) => ({ id, projectId, environmentName, targetName });
 
 export const listTargets = (organizationId: string, projectId: string, environmentName: string): Promise<IPage<TTarget>> =>
   requestPage(() =>
     ApiClient.GET('/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets', {
       params: { path: { id: organizationId, projectId, environmentName }, query: { Page: 1, Limit: TARGETS_LIMIT } },
+    }),
+  );
+
+export const getTarget = (organizationId: string, projectId: string, environmentName: string, name: string): Promise<TTarget> =>
+  request(() =>
+    ApiClient.GET('/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}', {
+      params: { path: targetPath(organizationId, projectId, environmentName, name) },
     }),
   );
 

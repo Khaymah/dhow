@@ -5,3 +5,5 @@ export const isUuid = (value: unknown): value is string => typeof value === 'str
 const ENVIRONMENT_NAME = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 export const isEnvironmentName = (value: unknown): value is string => typeof value === 'string' && ENVIRONMENT_NAME.test(value);
+
+export const isTargetName = (value: unknown): value is string => isEnvironmentName(value);

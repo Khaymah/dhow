@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 import type { TFactorMethod } from '@/Core/Auth/Factor';
 import { formatClock } from '@/Core/Format/TimeFormat';
@@ -14,6 +14,8 @@ export interface IConfirmPanelProps<TResult> {
   confirm: string;
   icon: TIconName;
   danger?: boolean;
+  disabled?: boolean;
+  children?: ReactNode;
   methods: readonly TFactorMethod[];
   action: IFactorAction<TResult>;
   onConfirm: () => void;
@@ -25,6 +27,8 @@ export const ConfirmPanel = <TResult,>({
   confirm,
   icon,
   danger = false,
+  disabled = false,
+  children,
   methods,
   action,
   onConfirm,
@@ -41,15 +45,16 @@ export const ConfirmPanel = <TResult,>({
   return (
     <div ref={panelRef} className="grid gap-3 px-card pb-card">
       <p className="m-0 text-body-sm text-secondary">{question}</p>
+      {children}
       {action.Notice ? <InlineAlert accent="failed" title={action.Notice} /> : null}
       <FactorFields methods={methods} draft={action.Draft} onChange={action.SetDraft} disabled={action.Busy} />
       <div className="flex flex-wrap gap-2">
         {danger ? (
-          <Button size="sm" variant="danger" iconStart={icon} disabled={action.Busy || locked} onClick={onConfirm}>
+          <Button size="sm" variant="danger" iconStart={icon} disabled={action.Busy || locked || disabled} onClick={onConfirm}>
             {locked ? t('throttle.retryIn', { time: formatClock(action.Countdown.Remaining) }) : confirm}
           </Button>
         ) : (
-          <Button size="sm" variant="primary" iconStart={icon} disabled={action.Busy || locked} onClick={onConfirm}>
+          <Button size="sm" variant="primary" iconStart={icon} disabled={action.Busy || locked || disabled} onClick={onConfirm}>
             {locked ? t('throttle.retryIn', { time: formatClock(action.Countdown.Remaining) }) : confirm}
           </Button>
         )}
