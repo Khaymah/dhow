@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -38,6 +39,50 @@ func TestAReleaseWhoseFileWasChangedIsNotStartedByARollback(t *testing.T) {
 	for _, fact := range facts {
 		assert.Contains(t, fact, "privileged=false", "the changed file was never started")
 	}
+}
+
+func (d *deployment) plantAndFollow(image, writerVolume, readerVolume, tail string) string {
+	return fmt.Sprintf(`services:
+  writer:
+    image: %[1]s
+    command: ["sh", "-c", "ln -sfn / /data/l; exec httpd -f -p 8080 -h /www"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 1s
+      retries: 2
+      start_period: 1s
+    volumes:
+      - '%[2]s'
+  reader:
+    image: %[1]s
+    ports:
+      - "%[4]d:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 1s
+      retries: 2
+      start_period: 1s
+    volumes:
+      - '%[3]s'
+%[5]s`, image, writerVolume, readerVolume, d.port, tail)
+}
+
+func TestAWritableBindThatPlantsALinkIsRefusedAndNamedVolumesDeployFine(t *testing.T) {
+	d := newDeployment(t, "plant", 8092, 1)
+	h := d.hosts[0]
+	v1 := publishApp(t, "v1")
+
+	exploit := d.plantAndFollow(v1, "./data:/data", "./data/l:/x:ro", "")
+	res := d.deploy("compose-single-writable-bind-refused", spec{release: releaseOne, compose: exploit, extra: map[string]string{"data/keep": "x"}})
+	assert.Equal(t, exitPolicy, res.exit, res.output)
+	assert.Contains(t, res.output, "COMPOSE_UNSAFE_BIND_WRITABLE")
+	assert.Empty(t, h.releases(d.path), "refused before anything reached the server")
+	assert.Empty(t, h.runningImages(d.project))
+
+	named := d.plantAndFollow(v1, "data:/data", "data:/x:ro", "volumes:\n  data: {}\n")
+	ok := d.deploy("", spec{release: releaseOne, compose: named})
+	require.Equal(t, 0, ok.exit, ok.output)
+	assert.Equal(t, "v1", h.served(d.port))
 }
 
 func TestTheEnvironmentOfTheServerAndTheEnvFileOfTheArtifactNeverReachCompose(t *testing.T) {

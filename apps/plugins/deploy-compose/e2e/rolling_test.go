@@ -13,8 +13,8 @@ func TestTheSecondServerFailingInTheSecondBatchRollsTheFirstBack(t *testing.T) {
 	d := newDeployment(t, "fleet", 8090, 2)
 	one, two := d.hosts[0], d.hosts[1]
 	v1, v2 := publishApp(t, "v1"), publishApp(t, "v2")
-	one.setBad(t, d.path, "")
-	two.setBad(t, d.path, "")
+	one.setBad(t, v1, d.project, "")
+	two.setBad(t, v1, d.project, "")
 
 	first := d.deploy("", spec{release: releaseOne, compose: d.compose(v1, stateCheck(), ""), batch: 1, health: true})
 	require.Equal(t, 0, first.exit, first.output)
@@ -23,7 +23,7 @@ func TestTheSecondServerFailingInTheSecondBatchRollsTheFirstBack(t *testing.T) {
 		assert.Equal(t, []string{v1}, h.runningImages(d.project), h.name)
 	}
 
-	two.setBad(t, d.path, "v2")
+	two.setBad(t, v1, d.project, "v2")
 	res := d.deploy("rolling-compose-second-fails", spec{release: releaseTwo, compose: d.compose(v2, stateCheck(), ""), batch: 1, health: true})
 	assert.Equal(t, deployrelease.ExitRolledBack, res.exit, res.output)
 	group, ok := res.groupEvent(deployrelease.EventRolledBack)
@@ -50,7 +50,7 @@ func TestAMissingImageOnTheSecondServerStopsBeforeAnySwitch(t *testing.T) {
 	d := newDeployment(t, "fleetpull", 8091, 2)
 	v1 := publishApp(t, "v1")
 	for _, h := range d.hosts {
-		h.setBad(t, d.path, "")
+		h.setBad(t, v1, d.project, "")
 	}
 	require.Equal(t, 0, d.deploy("", spec{release: releaseOne, compose: d.compose(v1, stateCheck(), ""), batch: 1}).exit)
 

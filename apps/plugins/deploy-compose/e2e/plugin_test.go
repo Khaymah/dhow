@@ -73,9 +73,11 @@ func (d *deployment) render(image, check, mount, extra string) string {
       retries: 2
       start_period: 1s
     volumes:
-      - %s/shared/state:/state
+      - state:/state
 %s%s
-`, image, d.port, check, d.path, mount, extra)
+volumes:
+  state: {}
+`, image, d.port, check, mount, extra)
 }
 
 type spec struct {

@@ -196,20 +196,22 @@ func (h *composeHost) runningImages(project string) []string {
 
 func (h *composeHost) prepare(t *testing.T, path, project string) {
 	t.Helper()
-	docker(t, "exec", "-u", "deploy", h.name, "mkdir", "-p", path+"/shared/state")
+	docker(t, "exec", "-u", "deploy", h.name, "mkdir", "-p", path)
+	h.exec(t, "docker", "volume", "create", "--label", "com.docker.compose.project="+project, "--label", "com.docker.compose.volume=state", project+"_state")
 	t.Cleanup(func() {
 		_, _ = dockerRun(nil, "exec", h.name, "docker", "compose", "--project-name="+project, "down", "--volumes", "--remove-orphans", "--timeout", "1")
+		_, _ = dockerRun(nil, "exec", h.name, "docker", "volume", "rm", "--force", project+"_state")
 	})
 }
 
-func (h *composeHost) setBad(t *testing.T, path, version string) {
+func (h *composeHost) setBad(t *testing.T, ref, project, version string) {
 	t.Helper()
-	flag := path + "/shared/state/bad"
+	volume := project + "_state:/state"
 	if version == "" {
-		h.exec(t, "rm", "-f", flag)
+		h.exec(t, "docker", "run", "--rm", "-v", volume, ref, "rm", "-f", "/state/bad")
 		return
 	}
-	out, err := dockerRun(bytes.NewReader([]byte(version)), "exec", "-i", "-u", "deploy", h.name, "tee", flag)
+	out, err := dockerRun(bytes.NewReader([]byte(version)), "exec", "-i", h.name, "docker", "run", "--rm", "-i", "-v", volume, ref, "tee", "/state/bad")
 	require.NoError(t, err, out)
 }
 
