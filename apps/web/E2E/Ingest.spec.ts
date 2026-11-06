@@ -126,7 +126,9 @@ test('a wide pattern lists the protected environment and needs an explicit yes, 
   const dialog = page.getByRole('dialog', { name: T['ingest.new.title'] });
   await fillToken(dialog, view, WIDE_TOKEN, '**');
   await typePassword(dialog, view);
+  const refused = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().endsWith('/ingest-tokens'));
   await dialog.getByRole('button', { name: T['ingest.form.submit'] }).click();
+  expect((await refused).status()).toBe(422);
 
   await expect(dialog.getByText(T['ingest.reach.title'])).toBeVisible();
   await expect(dialog.getByRole('list', { name: T['ingest.reach.label'] }).getByText(PROTECTED)).toBeVisible();
@@ -152,6 +154,7 @@ test('a wide pattern lists the protected environment and needs an explicit yes, 
   await expect(page.getByRole('list', { name: T['ingest.tokens.title'] }).getByText(PROTECTED).first()).toBeVisible();
   await page.goto(`/projects/${stack().ProjectId}/environments`);
   await expectNowhere(view, value);
+  expect(view.Problems.splice(0, 1)).toEqual([expect.stringContaining('422')]);
   await close(view);
 });
 
