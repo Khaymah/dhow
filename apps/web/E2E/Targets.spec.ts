@@ -32,6 +32,9 @@ test.beforeAll(async () => {
   await call('POST', `/organizations/${OrgId}/projects/${ProjectId}/environments`, { Name: ENVIRONMENT, CurrentFactor: factor() }, owner);
 });
 
+
+const isolated = (value: string): string => `\u2068${value}\u2069`;
+
 test('the owner adds a target from the environment page and lands on its page with the key not pinned', async ({ browser }) => {
   const view = await open(browser, 'ar', DESKTOP);
   const { Page: page, T } = view;
@@ -115,7 +118,7 @@ test('the private key goes into the environment secret once and is never shown a
   await panel.getByRole('textbox', { name: T['factor.method.password'], exact: true }).fill(stack().Owner.Password);
   await panel.getByRole('button', { name: T['targets.keySecret.attach.confirm'] }).click();
 
-  await expect(page.getByText(T['targets.key.secret'].replace('{name}', KEY_SECRET))).toBeVisible();
+  await expect(page.getByText(T['targets.key.secret'].replace('{name}', isolated(KEY_SECRET)))).toBeVisible();
   await expectNowhere(view, KEY_MATERIAL);
   const saved = (await call('GET', apiPath(), undefined, owner)).Data;
   expect(text(saved, 'KeySecretName')).toBe(KEY_SECRET);
@@ -174,7 +177,7 @@ test('the history renders a rolled-back release (served by a stub of the release
 
     const row = page.getByRole('listitem').filter({ hasText: '2-bbbbbbbb-1' });
     await expect(row.getByText(T['targets.release.auto'])).toBeVisible();
-    await expect(row.getByText(T['targets.release.reason'].replace('{reason}', T['targets.reason.health_check_failed']), { exact: false })).toBeVisible();
+    await expect(row.getByText(T['targets.release.reason'].replace('{reason}', isolated(T['targets.reason.health_check_failed'])), { exact: false })).toBeVisible();
     await expect(row.getByText(`${ADDRESS}:22`)).toBeVisible();
     await expect(row.getByRole('button', { name: T['targets.rollback.action'] })).toHaveCount(0);
     await expect(page.getByRole('listitem').filter({ hasText: '1-aaaaaaaa-1' }).getByText(T['targets.release.auto'])).toHaveCount(0);
