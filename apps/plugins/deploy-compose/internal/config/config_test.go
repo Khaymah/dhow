@@ -92,18 +92,20 @@ func TestWhatThePluginDoesNotAcceptIsRefused(t *testing.T) {
 		return c
 	}
 	for name, s := range map[string]setup{
-		"an ssh target":             {kind: "ssh", settings: &runnerv1.TargetSettings{BatchSize: 1}},
-		"a project with a slash":    {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeProject = "a/b" })},
-		"an upper case project":     {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeProject = "Shop" })},
-		"a file that climbs up":     {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeFile = "../x.yaml" })},
-		"an absolute file":          {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeFile = "/etc/x.yaml" })},
-		"the override file":         {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeFile = "compose.dhow.yaml" })},
-		"a reload command":          {settings: with(func(c *runnerv1.TargetSettings) { c.ReloadCommand = "true" })},
-		"a shared path":             {settings: with(func(c *runnerv1.TargetSettings) { c.Shared = []string{".env"} })},
-		"an image by tag":           {extra: map[string]string{"DHOW_INPUT_IMAGES": "web=ghcr.io/acme/web:1"}},
-		"a wait that is too long":   {extra: map[string]string{"DHOW_INPUT_WAIT_TIMEOUT": "1h"}},
-		"a wait that is too short":  {extra: map[string]string{"DHOW_INPUT_WAIT_TIMEOUT": "1s"}},
-		"a pull that is not a time": {extra: map[string]string{"DHOW_INPUT_PULL_TIMEOUT": "soon"}},
+		"an ssh target":                     {kind: "ssh", settings: &runnerv1.TargetSettings{BatchSize: 1}},
+		"a project with a slash":            {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeProject = "a/b" })},
+		"an upper case project":             {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeProject = "Shop" })},
+		"a project with an underscore":      {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeProject = "shop_eu" })},
+		"a project that starts with a dash": {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeProject = "-shop" })},
+		"a file that climbs up":             {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeFile = "../x.yaml" })},
+		"an absolute file":                  {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeFile = "/etc/x.yaml" })},
+		"the override file":                 {settings: with(func(c *runnerv1.TargetSettings) { c.ComposeFile = "compose.dhow.yaml" })},
+		"a reload command":                  {settings: with(func(c *runnerv1.TargetSettings) { c.ReloadCommand = "true" })},
+		"a shared path":                     {settings: with(func(c *runnerv1.TargetSettings) { c.Shared = []string{".env"} })},
+		"an image by tag":                   {extra: map[string]string{"DHOW_INPUT_IMAGES": "web=ghcr.io/acme/web:1"}},
+		"a wait that is too long":           {extra: map[string]string{"DHOW_INPUT_WAIT_TIMEOUT": "1h"}},
+		"a wait that is too short":          {extra: map[string]string{"DHOW_INPUT_WAIT_TIMEOUT": "1s"}},
+		"a pull that is not a time":         {extra: map[string]string{"DHOW_INPUT_PULL_TIMEOUT": "soon"}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := config.Parse(env(t, s))

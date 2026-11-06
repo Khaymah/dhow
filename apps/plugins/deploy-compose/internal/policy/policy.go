@@ -51,6 +51,7 @@ const OverrideFile = "compose.dhow.yaml"
 
 type Options struct {
 	File        string
+	Project     string
 	DeployPath  string
 	AllowUnsafe bool
 	Images      map[string]string
@@ -83,15 +84,34 @@ func parse(raw []byte) (map[string]any, error) {
 		return nil, invalid("the file is empty or larger than %d bytes", MaxFileBytes)
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	var doc map[string]any
-	if err := dec.Decode(&doc); err != nil || doc == nil {
+	var node yaml.Node
+	if err := dec.Decode(&node); err != nil {
 		return nil, invalid("the file is not a YAML mapping")
 	}
 	var extra any
 	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
 		return nil, invalid("the file has more than one YAML document")
 	}
+	if err := checkTags(&node); err != nil {
+		return nil, err
+	}
+	var doc map[string]any
+	if err := node.Decode(&doc); err != nil || doc == nil {
+		return nil, invalid("the file is not a YAML mapping")
+	}
 	return doc, nil
+}
+
+func checkTags(n *yaml.Node) error {
+	if n.Tag != "" && !strings.HasPrefix(n.Tag, "!!") && !strings.HasPrefix(n.Tag, "tag:yaml.org,2002:") {
+		return invalid("the file uses a YAML tag that is not a core tag")
+	}
+	for _, child := range n.Content {
+		if err := checkTags(child); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func asMap(v any) (map[string]any, bool) {

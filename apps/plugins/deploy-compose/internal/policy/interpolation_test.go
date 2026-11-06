@@ -97,8 +97,11 @@ func TestATypedFieldMustBeALiteralYamlType(t *testing.T) {
 func TestTheModeOfAShortVolumeIsOneOfTheKnownFlags(t *testing.T) {
 	for entry, want := range map[string]string{
 		"./c:/c:ro":            "",
-		"./c:/c:ro,z":          "",
-		"./c:/c:ro,Z,rprivate": "",
+		"./c:/c:ro,private":    "",
+		"./c:/c:ro,z":          policy.CodeInvalid,
+		"./c:/c:ro,Z,rprivate": policy.CodeInvalid,
+		"./c:/c:shared":        policy.CodeInvalid,
+		"./c:/c:rslave":        policy.CodeInvalid,
 		"data:/d:rw":           "",
 		"data:/d:nocopy":       "",
 		"./c:/c:bogus":         policy.CodeInvalid,
@@ -110,7 +113,7 @@ func TestTheModeOfAShortVolumeIsOneOfTheKnownFlags(t *testing.T) {
 		"data:/d:bogus":        policy.CodeInvalid,
 		"./c:/c:ro,rw":         "COMPOSE_UNSAFE_BIND_WRITABLE",
 		"./c:/c:rw":            "COMPOSE_UNSAFE_BIND_WRITABLE",
-		"./c:/c:z":             "COMPOSE_UNSAFE_BIND_WRITABLE",
+		"./c:/c:z":             policy.CodeInvalid,
 	} {
 		_, code := check(t, compose(vol(entry)+"volumes:\n  data: {}\n"), policy.Options{})
 		assert.Equal(t, want, code, entry)

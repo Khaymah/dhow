@@ -57,6 +57,9 @@ func (c *checker) longMount(m map[string]any) string {
 	if !validMountTexts(m) {
 		return invalidEntry
 	}
+	if code := c.bindOptions(m); code != "" {
+		return code
+	}
 	kind, _ := m["type"].(string)
 	source, _ := m["source"].(string)
 	target, _ := m["target"].(string)

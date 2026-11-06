@@ -114,7 +114,6 @@ func TestTheUnsafeOptionsOfAServiceAreRefused(t *testing.T) {
 func TestSafeOptionsAreNotRefused(t *testing.T) {
 	for name, extra := range map[string]string{
 		"privileged false":  "    privileged: false\n",
-		"network bridge":    "    network_mode: bridge\n",
 		"no new privileges": "    security_opt: ['no-new-privileges:true']\n",
 		"capabilities drop": "    cap_drop: [ALL]\n",
 		"a tmpfs":           "    volumes:\n      - type: tmpfs\n        target: /tmp\n",

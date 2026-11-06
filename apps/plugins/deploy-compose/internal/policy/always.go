@@ -58,6 +58,10 @@ func (c *checker) topAlways(doc map[string]any) error {
 		switch {
 		case key == "include":
 			return always("INCLUDE", "")
+		case key == "name":
+			if text, _ := doc[key].(string); text == "" || text != c.opt.Project {
+				return always("PROJECT_NAME", "")
+			}
 		case key == "models" && !c.opt.AllowUnsafe:
 			return always("MODELS", "")
 		case key == "models", strings.HasPrefix(key, "x-"), slices.Contains(topKeys, key):
@@ -95,6 +99,9 @@ func (c *checker) topAlways(doc map[string]any) error {
 
 func topItem(kind, name string, item map[string]any) error {
 	where := kind + "." + name
+	if hasDockerLabel(item["labels"]) {
+		return always("LABEL", where)
+	}
 	if err := typedBool(item, "external", where); err != nil {
 		return err
 	}
@@ -142,6 +149,14 @@ func (c *checker) serviceAlways(name string, svc map[string]any) error {
 			return always("NAMESPACE_SHARED", name)
 		}
 	}
+	if mode, ok := svc["network_mode"]; ok && mode != nil {
+		if text, isText := mode.(string); !isText || (text != "none" && strings.ToLower(strings.TrimSpace(text)) != "host") {
+			return always("NETWORK_MODE", name)
+		}
+	}
+	if hasDockerLabel(svc["labels"]) {
+		return always("LABEL", name)
+	}
 	deploy, _ := asMap(svc["deploy"])
 	for _, key := range sortedKeys(deploy) {
 		if !slices.Contains(deployKeys, key) && !strings.HasPrefix(key, "x-") {
@@ -149,6 +164,29 @@ func (c *checker) serviceAlways(name string, svc map[string]any) error {
 		}
 	}
 	return c.volumesAlways(name, svc)
+}
+
+func hasDockerLabel(v any) bool {
+	switch labels := v.(type) {
+	case map[string]any:
+		for k := range labels {
+			if dockerLabel(k) {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range labels {
+			text, _ := item.(string)
+			if dockerLabel(text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func dockerLabel(key string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(key)), "com.docker.")
 }
 
 func keyPresent(key string) func(map[string]any) bool {

@@ -9,7 +9,7 @@ const invalidEntry = "INVALID_ENTRY"
 
 var (
 	boolKeys   = []string{"privileged", "use_api_socket", "init", "read_only"}
-	modeFlags  = []string{"ro", "rw", "z", "Z", "shared", "slave", "private", "rshared", "rslave", "rprivate", "nocopy", "delegated", "cached", "consistent"}
+	modeFlags  = []string{"ro", "rw", "private", "rprivate", "nocopy", "delegated", "cached", "consistent"}
 	mountTexts = []string{"type", "source", "target"}
 )
 
@@ -38,6 +38,34 @@ func (c *checker) typed(name string, svc map[string]any) error {
 		}
 	}
 	return nil
+}
+
+func (c *checker) bindOptions(m map[string]any) string {
+	raw, ok := m["bind"]
+	if !ok || raw == nil {
+		return ""
+	}
+	bind, isMap := asMap(raw)
+	if !isMap {
+		return invalidEntry
+	}
+	if v, has := bind["create_host_path"]; has && v != nil {
+		if _, isBool := v.(bool); !isBool {
+			return invalidEntry
+		}
+	}
+	if c.opt.AllowUnsafe {
+		return ""
+	}
+	for _, key := range []string{"propagation", "selinux", "recursive"} {
+		if _, has := bind[key]; has {
+			return "BIND_OPTIONS"
+		}
+	}
+	if truthy(bind["create_host_path"]) {
+		return "BIND_OPTIONS"
+	}
+	return ""
 }
 
 func parseMode(text string) (readOnly, ok bool) {

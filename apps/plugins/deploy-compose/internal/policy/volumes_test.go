@@ -20,7 +20,7 @@ func TestPersistentDataIsInNamedVolumesAndHostBindsAreReadOnly(t *testing.T) {
 	for name, tc := range map[string]struct{ extra, code string }{
 		"a writable relative bind":           {vol("./data:/data"), "COMPOSE_UNSAFE_BIND_WRITABLE"},
 		"an explicit rw bind":                {vol("./data:/data:rw"), "COMPOSE_UNSAFE_BIND_WRITABLE"},
-		"a writable bind with z":             {vol("./data:/data:z"), "COMPOSE_UNSAFE_BIND_WRITABLE"},
+		"a bind with z":                      {vol("./data:/data:z"), policy.CodeInvalid},
 		"a long syntax bind":                 {"    volumes:\n      - type: bind\n        source: ./data\n        target: /data\n", "COMPOSE_UNSAFE_BIND_WRITABLE"},
 		"a long syntax bind read_only false": {"    volumes:\n      - type: bind\n        source: ./data\n        target: /data\n        read_only: false\n", "COMPOSE_UNSAFE_BIND_WRITABLE"},
 		"a bind of shared":                   {vol(deployDir + "/shared/uploads:/u:ro"), "COMPOSE_UNSAFE_BIND_SHARED_DATA"},
@@ -38,7 +38,7 @@ func TestPersistentDataIsInNamedVolumesAndHostBindsAreReadOnly(t *testing.T) {
 }
 
 func TestReadOnlyBindsInsideTheReleaseAndNamedVolumesAreFine(t *testing.T) {
-	extra := vol("./conf:/conf:ro", "./a/b:/b:ro,z", "data:/data", "/cache") + "    tmpfs: [/tmp]\n"
+	extra := vol("./conf:/conf:ro", "./a/b:/b:ro,private", "data:/data", "/cache") + "    tmpfs: [/tmp]\n"
 	extra += "volumes:\n  data: {}\n"
 	res, code := check(t, compose(extra), policy.Options{})
 	assert.Empty(t, code)
