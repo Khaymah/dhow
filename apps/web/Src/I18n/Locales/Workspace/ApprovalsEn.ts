@@ -52,6 +52,8 @@ export const ApprovalsEn = {
   'approvals.gate.timer.unknown': 'Waiting for the environment timer to end.',
   'approvals.gate.busy.badge': 'Environment busy',
   'approvals.gate.busy.body': 'Waiting for another run to finish on environment {environment}.',
+  'approvals.gate.targetBusy.badge': 'Target busy',
+  'approvals.gate.targetBusy.body': 'Waiting for another job of this run that deploys to the same target.',
   'approvals.gate.paused.badge': 'Deploys paused',
   'approvals.gate.paused.body': 'Deploys to environment {environment} are paused. This job starts after an admin resumes them.',
 

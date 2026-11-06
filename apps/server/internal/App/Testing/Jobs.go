@@ -16,6 +16,8 @@ import (
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
+const TestDeploySSHImage = "ghcr.io/khaymah/dhow-deploy-ssh@sha256:03fddb3b486b758f338f8999afbf04ced985d74825963dd28b92e650645e6778"
+
 const TestImage = "registry.example.com/dhow/test@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 type FakeSecrets struct {

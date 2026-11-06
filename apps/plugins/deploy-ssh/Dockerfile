@@ -31,7 +31,7 @@ LABEL org.opencontainers.image.title="dhow-deploy-ssh" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${COMMIT}"
 
-LABEL io.dhow.plugin.manifest='{"Version":1,"Entrypoint":["/dhow-deploy-ssh"],"Inputs":{"target":{"Required":true},"artifact":{"Required":true,"Kind":"artifact"},"strategy":{"Default":"atomic-symlink"},"keep_releases":{},"health_check_url":{},"health_check_status":{"Default":"200-399"},"health_check_timeout":{"Default":"5s"},"health_check_retries":{"Default":"10"},"health_check_interval":{"Default":"5s"},"health_check_stable":{"Default":"3"},"health_check_start_delay":{"Default":"0s"},"on_first_failure":{"Default":"keep"}},"Outputs":[],"Mutating":true}'
+LABEL io.dhow.plugin.manifest='{"Version":1,"Entrypoint":["/dhow-deploy-ssh"],"Inputs":{"target":{"Required":true},"artifact":{"Kind":"artifact"},"mode":{"Default":"deploy"},"strategy":{"Default":"atomic-symlink"},"keep_releases":{},"health_check_url":{},"health_check_status":{"Default":"200-399"},"health_check_timeout":{"Default":"5s"},"health_check_retries":{"Default":"10"},"health_check_interval":{"Default":"5s"},"health_check_stable":{"Default":"3"},"health_check_start_delay":{"Default":"0s"},"on_first_failure":{"Default":"keep"}},"Outputs":[],"Mutating":true,"ExitReasons":{"1":"DEPLOY_FAILED","2":"PLUGIN_INPUT_INVALID","10":"DEPLOY_ROLLED_BACK","11":"DEPLOY_HEALTH_FAILED","12":"DEPLOY_ROLLBACK_FAILED","13":"HOST_KEY_MISMATCH","14":"ARTIFACT_UNSAFE","15":"TARGET_LOCKED","16":"CURRENT_NOT_A_SYMLINK","17":"TARGET_HOST_UNREACHABLE","18":"TARGET_STATE_CORRUPT","19":"TARGET_CHECK_FAILED"}}'
 
 COPY --from=build /out/dhow-deploy-ssh /dhow-deploy-ssh
 

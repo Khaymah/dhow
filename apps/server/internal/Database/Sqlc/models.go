@@ -275,6 +275,26 @@ type DeploymentApproval struct {
 	SupersededByRunId *uuid.UUID
 }
 
+type DeploymentHostCheck struct {
+	Id                uuid.UUID
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	IsDeleted         bool
+	OrganizationId    uuid.UUID
+	TargetId          uuid.UUID
+	HostId            uuid.UUID
+	DeploymentId      uuid.UUID
+	RunJobId          uuid.UUID
+	Reason            string
+	Message           pgtype.Text
+	CurrentReleaseId  pgtype.Text
+	VerifiedReleaseId pgtype.Text
+	FreeBytes         pgtype.Int8
+	Locked            bool
+	Repaired          bool
+	CheckedAt         time.Time
+}
+
 type DeploymentRelease struct {
 	Id                uuid.UUID
 	CreatedAt         time.Time

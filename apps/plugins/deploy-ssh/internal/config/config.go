@@ -31,6 +31,7 @@ const (
 var ErrInput = errors.New("an input of the deploy plugin is not valid")
 
 type Settings struct {
+	Mode         string
 	Step         jobspec.TargetStep
 	Deploy       deployrelease.Config
 	BatchSize    int
@@ -55,6 +56,19 @@ func Parse(getenv func(string) string) (Settings, error) {
 		return Settings{}, fmt.Errorf("%w: the target is not an ssh target", ErrInput)
 	}
 	in := func(name string) string { return getenv(envInputPrefix + strings.ToUpper(name)) }
+	mode := orDefault(in(jobspec.TargetModeInput), jobspec.TargetModeDeploy)
+	if mode != jobspec.TargetModeDeploy && mode != jobspec.TargetModeCheck {
+		return Settings{}, fmt.Errorf("%w: mode %q is not supported", ErrInput, mode)
+	}
+	allow, err := netguard.ParseCIDRs(getenv(envAllowPrivate))
+	if err != nil {
+		return Settings{}, fmt.Errorf("%w: %w", ErrInput, err)
+	}
+	if mode == jobspec.TargetModeCheck {
+		return Settings{
+			Mode: mode, Step: step, KeyFile: step.KeyFile, ReportPath: getenv(envReport), ProxyURL: getenv(envProxy), AllowPrivate: allow,
+		}, nil
+	}
 	if s := in("strategy"); s != "" && s != StrategyAtomicSymlink {
 		return Settings{}, fmt.Errorf("%w: strategy %q is not supported, only %s", ErrInput, s, StrategyAtomicSymlink)
 	}
@@ -66,15 +80,11 @@ func Parse(getenv func(string) string) (Settings, error) {
 	if cfg.ArchivePath == "" || !jobspec.ValidDigest(cfg.ArchiveDigest) {
 		return Settings{}, fmt.Errorf("%w: the artifact", ErrInput)
 	}
-	allow, err := netguard.ParseCIDRs(getenv(envAllowPrivate))
-	if err != nil {
-		return Settings{}, fmt.Errorf("%w: %w", ErrInput, err)
-	}
 	batch, pause := max(step.Settings.BatchSize, 1), time.Duration(step.Settings.BatchPauseSeconds)*time.Second
 	if err := deployrelease.ValidateRollout(len(step.Hosts), batch, pause, cfg.Health); err != nil {
 		return Settings{}, fmt.Errorf("%w: %w", ErrInput, err)
 	}
-	s := Settings{Step: step, Deploy: cfg, BatchSize: batch, BatchPause: pause, KeyFile: step.KeyFile, ReportPath: getenv(envReport), ProxyURL: getenv(envProxy), AllowPrivate: allow}
+	s := Settings{Mode: mode, Step: step, Deploy: cfg, BatchSize: batch, BatchPause: pause, KeyFile: step.KeyFile, ReportPath: getenv(envReport), ProxyURL: getenv(envProxy), AllowPrivate: allow}
 	return s, cfg.Validate()
 }
 

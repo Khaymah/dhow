@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -18,6 +19,9 @@ const (
 	FeatureDeployTargets = "deploy_targets"
 	TargetInput          = "target"
 	TargetArtifactInput  = "artifact"
+	TargetModeInput      = "mode"
+	TargetModeDeploy     = "deploy"
+	TargetModeCheck      = "check"
 	TargetKindSSH        = "ssh"
 	TargetKindCompose    = "compose"
 	DeploySSHImage       = "ghcr.io/khaymah/dhow-deploy-ssh"
@@ -36,6 +40,11 @@ const (
 	MaxBatchPause      = 600
 	MaxKnownHostsBytes = 1024
 	defaultSSHPort     = 22
+
+	DeployRollbackBudget = 3 * time.Minute
+	DeployCleanupBudget  = 30 * time.Second
+	DeployUnlockBudget   = 10 * time.Second
+	DeployConnGrace      = 15 * time.Second
 )
 
 var (
@@ -81,6 +90,24 @@ func TargetKeyFile(index int) string {
 }
 
 func OfficialDeployImages() []string { return []string{DeploySSHImage, DeployComposeImage} }
+
+func IsOfficialDeployImage(image string) bool {
+	repo, _, _ := strings.Cut(QualifyImage(image), "@")
+	if i := strings.LastIndex(repo, ":"); i > strings.LastIndex(repo, "/") {
+		repo = repo[:i]
+	}
+	return slices.Contains(OfficialDeployImages(), repo)
+}
+
+var pinnedImagePattern = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$`)
+
+func ValidPinnedDeployImage(image string) bool {
+	return pinnedImagePattern.MatchString(image) && IsOfficialDeployImage(image)
+}
+
+func DeployCancelGrace() time.Duration {
+	return DeployRollbackBudget + DeployConnGrace + DeployCleanupBudget + DeployUnlockBudget
+}
 
 func ValidDeployPath(p string) bool {
 	if !deployPathPattern.MatchString(p) || strings.HasSuffix(p, "/") || strings.Contains(p, "//") {

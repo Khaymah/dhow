@@ -74,6 +74,7 @@ type Infra struct {
 	Definitions        pipelines.Definitions
 	Images             pipelines.ImageResolver
 	CheckoutImage      string
+	DeploySSHImage     string
 	RegistryTLS        *tls.Config
 	ManualJobs         bool
 	PinBudget          time.Duration

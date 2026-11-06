@@ -22,6 +22,8 @@ const (
 	ExitTargetLocked    = 15
 	ExitCurrentNotLink  = 16
 	ExitConnect         = 17
+	ExitStateCorrupt    = 18
+	ExitCheckFailed     = 19
 
 	FirstFailureKeep = "keep"
 	FirstFailureFail = "fail"
@@ -29,8 +31,8 @@ const (
 	DefaultHookTimeout = 120 * time.Second
 	MaxHookTimeout     = 600 * time.Second
 	LockTTL            = 30 * time.Minute
-	RollbackBudget     = 3 * time.Minute
-	CleanupBudget      = 30 * time.Second
+	RollbackBudget     = jobspec.DeployRollbackBudget
+	CleanupBudget      = jobspec.DeployCleanupBudget
 	DefaultLockTimeout = 10 * time.Second
 )
 
@@ -43,6 +45,8 @@ var (
 	ErrDigest          = errors.New("the artifact is not the one whose digest was handed over")
 	ErrSharedConflict  = errors.New("the release has a file with the name of a shared path")
 	ErrNoSpace         = errors.New("the server does not have the disk space for the release")
+	ErrAuthFailed      = errors.New("the server did not accept the key of the target")
+	ErrStateCorrupt    = errors.New("a state file of Dhow on the server is damaged")
 )
 
 type Failure struct {

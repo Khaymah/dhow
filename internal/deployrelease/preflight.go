@@ -47,6 +47,9 @@ func (d *run) preflight(ctx context.Context) *Failure {
 	if f := d.inspectCurrent(); f != nil {
 		return f
 	}
+	if _, err := readDhow(d.r, d.dhow); err != nil {
+		return stateFailure(err)
+	}
 	for _, dir := range []string{d.dhow, d.releases, d.base + "/" + sharedName} {
 		if err := d.r.MkdirAll(dir, 0o755); err != nil {
 			return fail(ExitFailed, CauseOther, "cannot create the release directories", err)

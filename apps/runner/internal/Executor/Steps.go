@@ -39,6 +39,8 @@ type execPlan struct {
 	report   bool
 	silent   bool
 	isolated bool
+	grace    time.Duration
+	reasons  func(int32) (runnerv1.FailureReason, bool)
 }
 
 func jobContext(ctx context.Context, spec *runnerv1.JobSpec) (context.Context, context.CancelFunc) {
@@ -125,7 +127,8 @@ func (a *attempt) runStep(ctx, jobCtx context.Context, idx int32, step *runnerv1
 		})
 		done <- stepEnd{res: res, err: err, ok: true}
 	}()
-	end, why, stopped := a.waitStep(ctx, jobCtx, stepCtx, done, stopExec)
+	end, why, stopped := a.waitStep(ctx, jobCtx, stepCtx, done, stopExec, plan.grace)
+	end = mapExit(end, stopped, plan)
 	if stopped {
 		a.pipe.Unblock()
 	}
@@ -159,16 +162,16 @@ func (a *attempt) runStep(ctx, jobCtx context.Context, idx int32, step *runnerv1
 	return a.stepOutcome(idx, end)
 }
 
-func (a *attempt) waitStep(ctx, jobCtx, stepCtx context.Context, done <-chan stepEnd, stopExec func()) (stepEnd, result, bool) {
+func (a *attempt) waitStep(ctx, jobCtx, stepCtx context.Context, done <-chan stepEnd, stopExec func(), grace time.Duration) (stepEnd, result, bool) {
 	select {
 	case end := <-done:
 		return end, result{}, false
 	case <-a.fence.Lost():
 		return a.awaitExit(done, stopExec), a.lostResult(), true
 	case <-a.fence.Canceled():
-		return a.terminate(ctx, done, stopExec), canceledResult(), true
+		return a.terminate(ctx, done, stopExec, grace), canceledResult(), true
 	case <-stepCtx.Done():
-		end := a.terminate(ctx, done, stopExec)
+		end := a.terminate(ctx, done, stopExec, grace)
 		if jobCtx.Err() != nil {
 			return end, timedOut(), true
 		}
@@ -180,6 +183,16 @@ func (a *attempt) waitStep(ctx, jobCtx, stepCtx context.Context, done <-chan ste
 		a.killBox(ctx)
 		return a.awaitExit(done, stopExec), lost(runnerv1.FailureReason_FAILURE_REASON_RUNNER_RESTARTED), true
 	}
+}
+
+func mapExit(end stepEnd, stopped bool, plan execPlan) stepEnd {
+	if stopped || plan.reasons == nil || end.err != nil || end.res.ExitCode == 0 || end.res.Reason != runnerv1.FailureReason_FAILURE_REASON_UNSPECIFIED {
+		return end
+	}
+	if reason, ok := plan.reasons(end.res.ExitCode); ok {
+		end.res.Reason = reason
+	}
+	return end
 }
 
 func stepReasonOf(end stepEnd, why result, stopped bool) runnerv1.FailureReason {
@@ -277,10 +290,10 @@ func waitFor(done <-chan stepEnd, d time.Duration) (stepEnd, bool) {
 	}
 }
 
-func (a *attempt) terminate(ctx context.Context, done <-chan stepEnd, stopExec func()) stepEnd {
+func (a *attempt) terminate(ctx context.Context, done <-chan stepEnd, stopExec func(), grace time.Duration) stepEnd {
 	box := a.currentBox()
 	_ = box.Signal(ctx, syscall.SIGTERM)
-	if end, ok := waitFor(done, a.e.o.Config.CancelGrace); ok {
+	if end, ok := waitFor(done, max(a.e.o.Config.CancelGrace, grace)); ok {
 		return end
 	}
 	_ = box.Signal(ctx, syscall.SIGKILL)

@@ -31,7 +31,7 @@ import (
 
 const (
 	deployImage    = "ghcr.io/khaymah/dhow-deploy-ssh@sha256:3333333333333333333333333333333333333333333333333333333333333333"
-	deployManifest = `{"Version":1,"Entrypoint":["/deploy"],"Mutating":true,"Inputs":{"target":{"Required":true},"artifact":{"Required":true,"Kind":"artifact"}}}`
+	deployManifest = `{"Version":1,"Entrypoint":["/deploy"],"Mutating":true,"Inputs":{"target":{"Required":true},"artifact":{"Required":true,"Kind":"artifact"}},"ExitReasons":{"1":"DEPLOY_FAILED","10":"DEPLOY_ROLLED_BACK","11":"DEPLOY_HEALTH_FAILED","12":"DEPLOY_ROLLBACK_FAILED","13":"HOST_KEY_MISMATCH","15":"TARGET_LOCKED","18":"TARGET_STATE_CORRUPT"}}`
 	releaseID      = "12-abcdef01-0"
 	targetKeyLine1 = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW"
 	targetKeyLine2 = "QyNTUxOQAAACD3d5eD0W6rQmJXm5nQ0m5rWQ7s5oX6lWQ0v2q2QJ0m3AAAAJgq1ZZ"

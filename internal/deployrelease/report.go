@@ -21,6 +21,7 @@ const (
 	EventFailed         = "failed"
 	EventSkipped        = "skipped"
 	EventBatchPassed    = "batch_passed"
+	EventChecked        = "checked"
 
 	ModeDeploy = "deploy"
 
@@ -58,6 +59,11 @@ type Event struct {
 	Reason            string        `json:"Reason"`
 	Message           string        `json:"Message"`
 	Health            *HealthReport `json:"Health"`
+
+	CurrentReleaseID  string `json:"CurrentReleaseId,omitempty"`
+	VerifiedReleaseID string `json:"VerifiedReleaseId,omitempty"`
+	FreeBytes         int64  `json:"FreeBytes,omitempty"`
+	Locked            bool   `json:"Locked,omitempty"`
 }
 
 type Reporter interface {

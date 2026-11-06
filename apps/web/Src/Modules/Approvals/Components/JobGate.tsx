@@ -35,6 +35,7 @@ const TONES: Record<TGateKind, TBadgeTone> = {
   approval: 'warn',
   timer: 'info',
   environment_busy: 'queue',
+  target_busy: 'queue',
   paused: 'warn',
 };
 
@@ -180,6 +181,13 @@ const GateBody = ({ kind, props }: { kind: TGateKind; props: IJobGateProps }) =>
     return (
       <Frame kind={kind} label={t('approvals.gate.busy.badge')}>
         <Line>{t('approvals.gate.busy.body', { environment })}</Line>
+      </Frame>
+    );
+  }
+  if (kind === 'target_busy') {
+    return (
+      <Frame kind={kind} label={t('approvals.gate.targetBusy.badge')}>
+        <Line>{t('approvals.gate.targetBusy.body')}</Line>
       </Frame>
     );
   }

@@ -236,6 +236,11 @@ func (sc *reportScope) finishGroup(ctx context.Context, ev *runnerv1.DeployEvent
 		return err
 	}
 	sc.rel.State = verdict.state
+	if verdict.state == groupSucceeded {
+		if err := sc.settleOlderUnknown(ctx); err != nil {
+			return err
+		}
+	}
 	return sc.auditEnd(ctx, verdict.state, reason)
 }
 

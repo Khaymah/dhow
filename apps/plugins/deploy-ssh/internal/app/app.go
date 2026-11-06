@@ -22,7 +22,7 @@ import (
 const (
 	maxKeyBytes    = 16 << 10
 	proxyDialLimit = 15 * time.Second
-	cancelGrace    = 15 * time.Second
+	cancelGrace    = jobspec.DeployConnGrace
 )
 
 var codes = map[int]string{
@@ -36,6 +36,8 @@ var codes = map[int]string{
 	deployrelease.ExitTargetLocked:    "TARGET_LOCKED",
 	deployrelease.ExitCurrentNotLink:  "CURRENT_NOT_A_SYMLINK",
 	deployrelease.ExitConnect:         "TARGET_HOST_UNREACHABLE",
+	deployrelease.ExitStateCorrupt:    "TARGET_STATE_CORRUPT",
+	deployrelease.ExitCheckFailed:     "TARGET_CHECK_FAILED",
 }
 
 func Code(exit int) string {
@@ -99,6 +101,9 @@ func Run(ctx context.Context, s config.Settings, log *slog.Logger) int {
 		defer func() { _ = out.Close() }()
 		reporter = deployrelease.NewStreamReporter(out)
 	}
+	if s.Mode == jobspec.TargetModeCheck {
+		return runCheck(ctx, s, log, reporter, key, dial)
+	}
 	fleet := &deployrelease.Fleet{
 		Config: s.Deploy, BatchSize: s.BatchSize, BatchPause: s.BatchPause,
 		Doer: deployrelease.NewHealthClient(transport), Report: reporter, Log: log, Clock: deployrelease.RealClock(),
@@ -128,4 +133,18 @@ func connector(s config.Settings, host jobspec.TargetHost, key []byte, dial sshr
 		}
 		return c, nil
 	}
+}
+
+func runCheck(ctx context.Context, s config.Settings, log *slog.Logger, reporter deployrelease.Reporter, key []byte, dial sshremote.DialFunc) int {
+	checker := &deployrelease.Checker{DeployPath: s.Step.DeployPath, Report: reporter, Log: log, Clock: deployrelease.RealClock()}
+	for _, h := range s.Step.Hosts {
+		checker.Hosts = append(checker.Hosts, deployrelease.Host{ID: h.HostID, Name: h.Host, Connect: connector(s, h, key, dial)})
+	}
+	f := checker.Run(ctx)
+	if f == nil {
+		log.Info("every server of the target is ready", "servers", len(s.Step.Hosts))
+		return deployrelease.ExitOK
+	}
+	log.Error("the check found a problem", "code", Code(f.Exit), "detail", f.Text)
+	return f.Exit
 }

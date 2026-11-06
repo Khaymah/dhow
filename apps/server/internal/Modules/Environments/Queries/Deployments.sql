@@ -69,13 +69,15 @@ WHERE e."Id" = stale."Id";
 SELECT d.*
 FROM "Deployments" d
 WHERE d."EnvironmentId" = @environment_id AND d."OrganizationId" = @organization_id AND NOT d."IsDeleted"
+  AND NOT EXISTS (SELECT 1 FROM "PipelineRuns" r WHERE r."Id" = d."RunId" AND r."Trigger" = 'check')
 ORDER BY d."CreatedAt" DESC, d."Id" DESC
 LIMIT @page_limit OFFSET @page_offset;
 
 -- name: CountDeployments :one
 SELECT count(*)
-FROM "Deployments"
-WHERE "EnvironmentId" = @environment_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted";
+FROM "Deployments" d
+WHERE d."EnvironmentId" = @environment_id AND d."OrganizationId" = @organization_id AND NOT d."IsDeleted"
+  AND NOT EXISTS (SELECT 1 FROM "PipelineRuns" r WHERE r."Id" = d."RunId" AND r."Trigger" = 'check');
 
 -- name: GetStartEnvironment :one
 SELECT e."Id", e."Name", e."RuleVersion", e."AllowedRefs", e."AllowPullRequests", (e."PausedAt" IS NOT NULL)::boolean AS "Paused",

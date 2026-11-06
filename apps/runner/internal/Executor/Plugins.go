@@ -97,7 +97,26 @@ func (a *attempt) runPlugin(ctx, jobCtx context.Context, idx int32) (result, boo
 	maps.Copy(env, delivered)
 	maps.Copy(env, target)
 	allowed := append([]string{}, m.Outputs...)
-	return a.runStep(ctx, jobCtx, idx, step, execPlan{argv: m.Entrypoint, env: env, files: files, allowed: allowed, isolated: true, report: target != nil})
+	plan := execPlan{argv: m.Entrypoint, env: env, files: files, allowed: allowed, isolated: true, report: target != nil}
+	if target != nil && jobspec.IsOfficialDeployImage(step.GetPlugin().GetImage()) {
+		plan.grace = jobspec.DeployCancelGrace()
+		plan.reasons = deployReasons(m)
+	}
+	return a.runStep(ctx, jobCtx, idx, step, plan)
+}
+
+func deployReasons(m plugin.Manifest) func(int32) (runnerv1.FailureReason, bool) {
+	if !m.Mutating || len(m.ExitReasons) == 0 {
+		return nil
+	}
+	return func(code int32) (runnerv1.FailureReason, bool) {
+		name, ok := m.ExitReason(code)
+		if !ok {
+			return 0, false
+		}
+		v, ok := runnerv1.FailureReason_value["FAILURE_REASON_"+name]
+		return runnerv1.FailureReason(v), ok
+	}
 }
 
 func (a *attempt) pluginEnv(idx int32, step *runnerv1.Step) (map[string]string, map[string]string, map[string][]byte) {

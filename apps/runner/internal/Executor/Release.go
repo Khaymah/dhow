@@ -43,6 +43,11 @@ type reportLine struct {
 	Reason            string        `json:"Reason"`
 	Message           string        `json:"Message"`
 	Health            *reportHealth `json:"Health"`
+
+	CurrentReleaseID  string `json:"CurrentReleaseId"`
+	VerifiedReleaseID string `json:"VerifiedReleaseId"`
+	FreeBytes         int64  `json:"FreeBytes"`
+	Locked            bool   `json:"Locked"`
 }
 
 var eventKinds = map[string]runnerv1.DeployEventKind{
@@ -57,6 +62,7 @@ var eventKinds = map[string]runnerv1.DeployEventKind{
 	"batch_passed":    runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_BATCH_PASSED,
 	"failed":          runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_FAILED,
 	"skipped":         runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_SKIPPED,
+	"checked":         runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_CHECKED,
 }
 
 func parseReportLine(raw []byte, mask func(string) string) (*runnerv1.DeployEvent, bool) {
@@ -75,7 +81,8 @@ func parseReportLine(raw []byte, mask func(string) string) (*runnerv1.DeployEven
 	}
 	ev := &runnerv1.DeployEvent{
 		Kind: kind, HostId: l.HostID, Batch: clampInt32(l.Batch), ReleaseId: l.ReleaseID, PreviousReleaseId: l.PreviousReleaseID,
-		Mode: l.Mode, Reason: l.Reason, Message: mask(l.Message),
+		Mode: l.Mode, Reason: l.Reason, Message: mask(l.Message), CurrentReleaseId: l.CurrentReleaseID, VerifiedReleaseId: l.VerifiedReleaseID,
+		FreeBytes: max(l.FreeBytes, 0), Locked: l.Locked,
 	}
 	if h := l.Health; h != nil {
 		ev.Health = &runnerv1.DeployHealth{

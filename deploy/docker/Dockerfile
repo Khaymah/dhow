@@ -14,6 +14,7 @@ FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1
 
 ARG VERSION=dev
 ARG COMMIT=unknown
+ARG DEPLOY_SSH_PINNED=
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -29,12 +30,17 @@ COPY apps/server ./apps/server
 COPY internal ./internal
 COPY packages/proto/gen/go ./packages/proto/gen/go
 COPY --from=web /src/apps/web/dist/ ./apps/server/internal/App/WebDist/
+RUN if [ -n "$DEPLOY_SSH_PINNED" ]; then \
+      printf '%s' "$DEPLOY_SSH_PINNED" | grep -Eq '^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$' \
+        || { echo "DEPLOY_SSH_PINNED must be registry/name@sha256:<64 hex>, got: $DEPLOY_SSH_PINNED" >&2; exit 1; }; \
+    fi
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
       -ldflags "-s -w -buildid= \
         -X github.com/Khaymah/dhow/internal/buildinfo.version=${VERSION} \
-        -X github.com/Khaymah/dhow/internal/buildinfo.commit=${COMMIT}" \
+        -X github.com/Khaymah/dhow/internal/buildinfo.commit=${COMMIT} \
+        -X github.com/Khaymah/dhow/internal/buildinfo.deploySSHImage=${DEPLOY_SSH_PINNED}" \
       -o /out/dhow-server ./apps/server/cmd/dhow-server
 RUN mkdir -p /out/state/blobs
 

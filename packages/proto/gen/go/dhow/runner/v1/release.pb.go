@@ -36,6 +36,7 @@ const (
 	DeployEventKind_DEPLOY_EVENT_KIND_BATCH_PASSED    DeployEventKind = 9
 	DeployEventKind_DEPLOY_EVENT_KIND_FAILED          DeployEventKind = 10
 	DeployEventKind_DEPLOY_EVENT_KIND_SKIPPED         DeployEventKind = 11
+	DeployEventKind_DEPLOY_EVENT_KIND_CHECKED         DeployEventKind = 12
 )
 
 // Enum value maps for DeployEventKind.
@@ -53,6 +54,7 @@ var (
 		9:  "DEPLOY_EVENT_KIND_BATCH_PASSED",
 		10: "DEPLOY_EVENT_KIND_FAILED",
 		11: "DEPLOY_EVENT_KIND_SKIPPED",
+		12: "DEPLOY_EVENT_KIND_CHECKED",
 	}
 	DeployEventKind_value = map[string]int32{
 		"DEPLOY_EVENT_KIND_UNSPECIFIED":     0,
@@ -67,6 +69,7 @@ var (
 		"DEPLOY_EVENT_KIND_BATCH_PASSED":    9,
 		"DEPLOY_EVENT_KIND_FAILED":          10,
 		"DEPLOY_EVENT_KIND_SKIPPED":         11,
+		"DEPLOY_EVENT_KIND_CHECKED":         12,
 	}
 )
 
@@ -192,6 +195,10 @@ type DeployEvent struct {
 	Reason            string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
 	Message           string                 `protobuf:"bytes,8,opt,name=message,proto3" json:"message,omitempty"`
 	Health            *DeployHealth          `protobuf:"bytes,9,opt,name=health,proto3" json:"health,omitempty"`
+	CurrentReleaseId  string                 `protobuf:"bytes,10,opt,name=current_release_id,json=currentReleaseId,proto3" json:"current_release_id,omitempty"`
+	VerifiedReleaseId string                 `protobuf:"bytes,11,opt,name=verified_release_id,json=verifiedReleaseId,proto3" json:"verified_release_id,omitempty"`
+	FreeBytes         int64                  `protobuf:"varint,12,opt,name=free_bytes,json=freeBytes,proto3" json:"free_bytes,omitempty"`
+	Locked            bool                   `protobuf:"varint,13,opt,name=locked,proto3" json:"locked,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -287,6 +294,34 @@ func (x *DeployEvent) GetHealth() *DeployHealth {
 		return x.Health
 	}
 	return nil
+}
+
+func (x *DeployEvent) GetCurrentReleaseId() string {
+	if x != nil {
+		return x.CurrentReleaseId
+	}
+	return ""
+}
+
+func (x *DeployEvent) GetVerifiedReleaseId() string {
+	if x != nil {
+		return x.VerifiedReleaseId
+	}
+	return ""
+}
+
+func (x *DeployEvent) GetFreeBytes() int64 {
+	if x != nil {
+		return x.FreeBytes
+	}
+	return 0
+}
+
+func (x *DeployEvent) GetLocked() bool {
+	if x != nil {
+		return x.Locked
+	}
+	return false
 }
 
 type ReleaseServiceReportRequest struct {
@@ -407,7 +442,7 @@ const file_dhow_runner_v1_release_proto_rawDesc = "" +
 	"last_error\x18\x04 \x01(\tR\tlastError\x12\x1f\n" +
 	"\vduration_ms\x18\x05 \x01(\x03R\n" +
 	"durationMs\x12#\n" +
-	"\rstable_checks\x18\x06 \x01(\x05R\fstableChecks\"\xbc\x02\n" +
+	"\rstable_checks\x18\x06 \x01(\x05R\fstableChecks\"\xd1\x03\n" +
 	"\vDeployEvent\x123\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1f.dhow.runner.v1.DeployEventKindR\x04kind\x12\x17\n" +
 	"\ahost_id\x18\x02 \x01(\tR\x06hostId\x12\x14\n" +
@@ -418,14 +453,20 @@ const file_dhow_runner_v1_release_proto_rawDesc = "" +
 	"\x04mode\x18\x06 \x01(\tR\x04mode\x12\x16\n" +
 	"\x06reason\x18\a \x01(\tR\x06reason\x12\x18\n" +
 	"\amessage\x18\b \x01(\tR\amessage\x124\n" +
-	"\x06health\x18\t \x01(\v2\x1c.dhow.runner.v1.DeployHealthR\x06health\"\xa1\x01\n" +
+	"\x06health\x18\t \x01(\v2\x1c.dhow.runner.v1.DeployHealthR\x06health\x12,\n" +
+	"\x12current_release_id\x18\n" +
+	" \x01(\tR\x10currentReleaseId\x12.\n" +
+	"\x13verified_release_id\x18\v \x01(\tR\x11verifiedReleaseId\x12\x1d\n" +
+	"\n" +
+	"free_bytes\x18\f \x01(\x03R\tfreeBytes\x12\x16\n" +
+	"\x06locked\x18\r \x01(\bR\x06locked\"\xa1\x01\n" +
 	"\x1bReleaseServiceReportRequest\x12.\n" +
 	"\x05lease\x18\x01 \x01(\v2\x18.dhow.runner.v1.LeaseRefR\x05lease\x12\x1d\n" +
 	"\n" +
 	"step_index\x18\x02 \x01(\x05R\tstepIndex\x123\n" +
 	"\x06events\x18\x03 \x03(\v2\x1b.dhow.runner.v1.DeployEventR\x06events\":\n" +
 	"\x1cReleaseServiceReportResponse\x12\x1a\n" +
-	"\baccepted\x18\x01 \x01(\x05R\baccepted*\xa2\x03\n" +
+	"\baccepted\x18\x01 \x01(\x05R\baccepted*\xc1\x03\n" +
 	"\x0fDeployEventKind\x12!\n" +
 	"\x1dDEPLOY_EVENT_KIND_UNSPECIFIED\x10\x00\x12%\n" +
 	"!DEPLOY_EVENT_KIND_RELEASE_STARTED\x10\x01\x12\x1e\n" +
@@ -439,7 +480,8 @@ const file_dhow_runner_v1_release_proto_rawDesc = "" +
 	"\x1eDEPLOY_EVENT_KIND_BATCH_PASSED\x10\t\x12\x1c\n" +
 	"\x18DEPLOY_EVENT_KIND_FAILED\x10\n" +
 	"\x12\x1d\n" +
-	"\x19DEPLOY_EVENT_KIND_SKIPPED\x10\v2u\n" +
+	"\x19DEPLOY_EVENT_KIND_SKIPPED\x10\v\x12\x1d\n" +
+	"\x19DEPLOY_EVENT_KIND_CHECKED\x10\f2u\n" +
 	"\x0eReleaseService\x12c\n" +
 	"\x06Report\x12+.dhow.runner.v1.ReleaseServiceReportRequest\x1a,.dhow.runner.v1.ReleaseServiceReportResponseB\xc3\x01\n" +
 	"\x12com.dhow.runner.v1B\fReleaseProtoP\x01ZEgithub.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1;runnerv1\xa2\x02\x03DRX\xaa\x02\x0eDhow.Runner.V1\xca\x02\x0eDhow\\Runner\\V1\xe2\x02\x1aDhow\\Runner\\V1\\GPBMetadata\xea\x02\x10Dhow::Runner::V1b\x06proto3"
