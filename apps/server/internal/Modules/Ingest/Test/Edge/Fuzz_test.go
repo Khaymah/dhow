@@ -57,7 +57,7 @@ func TestBadHeadersNameTheFieldAndNeverBecomeAnotherRef(t *testing.T) {
 		"a ref with a dot dot":      headers("web", "a/../b", "branch", sha, "", ""),
 		"a short sha":               headers("web", "main", "branch", "abc123", "", ""),
 		"the zero sha":              headers("web", "main", "branch", strings.Repeat("0", 40), "", ""),
-		"an upper case sha":         headers("web", "main", "branch", strings.ToUpper(sha), "", ""),
+		"an upper case sha":         headers("web", "main", "branch", strings.Repeat("A", 40), "", ""),
 		"a trigger that is a word":  headers("web", "main", "branch", sha, "yes", ""),
 		"provenance that is a list": headers("web", "main", "branch", sha, "", `["a"]`),
 		"provenance with a number":  headers("web", "main", "branch", sha, "", `{"RunId":7}`),
