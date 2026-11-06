@@ -93,8 +93,6 @@ export const rollbackReasonOf = (reason: string | undefined): TRollbackReason | 
 
 export const isAutomaticRollback = (release: TTargetRelease): boolean => release.Kind === 'deploy' && release.State === 'rolled_back';
 
-export const isFailedRollback = (release: TTargetRelease): boolean => release.State === 'rollback_failed';
-
 export interface ILastCheck {
   At: string;
   Problems: number;

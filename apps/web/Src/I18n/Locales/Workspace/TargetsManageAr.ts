@@ -148,7 +148,6 @@ export const TargetsManageAr = {
   'targets.release.finished': 'انتهى {time}',
   'targets.release.reason': 'السبب: {reason}',
   'targets.release.auto': 'رجع تلقائيًا',
-  'targets.release.rollbackFailed': 'فشل الرجوع',
   'targets.reason.health_check_failed': 'فشل فحص الصحة',
   'targets.reason.reload_failed': 'فشل أمر إعادة التحميل',
   'targets.reason.hook_failed': 'فشل أمر قبل التبديل أو بعده',

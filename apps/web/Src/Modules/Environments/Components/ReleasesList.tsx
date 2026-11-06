@@ -9,7 +9,6 @@ import {
   canRollBackTo,
   hostStatusOf,
   isAutomaticRollback,
-  isFailedRollback,
   releaseStatusOf,
   rollbackReasonOf,
 } from '@/Modules/Environments/Types/TargetState';
@@ -87,13 +86,6 @@ const StateBadges = ({ release }: { release: TTargetRelease }) => {
     return (
       <Badge tone="bad" icon="alert">
         {t('targets.release.auto')}
-      </Badge>
-    );
-  }
-  if (isFailedRollback(release)) {
-    return (
-      <Badge tone="bad" icon="alert">
-        {t('targets.release.rollbackFailed')}
       </Badge>
     );
   }

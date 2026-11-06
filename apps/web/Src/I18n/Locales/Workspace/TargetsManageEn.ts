@@ -152,7 +152,6 @@ export const TargetsManageEn = {
   'targets.release.finished': 'ended {time}',
   'targets.release.reason': 'Reason: {reason}',
   'targets.release.auto': 'Rolled back automatically',
-  'targets.release.rollbackFailed': 'The rollback failed',
   'targets.reason.health_check_failed': 'the health check failed',
   'targets.reason.reload_failed': 'the reload command failed',
   'targets.reason.hook_failed': 'a command before or after the switch failed',
