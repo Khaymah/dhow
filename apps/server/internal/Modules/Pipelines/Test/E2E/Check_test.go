@@ -198,7 +198,7 @@ func TestOnlyAMaintainerOrMoreStartsACheck(t *testing.T) {
 
 func (c checkJob) unknownRelease(t *testing.T) (string, []uuid.UUID) {
 	t.Helper()
-	j := c.deployWorld.releasing(t)
+	j := c.releasing(t)
 	h := j.hosts()
 	j.start(t)
 	j.report(t, ev(kindUploaded, h[0]), ev(kindSwitched, h[0]), ev(kindUploaded, h[1]))

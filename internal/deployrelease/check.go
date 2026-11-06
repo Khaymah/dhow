@@ -62,7 +62,7 @@ func (c *Checker) Run(ctx context.Context) *Failure {
 		}
 		c.Report.Emit(Event{
 			Event: EventChecked, HostID: h.ID, Reason: facts.reason, Message: checkMessages[facts.reason],
-			CurrentReleaseID: facts.current, VerifiedReleaseID: facts.verified, FreeBytes: int64(min(facts.free, 1<<62)), Locked: facts.locked, //nolint:gosec // Capped below the int64 limit.
+			CurrentReleaseID: facts.current, VerifiedReleaseID: facts.verified, FreeBytes: int64(min(facts.free, 1<<62)), Locked: facts.locked,
 		})
 		c.Log.Info("server checked", "server", h.Name, "result", facts.reason)
 	}
