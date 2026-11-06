@@ -67,7 +67,7 @@ deploy:
 
 الرمز `<digest>` هو بصمة الإضافة المنشورة مع كل إصدار من داو. `artifact` أرشيف فيه ملف Compose، ويصل إلى الإضافة بالشروط نفسها التي في [النشر على سيرفر بـ SSH](deploy-ssh.md#الخطوة-في-ملف-الـ-pipeline): تفحصه الإضافة قبل أي اتصال وترفض أي عنصر غير آمن.
 
-اسم المشروع (`ComposeProject`) واسم الملف (`ComposeFile`) وخيار فتح السياسة (`AllowUnsafeCompose`) تأتي من الهدف، فلا يستطيع الـ commit تغييرها.
+اسم المشروع (`ComposeProject`) واسم الملف (`ComposeFile`) وخيار فتح السياسة (`AllowUnsafeCompose`) تأتي من الهدف، فلا يستطيع الـ commit تغييرها. اسم المشروع أحرف صغيرة وأرقام وشرطات (`-`) فقط، بلا شرطة سفلية، حتى لا يتطابق اسم مورد في مشروع مع مورد في مشروع آخر. إذا كتبت `name:` في أعلى الملف فيجب أن يساوي اسم المشروع.
 
 ## الصور بالـ digest
 
@@ -127,14 +127,20 @@ with:
 | `COMPOSE_UNSAFE_BIND_SHARED` | ربط `shared` نفسه أو `shared/.env` |
 | `COMPOSE_UNSAFE_CGROUP_PARENT` و`_RUNTIME` و`_SYSCTLS` و`_GROUP_ADD` و`_EXTRA_HOSTS` و`_EXTERNAL_LINKS` و`_MODELS` | المفاتيح `cgroup_parent` و`runtime` و`sysctls` و`group_add` و`extra_hosts` و`external_links` و`models` |
 | `COMPOSE_FILE_CHANGED` | ملف Compose أو `compose.dhow.yaml` على السيرفر لا يطابق ما فُحص، أو لا يوجد سجل بصماتهما |
-| `COMPOSE_ENV_FORBIDDEN` | متغير يبدأ بـ `COMPOSE_` في `shared/.env`، أو سطر فيه لا تستطيع الإضافة قراءته |
-| `COMPOSE_INVALID` | ملف ليس YAML صحيحًا، أو فيه أكثر من مستند، أو مفتاح مكرر، أو بلا خدمات، أو أكبر من 256 KiB، أو غير موجود في الأرشيف، أو فيه نص حيث يجب أن تكون القيمة `true` أو `false` (مثل `read_only: "true"`)، أو وضع ربط غير معروف في `volumes` |
+| `COMPOSE_ENV_FORBIDDEN` | متغير يبدأ بـ `COMPOSE_` أو `DOCKER_` أو `LD_` في `shared/.env`، أو سطر فيه لا تستطيع الإضافة قراءته |
+| `COMPOSE_UNSAFE_NETWORK_MODE` | `network_mode` غير `none` (عدا `host` الذي يتبع قاعدته). لربط خدمة بشبكة استخدم `networks` |
+| `COMPOSE_UNSAFE_PROJECT_NAME` | `name:` في أعلى الملف لا يساوي اسم المشروع في الهدف |
+| `COMPOSE_UNSAFE_LABEL` | وسم يبدأ بـ `com.docker.` |
+| `COMPOSE_UNSAFE_BIND_OPTIONS` | في صيغة الربط الطويلة: `bind.propagation` أو `bind.selinux` أو `bind.recursive` أو `bind.create_host_path: true` |
+| `COMPOSE_RESOLVED_UNSAFE` | الملف بعد حساب Compose للمتغيرات والدمج يخالف ما فُحص: مشروع أو صورة أو ربط أو خيار أمان أو volume |
+| `COMPOSE_INVALID` | ملف ليس YAML صحيحًا، أو فيه وسم YAML غير أساسي مثل `!reset` و`!override`، أو فيه أكثر من مستند، أو مفتاح مكرر، أو بلا خدمات، أو أكبر من 256 KiB، أو غير موجود في الأرشيف، أو فيه نص حيث يجب أن تكون القيمة `true` أو `false` (مثل `read_only: "true"`)، أو وضع ربط غير معروف في `volumes` |
 
 - الربط المسموح: volume مسمّى، أو volume بلا اسم مثل `/data`، أو `tmpfs`، أو مجلد فرعي داخل مجلد الإصدار للقراءة فقط مثل `./conf:/conf:ro`. لا يُسمح بربط مجلد الإصدار نفسه ولا ملفات Compose ولا أي شيء تحت `shared` ولا إصدار آخر ولا مسار مطلق.
 - `env_file` وملفات `secrets` و`configs` تقرأ من داخل مجلد الإصدار أو من `shared/.env` بالضبط، وتكون ملفات عادية وليست روابط.
 - في الـ volumes المسماة: `driver` هو `local` فقط، بلا `driver_opts`.
 - الشبكات في أعلى الملف بالـ driver الافتراضي (`bridge`) بلا `driver_opts` ولا `ipam`، و`logging` بـ `json-file` أو `local` وبالخيارات `max-size` و`max-file` و`compress` فقط. المتغيرات `${...}` في أي إدخال من `volumes`، وفي `network_mode` و`pid` و`ipc` و`uts`، مرفوضة دائمًا.
 - المرجعيات `&` و`<<` في YAML تُفكّ قبل الفحص، فلا تخفي خيارًا.
+- فحص ثانٍ للنموذج النهائي: قبل كل تشغيل، ومنه الرجوع، تنفّذ الإضافة `docker compose config --format json` بالبيئة المعزولة نفسها وبالملفين نفسيهما، وتفحص ما حسبه Compose فعلًا. كل مصدر ربط مسار مطلق داخل مجلد الإصدار وللقراءة فقط، ولا `privileged` ولا `cap_add` ولا `devices` ولا `security_opt` غير `no-new-privileges` ولا مساحة أسماء مشتركة، والـ volumes `local` بلا خيارات وغير خارجية، وصورة كل خدمة هي المثبّتة في `compose.dhow.yaml`، واسم المشروع هو اسم الهدف. أي اختلاف يوقف النشر بـ `COMPOSE_RESOLVED_UNSAFE`. هذا يغلق كل ثغرة تفوت فيها قراءة الملف شيئًا يحسبه Compose بطريقة أخرى. يعمل الفحص أيضًا قبل سحب الصور. النموذج الذي يزيد حجمه على 64 KiB يُرفض.
 - المفاتيح المسموحة قائمة محددة: `image` و`command` و`entrypoint` و`environment` و`env_file` و`ports` و`expose` و`volumes` و`networks` و`depends_on` و`healthcheck` و`restart` و`labels` و`logging` و`deploy` (`resources` و`restart_policy` فقط) و`user` و`working_dir` و`read_only` و`tmpfs` و`stop_signal` و`stop_grace_period` و`init` و`hostname` و`domainname` و`mem_limit` و`cpus` و`ulimits` و`shm_size` و`secrets` و`configs` و`profiles` وما يبدأ بـ `x-`. أي مفتاح آخر يفشل بـ `COMPOSE_UNSAFE_UNKNOWN_KEY`.
 - المدير يستطيع فتح قواعد `COMPOSE_UNSAFE_*` لهدف معيّن بالخيار `AllowUnsafeCompose`، وهي المفاتيح التي تتطلب صلاحيات أوسع مثل `privileged` و`cap_add` و`devices` و`sysctls`. ويعيد هذا الخيار فتح الربط القابل للكتابة تحت مجلد النشر. تحذير: حاوية تستطيع الكتابة في مجلد مربوط تستطيع أن تضع فيه رابطًا رمزيًا إلى `/`، ثم يتبعه Docker بصلاحيات root عند أي ربط لاحق من هذا المجلد. لا تفتح الخيار إلا لتطبيق تثق به كما تثق بالسيرفر نفسه. الخيار لا يفتح ربط `.dhow` ولا ملفات Compose ولا مجلد الإصدار، ولا يفتح تثبيت الصور ولا منع `build` ولا `COMPOSE_INVALID`، ولا القواعد التي تجلب ملفات أخرى أو تشارك مساحات الأسماء أو تستخدم موارد خارجية: `include` و`extends` و`provider` و`volumes_from` و`container:` و`service:` وما يتعلق بـ `external` وبمصادر `secrets`.
 - الرفض يوقف الـ job بالخروج 30 قبل أي اتصال أو كتابة على السيرفر، ويكتب الرمز واسم الخدمة في السجل. في التقرير يظهر النشر فاشلًا برسالة ثابتة.
@@ -165,11 +171,12 @@ volumes:
 
 - إذا لم يوجد `shared/.env` تمرّر الإضافة `/dev/null`، فلا يُحمَّل ملف `.env` الموجود داخل الأرشيف أبدًا.
 - المتغير غير المعرّف يصبح فارغًا، ويحذّر Compose.
-- ملف `shared/.env` فيه متغير يبدأ بـ `COMPOSE_` يوقف النشر بـ `COMPOSE_ENV_FORBIDDEN`، لأن هذه المتغيرات تغيّر ما يقرؤه Compose. والإضافة تقرأ الملف بقواعد Compose نفسها (`export` ومسافات وأسطر Windows)، وأي سطر لا تستطيع قراءته يوقف النشر بالرمز نفسه. لا تستخدم قيمًا من عدة أسطر في هذا الملف.
+- قيم `shared/.env` يستطيع التطبيق أن يقرأها، وهذا مقصود: ضع فيه ما يجوز للتطبيق أن يراه فقط. المتغيرات التي تستخدم في `environment` تظهر داخل الحاوية.
+- ملف `shared/.env` فيه متغير يبدأ بـ `COMPOSE_` أو `DOCKER_` أو `LD_` يوقف النشر بـ `COMPOSE_ENV_FORBIDDEN`، لأن هذه المتغيرات تغيّر ما يقرؤه Compose. والإضافة تقرأ الملف بقواعد Compose نفسها (`export` ومسافات وأسطر Windows)، وأي سطر لا تستطيع قراءته يوقف النشر بالرمز نفسه. لا تستخدم قيمًا من عدة أسطر في هذا الملف.
 - أين يُسمح بـ `${...}`: في قيم `environment` (قائمة أو خريطة)، وفي `command` و`entrypoint` و`labels` و`healthcheck.test` فقط. هذه نصوص تخص الحاوية ولا تصبح مسارات على السيرفر ولا إعدادات أمان. في أي مكان آخر، مثل `image` و`ports` و`networks` و`volumes` و`read_only` و`privileged`، يفشل النشر بـ `COMPOSE_UNSAFE_INTERPOLATION` حتى مع `AllowUnsafeCompose`.
 - السبب: تفحص الإضافة الملف كما هو، أما Compose فيحسب المتغيرات بعد ذلك. قيمة مثل `read_only: "${RO:-false}"` تبدو للفاحص نصًا، وتصبح `false` عند Compose، فيُربط المجلد للكتابة. لذلك لا تُقبل المتغيرات حيث تؤثر القيمة على السيرفر.
 - لكتابة علامة `$` حرفيًا اكتب `$$`. الكتابة `$$$X` تعني `$` حرفيًا ثم متغير، فتُرفض خارج الأماكن المسموحة.
-- القيم المنطقية والأرقام التي تقرؤها الإضافة يجب أن تكون من نوعها في YAML (`true` و`false` بلا علامات اقتباس). وقيمة الوضع في `volumes` مثل `:ro` تقبل الرموز المعروفة فقط (`ro` و`rw` و`z` و`Z` وخيارات الانتشار)، ولا يزيد الإدخال على ثلاثة أجزاء.
+- القيم المنطقية والأرقام التي تقرؤها الإضافة يجب أن تكون من نوعها في YAML (`true` و`false` بلا علامات اقتباس). وقيمة الوضع في `volumes` مثل `:ro` تقبل الرموز المعروفة فقط (`ro` و`rw` و`private` و`rprivate` و`nocopy` و`delegated` و`cached` و`consistent`)، ولا يزيد الإدخال على ثلاثة أجزاء. رموز SELinux والانتشار الأخرى (`z` و`Z` و`shared` و`slave`) لا تُقبل.
 
 ## مدخلات الإضافة
 
