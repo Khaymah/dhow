@@ -29,58 +29,7 @@ var rules = []rule{
 	{"EXTRA_HOSTS", keyPresent("extra_hosts")},
 	{"EXTERNAL_LINKS", keyPresent("external_links")},
 	{"MODELS", keyPresent("models")},
-}
-
-func (c *checker) top(doc map[string]any) error {
-	if err := c.topVolumes(doc["volumes"]); err != nil {
-		return err
-	}
-	for _, key := range []string{"configs", "secrets"} {
-		items, _ := asMap(doc[key])
-		for name, v := range items {
-			item, _ := asMap(v)
-			file, ok := item["file"].(string)
-			if !ok {
-				continue
-			}
-			if code := c.bindCode(file, false); code != "" {
-				return &Violation{Code: unsafePrefix + code, Service: key + "." + name}
-			}
-		}
-	}
-	return nil
-}
-
-func (c *checker) topVolumes(v any) error {
-	items, _ := asMap(v)
-	for name, raw := range items {
-		item, _ := asMap(raw)
-		opts, _ := asMap(item["driver_opts"])
-		device, ok := opts["device"].(string)
-		if !ok {
-			continue
-		}
-		code := c.bindCode(device, true)
-		if code == "" && !strings.HasPrefix(device, "/") {
-			code = "BIND_OUTSIDE"
-		}
-		if code != "" {
-			return &Violation{Code: unsafePrefix + code, Service: "volumes." + name}
-		}
-	}
-	return nil
-}
-
-func (c *checker) unsafe(name string, svc map[string]any) error {
-	for _, r := range rules {
-		if r.hit(svc) {
-			return &Violation{Code: unsafePrefix + r.name, Service: name}
-		}
-	}
-	if code := c.mounts(svc); code != "" {
-		return &Violation{Code: unsafePrefix + code, Service: name}
-	}
-	return nil
+	{"LOGGING", loggingUnsafe},
 }
 
 func present(v any) bool {

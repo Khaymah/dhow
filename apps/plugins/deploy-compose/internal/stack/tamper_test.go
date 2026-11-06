@@ -85,17 +85,100 @@ func TestAResumedReleaseIsCheckedBeforeItIsStartedToo(t *testing.T) {
 	assert.Len(t, onlyDocker(r.log.forHost("a")[mark:]), 1, "only the first, unchanged, start ran")
 }
 
-func TestAnUnrecordedReleaseIsNotStarted(t *testing.T) {
+func TestAReleaseThatWasNeverPreparedIsPreparedAgainBeforeItStarts(t *testing.T) {
 	r := newRig(t, "a")
 	h := r.hosts[0]
 	require.NoError(t, h.MkdirAll("/srv/app/releases/r7", 0o755))
 	require.NoError(t, h.MkdirAll("/srv/app/.dhow", 0o755))
 	require.NoError(t, os.WriteFile(h.path("/srv/app/releases/r7/compose.yaml"), []byte(composeFile(1, "")), 0o644))
 	act := &stack.Activator{Project: project, File: "compose.yaml"}
-	err := act.Activate(context.Background(), h, deployrelease.Release{DeployPath: "/srv/app", Path: "/srv/app/releases/r7", ID: "r7"})
-	require.Error(t, err)
+	rel := deployrelease.Release{DeployPath: "/srv/app", Path: "/srv/app/releases/r7", ID: "r7"}
+	require.NoError(t, act.Activate(context.Background(), h, rel))
+	assert.Len(t, onlyDocker(r.log.forHost("a")), 2, "pull and start")
+	assert.FileExists(t, h.path("/srv/app/.dhow/compose-r7.json"))
+
+	require.NoError(t, os.Remove(h.path("/srv/app/.dhow/compose-r7.json")))
+	err := act.Activate(context.Background(), h, rel)
+	require.Error(t, err, "an override without its record means the release was prepared before")
 	assert.Equal(t, stack.CodeChanged, violationCode(t, err))
-	assert.Empty(t, r.log.all())
+}
+
+func TestTheRecordsOfRemovedReleasesAreRemovedWithThem(t *testing.T) {
+	r := newRig(t, "a")
+	okDeploy(t, r, 1)
+	okDeploy(t, r, 2)
+	h := r.hosts[0]
+	require.NoError(t, os.RemoveAll(h.path("/srv/app/releases/r1")))
+	okDeploy(t, r, 3)
+	assert.NoFileExists(t, h.path("/srv/app/.dhow/compose-r1.json"))
+	assert.FileExists(t, h.path("/srv/app/.dhow/compose-r2.json"))
+	assert.FileExists(t, h.path("/srv/app/.dhow/compose-r3.json"))
+}
+
+func TestAFileOrBindSourceThatIsALinkIsNotStarted(t *testing.T) {
+	for name, tc := range map[string]struct {
+		extra string
+		plant func(h *fakeHost)
+	}{
+		"a bind source that became a link": {
+			"    volumes: ['./conf:/conf:ro']\n",
+			func(h *fakeHost) {
+				require.NoError(t, os.RemoveAll(h.path("/srv/app/releases/r1/conf")))
+				require.NoError(t, os.Symlink("/", h.path("/srv/app/releases/r1/conf")))
+			},
+		},
+		"an env file that became a link": {
+			"    env_file: ./a.env\n",
+			func(h *fakeHost) {
+				require.NoError(t, os.Remove(h.path("/srv/app/releases/r1/a.env")))
+				require.NoError(t, os.Symlink("/etc/passwd", h.path("/srv/app/releases/r1/a.env")))
+			},
+		},
+		"a missing bind source": {
+			"    volumes: ['./conf:/conf:ro']\n",
+			func(h *fakeHost) { require.NoError(t, os.RemoveAll(h.path("/srv/app/releases/r1/conf"))) },
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t, "a")
+			f, _ := r.deploy("r1", rollout{files: map[string]string{"compose.yaml": composeFile(1, tc.extra), "conf/x": "x", "a.env": "A=1\n"}})
+			require.Nil(t, f)
+			tc.plant(r.hosts[0])
+			act := &stack.Activator{Project: project, File: "compose.yaml"}
+			err := act.Activate(context.Background(), r.hosts[0], deployrelease.Release{DeployPath: "/srv/app", Path: "/srv/app/releases/r1", ID: "r1"})
+			require.Error(t, err)
+			assert.Equal(t, stack.CodeSource, violationCode(t, err))
+		})
+	}
+}
+
+func TestAnEnvFileOfTheServerIsParsedLikeComposeParsesIt(t *testing.T) {
+	for name, body := range map[string]string{
+		"carriage returns":     "A=1\rCOMPOSE_FILE=x\r",
+		"windows line ends":    "A=1\r\nCOMPOSE_PROFILES=x\r\n",
+		"export with a tab":    "export\tCOMPOSE_FILE=x\n",
+		"export with spaces":   "export    COMPOSE_FILE=x\n",
+		"a lower case key":     "compose_file=x\n",
+		"a colon":              "COMPOSE_FILE: x\n",
+		"a bom":                "\xef\xbb\xbfCOMPOSE_FILE=x\n",
+		"a line not parseable": "A=1\n=oops\n",
+		"a quoted key":         "\"COMPOSE_FILE\"=x\n",
+		"junk after the key":   "A B=1\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t, "a")
+			require.NoError(t, r.hosts[0].MkdirAll("/srv/app/shared", 0o755))
+			require.NoError(t, os.WriteFile(r.hosts[0].path("/srv/app/shared/.env"), []byte(body), 0o600))
+			f, _ := r.deploy("r1", rollout{files: map[string]string{"compose.yaml": composeFile(1, "")}})
+			require.NotNil(t, f)
+			assert.Empty(t, onlyDocker(r.log.forHost("a")))
+		})
+	}
+	r := newRig(t, "a")
+	require.NoError(t, r.hosts[0].MkdirAll("/srv/app/shared", 0o755))
+	require.NoError(t, os.WriteFile(r.hosts[0].path("/srv/app/shared/.env"), []byte("# note\n\nA=1\nexport B = 2\nC:3\nCOMPOSER=1\n"), 0o600))
+	f, _ := r.deploy("r1", rollout{files: map[string]string{"compose.yaml": composeFile(1, "")}})
+	require.Nil(t, f)
 }
 
 func TestTheOverrideMustPinEveryServiceOfTheFile(t *testing.T) {

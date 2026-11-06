@@ -36,7 +36,7 @@ func check(t *testing.T, raw []byte, opt policy.Options) (policy.Result, string)
 }
 
 func TestAComposeFileWithPinnedImagesPasses(t *testing.T) {
-	raw := []byte("services:\n  web:\n    image: " + webDigest + "\n    ports: ['8080:80']\n    volumes:\n      - data:/data\n      - ./conf:/conf:ro\n      - " + deployDir + "/shared/uploads:/uploads\n  db:\n    image: " + dbDigest + "\nvolumes:\n  data: {}\n")
+	raw := []byte("services:\n  web:\n    image: " + webDigest + "\n    ports: ['8080:80']\n    volumes:\n      - data:/data\n      - ./conf:/conf:ro\n  db:\n    image: " + dbDigest + "\nvolumes:\n  data: {}\n")
 	res, code := check(t, raw, policy.Options{})
 	require.Empty(t, code)
 	assert.Equal(t, map[string]string{"web": webDigest, "db": dbDigest}, res.Images)
@@ -115,14 +115,13 @@ func TestTheUnsafeOptionsOfAServiceAreRefused(t *testing.T) {
 
 func TestSafeOptionsAreNotRefused(t *testing.T) {
 	for name, extra := range map[string]string{
-		"privileged false":   "    privileged: false\n",
-		"network bridge":     "    network_mode: bridge\n",
-		"no new privileges":  "    security_opt: ['no-new-privileges:true']\n",
-		"capabilities drop":  "    cap_drop: [ALL]\n",
-		"a tmpfs":            "    volumes:\n      - type: tmpfs\n        target: /tmp\n",
-		"a named volume":     "    volumes:\n      - type: volume\n        source: data\n        target: /data\n",
-		"a bind in the path": "    volumes:\n      - type: bind\n        source: " + deployDir + "/shared/x\n        target: /x\n",
-		"an env file":        "    env_file:\n      - .env\n      - path: ./other.env\n",
+		"privileged false":  "    privileged: false\n",
+		"network bridge":    "    network_mode: bridge\n",
+		"no new privileges": "    security_opt: ['no-new-privileges:true']\n",
+		"capabilities drop": "    cap_drop: [ALL]\n",
+		"a tmpfs":           "    volumes:\n      - type: tmpfs\n        target: /tmp\n",
+		"a named volume":    "    volumes:\n      - type: volume\n        source: data\n        target: /data\n",
+		"an env file":       "    env_file:\n      - .env\n      - path: ./other.env\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, code := check(t, compose(extra), policy.Options{})
@@ -142,7 +141,7 @@ func TestBindMountsAreCheckedBeforeTheServerIsTouched(t *testing.T) {
 		"home":                      {"~/keys:/keys", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
 		"the deploy path itself":    {deployDir + ":/d", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
 		"a sibling path":            {deployDir + "-other/x:/d", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
-		"the state of dhow":         {deployDir + "/.dhow:/d", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
+		"the state of dhow":         {deployDir + "/.dhow:/d", "COMPOSE_UNSAFE_BIND_STATE"},
 		"dots out of the deploy":    {deployDir + "/../etc:/d", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
 		"relative dots":             {"../../etc:/d", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
 		"relative dots after a dir": {"./a/../../etc:/d", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
@@ -176,10 +175,8 @@ func TestLongSyntaxBindMountsFollowTheSameRules(t *testing.T) {
 
 func TestTopLevelDefinitionsThatReachTheHostAreChecked(t *testing.T) {
 	for name, tail := range map[string]string{
-		"a volume bound to /":  "volumes:\n  v:\n    driver_opts:\n      type: none\n      o: bind\n      device: /\n",
-		"a volume bound to ..": "volumes:\n  v:\n    driver_opts:\n      device: ../x\n",
-		"a secret file":        "secrets:\n  s:\n    file: /etc/shadow\n",
-		"a config file":        "configs:\n  c:\n    file: /root/.ssh/id_ed25519\n",
+		"a secret file": "secrets:\n  s:\n    file: /etc/shadow\n",
+		"a config file": "configs:\n  c:\n    file: /root/.ssh/id_ed25519\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, code := check(t, compose(tail), policy.Options{})

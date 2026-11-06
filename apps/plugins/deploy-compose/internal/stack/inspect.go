@@ -22,6 +22,7 @@ func (a *Activator) Inspect(ctx context.Context, cfg deployrelease.Config) error
 		return &deployrelease.Failure{Exit: deployrelease.ExitInput, Reason: deployrelease.CauseOther, Text: "the artifact cannot be opened", Err: err}
 	}
 	defer func() { _ = f.Close() }()
+	a.releaseID = cfg.ReleaseID
 	var raw []byte
 	var found bool
 	var links []string

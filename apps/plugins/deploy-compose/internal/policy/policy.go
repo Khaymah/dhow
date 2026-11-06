@@ -59,6 +59,8 @@ type Options struct {
 
 type Result struct {
 	Images map[string]string
+	Binds  []string
+	Files  []string
 }
 
 func (r Result) Services() []string {
@@ -111,7 +113,9 @@ func asMap(v any) (map[string]any, bool) {
 }
 
 type checker struct {
-	opt Options
+	opt   Options
+	binds []string
+	files []string
 }
 
 func Check(raw []byte, opt Options) (Result, error) {
@@ -152,6 +156,9 @@ func Check(raw []byte, opt Options) (Result, error) {
 	if err := c.always(doc, names, services); err != nil {
 		return Result{}, err
 	}
+	slices.Sort(c.binds)
+	slices.Sort(c.files)
+	res.Binds, res.Files = c.binds, c.files
 	if opt.AllowUnsafe {
 		return res, nil
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"regexp"
 	"strconv"
@@ -31,6 +32,7 @@ const (
 
 	CodeChanged      = "COMPOSE_FILE_CHANGED"
 	CodeEnvForbidden = "COMPOSE_ENV_FORBIDDEN"
+	CodeSource       = "COMPOSE_BIND_SOURCE"
 )
 
 var (
@@ -48,7 +50,8 @@ type Activator struct {
 	Policy      policy.Options
 	Log         deployrelease.Logger
 
-	links []string
+	links     []string
+	releaseID string
 }
 
 func (a *Activator) options(deployPath string, links []string) policy.Options {
@@ -64,7 +67,11 @@ func (a *Activator) Prepare(ctx context.Context, r deployrelease.Remote, rel dep
 	if err != nil {
 		return err
 	}
-	res, err := policy.Check(raw, a.options(rel.DeployPath, a.links))
+	opt := a.options(rel.DeployPath, a.links)
+	if a.releaseID != "" && rel.ID != a.releaseID {
+		opt.Images = nil
+	}
+	res, err := policy.Check(raw, opt)
 	if err != nil {
 		return refusal(err)
 	}
@@ -78,10 +85,25 @@ func (a *Activator) Prepare(ctx context.Context, r deployrelease.Remote, rel dep
 	if err := writeRecord(r, rel, newRecord(raw, override, a.links, a.Policy.AllowUnsafe)); err != nil {
 		return fmt.Errorf("write the record of the compose files: %w", err)
 	}
+	a.pruneRecords(r, rel)
 	return a.run(ctx, r, rel, a.pullTimeout(), "pull", "--quiet")
 }
 
+func (a *Activator) neverPrepared(r deployrelease.Remote, rel deployrelease.Release) bool {
+	for _, p := range []string{recordPath(rel), rel.Path + "/" + OverrideFile} {
+		if _, err := r.Lstat(p); err == nil || !errors.Is(err, fs.ErrNotExist) {
+			return false
+		}
+	}
+	return true
+}
+
 func (a *Activator) Activate(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release) error {
+	if a.neverPrepared(r, rel) {
+		if err := a.Prepare(ctx, r, rel); err != nil {
+			return err
+		}
+	}
 	if err := a.verify(r, rel); err != nil {
 		return err
 	}
@@ -130,7 +152,31 @@ func (a *Activator) verify(r deployrelease.Remote, rel deployrelease.Release) er
 	if !maps.Equal(res.Images, images) {
 		return changed("the image override does not pin every service of the release")
 	}
+	return checkSources(r, rel, res, rec.AllowUnsafe)
+}
+
+func checkSources(r deployrelease.Remote, rel deployrelease.Release, res policy.Result, allowUnsafe bool) error {
+	for _, p := range res.Binds {
+		info, err := r.Lstat(rel.Path + "/" + p)
+		switch {
+		case err != nil && allowUnsafe && errors.Is(err, fs.ErrNotExist):
+		case err != nil || info.IsSymlink() || !(info.IsDir() || info.Mode.IsRegular()):
+			return source("a bind source is missing, a link or not a folder or file")
+		}
+	}
+	for _, p := range res.Files {
+		if !strings.HasPrefix(p, "/") {
+			p = rel.Path + "/" + p
+		}
+		if info, err := r.Lstat(p); err != nil || !info.Mode.IsRegular() {
+			return source("a file that Compose reads is missing or is not a regular file")
+		}
+	}
 	return nil
+}
+
+func source(detail string) *deployrelease.Failure {
+	return refusal(&policy.Violation{Code: CodeSource, Detail: detail})
 }
 
 func changed(detail string) *deployrelease.Failure {
@@ -193,11 +239,8 @@ func (a *Activator) envFile(r deployrelease.Remote, rel deployrelease.Release) (
 	if err != nil || len(raw) > maxEnvBytes {
 		return "", fmt.Errorf("%w: shared/.env cannot be read", ErrFile)
 	}
-	for _, line := range strings.Split(string(raw), "\n") {
-		line = strings.TrimPrefix(strings.TrimSpace(line), "export ")
-		if strings.HasPrefix(strings.TrimSpace(line), "COMPOSE_") {
-			return "", refusal(&policy.Violation{Code: CodeEnvForbidden, Detail: "shared/.env sets a COMPOSE_ variable"})
-		}
+	if err := checkEnv(string(raw)); err != nil {
+		return "", err
 	}
 	return file, nil
 }

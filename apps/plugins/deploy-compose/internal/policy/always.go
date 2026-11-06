@@ -80,6 +80,11 @@ func (c *checker) topAlways(doc map[string]any) error {
 					return always("SECRET_SOURCE", key+"."+name)
 				}
 			}
+			if file, ok := item["file"].(string); ok {
+				if code := c.fileCode(file); code != "" {
+					return always(code, key+"."+name)
+				}
+			}
 		}
 	}
 	return nil
@@ -98,6 +103,9 @@ func topItem(kind, name string, item map[string]any) error {
 			return always("VOLUME_DRIVER", where)
 		}
 	}
+	if _, ok := item["driver_opts"]; ok && kind == "volumes" {
+		return always("VOLUME_OPTS", where)
+	}
 	return nil
 }
 
@@ -115,8 +123,11 @@ func (c *checker) serviceAlways(name string, svc map[string]any) error {
 			return always("UNKNOWN_KEY", name+"."+key)
 		}
 	}
-	for _, key := range []string{"pid", "network_mode", "ipc"} {
+	for _, key := range []string{"pid", "network_mode", "ipc", "uts"} {
 		text, _ := svc[key].(string)
+		if strings.Contains(text, "$") {
+			return always("INTERPOLATION", name)
+		}
 		text = strings.ToLower(strings.TrimSpace(text))
 		if strings.HasPrefix(text, "container:") || strings.HasPrefix(text, "service:") || (key == "ipc" && text == "shareable") {
 			return always("NAMESPACE_SHARED", name)
@@ -128,7 +139,7 @@ func (c *checker) serviceAlways(name string, svc map[string]any) error {
 			return always("UNKNOWN_KEY", name+".deploy."+key)
 		}
 	}
-	return nil
+	return c.volumesAlways(name, svc)
 }
 
 func keyPresent(key string) func(map[string]any) bool {

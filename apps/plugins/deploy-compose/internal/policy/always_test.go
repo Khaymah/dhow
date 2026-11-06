@@ -106,7 +106,7 @@ func TestABindCannotReachTheReleaseItsFilesOrItsAncestors(t *testing.T) {
 		"a release folder with dots": {base + "/releases/2-bbbbbbbb-1/.:/d", "COMPOSE_UNSAFE_BIND_RELEASE"},
 		"the deploy base":            {base + ":/d", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
 		"the parent of the base":     {"/srv:/d", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
-		"current":                    {base + "/current:/d", "COMPOSE_UNSAFE_BIND_OUTSIDE"},
+		"current":                    {base + "/current:/d", "COMPOSE_UNSAFE_BIND_RELEASE"},
 		"the compose file":           {"./compose.yaml:/d", "COMPOSE_UNSAFE_BIND_COMPOSE"},
 		"the override file":          {"./compose.dhow.yaml:/d", "COMPOSE_UNSAFE_BIND_COMPOSE"},
 		"the compose file by path":   {base + "/releases/9-aaaaaaaa-1/compose.yaml:/d", "COMPOSE_UNSAFE_BIND_COMPOSE"},
@@ -128,18 +128,8 @@ func TestAComposeFileInASubfolderIsProtectedWithItsFolder(t *testing.T) {
 	raw := compose("    volumes: ['./deploy:/d']\n")
 	_, code := check(t, raw, policy.Options{File: "deploy/prod.yaml"})
 	assert.Equal(t, "COMPOSE_UNSAFE_BIND_COMPOSE", code)
-	_, code = check(t, compose("    volumes: ['./deploy/data:/d']\n"), policy.Options{File: "deploy/prod.yaml"})
+	_, code = check(t, compose("    volumes: ['./deploy/data:/d:ro']\n"), policy.Options{File: "deploy/prod.yaml"})
 	assert.Empty(t, code)
-}
-
-func TestSubfoldersOfTheReleaseAndOfSharedStillWork(t *testing.T) {
-	for _, volume := range []string{
-		"./conf:/c", "./a/b:/c", deployDir + "/shared/uploads:/u", deployDir + "/shared/uploads/2026:/u", deployDir + "/shared/.cache:/u",
-		deployDir + "/releases/9-aaaaaaaa-1/conf:/c",
-	} {
-		_, code := check(t, compose("    volumes: ['"+volume+"']\n"), policy.Options{})
-		assert.Empty(t, code, volume)
-	}
 }
 
 func TestTheEnvFileOfTheServerCanBeReadEvenThoughItCannotBeMounted(t *testing.T) {

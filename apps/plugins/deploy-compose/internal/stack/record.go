@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"strings"
 
 	"github.com/Khaymah/dhow/internal/deployrelease"
@@ -30,6 +32,25 @@ func newRecord(compose, override []byte, links []string, allowUnsafe bool) recor
 
 func recordPath(rel deployrelease.Release) string {
 	return rel.DeployPath + "/.dhow/compose-" + rel.ID + ".json"
+}
+
+func (a *Activator) pruneRecords(r deployrelease.Remote, rel deployrelease.Release) {
+	list, err := r.ReadDir(rel.DeployPath + "/.dhow")
+	if err != nil {
+		return
+	}
+	for _, f := range list {
+		id, ok := strings.CutPrefix(f.Name, "compose-")
+		if !ok {
+			continue
+		}
+		if id, ok = strings.CutSuffix(id, ".json"); !ok || id == rel.ID || strings.Contains(id, "/") {
+			continue
+		}
+		if _, err := r.Lstat(rel.DeployPath + "/releases/" + id); err != nil && errors.Is(err, fs.ErrNotExist) {
+			_ = r.Remove(rel.DeployPath + "/.dhow/" + f.Name)
+		}
+	}
 }
 
 func writeRecord(r deployrelease.Remote, rel deployrelease.Release, rec record) error {

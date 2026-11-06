@@ -8,10 +8,15 @@ import (
 const (
 	sharedDir   = "shared"
 	releasesDir = "releases"
+	stateDir    = ".dhow"
 	defaultFile = "compose.yaml"
 )
 
-func (c *checker) bindCode(p string, strict bool) string {
+var hardCodes = map[string]bool{
+	"INTERPOLATION": true, "BIND_RELEASE": true, "BIND_COMPOSE": true, "BIND_SHARED": true, "BIND_STATE": true, "BIND_SYMLINK": true,
+}
+
+func (c *checker) structCode(p string, strict bool) string {
 	switch {
 	case p == "":
 		return "BIND_OUTSIDE"
@@ -36,18 +41,22 @@ func (c *checker) absoluteCode(p string, strict bool) string {
 		return "BIND_OUTSIDE"
 	}
 	first, tail, _ := strings.Cut(strings.TrimPrefix(p, deploy+"/"), "/")
-	switch first {
-	case sharedDir:
+	switch {
+	case first == sharedDir:
 		if strict && (tail == "" || tail == ".env" || strings.HasPrefix(tail, ".env/")) {
 			return "BIND_SHARED"
 		}
 		return ""
-	case releasesDir:
+	case first == releasesDir:
 		id, sub, _ := strings.Cut(tail, "/")
 		if id == "" || sub == "" {
 			return "BIND_RELEASE"
 		}
 		return c.relativeCode(sub, strict)
+	case first == stateDir:
+		return "BIND_STATE"
+	case first == "current" || strings.HasPrefix(first, "current."):
+		return "BIND_RELEASE"
 	}
 	return "BIND_OUTSIDE"
 }
