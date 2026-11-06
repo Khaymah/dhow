@@ -47,7 +47,10 @@ func (v *Violation) Error() string {
 	return out
 }
 
+const OverrideFile = "compose.dhow.yaml"
+
 type Options struct {
+	File        string
 	DeployPath  string
 	AllowUnsafe bool
 	Images      map[string]string
@@ -146,6 +149,9 @@ func Check(raw []byte, opt Options) (Result, error) {
 		}
 		res.Images[name] = image
 	}
+	if err := c.always(doc, names, services); err != nil {
+		return Result{}, err
+	}
 	if opt.AllowUnsafe {
 		return res, nil
 	}
@@ -159,6 +165,30 @@ func Check(raw []byte, opt Options) (Result, error) {
 		}
 	}
 	return res, nil
+}
+
+func ParseOverride(raw []byte) (map[string]string, error) {
+	if len(raw) == 0 || len(raw) > MaxFileBytes {
+		return nil, invalid("the override file is empty or too large")
+	}
+	var doc struct {
+		Services map[string]struct {
+			Image string `yaml:"image"`
+		} `yaml:"services"`
+	}
+	dec := yaml.NewDecoder(bytes.NewReader(raw))
+	dec.KnownFields(true)
+	if err := dec.Decode(&doc); err != nil || len(doc.Services) == 0 {
+		return nil, invalid("the override file is not valid")
+	}
+	out := make(map[string]string, len(doc.Services))
+	for name, svc := range doc.Services {
+		if !serviceName.MatchString(name) || !pinned.MatchString(svc.Image) {
+			return nil, &Violation{Code: CodeNotPinned, Service: name}
+		}
+		out[name] = svc.Image
+	}
+	return out, nil
 }
 
 func (c *checker) image(name string, svc map[string]any) (string, error) {

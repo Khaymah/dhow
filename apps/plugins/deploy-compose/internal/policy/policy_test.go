@@ -102,8 +102,6 @@ func TestTheUnsafeOptionsOfAServiceAreRefused(t *testing.T) {
 		"seccomp unconfined (:)":  {"    security_opt: ['seccomp:unconfined']\n", "COMPOSE_UNSAFE_SECURITY_OPT"},
 		"apparmor unconfined":     {"    security_opt: ['apparmor=unconfined']\n", "COMPOSE_UNSAFE_SECURITY_OPT"},
 		"the api socket":          {"    use_api_socket: true\n", "COMPOSE_UNSAFE_DOCKER_SOCKET"},
-		"extends":                 {"    extends:\n      file: other.yaml\n      service: web\n", "COMPOSE_UNSAFE_EXTENDS"},
-		"a provider":              {"    provider:\n      type: tool\n", "COMPOSE_UNSAFE_PROVIDER"},
 		"a privileged post_start": {"    post_start:\n      - command: id\n        privileged: true\n", "COMPOSE_UNSAFE_PRIVILEGED"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -119,7 +117,6 @@ func TestSafeOptionsAreNotRefused(t *testing.T) {
 	for name, extra := range map[string]string{
 		"privileged false":   "    privileged: false\n",
 		"network bridge":     "    network_mode: bridge\n",
-		"another container":  "    network_mode: 'service:db'\n",
 		"no new privileges":  "    security_opt: ['no-new-privileges:true']\n",
 		"capabilities drop":  "    cap_drop: [ALL]\n",
 		"a tmpfs":            "    volumes:\n      - type: tmpfs\n        target: /tmp\n",
@@ -179,7 +176,6 @@ func TestLongSyntaxBindMountsFollowTheSameRules(t *testing.T) {
 
 func TestTopLevelDefinitionsThatReachTheHostAreChecked(t *testing.T) {
 	for name, tail := range map[string]string{
-		"include":              "include:\n  - other.yaml\n",
 		"a volume bound to /":  "volumes:\n  v:\n    driver_opts:\n      type: none\n      o: bind\n      device: /\n",
 		"a volume bound to ..": "volumes:\n  v:\n    driver_opts:\n      device: ../x\n",
 		"a secret file":        "secrets:\n  s:\n    file: /etc/shadow\n",

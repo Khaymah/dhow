@@ -21,15 +21,17 @@ var rules = []rule{
 	{"CAP_ADD", func(s map[string]any) bool { return present(s["cap_add"]) }},
 	{"DEVICES", deviceAccess},
 	{"SECURITY_OPT", securityOpt},
-	{"EXTENDS", func(s map[string]any) bool { _, ok := s["extends"]; return ok }},
-	{"PROVIDER", func(s map[string]any) bool { _, ok := s["provider"]; return ok }},
 	{"PRIVILEGED", lifecycleHooks},
+	{"CGROUP_PARENT", keyPresent("cgroup_parent")},
+	{"RUNTIME", keyPresent("runtime")},
+	{"SYSCTLS", keyPresent("sysctls")},
+	{"GROUP_ADD", keyPresent("group_add")},
+	{"EXTRA_HOSTS", keyPresent("extra_hosts")},
+	{"EXTERNAL_LINKS", keyPresent("external_links")},
+	{"MODELS", keyPresent("models")},
 }
 
 func (c *checker) top(doc map[string]any) error {
-	if _, ok := doc["include"]; ok {
-		return &Violation{Code: unsafePrefix + "INCLUDE"}
-	}
 	if err := c.topVolumes(doc["volumes"]); err != nil {
 		return err
 	}
@@ -41,7 +43,7 @@ func (c *checker) top(doc map[string]any) error {
 			if !ok {
 				continue
 			}
-			if code := c.bindCode(file); code != "" {
+			if code := c.bindCode(file, false); code != "" {
 				return &Violation{Code: unsafePrefix + code, Service: key + "." + name}
 			}
 		}
@@ -58,7 +60,7 @@ func (c *checker) topVolumes(v any) error {
 		if !ok {
 			continue
 		}
-		code := c.bindCode(device)
+		code := c.bindCode(device, true)
 		if code == "" && !strings.HasPrefix(device, "/") {
 			code = "BIND_OUTSIDE"
 		}
