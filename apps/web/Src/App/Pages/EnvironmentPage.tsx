@@ -22,9 +22,11 @@ import { PauseCard } from '@/Modules/Environments/Components/PauseCard';
 import { RemoveZone } from '@/Modules/Environments/Components/RemoveZone';
 import { RulesForm } from '@/Modules/Environments/Components/RulesForm';
 import { RulesSummary } from '@/Modules/Environments/Components/RulesSummary';
+import { TargetsCard } from '@/Modules/Environments/Components/TargetsCard';
 import type { TEnvironment } from '@/Modules/Environments/Api/EnvironmentsApi';
 import { useEnvironment } from '@/Modules/Environments/Hooks/useEnvironments';
 import {
+  canActOnTargets,
   canManageEnvironments,
   canPauseEnvironments,
   canReadEnvironmentSecrets,
@@ -83,6 +85,15 @@ const EnvironmentSections = ({ view, environment, onReload, onRemoved }: ISectio
           />
         </>
       ) : null}
+      <PageGroup title={t('targets.group')} lead={t('targets.group.lead')} icon="server">
+        <TargetsCard
+          organizationId={organizationId}
+          projectId={projectId}
+          environmentName={environment.Name}
+          canAct={canActOnTargets(role) && project.State === 'active'}
+          paused={environment.Paused}
+        />
+      </PageGroup>
       <PageGroup title={t('environments.group.deployments')} lead={t('environments.group.deployments.lead')} icon="queue">
         <DeploymentsCard
           organizationId={organizationId}

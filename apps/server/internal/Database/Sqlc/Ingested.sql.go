@@ -41,6 +41,34 @@ func (q *Queries) ExpireIngestedArtifacts(ctx context.Context, batch int32) (int
 	return result.RowsAffected(), nil
 }
 
+const findRollbackIngested = `-- name: FindRollbackIngested :one
+SELECT a."Name", a."Digest", a."SizeBytes"
+FROM "IngestedArtifacts" a
+JOIN "Blobs" b ON b."Digest" = a."Digest" AND NOT b."IsDeleted"
+WHERE a."OrganizationId" = $1 AND a."ProjectId" = $2 AND a."Digest" = $3 AND NOT a."IsDeleted"
+ORDER BY a."CreatedAt" DESC, a."Id" DESC
+LIMIT 1
+`
+
+type FindRollbackIngestedParams struct {
+	OrganizationID uuid.UUID
+	ProjectID      uuid.UUID
+	Digest         []byte
+}
+
+type FindRollbackIngestedRow struct {
+	Name      string
+	Digest    []byte
+	SizeBytes int64
+}
+
+func (q *Queries) FindRollbackIngested(ctx context.Context, arg FindRollbackIngestedParams) (FindRollbackIngestedRow, error) {
+	row := q.db.QueryRow(ctx, findRollbackIngested, arg.OrganizationID, arg.ProjectID, arg.Digest)
+	var i FindRollbackIngestedRow
+	err := row.Scan(&i.Name, &i.Digest, &i.SizeBytes)
+	return i, err
+}
+
 const listRunIngestedArtifacts = `-- name: ListRunIngestedArtifacts :many
 SELECT ia."Name", ia."Digest", ia."SizeBytes"
 FROM "RunIngestedArtifacts" ria

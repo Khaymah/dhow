@@ -37,6 +37,14 @@ type Prepared struct {
 	CacheMaxBytes    int64
 }
 
+type DigestRequest struct {
+	OrganizationID uuid.UUID
+	ProjectID      uuid.UUID
+	RunJobID       uuid.UUID
+	Digest         []byte
+}
+
 type Index interface {
 	Prepare(ctx context.Context, tx *sqlc.Queries, r Request) (Prepared, error)
+	PrepareDigest(ctx context.Context, tx *sqlc.Queries, r DigestRequest) (Input, bool, error)
 }

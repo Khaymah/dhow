@@ -42,3 +42,11 @@ WHERE "Id" IN (SELECT a."Id"
                                                AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases"))
                LIMIT @batch
                FOR UPDATE SKIP LOCKED);
+
+-- name: FindRollbackIngested :one
+SELECT a."Name", a."Digest", a."SizeBytes"
+FROM "IngestedArtifacts" a
+JOIN "Blobs" b ON b."Digest" = a."Digest" AND NOT b."IsDeleted"
+WHERE a."OrganizationId" = @organization_id AND a."ProjectId" = @project_id AND a."Digest" = @digest AND NOT a."IsDeleted"
+ORDER BY a."CreatedAt" DESC, a."Id" DESC
+LIMIT 1;

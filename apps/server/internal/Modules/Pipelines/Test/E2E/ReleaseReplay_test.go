@@ -112,7 +112,9 @@ func TestTheReportsOfTheRealPluginRunAreAcceptedByTheServerAndEndInTheSameState(
 	}
 	files, err := filepath.Glob(filepath.Join(dir, "*.jsonl"))
 	require.NoError(t, err)
-	files = slices.DeleteFunc(files, func(f string) bool { return strings.HasPrefix(filepath.Base(f), checkScenarioPrefix) })
+	files = slices.DeleteFunc(files, func(f string) bool {
+		return strings.HasPrefix(filepath.Base(f), checkScenarioPrefix) || strings.HasPrefix(filepath.Base(f), rollbackScenarioPrefix)
+	})
 	require.NotEmpty(t, files, "the deploy end to end run left no reports")
 	for _, file := range files {
 		name := strings.TrimSuffix(filepath.Base(file), ".jsonl")

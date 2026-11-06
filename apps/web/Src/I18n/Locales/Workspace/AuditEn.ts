@@ -104,6 +104,7 @@ export const AuditEn: Record<keyof typeof AuditAr, string> = {
   'audit.action.deployment.release_repaired': 'Release state written from a check of the target',
   'audit.action.deployment.target_checked': 'Server of a deploy target checked',
   'audit.action.deployment.target_check_requested': 'Check of a deploy target requested',
+  'audit.action.deployment.rollback_requested': 'Rollback of a deploy target to an earlier release requested',
   'audit.action.secret.created': 'Secret created',
   'audit.action.secret.updated': 'New secret value written',
   'audit.action.secret.version_restored': 'Earlier secret value restored',

@@ -78,3 +78,42 @@ const (
 func CheckRunNotRerunnable() *AppError {
 	return New(http.StatusConflict, CodeCheckRunNotRerunnable, KeyCheckRunNotRerunnable)
 }
+
+const (
+	CodeRollbackRunNotRerunnable = "ROLLBACK_RUN_NOT_RERUNNABLE"
+	KeyRollbackRunNotRerunnable  = "errors.rollbackRunNotRerunnable"
+	CodeRollbackNotEligible      = "ROLLBACK_RELEASE_NOT_ELIGIBLE"
+	KeyRollbackNotEligible       = "errors.rollbackNotEligible"
+	CodeRollbackUnavailable      = "ROLLBACK_UNAVAILABLE"
+	KeyRollbackUnavailable       = "errors.rollbackUnavailable"
+	CodeRollbackNotSupported     = "ROLLBACK_NOT_SUPPORTED"
+	KeyRollbackNotSupported      = "errors.rollbackNotSupported"
+	CodeRollbackSettingsInvalid  = "ROLLBACK_SETTINGS_INVALID"
+	KeyRollbackSettingsInvalid   = "errors.rollbackSettingsInvalid"
+	CodeEnvironmentPaused        = "ENVIRONMENT_PAUSED"
+	KeyEnvironmentPaused         = "errors.environmentPaused"
+)
+
+func RollbackRunNotRerunnable() *AppError {
+	return New(http.StatusConflict, CodeRollbackRunNotRerunnable, KeyRollbackRunNotRerunnable)
+}
+
+func RollbackNotEligible() *AppError {
+	return New(http.StatusConflict, CodeRollbackNotEligible, KeyRollbackNotEligible)
+}
+
+func RollbackUnavailable() *AppError {
+	return New(http.StatusUnprocessableEntity, CodeRollbackUnavailable, KeyRollbackUnavailable)
+}
+
+func RollbackNotSupported() *AppError {
+	return New(http.StatusUnprocessableEntity, CodeRollbackNotSupported, KeyRollbackNotSupported)
+}
+
+func RollbackSettingsInvalid() *AppError {
+	return New(http.StatusUnprocessableEntity, CodeRollbackSettingsInvalid, KeyRollbackSettingsInvalid)
+}
+
+func EnvironmentPaused() *AppError {
+	return New(http.StatusConflict, CodeEnvironmentPaused, KeyEnvironmentPaused)
+}

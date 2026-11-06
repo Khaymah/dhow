@@ -22,6 +22,7 @@ const (
 	TargetModeInput      = "mode"
 	TargetModeDeploy     = "deploy"
 	TargetModeCheck      = "check"
+	TargetModeRollback   = "rollback"
 	TargetKindSSH        = "ssh"
 	TargetKindCompose    = "compose"
 	DeploySSHImage       = "ghcr.io/khaymah/dhow-deploy-ssh"

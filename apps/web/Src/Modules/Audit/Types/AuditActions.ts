@@ -103,6 +103,7 @@ export const AUDIT_ACTIONS: Readonly<Record<string, IAuditAction>> = {
   'deployment.release_repaired': { Icon: 'queue', Bad: false },
   'deployment.target_checked': { Icon: 'queue', Bad: false },
   'deployment.target_check_requested': { Icon: 'queue', Bad: false },
+  'deployment.rollback_requested': { Icon: 'stop', Bad: true },
   'secret.created': { Icon: 'key', Bad: false },
   'secret.updated': { Icon: 'key', Bad: false },
   'secret.version_restored': { Icon: 'key', Bad: false },

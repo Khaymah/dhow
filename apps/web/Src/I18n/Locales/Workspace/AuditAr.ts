@@ -102,6 +102,7 @@ export const AuditAr = {
   'audit.action.deployment.release_repaired': 'كتابة حالة إصدار من فحص الهدف',
   'audit.action.deployment.target_checked': 'فحص سيرفر في هدف نشر',
   'audit.action.deployment.target_check_requested': 'طلب فحص هدف نشر',
+  'audit.action.deployment.rollback_requested': 'طلب الرجوع بهدف نشر إلى إصدار سابق',
   'audit.action.secret.created': 'إنشاء سر',
   'audit.action.secret.updated': 'كتابة قيمة جديدة لسر',
   'audit.action.secret.version_restored': 'إرجاع قيمة قديمة لسر',

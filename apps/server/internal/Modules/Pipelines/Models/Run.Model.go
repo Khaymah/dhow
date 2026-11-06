@@ -96,6 +96,8 @@ const (
 	ReasonTargetKeyReferenced    = "TARGET_KEY_NOT_REFERENCEABLE"
 	ReasonHealthBudget           = "HEALTH_BUDGET_EXCEEDED"
 	ReasonRollingBudget          = "ROLLING_BUDGET_EXCEEDED"
+	ReasonRollbackReleaseGone    = "ROLLBACK_RELEASE_UNAVAILABLE"
+	ReasonRollbackNotAllowed     = "ROLLBACK_MODE_NOT_ALLOWED"
 )
 
 const (

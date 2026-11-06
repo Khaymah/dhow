@@ -378,6 +378,14 @@ WHERE "ProjectId" = @project_id AND "OrganizationId" = @organization_id AND "Tri
 ORDER BY "CreatedAt" DESC, "Id" DESC
 LIMIT 1;
 
+-- name: FindActiveRollbackRun :one
+SELECT *
+FROM "PipelineRuns"
+WHERE "ProjectId" = @project_id AND "OrganizationId" = @organization_id AND "Trigger" = 'rollback' AND "DefinitionSource" = @definition_source
+  AND "State" NOT IN ('succeeded', 'failed', 'canceled', 'skipped') AND NOT "IsDeleted"
+ORDER BY "CreatedAt" DESC, "Id" DESC
+LIMIT 1;
+
 -- name: TargetBusyInRun :one
 SELECT EXISTS (SELECT 1
                FROM "RunJobs" rj

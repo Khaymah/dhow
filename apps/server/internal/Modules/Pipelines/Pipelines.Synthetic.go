@@ -21,7 +21,8 @@ import (
 
 const (
 	triggerCheck       = "check"
-	syntheticPath      = "synthetic:check"
+	triggerRollback    = "rollback"
+	syntheticPath      = "synthetic:"
 	syntheticJobKey    = "check"
 	defaultBranchValue = "main"
 )
@@ -64,16 +65,13 @@ func (s *Service) StartSynthetic(ctx context.Context, req deployments.SyntheticR
 	if err != nil {
 		return deployments.SyntheticRun{}, err
 	}
-	if req.Kind != deployments.SyntheticCheck {
-		return deployments.SyntheticRun{}, errors.New("this kind of synthetic run is not supported")
-	}
-	if s.deployImage == "" {
-		return deployments.SyntheticRun{}, apperrors.TargetCheckUnavailable()
+	trigger, source, err := s.syntheticSourceOf(req)
+	if err != nil {
+		return deployments.SyntheticRun{}, err
 	}
 	if err := s.requireActiveProject(ctx, req); err != nil {
 		return deployments.SyntheticRun{}, err
 	}
-	source := syntheticSource(s.deployImage, req.EnvironmentName, req.TargetName)
 	digest := sha256.Sum256(source)
 	var run sqlc.PipelineRun
 	existing := false
@@ -81,9 +79,7 @@ func (s *Service) StartSynthetic(ctx context.Context, req deployments.SyntheticR
 		if err := q.LockCheckRequests(ctx, req.ProjectID.String()+"/"+hex.EncodeToString(digest[:])); err != nil {
 			return err
 		}
-		found, err := q.FindActiveCheckRun(ctx, sqlc.FindActiveCheckRunParams{
-			ProjectID: req.ProjectID, OrganizationID: req.OrganizationID, DefinitionSource: text(string(source)),
-		})
+		found, err := s.findActive(ctx, q, trigger, req, source)
 		if err == nil {
 			run, existing = found, true
 			return nil
@@ -107,8 +103,8 @@ func (s *Service) StartSynthetic(ctx context.Context, req deployments.SyntheticR
 			return err
 		}
 		run, err = q.InsertSyntheticRun(ctx, sqlc.InsertSyntheticRunParams{
-			OrganizationID: req.OrganizationID, ProjectID: project.Id, Number: number, Trigger: triggerCheck, Ref: ref, Actor: text(p.Name),
-			DefinitionPath: syntheticPath, DefinitionSource: text(string(source)), DefinitionDigest: digest[:], TriggeredByUserID: &p.UserID,
+			OrganizationID: req.OrganizationID, ProjectID: project.Id, Number: number, Trigger: trigger, Ref: ref, Actor: text(p.Name),
+			DefinitionPath: syntheticPath + trigger, DefinitionSource: text(string(source)), DefinitionDigest: digest[:], TriggeredByUserID: &p.UserID,
 		})
 		return err
 	})
@@ -119,6 +115,34 @@ func (s *Service) StartSynthetic(ctx context.Context, req deployments.SyntheticR
 		s.auditByUser(ctx, eventbus.RunCreated, run, p)
 	}
 	return deployments.SyntheticRun{RunID: run.Id, Number: run.Number, Existing: existing}, nil
+}
+
+func (s *Service) syntheticSourceOf(req deployments.SyntheticRequest) (string, []byte, error) {
+	switch req.Kind {
+	case deployments.SyntheticCheck:
+		if s.deployImage == "" {
+			return "", nil, apperrors.TargetCheckUnavailable()
+		}
+		return triggerCheck, syntheticSource(s.deployImage, req.EnvironmentName, req.TargetName), nil
+	case deployments.SyntheticRollback:
+		if s.deployImage == "" {
+			return "", nil, apperrors.RollbackUnavailable()
+		}
+		return triggerRollback, rollbackSource(s.deployImage, req), nil
+	default:
+		return "", nil, errors.New("this kind of synthetic run is not supported")
+	}
+}
+
+func (s *Service) findActive(ctx context.Context, q *sqlc.Queries, trigger string, req deployments.SyntheticRequest, source []byte) (sqlc.PipelineRun, error) {
+	if trigger == triggerRollback {
+		return q.FindActiveRollbackRun(ctx, sqlc.FindActiveRollbackRunParams{
+			ProjectID: req.ProjectID, OrganizationID: req.OrganizationID, DefinitionSource: text(string(source)),
+		})
+	}
+	return q.FindActiveCheckRun(ctx, sqlc.FindActiveCheckRunParams{
+		ProjectID: req.ProjectID, OrganizationID: req.OrganizationID, DefinitionSource: text(string(source)),
+	})
 }
 
 func (s *Service) requireActiveProject(ctx context.Context, req deployments.SyntheticRequest) error {

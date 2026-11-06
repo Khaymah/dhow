@@ -41,7 +41,7 @@ func (s *Service) RunRetention(ctx context.Context) {
 func (s *Service) Sweep(ctx context.Context) (SweepReport, error) {
 	var report SweepReport
 	for {
-		n, err := s.queries().ExpireArtifacts(ctx, config.BlobSweepBatch)
+		n, err := s.queries().ExpireArtifacts(ctx, sqlc.ExpireArtifactsParams{Batch: config.BlobSweepBatch, RollbackGraceSeconds: config.RollbackArtifactMaxKeep.Seconds()})
 		if err != nil {
 			return report, fmt.Errorf("expire artifacts: %w", err)
 		}

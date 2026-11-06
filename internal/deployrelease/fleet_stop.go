@@ -3,6 +3,7 @@ package deployrelease
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -13,6 +14,8 @@ const (
 	messageRollbackFails = "the rollback failed"
 	messageNoPrevious    = "the first release failed and there is no earlier release to go back to"
 	messageNoTime        = "the rollback ran out of time"
+
+	messageRollbackStopped = "the rollback stopped before this server was confirmed healthy on the release"
 )
 
 func (g *group) assign(cause *Failure, culprit *member) {
@@ -72,15 +75,31 @@ func (g *group) stop(ctx context.Context, cause *Failure, culprit *member) *Fail
 	switched := g.switched()
 	g.reportUnswitched()
 	var out *Failure
-	if len(switched) > 0 {
+	switch {
+	case len(switched) > 0 && g.f.Config.Rollback:
+		out = g.abandonRollback(cause, switched)
+	case len(switched) > 0:
 		out = g.rollBackGroup(ctx, cause, switched)
-	} else {
+	default:
 		g.rep.Emit(Event{Event: EventFailed, ReleaseID: g.releaseID(), Reason: cause.Reason, Message: cause.Text})
 		g.log.Warn("the deployment failed", "reason", cause.Reason, "error", cause.Error())
 		out = cause
 	}
 	g.cleanUnswitched(ctx)
 	return out
+}
+
+func (g *group) abandonRollback(cause *Failure, switched []*member) *Failure {
+	g.log.Warn("the rollback failed after the switch, and nothing is tried again by itself", "reason", cause.Reason, "error", cause.Error())
+	open := slices.DeleteFunc(slices.Clone(switched), func(m *member) bool { return m.d.confirmed })
+	if len(open) == 0 {
+		open = switched
+	}
+	for _, m := range open {
+		g.rep.Emit(Event{Event: EventRollbackFailed, HostID: m.d.cfg.HostID, ReleaseID: g.releaseID(), Reason: cause.Reason, Message: messageRollbackStopped})
+	}
+	g.rep.Emit(Event{Event: EventRollbackFailed, ReleaseID: g.releaseID(), Reason: cause.Reason, Message: messageRollbackFails})
+	return fail(ExitRollbackFailed, cause.Reason, messageRollbackFails, cause)
 }
 
 func (g *group) rollBackGroup(ctx context.Context, cause *Failure, switched []*member) *Failure {

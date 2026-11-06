@@ -48,6 +48,8 @@ func Policies() []policy.Rule {
 		policy.Project(http.MethodPost, targetPath+"/generate-key", policy.EnvironmentManage, orgParam, projectParam),
 		policy.Project(http.MethodGet, targetPath+"/check", policy.ProjectRead, orgParam, projectParam).AllowTokens(),
 		policy.Project(http.MethodPost, targetPath+"/check", policy.DeploymentCheck, orgParam, projectParam),
+		policy.Project(http.MethodPost, targetPath+"/rollback", policy.DeploymentRollback, orgParam, projectParam),
+		policy.Project(http.MethodGet, targetPath+"/releases", policy.ProjectRead, orgParam, projectParam).AllowTokens(),
 		policy.Project(http.MethodPost, targetPath+"/hosts", policy.EnvironmentManage, orgParam, projectParam),
 		policy.Project(http.MethodPut, targetPath+"/hosts-order", policy.EnvironmentManage, orgParam, projectParam),
 		policy.Project(http.MethodPut, hostPath, policy.EnvironmentManage, orgParam, projectParam),

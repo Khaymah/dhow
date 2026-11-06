@@ -47,6 +47,7 @@ var (
 	ErrNoSpace         = errors.New("the server does not have the disk space for the release")
 	ErrAuthFailed      = errors.New("the server did not accept the key of the target")
 	ErrStateCorrupt    = errors.New("a state file of Dhow on the server is damaged")
+	ErrReleaseGone     = errors.New("the release is no longer on the server and no artifact was handed over to put it back")
 )
 
 type Failure struct {
@@ -85,6 +86,7 @@ type Config struct {
 	ArchivePath   string
 	ArchiveDigest string
 	Limits        archive.Limits
+	Rollback      bool
 	Activator     Activator
 }
 
@@ -102,7 +104,7 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%w: on_first_failure", ErrConfig)
 	case c.HookTimeout <= 0 || c.HookTimeout > MaxHookTimeout:
 		return fmt.Errorf("%w: the hook timeout", ErrConfig)
-	case c.ArchivePath == "":
+	case c.ArchivePath == "" && !c.Rollback:
 		return fmt.Errorf("%w: the artifact", ErrConfig)
 	}
 	for _, h := range []string{c.ReloadCommand, c.PreSwitch, c.PostSwitch} {
