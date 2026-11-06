@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,7 +17,10 @@ import (
 	"github.com/Khaymah/dhow/internal/buildinfo"
 )
 
-const commandHealthcheck = "healthcheck"
+const (
+	commandHealthcheck = "healthcheck"
+	commandVersion     = "version"
+)
 
 func main() {
 	if err := run(context.Background(), os.Args[1:]); err != nil {
@@ -43,6 +47,8 @@ func run(ctx context.Context, args []string) error {
 		return app.Run(ctx)
 	case len(args) == 1 && args[0] == commandHealthcheck:
 		return app.RunHealthcheck(ctx)
+	case len(args) == 1 && args[0] == commandVersion:
+		return printVersion(os.Stdout)
 	case args[0] == app.CommandMigrate:
 		return runMigrate(ctx, args[1:])
 	case args[0] == app.CommandKeys:
@@ -50,8 +56,8 @@ func run(ctx context.Context, args []string) error {
 	case installer.IsCommand(args[0]):
 		return runInstaller(ctx, args)
 	default:
-		return fmt.Errorf("unknown command %q; run without arguments to start the server, or use %q, %q, %q, %q, %q or %q",
-			args[0], commandHealthcheck, app.CommandMigrate, app.CommandKeys, installer.CommandInstall, installer.CommandDoctor, installer.CommandUninstall)
+		return fmt.Errorf("unknown command %q; run without arguments to start the server, or use %q, %q, %q, %q, %q, %q or %q",
+			args[0], commandHealthcheck, commandVersion, app.CommandMigrate, app.CommandKeys, installer.CommandInstall, installer.CommandDoctor, installer.CommandUninstall)
 	}
 }
 
@@ -79,4 +85,16 @@ func runInstaller(ctx context.Context, args []string) error {
 		Locale:  config.LocaleFromEnv(),
 		Version: buildinfo.Get().Version,
 	}, os.Stderr)
+}
+
+func printVersion(w io.Writer) error {
+	info := buildinfo.Get()
+	if _, err := fmt.Fprintf(w, "dhow-server %s (%s, %s)\n", info.Version, info.Commit, info.GoVersion); err != nil {
+		return err
+	}
+	if image := buildinfo.DeploySSHImage(); image != "" {
+		_, err := fmt.Fprintf(w, "deploy plugin image %s\n", image)
+		return err
+	}
+	return nil
 }

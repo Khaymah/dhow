@@ -95,7 +95,7 @@ vm-test: build build-runner ## Install, check and uninstall the runner in a clou
 .PHONY: image
 image: ## Build the container image (IMAGE=dhow:dev)
 	docker buildx build --load $(DOCKER_BUILD_FLAGS) -f $(IMAGE_DOCKERFILE) \
-		--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t $(IMAGE) .
+		--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --build-arg DEPLOY_SSH_PINNED=$(DEPLOY_SSH_PINNED) -t $(IMAGE) .
 
 .PHONY: compose-up
 compose-up: ## Start the Compose stack with the local image (run deploy/compose/init.sh first)

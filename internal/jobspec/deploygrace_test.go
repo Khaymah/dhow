@@ -35,3 +35,18 @@ func TestOnlyTheOfficialDeployImagesAreOfficial(t *testing.T) {
 		assert.Equal(t, want, jobspec.IsOfficialDeployImage(image), image)
 	}
 }
+
+func TestOnlyAFullyPinnedOfficialImageIsAcceptedAsTheBakedPlugin(t *testing.T) {
+	digest := "@sha256:" + strings.Repeat("a", 64)
+	for image, want := range map[string]bool{
+		"ghcr.io/khaymah/dhow-deploy-ssh" + digest:        true,
+		"ghcr.io/khaymah/dhow-deploy-ssh":                 false,
+		"ghcr.io/khaymah/dhow-deploy-ssh:1.0":             false,
+		"ghcr.io/khaymah/dhow-deploy-ssh@sha256:abc":      false,
+		"ghcr.io/acme/deploy" + digest:                    false,
+		"ghcr.io/khaymah/dhow-deploy-ssh" + digest + "\n": false,
+		"": false,
+	} {
+		assert.Equal(t, want, jobspec.ValidPinnedDeployImage(image), image)
+	}
+}

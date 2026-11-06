@@ -99,6 +99,12 @@ func IsOfficialDeployImage(image string) bool {
 	return slices.Contains(OfficialDeployImages(), repo)
 }
 
+var pinnedImagePattern = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$`)
+
+func ValidPinnedDeployImage(image string) bool {
+	return pinnedImagePattern.MatchString(image) && IsOfficialDeployImage(image)
+}
+
 func DeployCancelGrace() time.Duration {
 	return DeployRollbackBudget + DeployConnGrace + DeployCleanupBudget + DeployUnlockBudget
 }

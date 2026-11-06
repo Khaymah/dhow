@@ -26,6 +26,7 @@ import (
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
+	"github.com/Khaymah/dhow/internal/jobspec"
 )
 
 const targetRun = "run"
@@ -97,7 +98,7 @@ func NewService(o Options) *Service {
 	}
 	return &Service{
 		db: o.DB, bus: o.Bus, log: o.Log, now: now, queue: o.Queue, statuses: o.Statuses, definitions: definitions,
-		images: o.Images, checkoutImage: o.CheckoutImage, deployImage: o.DeploySSHImage, publicURL: strings.TrimSuffix(o.PublicURL, "/"), limiter: o.Limiter, pinBudget: budget,
+		images: o.Images, checkoutImage: o.CheckoutImage, deployImage: validDeployImage(o.DeploySSHImage), publicURL: strings.TrimSuffix(o.PublicURL, "/"), limiter: o.Limiter, pinBudget: budget,
 	}
 }
 
@@ -203,4 +204,11 @@ func runOf(r sqlc.PipelineRun) models.Run {
 		out.DefinitionDigest = hex.EncodeToString(r.DefinitionDigest)
 	}
 	return out
+}
+
+func validDeployImage(image string) string {
+	if jobspec.ValidPinnedDeployImage(image) {
+		return image
+	}
+	return ""
 }
