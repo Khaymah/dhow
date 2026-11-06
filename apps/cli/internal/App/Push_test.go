@@ -325,3 +325,49 @@ func TestEveryPushMessageExistsInBothLanguages(t *testing.T) {
 		assert.NotEqual(t, en.T(key), ar.T(key), code)
 	}
 }
+
+func TestAFolderWithGitAtItsRootIsRefusedWithExitOne(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "index.html"), []byte("hi"), 0o600))
+	for _, lang := range []string{"en", "ar"} {
+		out, errOut, code := runPushCmd([]string{"artifact", "push", "--dry-run", "--lang", lang, "--name", "web", "--ref", "main", "--sha", pushSha, "--", dir}, nil, "")
+		assert.Equal(t, ExitRefused, code, lang)
+		assert.Empty(t, out)
+		assert.Contains(t, errOut, "(PACK_HAS_GIT_DIR)")
+	}
+	out, _, code := runPushCmd([]string{"artifact", "push", "--dry-run", "--include-git", "--name", "web", "--ref", "main", "--sha", pushSha, "--", dir}, nil, "")
+	assert.Equal(t, ExitValid, code)
+	assert.Contains(t, out, "Archive: ")
+}
+
+func TestThePacksSizeIsPrinted(t *testing.T) {
+	path, _ := buildArchive(t)
+	srv := newPushServer(t, func(w http.ResponseWriter, d string) { created(w, d) })
+	out, errOut, code := runPushCmd(pushArgs(path, "--server", srv.URL), map[string]string{EnvIngestToken: pushToken}, "")
+	require.Equal(t, ExitValid, code, errOut)
+	assert.Contains(t, out, "Archive: 1 entries, 2 bytes unpacked,")
+}
+
+func TestAPathShapedLikeATokenIsRefusedWithoutEchoingIt(t *testing.T) {
+	for _, args := range [][]string{
+		{"artifact", "push", "--dry-run", "--name", "web", "--ref", "main", "--sha", pushSha, "--", pushToken},
+		{"artifact", "push", "--dry-run", "--name", "web", "--ref", "main", "--sha", pushSha, pushToken},
+	} {
+		out, errOut, code := runPushCmd(args, nil, "")
+		assert.Equal(t, ExitUsage, code)
+		assert.Contains(t, errOut, "looks like an ingest token")
+		assert.NotContains(t, out+errOut, pushToken)
+	}
+}
+
+func TestMaxBytesIsCheckedBeforeAnyUpload(t *testing.T) {
+	path, _ := buildArchive(t)
+	srv := newPushServer(t, func(w http.ResponseWriter, d string) { created(w, d) })
+	_, errOut, code := runPushCmd(pushArgs(path, "--server", srv.URL, "--max-bytes", "10"), map[string]string{EnvIngestToken: pushToken}, "")
+	assert.Equal(t, ExitRefused, code)
+	assert.Contains(t, errOut, "ARTIFACT_TOO_LARGE")
+	assert.Zero(t, srv.requests)
+	_, errOut, code = runPushCmd(pushArgs(path, "--max-bytes", "0"), nil, "")
+	assert.Equal(t, ExitUsage, code, errOut)
+}

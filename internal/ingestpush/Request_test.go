@@ -100,7 +100,7 @@ func TestHeadersCarryOnlyWhatTheServerReads(t *testing.T) {
 
 func TestPrepareHashesAFileAndPacksAFolderTheSameWay(t *testing.T) {
 	path, digest := writeArchive(t, map[string]string{"a.txt": "a", "dir/b.txt": "b"})
-	pkg, err := ingestpush.Prepare(path)
+	pkg, err := ingestpush.Prepare(path, ingestpush.PrepareOptions{})
 	require.NoError(t, err)
 	defer pkg.Close()
 	assert.Equal(t, digest, pkg.Digest)
@@ -113,9 +113,9 @@ func TestPrepareHashesAFileAndPacksAFolderTheSameWay(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "assets"), 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "assets", "app.js"), []byte("x"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".hidden"), []byte("y"), 0o600))
-	first, err := ingestpush.Prepare(dir)
+	first, err := ingestpush.Prepare(dir, ingestpush.PrepareOptions{})
 	require.NoError(t, err)
-	second, err := ingestpush.Prepare(dir)
+	second, err := ingestpush.Prepare(dir, ingestpush.PrepareOptions{})
 	require.NoError(t, err)
 	assert.True(t, first.Packed)
 	assert.Equal(t, first.Digest, second.Digest, "the pack is reproducible")
@@ -129,18 +129,18 @@ func TestPrepareRefusesWhatTheServerWouldRefuse(t *testing.T) {
 	dir := t.TempDir()
 	notGzip := filepath.Join(dir, "plain.tar.gz")
 	require.NoError(t, os.WriteFile(notGzip, []byte("hello world"), 0o600))
-	_, err := ingestpush.Prepare(notGzip)
+	_, err := ingestpush.Prepare(notGzip, ingestpush.PrepareOptions{})
 	assert.ErrorIs(t, err, ingestpush.ErrNotGzip)
 
 	empty := filepath.Join(dir, "empty.tar.gz")
 	require.NoError(t, os.WriteFile(empty, nil, 0o600))
-	_, err = ingestpush.Prepare(empty)
+	_, err = ingestpush.Prepare(empty, ingestpush.PrepareOptions{})
 	assert.ErrorIs(t, err, ingestpush.ErrEmpty)
 
-	_, err = ingestpush.Prepare(t.TempDir())
+	_, err = ingestpush.Prepare(t.TempDir(), ingestpush.PrepareOptions{})
 	assert.ErrorIs(t, err, ingestpush.ErrEmpty)
 
-	_, err = ingestpush.Prepare(filepath.Join(dir, "missing"))
+	_, err = ingestpush.Prepare(filepath.Join(dir, "missing"), ingestpush.PrepareOptions{})
 	assert.ErrorIs(t, err, ingestpush.ErrSource)
 
 	var buf bytes.Buffer
@@ -153,7 +153,7 @@ func TestPrepareRefusesWhatTheServerWouldRefuse(t *testing.T) {
 	require.NoError(t, gz.Close())
 	unsafe := filepath.Join(dir, "unsafe.tar.gz")
 	require.NoError(t, os.WriteFile(unsafe, buf.Bytes(), 0o600))
-	_, err = ingestpush.Prepare(unsafe)
+	_, err = ingestpush.Prepare(unsafe, ingestpush.PrepareOptions{})
 	var pe *ingestpush.Error
 	require.ErrorAs(t, err, &pe)
 	assert.Equal(t, ingestpush.CodeArchiveUnsafe, pe.Code)
@@ -161,7 +161,7 @@ func TestPrepareRefusesWhatTheServerWouldRefuse(t *testing.T) {
 
 	escape := t.TempDir()
 	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(escape, "link")))
-	_, err = ingestpush.Prepare(escape)
+	_, err = ingestpush.Prepare(escape, ingestpush.PrepareOptions{})
 	assert.ErrorIs(t, err, ingestpush.ErrSource)
 }
 

@@ -57,7 +57,7 @@ func runPush(args []string, env Env) int {
 	if code, ok := precheck(c, env, opts, meta, server); !ok {
 		return code
 	}
-	pkg, err := ingestpush.Prepare(opts.paths[0])
+	pkg, err := ingestpush.Prepare(opts.paths[0], ingestpush.PrepareOptions{IncludeGit: opts.includeGit, MaxBytes: opts.maxBytes})
 	if err != nil {
 		return fail(c, env, err)
 	}
@@ -139,7 +139,7 @@ func upload(c output.Catalog, env Env, opts pushOptions, o ingestpush.Options, p
 	if err != nil {
 		return fail(c, env, err)
 	}
-	return renderResult(c, env, opts, res)
+	return renderResult(c, env, opts, res, pkg)
 }
 
 func fail(c output.Catalog, env Env, err error) int {

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -27,6 +28,8 @@ const (
 	optionDryRun     = "dry-run"
 	optionCAFile     = "ca-file"
 	optionRetries    = "retries"
+	optionMaxBytes   = "max-bytes"
+	optionIncludeGit = "include-git"
 	optionToken      = "token"
 	optionHelp       = "help"
 	optionShortHelp  = "h"
@@ -42,6 +45,8 @@ type pushOptions struct {
 	format     string
 	lang       string
 	retries    int
+	maxBytes   int64
+	includeGit bool
 	noTrigger  bool
 	tokenStdin bool
 	dryRun     bool
@@ -51,15 +56,16 @@ type pushOptions struct {
 }
 
 var pushValueOptions = map[string]func(*pushOptions, string) *usageError{
-	optionServer:  func(o *pushOptions, v string) *usageError { o.server = v; return nil },
-	optionName:    func(o *pushOptions, v string) *usageError { o.name = v; return nil },
-	optionRef:     func(o *pushOptions, v string) *usageError { o.ref = v; return nil },
-	optionRefKind: func(o *pushOptions, v string) *usageError { o.refKind = v; return nil },
-	optionSha:     func(o *pushOptions, v string) *usageError { o.sha = v; return nil },
-	optionCAFile:  func(o *pushOptions, v string) *usageError { o.caFile = v; return nil },
-	optionFormat:  func(o *pushOptions, v string) *usageError { o.format = v; return nil },
-	optionLang:    func(o *pushOptions, v string) *usageError { o.lang = v; return nil },
-	optionRetries: setRetries,
+	optionServer:   func(o *pushOptions, v string) *usageError { o.server = v; return nil },
+	optionName:     func(o *pushOptions, v string) *usageError { o.name = v; return nil },
+	optionRef:      func(o *pushOptions, v string) *usageError { o.ref = v; return nil },
+	optionRefKind:  func(o *pushOptions, v string) *usageError { o.refKind = v; return nil },
+	optionSha:      func(o *pushOptions, v string) *usageError { o.sha = v; return nil },
+	optionCAFile:   func(o *pushOptions, v string) *usageError { o.caFile = v; return nil },
+	optionFormat:   func(o *pushOptions, v string) *usageError { o.format = v; return nil },
+	optionLang:     func(o *pushOptions, v string) *usageError { o.lang = v; return nil },
+	optionRetries:  setRetries,
+	optionMaxBytes: setMaxBytes,
 	optionProvenance: func(o *pushOptions, v string) *usageError {
 		k, val, ok := strings.Cut(v, "=")
 		if !ok || k == "" {
@@ -74,6 +80,7 @@ var pushFlagOptions = map[string]func(*pushOptions){
 	optionNoTrigger:  func(o *pushOptions) { o.noTrigger = true },
 	optionTokenStdin: func(o *pushOptions) { o.tokenStdin = true },
 	optionDryRun:     func(o *pushOptions) { o.dryRun = true },
+	optionIncludeGit: func(o *pushOptions) { o.includeGit = true },
 	optionHelp:       func(o *pushOptions) { o.help = true },
 	optionShortHelp:  func(o *pushOptions) { o.help = true },
 }
@@ -84,6 +91,15 @@ func setRetries(o *pushOptions, v string) *usageError {
 		return &usageError{key: output.KeyPushRetries}
 	}
 	o.retries = n
+	return nil
+}
+
+func setMaxBytes(o *pushOptions, v string) *usageError {
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || n <= 0 {
+		return &usageError{key: output.KeyPushMaxBytes}
+	}
+	o.maxBytes = n
 	return nil
 }
 
@@ -144,6 +160,8 @@ func pushShape(opts pushOptions) *usageError {
 		return &usageError{key: output.KeyPushFormatInvalid}
 	case opts.help:
 		return nil
+	case slices.ContainsFunc(opts.paths, func(p string) bool { return strings.HasPrefix(p, ingestpush.TokenPrefix) }):
+		return &usageError{key: output.KeyPushPathIsToken}
 	case len(opts.paths) != 1:
 		return &usageError{key: output.KeyPushNeedPath}
 	}

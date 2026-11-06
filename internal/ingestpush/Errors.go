@@ -33,6 +33,7 @@ const (
 	CodeValidationFailed   = "VALIDATION_FAILED"
 	CodeProjectArchived    = "PROJECT_ARCHIVED"
 
+	CodePackHasGit   = "PACK_HAS_GIT_DIR"
 	CodeInput        = "INPUT"
 	CodeNetwork      = "NETWORK"
 	CodeTimeout      = "TIMEOUT"
@@ -56,6 +57,9 @@ var (
 	ErrCAFile       = errors.New("the CA bundle cannot be read or holds no certificate")
 	ErrSource       = errors.New("the path is not a folder or a tar.gz file that can be sent")
 	ErrNotGzip      = errors.New("the file is not a gzip stream")
+	ErrHasGit       = errors.New("the folder has a .git entry, and packing it would send the history and maybe credentials")
+	ErrTooBig       = errors.New("the archive is larger than the limit")
+	ErrNotLoopback  = errors.New("the http server name does not resolve to a loopback address")
 	ErrEmpty        = errors.New("the folder or file is empty")
 	ErrRetries      = errors.New("the number of retries is out of range")
 	ErrBadResponse  = errors.New("the server answered with something that is not a Dhow ingest reply")

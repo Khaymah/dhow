@@ -70,7 +70,7 @@ func TestAFolderIsPackedAndSentWithItsOwnDigest(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "index.html"), []byte("<h1>hi</h1>"), 0o600))
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "assets"), 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "assets", "app.js"), []byte("1"), 0o600))
-	pkg, err := ingestpush.Prepare(dir)
+	pkg, err := ingestpush.Prepare(dir, ingestpush.PrepareOptions{})
 	require.NoError(t, err)
 	defer pkg.Close()
 	srv := newFake(t, stored(pkg.Digest, true))

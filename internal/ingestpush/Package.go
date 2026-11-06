@@ -18,12 +18,24 @@ const (
 	gzipMagic1  = 0x8b
 )
 
+const (
+	DefaultMaxBytes = 1 << 30
+	expandFactor    = 8
+	gitDir          = ".git"
+)
+
+type PrepareOptions struct {
+	IncludeGit bool
+	MaxBytes   int64
+}
+
 type Package struct {
-	Path    string
-	Digest  string
-	Size    int64
-	Packed  bool
-	Entries int
+	Path     string
+	Digest   string
+	Size     int64
+	Packed   bool
+	Entries  int
+	Unpacked int64
 
 	cleanup func()
 }
@@ -35,22 +47,25 @@ func (p *Package) Close() {
 	}
 }
 
-func Prepare(source string) (*Package, error) {
+func Prepare(source string, o PrepareOptions) (*Package, error) {
+	if o.MaxBytes <= 0 {
+		o.MaxBytes = DefaultMaxBytes
+	}
 	info, err := os.Stat(source)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSource, err)
 	}
 	switch {
 	case info.IsDir():
-		return packFolder(source)
+		return packFolder(source, o)
 	case info.Mode().IsRegular():
-		return inspectFile(source, false, nil)
+		return inspectFile(source, false, nil, o)
 	default:
 		return nil, ErrSource
 	}
 }
 
-func packFolder(dir string) (*Package, error) {
+func packFolder(dir string, o PrepareOptions) (*Package, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSource, err)
@@ -60,6 +75,9 @@ func packFolder(dir string) (*Package, error) {
 	}
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
+		if e.Name() == gitDir && !o.IncludeGit {
+			return nil, &Error{Class: ClassRefused, Code: CodePackHasGit, Err: ErrHasGit}
+		}
 		names = append(names, e.Name())
 	}
 	slices.Sort(names)
@@ -77,7 +95,7 @@ func packFolder(dir string) (*Package, error) {
 		remove()
 		return nil, fmt.Errorf("%w: %w", ErrSource, err)
 	}
-	p, err := inspectFile(tmp.Name(), true, remove)
+	p, err := inspectFile(tmp.Name(), true, remove, o)
 	if err != nil {
 		remove()
 		return nil, err
@@ -85,7 +103,7 @@ func packFolder(dir string) (*Package, error) {
 	return p, nil
 }
 
-func inspectFile(path string, packed bool, cleanup func()) (*Package, error) {
+func inspectFile(path string, packed bool, cleanup func(), o PrepareOptions) (*Package, error) {
 	f, err := os.Open(path) //nolint:gosec // The path is the file the user named or our own temporary archive.
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSource, err)
@@ -105,7 +123,10 @@ func inspectFile(path string, packed bool, cleanup func()) (*Package, error) {
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSource, err)
 	}
-	entries, err := preflight(f)
+	if info.Size() > o.MaxBytes {
+		return nil, &Error{Class: ClassRefused, Code: CodeArtifactTooLarge, Err: ErrTooBig}
+	}
+	entries, unpacked, err := preflight(f, o.MaxBytes*expandFactor)
 	if err != nil {
 		return nil, err
 	}
@@ -117,17 +138,19 @@ func inspectFile(path string, packed bool, cleanup func()) (*Package, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSource, err)
 	}
-	return &Package{Path: path, Digest: hex.EncodeToString(h.Sum(nil)), Size: n, Packed: packed, Entries: entries, cleanup: cleanup}, nil
+	return &Package{Path: path, Digest: hex.EncodeToString(h.Sum(nil)), Size: n, Packed: packed, Entries: entries, Unpacked: unpacked, cleanup: cleanup}, nil
 }
 
-func preflight(r io.Reader) (int, error) {
-	totals, err := archive.Walk(r, archive.Limits{}, func(archive.Entry, io.Reader) error { return nil })
+func preflight(r io.Reader, limit int64) (int, int64, error) {
+	totals, err := archive.Walk(r, archive.Limits{MaxBytes: limit}, func(archive.Entry, io.Reader) error { return nil })
 	switch {
 	case err == nil:
-		return totals.Entries, nil
-	case errors.Is(err, archive.ErrUnsafe), errors.Is(err, archive.ErrTooLarge):
-		return 0, &Error{Class: ClassInput, Code: CodeArchiveUnsafe, Err: err}
+		return totals.Entries, totals.Bytes, nil
+	case errors.Is(err, archive.ErrTooLarge):
+		return 0, 0, &Error{Class: ClassRefused, Code: CodeArtifactTooLarge, Err: ErrTooBig}
+	case errors.Is(err, archive.ErrUnsafe):
+		return 0, 0, &Error{Class: ClassInput, Code: CodeArchiveUnsafe, Err: err}
 	default:
-		return 0, fmt.Errorf("%w: %w", ErrSource, err)
+		return 0, 0, fmt.Errorf("%w: %w", ErrSource, err)
 	}
 }

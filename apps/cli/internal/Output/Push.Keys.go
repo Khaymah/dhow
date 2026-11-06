@@ -47,4 +47,11 @@ const (
 	KeyPushNoRun             Key = "push.norun"
 )
 
+const (
+	KeyPushMaxBytes       Key = "push.maxbytes"
+	KeyPushPathIsToken    Key = "push.path.token"
+	KeyPushPacked         Key = "push.packed"
+	KeyPushErrNotLoopback Key = "push.err.notloopback"
+)
+
 func CodeKey(code string) Key { return Key("push.code." + code) }

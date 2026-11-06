@@ -21,6 +21,7 @@ type dryRunReport struct {
 	SizeBytes int64             `json:"SizeBytes"`
 	Packed    bool              `json:"Packed"`
 	Entries   int               `json:"Entries"`
+	Unpacked  int64             `json:"UnpackedBytes"`
 	URL       string            `json:"Url,omitempty"`
 	Headers   map[string]string `json:"Headers"`
 }
@@ -83,6 +84,7 @@ var inputKeys = []struct {
 	{ingestpush.ErrCAFile, output.KeyPushErrCAFile},
 	{ingestpush.ErrNotGzip, output.KeyPushErrNotGzip},
 	{ingestpush.ErrEmpty, output.KeyPushErrEmpty},
+	{ingestpush.ErrNotLoopback, output.KeyPushErrNotLoopback},
 	{ingestpush.ErrRetries, output.KeyPushRetries},
 	{archive.ErrUnsafe, output.KeyPushErrUnsafe},
 	{archive.ErrUnsupported, output.KeyPushErrUnsupported},
@@ -108,7 +110,7 @@ func renderDryRun(c output.Catalog, env Env, opts pushOptions, meta ingestpush.M
 	if err != nil {
 		return fail(c, env, err)
 	}
-	report := dryRunReport{DryRun: true, Digest: pkg.Digest, SizeBytes: pkg.Size, Packed: pkg.Packed, Entries: pkg.Entries, Headers: map[string]string{}}
+	report := dryRunReport{DryRun: true, Digest: pkg.Digest, SizeBytes: pkg.Size, Packed: pkg.Packed, Entries: pkg.Entries, Unpacked: pkg.Unpacked, Headers: map[string]string{}}
 	for k := range headers {
 		report.Headers[k] = headers.Get(k)
 	}
@@ -123,7 +125,7 @@ func renderDryRun(c output.Catalog, env Env, opts pushOptions, meta ingestpush.M
 	if opts.format == FormatJSON {
 		return writeJSON(env.Out, report)
 	}
-	lines := []string{c.T(output.KeyPushDryRun), c.T(output.KeyPushDigest, pkg.Digest), c.T(output.KeyPushSize, pkg.Size)}
+	lines := []string{c.T(output.KeyPushDryRun), c.T(output.KeyPushDigest, pkg.Digest), c.T(output.KeyPushSize, pkg.Size), c.T(output.KeyPushPacked, pkg.Entries, pkg.Unpacked, pkg.Size)}
 	if report.URL != "" {
 		lines = append(lines, "PUT "+output.Printable(report.URL))
 	}
@@ -139,7 +141,7 @@ func renderDryRun(c output.Catalog, env Env, opts pushOptions, meta ingestpush.M
 	return ExitValid
 }
 
-func renderResult(c output.Catalog, env Env, opts pushOptions, res ingestpush.Result) int {
+func renderResult(c output.Catalog, env Env, opts pushOptions, res ingestpush.Result, pkg *ingestpush.Package) int {
 	if opts.format == FormatJSON {
 		return writeJSON(env.Out, resultReport{
 			Name: res.Name, Digest: res.Digest, SizeBytes: res.SizeBytes, Created: res.Created, Triggered: res.Triggered, Reason: res.Reason,
@@ -150,7 +152,7 @@ func renderResult(c output.Catalog, env Env, opts pushOptions, res ingestpush.Re
 	if !res.Created {
 		head = output.KeyPushDuplicate
 	}
-	lines := []string{c.T(head, output.Printable(res.Name), res.Digest, res.SizeBytes)}
+	lines := []string{c.T(head, output.Printable(res.Name), res.Digest, res.SizeBytes), c.T(output.KeyPushPacked, pkg.Entries, pkg.Unpacked, pkg.Size)}
 	switch {
 	case res.Triggered && res.RunID != "":
 		lines = append(lines, c.T(output.KeyPushRun, res.RunNumber, output.Printable(res.RunURL)))

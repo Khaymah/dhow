@@ -101,21 +101,74 @@ func TestTheCommandLinksOnlyTheAllowedPackages(t *testing.T) {
 
 const pushPackage = "github.com/Khaymah/dhow/internal/ingestpush"
 
+var riskyImports = []string{"net", "crypto/tls", "crypto/x509", "syscall", "unsafe", "os/exec"}
+
+var riskyException = map[string][]string{
+	"cel.dev/expr": {"unsafe"},
+	"github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1": {"unsafe"},
+	"google.golang.org/genproto/googleapis/api/expr/v1alpha1":      {"unsafe"},
+	"google.golang.org/protobuf/internal/impl":                     {"unsafe"},
+	"google.golang.org/protobuf/internal/protolazy":                {"unsafe"},
+	"google.golang.org/protobuf/internal/strs":                     {"unsafe"},
+	"google.golang.org/protobuf/reflect/protoreflect":              {"unsafe"},
+	"google.golang.org/protobuf/types/descriptorpb":                {"unsafe"},
+	"google.golang.org/protobuf/types/gofeaturespb":                {"unsafe"},
+	"google.golang.org/protobuf/types/known/anypb":                 {"unsafe"},
+	"google.golang.org/protobuf/types/known/durationpb":            {"unsafe"},
+	"google.golang.org/protobuf/types/known/emptypb":               {"unsafe"},
+	"google.golang.org/protobuf/types/known/structpb":              {"unsafe"},
+	"google.golang.org/protobuf/types/known/timestamppb":           {"unsafe"},
+	"google.golang.org/protobuf/types/known/wrapperspb":            {"unsafe"},
+	"github.com/antlr4-go/antlr/v4":                                {"syscall"},
+	"github.com/Khaymah/dhow/internal/safefile":                    {"syscall"},
+}
+
+func risky(imp string) bool {
+	return slices.Contains(riskyImports, imp) || strings.HasPrefix(imp, "net/http") || strings.HasPrefix(imp, "golang.org/x/sys/")
+}
+
 func TestOnlyThePushClientImportsTheNetworkPackages(t *testing.T) {
-	cmd := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}} {{join .Imports \" \"}}", ".")
-	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0")
-	out, err := cmd.Output()
-	require.NoError(t, err)
-	network := []string{"net", "net/http", "crypto/tls", "crypto/x509"}
-	for _, line := range strings.Split(string(out), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) == 0 || !strings.HasPrefix(fields[0], "github.com/Khaymah/dhow/") || fields[0] == pushPackage {
-			continue
-		}
-		for _, imp := range fields[1:] {
-			assert.NotContains(t, network, imp, "%s imports %s: only %s may talk to the network", fields[0], imp, pushPackage)
-		}
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		t.Run(goos, func(t *testing.T) {
+			cmd := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}} {{join .Imports \" \"}}", ".")
+			cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH=amd64", "CGO_ENABLED=0")
+			out, err := cmd.Output()
+			require.NoError(t, err)
+			for _, line := range strings.Split(string(out), "\n") {
+				fields := strings.Fields(line)
+				if len(fields) == 0 || fields[0] == pushPackage {
+					continue
+				}
+				first, _, _ := strings.Cut(fields[0], "/")
+				if !strings.Contains(first, ".") {
+					continue
+				}
+				for _, imp := range fields[1:] {
+					if risky(imp) && !slices.Contains(riskyException[fields[0]], imp) {
+						assert.Fail(t, "forbidden import", "%s imports %s: only %s may talk to the network or the system (ADR-0099)", fields[0], imp, pushPackage)
+					}
+				}
+			}
+		})
 	}
+}
+
+func TestOnlyThePushCommandImportsThePushClient(t *testing.T) {
+	root := filepath.Join("..", "..", "..", "..")
+	err := filepath.WalkDir(filepath.Join(root, "apps", "cli"), func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return err
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(raw), pushPackage) {
+			assert.True(t, strings.HasPrefix(filepath.Base(path), "Push") && filepath.Base(filepath.Dir(path)) == "App", "%s imports %s", path, pushPackage)
+		}
+		return nil
+	})
+	require.NoError(t, err)
 }
 
 func difference(a, b []string) []string {

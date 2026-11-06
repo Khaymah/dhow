@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"time"
@@ -41,23 +42,29 @@ type Retry struct {
 	Code    string
 }
 
+type Resolver interface {
+	LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error)
+}
+
 type Options struct {
-	Server  string
-	Token   string
-	Meta    Meta
-	CAFile  string
-	Retries int
-	Lang    string
-	Proxy   func(*http.Request) (*url.URL, error)
-	Sleep   func(context.Context, time.Duration) error
-	OnRetry func(Retry)
+	Server   string
+	Token    string
+	Meta     Meta
+	CAFile   string
+	Retries  int
+	Prepare  PrepareOptions
+	Lang     string
+	Proxy    func(*http.Request) (*url.URL, error)
+	Resolver Resolver
+	Sleep    func(context.Context, time.Duration) error
+	OnRetry  func(Retry)
 }
 
 func Push(ctx context.Context, o Options, source string) (Result, error) {
 	if err := o.Meta.Validate(); err != nil {
 		return Result{}, inputError(err)
 	}
-	pkg, err := Prepare(source)
+	pkg, err := Prepare(source, o.Prepare)
 	if err != nil {
 		return Result{}, asError(err)
 	}
@@ -92,7 +99,7 @@ func Upload(ctx context.Context, o Options, pkg *Package) (Result, error) {
 	if err != nil {
 		return Result{}, inputError(err)
 	}
-	client, err := newClient(o)
+	client, err := newClient(o, target.Scheme == "http")
 	if err != nil {
 		return Result{}, inputError(err)
 	}
@@ -186,6 +193,8 @@ func transportFailure(ctx context.Context, err error) *Error {
 	var verify *tls.CertificateVerificationError
 	var record tls.RecordHeaderError
 	switch {
+	case errors.Is(err, ErrNotLoopback):
+		return inputError(ErrNotLoopback)
 	case errors.As(err, &verify), errors.As(err, &record):
 		return &Error{Class: ClassInput, Code: CodeTLS, Err: err}
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
@@ -195,7 +204,7 @@ func transportFailure(ctx context.Context, err error) *Error {
 	}
 }
 
-func newClient(o Options) (*http.Client, error) {
+func newClient(o Options, loopbackOnly bool) (*http.Client, error) {
 	pool, err := roots(o.CAFile)
 	if err != nil {
 		return nil, err
@@ -206,7 +215,7 @@ func newClient(o Options) (*http.Client, error) {
 	}
 	tr := &http.Transport{
 		Proxy:               proxy,
-		DialContext:         (&net.Dialer{Timeout: dialTimeout, KeepAlive: dialTimeout}).DialContext,
+		DialContext:         dialer(o.Resolver, loopbackOnly),
 		TLSHandshakeTimeout: handshakeLimit,
 		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: pool},
 		DisableCompression:  true,
@@ -216,6 +225,35 @@ func newClient(o Options) (*http.Client, error) {
 		Transport:     tr,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}, nil
+}
+
+func dialer(resolver Resolver, loopbackOnly bool) func(context.Context, string, string) (net.Conn, error) {
+	d := &net.Dialer{Timeout: dialTimeout, KeepAlive: dialTimeout}
+	if !loopbackOnly {
+		return d.DialContext
+	}
+	if resolver == nil {
+		resolver = net.DefaultResolver
+	}
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+		addrs, err := resolver.LookupNetIP(ctx, "ip", host)
+		if err != nil {
+			return nil, err
+		}
+		if len(addrs) == 0 {
+			return nil, ErrNotLoopback
+		}
+		for _, a := range addrs {
+			if !a.Unmap().IsLoopback() {
+				return nil, ErrNotLoopback
+			}
+		}
+		return d.DialContext(ctx, network, net.JoinHostPort(addrs[0].String(), port))
+	}
 }
 
 func roots(caFile string) (*x509.CertPool, error) {
