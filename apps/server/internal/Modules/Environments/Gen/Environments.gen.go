@@ -17,6 +17,48 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for DeployTargetHostCheckReason.
+const (
+	AuthFailed        DeployTargetHostCheckReason = "auth_failed"
+	CurrentNotSymlink DeployTargetHostCheckReason = "current_not_symlink"
+	DiskLow           DeployTargetHostCheckReason = "disk_low"
+	Diverged          DeployTargetHostCheckReason = "diverged"
+	HostKeyMismatch   DeployTargetHostCheckReason = "host_key_mismatch"
+	Locked            DeployTargetHostCheckReason = "locked"
+	Ok                DeployTargetHostCheckReason = "ok"
+	PathMissing       DeployTargetHostCheckReason = "path_missing"
+	StateCorrupt      DeployTargetHostCheckReason = "state_corrupt"
+	Unreachable       DeployTargetHostCheckReason = "unreachable"
+)
+
+// Valid indicates whether the value is a known member of the DeployTargetHostCheckReason enum.
+func (e DeployTargetHostCheckReason) Valid() bool {
+	switch e {
+	case AuthFailed:
+		return true
+	case CurrentNotSymlink:
+		return true
+	case DiskLow:
+		return true
+	case Diverged:
+		return true
+	case HostKeyMismatch:
+		return true
+	case Locked:
+		return true
+	case Ok:
+		return true
+	case PathMissing:
+		return true
+	case StateCorrupt:
+		return true
+	case Unreachable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeployTargetKind.
 const (
 	Compose DeployTargetKind = "compose"
@@ -281,6 +323,43 @@ type DeployTarget struct {
 	Version int64 `json:"Version"`
 }
 
+// DeployTargetCheck defines model for DeployTargetCheck.
+type DeployTargetCheck struct {
+	Hosts []DeployTargetHostCheck `json:"Hosts"`
+}
+
+// DeployTargetCheckResponse defines model for DeployTargetCheckResponse.
+type DeployTargetCheckResponse struct {
+	Data  *DeployTargetCheck `json:"Data,omitempty"`
+	Error *ErrorDetail       `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// DeployTargetCheckStarted defines model for DeployTargetCheckStarted.
+type DeployTargetCheckStarted struct {
+	RunId     openapi_types.UUID `json:"RunId"`
+	RunNumber int64              `json:"RunNumber"`
+}
+
+// DeployTargetCheckStartedResponse defines model for DeployTargetCheckStartedResponse.
+type DeployTargetCheckStartedResponse struct {
+	Data  *DeployTargetCheckStarted `json:"Data,omitempty"`
+	Error *ErrorDetail              `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
 // DeployTargetComposeSettings defines model for DeployTargetComposeSettings.
 type DeployTargetComposeSettings struct {
 	AllowUnsafeCompose *bool `json:"AllowUnsafeCompose,omitempty"`
@@ -309,6 +388,26 @@ type DeployTargetHost struct {
 	// Position The deploy order, from 1.
 	Position int `json:"Position"`
 }
+
+// DeployTargetHostCheck defines model for DeployTargetHostCheck.
+type DeployTargetHostCheck struct {
+	Checked           bool                         `json:"Checked"`
+	CheckedAt         *time.Time                   `json:"CheckedAt,omitempty"`
+	CurrentReleaseId  *string                      `json:"CurrentReleaseId,omitempty"`
+	FreeBytes         *int64                       `json:"FreeBytes,omitempty"`
+	Host              string                       `json:"Host"`
+	HostId            openapi_types.UUID           `json:"HostId"`
+	Locked            bool                         `json:"Locked"`
+	Message           *string                      `json:"Message,omitempty"`
+	Port              int                          `json:"Port"`
+	Position          int                          `json:"Position"`
+	Reason            *DeployTargetHostCheckReason `json:"Reason,omitempty"`
+	Repaired          bool                         `json:"Repaired"`
+	VerifiedReleaseId *string                      `json:"VerifiedReleaseId,omitempty"`
+}
+
+// DeployTargetHostCheckReason defines model for DeployTargetHostCheck.Reason.
+type DeployTargetHostCheckReason string
 
 // DeployTargetHostInput defines model for DeployTargetHostInput.
 type DeployTargetHostInput struct {
@@ -867,6 +966,12 @@ type ServerInterface interface {
 	// UpdateDeployTarget Change a deploy target
 	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName})
 	UpdateDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
+	// GetDeployTargetCheck Read the last check of every host of a deploy target
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check)
+	GetDeployTargetCheck(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
+	// StartDeployTargetCheck Check a deploy target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check)
+	StartDeployTargetCheck(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
 	// GenerateDeployTargetKey Make the deploy key of a target
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/generate-key)
 	GenerateDeployTargetKey(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
@@ -987,6 +1092,18 @@ func (_ Unimplemented) GetDeployTarget(w http.ResponseWriter, r *http.Request, i
 // UpdateDeployTarget Change a deploy target
 // (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName})
 func (_ Unimplemented) UpdateDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetDeployTargetCheck Read the last check of every host of a deploy target
+// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check)
+func (_ Unimplemented) GetDeployTargetCheck(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// StartDeployTargetCheck Check a deploy target
+// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check)
+func (_ Unimplemented) StartDeployTargetCheck(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1725,6 +1842,112 @@ func (siw *ServerInterfaceWrapper) UpdateDeployTarget(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateDeployTarget(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDeployTargetCheck operation middleware
+func (siw *ServerInterfaceWrapper) GetDeployTargetCheck(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDeployTargetCheck(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartDeployTargetCheck operation middleware
+func (siw *ServerInterfaceWrapper) StartDeployTargetCheck(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartDeployTargetCheck(w, r, id, projectId, environmentName, targetName)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2615,6 +2838,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/generate-key", wrapper.GenerateDeployTargetKey)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check", wrapper.GetDeployTargetCheck)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check", wrapper.StartDeployTargetCheck)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts", wrapper.AddDeployTargetHost)
 	})
 	r.Group(func(r chi.Router) {
@@ -3187,6 +3416,90 @@ type UpdateDeployTargetdefaultJSONResponse struct {
 }
 
 func (response UpdateDeployTargetdefaultJSONResponse) VisitUpdateDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDeployTargetCheckRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+}
+
+type GetDeployTargetCheckResponseObject interface {
+	VisitGetDeployTargetCheckResponse(w http.ResponseWriter) error
+}
+
+type GetDeployTargetCheck200JSONResponse DeployTargetCheckResponse
+
+func (response GetDeployTargetCheck200JSONResponse) VisitGetDeployTargetCheckResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDeployTargetCheckdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response GetDeployTargetCheckdefaultJSONResponse) VisitGetDeployTargetCheckResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDeployTargetCheckRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+}
+
+type StartDeployTargetCheckResponseObject interface {
+	VisitStartDeployTargetCheckResponse(w http.ResponseWriter) error
+}
+
+type StartDeployTargetCheck202JSONResponse DeployTargetCheckStartedResponse
+
+func (response StartDeployTargetCheck202JSONResponse) VisitStartDeployTargetCheckResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDeployTargetCheckdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response StartDeployTargetCheckdefaultJSONResponse) VisitStartDeployTargetCheckResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3800,6 +4113,12 @@ type StrictServerInterface interface {
 	// UpdateDeployTarget Change a deploy target
 	// (PUT /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName})
 	UpdateDeployTarget(ctx context.Context, request UpdateDeployTargetRequestObject) (UpdateDeployTargetResponseObject, error)
+	// GetDeployTargetCheck Read the last check of every host of a deploy target
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check)
+	GetDeployTargetCheck(ctx context.Context, request GetDeployTargetCheckRequestObject) (GetDeployTargetCheckResponseObject, error)
+	// StartDeployTargetCheck Check a deploy target
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check)
+	StartDeployTargetCheck(ctx context.Context, request StartDeployTargetCheckRequestObject) (StartDeployTargetCheckResponseObject, error)
 	// GenerateDeployTargetKey Make the deploy key of a target
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/generate-key)
 	GenerateDeployTargetKey(ctx context.Context, request GenerateDeployTargetKeyRequestObject) (GenerateDeployTargetKeyResponseObject, error)
@@ -4288,6 +4607,64 @@ func (sh *strictHandler) UpdateDeployTarget(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateDeployTargetResponseObject); ok {
 		if err := validResponse.VisitUpdateDeployTargetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDeployTargetCheck operation middleware
+func (sh *strictHandler) GetDeployTargetCheck(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request GetDeployTargetCheckRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDeployTargetCheck(ctx, request.(GetDeployTargetCheckRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDeployTargetCheck")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDeployTargetCheckResponseObject); ok {
+		if err := validResponse.VisitGetDeployTargetCheckResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartDeployTargetCheck operation middleware
+func (sh *strictHandler) StartDeployTargetCheck(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request StartDeployTargetCheckRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartDeployTargetCheck(ctx, request.(StartDeployTargetCheckRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartDeployTargetCheck")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartDeployTargetCheckResponseObject); ok {
+		if err := validResponse.VisitStartDeployTargetCheckResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

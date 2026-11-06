@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -42,7 +43,10 @@ var hostStateOfEvent = map[string]string{
 	deployrelease.EventRollbackFailed: "rollback_failed",
 }
 
-const groupScenarioPrefix = "rolling-"
+const (
+	groupScenarioPrefix = "rolling-"
+	checkScenarioPrefix = "check-"
+)
 
 func (d deployWorld) releasingOneHost(t *testing.T) releaseJob {
 	t.Helper()
@@ -108,6 +112,7 @@ func TestTheReportsOfTheRealPluginRunAreAcceptedByTheServerAndEndInTheSameState(
 	}
 	files, err := filepath.Glob(filepath.Join(dir, "*.jsonl"))
 	require.NoError(t, err)
+	files = slices.DeleteFunc(files, func(f string) bool { return strings.HasPrefix(filepath.Base(f), checkScenarioPrefix) })
 	require.NotEmpty(t, files, "the deploy end to end run left no reports")
 	for _, file := range files {
 		name := strings.TrimSuffix(filepath.Base(file), ".jsonl")

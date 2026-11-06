@@ -21,6 +21,7 @@ jobs:
   image:
     name: Build, sign and attest the image
     runs-on: ubuntu-24.04
+    needs: deploy-ssh-image
     permissions:
       contents: read
       packages: write
@@ -54,7 +55,8 @@ jobs:
       - name: Smoke test the tagged commit
         env:
           VERSION: ${{ steps.meta.outputs.version }}
-        run: make smoke IMAGE=dhow:release-check
+          DEPLOY_SSH_PINNED: ${{ env.DEPLOY_SSH_IMAGE_NAME }}@${{ needs.deploy-ssh-image.outputs.digest }}
+        run: make smoke IMAGE=dhow:release-check DEPLOY_SSH_PINNED="$DEPLOY_SSH_PINNED"
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
@@ -72,8 +74,16 @@ jobs:
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}
             COMMIT=${{ github.sha }}
+            DEPLOY_SSH_PINNED=${{ env.DEPLOY_SSH_IMAGE_NAME }}@${{ needs.deploy-ssh-image.outputs.digest }}
           provenance: false
           sbom: false
+      - name: Check that the image carries the pinned plugin image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          DEPLOY_SSH_PINNED: ${{ env.DEPLOY_SSH_IMAGE_NAME }}@${{ needs.deploy-ssh-image.outputs.digest }}
+        run: |
+          docker pull "${IMAGE_NAME}@${DIGEST}"
+          docker run --rm "${IMAGE_NAME}@${DIGEST}" version | grep -qxF "deploy plugin image $DEPLOY_SSH_PINNED"
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Sign the image by digest (keyless)
         env:
@@ -345,7 +355,7 @@ jobs:
 
   binaries:
     name: Build the binaries
-    needs: git-image
+    needs: [git-image, deploy-ssh-image]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -383,19 +393,22 @@ jobs:
           VERSION: ${{ steps.meta.outputs.version }}
           COMMIT: ${{ github.sha }}
           CHECKOUT_IMAGE: ${{ env.GIT_IMAGE_NAME }}@${{ needs.git-image.outputs.digest }}
-        run: make dist VERSION="$VERSION" COMMIT="$COMMIT" CHECKOUT_IMAGE="$CHECKOUT_IMAGE"
+          DEPLOY_SSH_PINNED: ${{ env.DEPLOY_SSH_IMAGE_NAME }}@${{ needs.deploy-ssh-image.outputs.digest }}
+        run: make dist VERSION="$VERSION" COMMIT="$COMMIT" CHECKOUT_IMAGE="$CHECKOUT_IMAGE" DEPLOY_SSH_PINNED="$DEPLOY_SSH_PINNED"
       - name: Check that a second build is byte for byte identical
         env:
           VERSION: ${{ steps.meta.outputs.version }}
           COMMIT: ${{ github.sha }}
           CHECKOUT_IMAGE: ${{ env.GIT_IMAGE_NAME }}@${{ needs.git-image.outputs.digest }}
+          DEPLOY_SSH_PINNED: ${{ env.DEPLOY_SSH_IMAGE_NAME }}@${{ needs.deploy-ssh-image.outputs.digest }}
         run: |
-          DIST_DIR="$RUNNER_TEMP/dist-again" make dist VERSION="$VERSION" COMMIT="$COMMIT" CHECKOUT_IMAGE="$CHECKOUT_IMAGE"
+          DIST_DIR="$RUNNER_TEMP/dist-again" make dist VERSION="$VERSION" COMMIT="$COMMIT" CHECKOUT_IMAGE="$CHECKOUT_IMAGE" DEPLOY_SSH_PINNED="$DEPLOY_SSH_PINNED"
           diff dist/SHA256SUMS "$RUNNER_TEMP/dist-again/SHA256SUMS"
       - name: Check the archives
         env:
           VERSION: ${{ steps.meta.outputs.version }}
           CHECKOUT_IMAGE: ${{ env.GIT_IMAGE_NAME }}@${{ needs.git-image.outputs.digest }}
+          DEPLOY_SSH_PINNED: ${{ env.DEPLOY_SSH_IMAGE_NAME }}@${{ needs.deploy-ssh-image.outputs.digest }}
         run: |
           (cd dist && sha256sum --check --strict SHA256SUMS)
           for arch in amd64 arm64; do
@@ -410,6 +423,7 @@ jobs:
           tar -xzf "dist/dhow-server_${VERSION}_linux_amd64.tar.gz" -C "$RUNNER_TEMP" dhow-server
           go version -m "$RUNNER_TEMP/dhow-server" | grep -q 'CGO_ENABLED=0'
           "$RUNNER_TEMP/dhow-server" install --help
+          "$RUNNER_TEMP/dhow-server" version | grep -qxF "deploy plugin image $DEPLOY_SSH_PINNED"
           tar -xzf "dist/dhow-runner_${VERSION}_linux_amd64.tar.gz" -C "$RUNNER_TEMP" dhow-runner dhow-runner.service
           go version -m "$RUNNER_TEMP/dhow-runner" | grep -q 'CGO_ENABLED=0'
           "$RUNNER_TEMP/dhow-runner" version | grep -qF "dhow-runner $VERSION "

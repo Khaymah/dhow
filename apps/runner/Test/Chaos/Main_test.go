@@ -58,6 +58,9 @@ func setUp() ([]func(), error) {
 	if err := os.MkdirAll(s.runnerDir, 0o700); err != nil {
 		return nil, err
 	}
+	if err := s.initKeyring(); err != nil {
+		return nil, err
+	}
 	certs := filepath.Join(work, "certs")
 	if err := os.MkdirAll(certs, 0o700); err != nil {
 		return nil, err

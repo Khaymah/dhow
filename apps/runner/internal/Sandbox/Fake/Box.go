@@ -13,6 +13,7 @@ import (
 	"slices"
 	"sync"
 	"syscall"
+	"time"
 
 	sandbox "github.com/Khaymah/dhow/apps/runner/internal/Sandbox"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
@@ -126,8 +127,13 @@ func (b *box) Exec(ctx context.Context, spec sandbox.StepSpec) (sandbox.StepResu
 
 func (b *box) watch(ctx context.Context, signals chan syscall.Signal, stop <-chan struct{}, halt func(), rec Step, result chan<- sandbox.StepResult) {
 	defer close(result)
+	var wound <-chan time.Time
 	for {
 		select {
+		case <-wound:
+			result <- sandbox.StepResult{ExitCode: rec.TermExit}
+			halt()
+			return
 		case <-stop:
 			return
 		case <-b.killed:
@@ -140,6 +146,10 @@ func (b *box) watch(ctx context.Context, signals chan syscall.Signal, stop <-cha
 			return
 		case sig := <-signals:
 			if (sig == syscall.SIGTERM && rec.IgnoreTerm) || (sig == syscall.SIGKILL && rec.IgnoreKill) {
+				continue
+			}
+			if sig == syscall.SIGTERM && rec.TermMillis > 0 {
+				wound = time.After(time.Duration(rec.TermMillis) * time.Millisecond)
 				continue
 			}
 			result <- sandbox.StepResult{ExitCode: sandbox.ExitCodeForSignal(sig), Signal: sig}

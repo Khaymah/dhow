@@ -129,6 +129,11 @@ func (r *TestRunner) EndStep(ref *runnerv1.LeaseRef, index, exitCode int32) erro
 	return err
 }
 
+func (r *TestRunner) EndStepWith(ref *runnerv1.LeaseRef, index, exitCode int32, reason runnerv1.FailureReason) error {
+	_, err := r.Client.Lease.EndStep(context.Background(), connect.NewRequest(&runnerv1.EndStepRequest{Lease: ref, Index: index, ExitCode: exitCode, FailureReason: reason}))
+	return err
+}
+
 func Digest(g *Grant, result runnerv1.AttemptResult, exitCode int32, reason runnerv1.FailureReason) []byte {
 	return runnersig.CompletionDigest(g.Grant.GetAttemptId(), g.Ref.GetFencingToken(), int32(result), exitCode, int32(reason))
 }

@@ -103,7 +103,7 @@ func (a *attempt) runTransfer(ctx, jobCtx context.Context, argv []string, env ma
 		})
 		done <- stepEnd{res: res, err: err, ok: true}
 	}()
-	end, why, stopped := a.waitStep(ctx, jobCtx, jobCtx, done, stopExec)
+	end, why, stopped := a.waitStep(ctx, jobCtx, jobCtx, done, stopExec, 0)
 	if stopped {
 		a.pipe.Unblock()
 		return 0, why, false

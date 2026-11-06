@@ -2807,6 +2807,63 @@ paths:
                 $ref: "#/components/schemas/DeployTargetResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check:
+    get:
+      operationId: getDeployTargetCheck
+      tags: [targets]
+      summary: Read the last check of every host of a deploy target
+      description: >-
+        Needs `project.read`. For each host of the target, in order, the answer says whether a check has run and what it found: `Reason` is
+        `ok`, or `host_key_mismatch`, `unreachable`, `auth_failed`, `path_missing`, `current_not_symlink`, `state_corrupt`, `disk_low`,
+        `locked` or `diverged`. It also gives the release `current` points to, the last release that passed its health check, the free disk
+        space, and whether the state of Dhow for this host was written from this check (`Repaired`). A host that was never checked has
+        `Checked` false and no other fact.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+      responses:
+        "200":
+          description: The last check of every host.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetCheckResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: startDeployTargetCheck
+      tags: [targets]
+      summary: Check a deploy target
+      description: >-
+        Needs `deployment.check`. Starts a run of one job that runs the official deploy plugin in `check` mode on the target. The run
+        goes through the same gate as any deployment: the rules of the environment, its lock, approvals, and the secrets and egress that
+        the server computes. The plugin connects to every host with the pinned host key and reads `current`, the last release that passed
+        its health check, the free disk space and the lock, and changes nothing on the host. The answer is 202 with the number of the run;
+        read the result with GET on this path once the run ends. A host whose release was left `unknown` by a runner that died is
+        written from what the check found. Answers 422 `TARGET_CHECK_UNAVAILABLE` when this build of the server has no pinned image of
+        the plugin.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/EnvironmentName"
+        - $ref: "#/components/parameters/TargetName"
+      responses:
+        "202":
+          description: The check run was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployTargetCheckStartedResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts:
     post:
       operationId: addDeployTargetHost
@@ -8268,6 +8325,75 @@ components:
         UpdatedAt:
           type: string
           format: date-time
+    DeployTargetHostCheck:
+      type: object
+      additionalProperties: false
+      required: [HostId, Position, Host, Port, Checked, Locked, Repaired]
+      properties:
+        HostId:
+          type: string
+          format: uuid
+        Position:
+          type: integer
+        Host:
+          type: string
+        Port:
+          type: integer
+        Checked:
+          type: boolean
+        Reason:
+          type: string
+          enum: [ok, host_key_mismatch, unreachable, auth_failed, path_missing, current_not_symlink, state_corrupt, disk_low, locked, diverged]
+        Message:
+          type: string
+        CurrentReleaseId:
+          type: string
+        VerifiedReleaseId:
+          type: string
+        FreeBytes:
+          type: integer
+          format: int64
+        Locked:
+          type: boolean
+        Repaired:
+          type: boolean
+        CheckedAt:
+          type: string
+          format: date-time
+    DeployTargetCheck:
+      type: object
+      additionalProperties: false
+      required: [Hosts]
+      properties:
+        Hosts:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeployTargetHostCheck"
+    DeployTargetCheckResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/DeployTargetCheck"
+    DeployTargetCheckStarted:
+      type: object
+      additionalProperties: false
+      required: [RunId, RunNumber]
+      properties:
+        RunId:
+          type: string
+          format: uuid
+        RunNumber:
+          type: integer
+          format: int64
+    DeployTargetCheckStartedResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/DeployTargetCheckStarted"
     DeployTargetResponse:
       allOf:
         - $ref: "#/components/schemas/Envelope"
@@ -8660,10 +8786,11 @@ components:
       enum: [waiting, active, succeeded, failed, canceled, skipped]
     RunJobGate:
       type: string
-      enum: [approval, timer, paused, environment_busy]
+      enum: [approval, timer, paused, environment_busy, target_busy]
       description: >-
         Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the
-        environment to be resumed, or for another run that holds the environment.
+        environment to be resumed, for another run that holds the environment, or (`target_busy`) for another job of the
+        same run that is deploying to the same target.
     RunIssue:
       type: object
       additionalProperties: false

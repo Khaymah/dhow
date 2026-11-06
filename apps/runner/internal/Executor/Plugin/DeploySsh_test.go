@@ -31,7 +31,7 @@ func TestTheManifestOfTheSshPluginIsOneTheRunnerAcceptsAndTheServerCanRelyOn(t *
 
 	assert.True(t, m.Inputs[jobspec.TargetInput].Required, "the server pins the target by this input name")
 	artifact := m.Inputs[jobspec.TargetArtifactInput]
-	assert.True(t, artifact.Required)
+	assert.False(t, artifact.Required, "only a deploy needs the artifact, a check does not")
 	assert.True(t, artifact.IsArtifact(), "the runner hands the archive over as a file for this input")
 	assert.Equal(t, map[string]string{jobspec.TargetArtifactInput: "web"}, m.ArtifactNames(map[string]string{jobspec.TargetArtifactInput: "web", jobspec.TargetInput: "prod"}))
 

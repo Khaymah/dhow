@@ -61,6 +61,7 @@ const (
 	Approval        RunJobGate = "approval"
 	EnvironmentBusy RunJobGate = "environment_busy"
 	Paused          RunJobGate = "paused"
+	TargetBusy      RunJobGate = "target_busy"
 	Timer           RunJobGate = "timer"
 )
 
@@ -72,6 +73,8 @@ func (e RunJobGate) Valid() bool {
 	case EnvironmentBusy:
 		return true
 	case Paused:
+		return true
+	case TargetBusy:
 		return true
 	case Timer:
 		return true
@@ -391,7 +394,7 @@ type RunJob struct {
 	FailureReason *string    `json:"FailureReason,omitempty"`
 	FinishedAt    *time.Time `json:"FinishedAt,omitempty"`
 
-	// Gate Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the environment to be resumed, or for another run that holds the environment.
+	// Gate Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the environment to be resumed, for another run that holds the environment, or (`target_busy`) for another job of the same run that is deploying to the same target.
 	Gate *RunJobGate `json:"Gate,omitempty"`
 
 	// GateOpensAt With the `timer` gate, or after it, when the wait timer of the environment ends.
@@ -413,7 +416,7 @@ type RunJob struct {
 	State     RunJobState       `json:"State"`
 }
 
-// RunJobGate Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the environment to be resumed, or for another run that holds the environment.
+// RunJobGate Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the environment to be resumed, for another run that holds the environment, or (`target_busy`) for another job of the same run that is deploying to the same target.
 type RunJobGate string
 
 // RunJobKind `discovery`: the job Dhow adds to read the pipeline file of a generic repository. Its `Name` is in English, so a client names it from the kind.

@@ -20,10 +20,14 @@ components=${DIST_COMPONENTS:-server runner cli}
 cli_oses=${DIST_CLI_OSES:-linux darwin windows}
 module=github.com/Khaymah/dhow
 checkout_image=${CHECKOUT_IMAGE:-}
+deploy_ssh_image=${DEPLOY_SSH_PINNED:-}
 
 [[ "$version" =~ ^[0-9A-Za-z][0-9A-Za-z.+-]*$ ]] || fail "VERSION must look like 1.2.3 or 1.2.3-rc.1, got: $version"
 if [[ -n "$checkout_image" && ! "$checkout_image" =~ ^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]]; then
   fail "CHECKOUT_IMAGE must be registry/name@sha256:<64 hex>, got: $checkout_image"
+fi
+if [[ -n "$deploy_ssh_image" && ! "$deploy_ssh_image" =~ ^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]]; then
+  fail "DEPLOY_SSH_PINNED must be registry/name@sha256:<64 hex>, got: $deploy_ssh_image"
 fi
 for component in $components; do
   case $component in
@@ -53,6 +57,9 @@ archive() {
   local baked=""
   if [[ $component == runner ]]; then
     baked="-X $module/internal/buildinfo.checkoutImage=$checkout_image"
+  fi
+  if [[ $component == server ]]; then
+    baked="-X $module/internal/buildinfo.deploySSHImage=$deploy_ssh_image"
   fi
   mkdir -p -- "$stage"
   (

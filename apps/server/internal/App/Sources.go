@@ -71,7 +71,7 @@ func pipelinesFor(in Infra, bus *eventbus.Bus, queue jobqueue.Queue, limiter rat
 	}
 	return pipelines.NewService(pipelines.Options{
 		DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now, Queue: queue, Definitions: in.Definitions, Images: images,
-		CheckoutImage: checkoutImage(in), PublicURL: in.Config.PublicURL.String(), Limiter: limiter, PinBudget: in.PinBudget,
+		CheckoutImage: checkoutImage(in), DeploySSHImage: deploySSHImage(in), PublicURL: in.Config.PublicURL.String(), Limiter: limiter, PinBudget: in.PinBudget,
 	})
 }
 

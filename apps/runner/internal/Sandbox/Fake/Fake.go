@@ -38,6 +38,8 @@ type Step struct {
 	HangMillis int               `json:"HangMillis"`
 	IgnoreTerm bool              `json:"IgnoreTerm"`
 	IgnoreKill bool              `json:"IgnoreKill"`
+	TermMillis int               `json:"TermMillis"`
+	TermExit   int32             `json:"TermExit"`
 	Writes     map[string]string `json:"Writes"`
 }
 

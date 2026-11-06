@@ -3,7 +3,7 @@ import type { TApproval } from '@/Modules/Approvals/Api/ApprovalsApi';
 
 export type TGateJob = components['schemas']['RunJob'];
 export type TDecision = 'approve' | 'reject' | 'bypass';
-export type TGateKind = 'skipped' | 'approval' | 'timer' | 'environment_busy' | 'paused';
+export type TGateKind = 'skipped' | 'approval' | 'timer' | 'environment_busy' | 'target_busy' | 'paused';
 
 export const REF_SKIP_REASON = 'ENVIRONMENT_REF_NOT_ALLOWED';
 

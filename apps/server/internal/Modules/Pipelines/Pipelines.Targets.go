@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	deployments "github.com/Khaymah/dhow/apps/server/internal/Core/Deployments"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
@@ -153,7 +155,8 @@ func (s *Service) checkTarget(
 		return t, denial{reason: models.ReasonTargetKeyNotFound, names: nonEmpty(t.KeySecretName)}, nil
 	}
 	inputs := c.spec.GetSteps()[ts.index].GetPlugin().GetInputs()
-	if !s.artifactAvailable(st, st.rows[i], inputs[inputArtifact], isOfficialDeploy(ts.image)) {
+	needsArtifact := isOfficialDeploy(ts.image) && inputs[jobspec.TargetModeInput] != jobspec.TargetModeCheck
+	if !s.artifactAvailable(st, st.rows[i], inputs[inputArtifact], needsArtifact) {
 		return t, denial{reason: models.ReasonTargetArtifact}, nil
 	}
 	return t, denial{}, nil
@@ -295,16 +298,8 @@ func (d denial) detail() []byte {
 	return failureDetail(d.names)
 }
 
-func repositoryOf(image string) string {
-	repo, _, _ := strings.Cut(image, "@")
-	if i := strings.LastIndex(repo, ":"); i > strings.LastIndex(repo, "/") {
-		repo = repo[:i]
-	}
-	return repo
-}
-
 func isOfficialDeploy(image string) bool {
-	return slices.Contains(jobspec.OfficialDeployImages(), repositoryOf(jobspec.QualifyImage(image)))
+	return jobspec.IsOfficialDeployImage(image)
 }
 
 func TargetPluginRefusal(image string, allowed []string) string {
@@ -336,3 +331,19 @@ func (s *Service) keysNotReferenced(ctx context.Context, q *sqlc.Queries, st *st
 }
 
 func deniedHealthAddr(addr netip.Addr) bool { return netguard.Policy{}.Denial(addr) != "" }
+
+func (s *Service) targetBusy(ctx context.Context, q *sqlc.Queries, st *step, i int, spec *runnerv1.JobSpec) (bool, error) {
+	for _, t := range spec.GetTargets() {
+		id, err := uuid.Parse(t.GetTargetId())
+		if err != nil {
+			return false, err
+		}
+		busy, err := q.TargetBusyInRun(ctx, sqlc.TargetBusyInRunParams{
+			RunID: st.run.Id, OrganizationID: st.run.OrganizationId, RunJobID: st.rows[i].Id, TargetID: id.String(),
+		})
+		if err != nil || busy {
+			return busy, err
+		}
+	}
+	return false, nil
+}

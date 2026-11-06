@@ -48,6 +48,13 @@ func checkoutImage(in Infra) string {
 	return buildinfo.CheckoutImage()
 }
 
+func deploySSHImage(in Infra) string {
+	if in.DeploySSHImage != "" {
+		return in.DeploySSHImage
+	}
+	return buildinfo.DeploySSHImage()
+}
+
 func withoutCheckout(names []string) []string {
 	return slices.DeleteFunc(slices.Clone(names), func(n string) bool { return n == jobspec.CheckoutSecret })
 }
@@ -148,6 +155,7 @@ func runsFor(
 	pipelinesService.UseGate(envs.Gate())
 	pipelinesService.UseTargets(envs.Targets())
 	envs.UseReopen(pipelinesService.Reopen)
+	envs.UseSynthetic(pipelinesService)
 	envs.UseSecretWriter(secretsService)
 	if in.Secrets == nil {
 		secrets.next = &pipelineSecrets{runs: pipelinesService, envs: envs, store: secretsService, logins: secretsService, bus: bus, log: in.Log}

@@ -60,3 +60,21 @@ func DeployPathInvalid(details ...IErrorDetail) *AppError {
 func TargetKeyNameTaken() *AppError {
 	return New(http.StatusConflict, CodeTargetKeyNameTaken, KeyTargetKeyNameTaken)
 }
+
+const (
+	CodeTargetCheckUnavailable = "TARGET_CHECK_UNAVAILABLE"
+	KeyTargetCheckUnavailable  = "errors.targetCheckUnavailable"
+)
+
+func TargetCheckUnavailable() *AppError {
+	return New(http.StatusUnprocessableEntity, CodeTargetCheckUnavailable, KeyTargetCheckUnavailable)
+}
+
+const (
+	CodeCheckRunNotRerunnable = "CHECK_RUN_NOT_RERUNNABLE"
+	KeyCheckRunNotRerunnable  = "errors.checkRunNotRerunnable"
+)
+
+func CheckRunNotRerunnable() *AppError {
+	return New(http.StatusConflict, CodeCheckRunNotRerunnable, KeyCheckRunNotRerunnable)
+}

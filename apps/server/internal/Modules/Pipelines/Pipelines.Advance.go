@@ -226,6 +226,15 @@ func (s *Service) admitJob(ctx context.Context, q *sqlc.Queries, st *step, i int
 		}
 		return true, s.endWithDetail(ctx, q, st, i, models.JobFailed, d.reason, d.detail())
 	}
+	if env != nil && len(spec.GetTargets()) > 0 {
+		busy, err := s.targetBusy(ctx, q, st, i, spec)
+		if err != nil {
+			return false, err
+		}
+		if busy {
+			return false, s.holdAtGate(ctx, q, st, i, *env, passage{gate: deployments.GateTargetBusy})
+		}
+	}
 	var approval *uuid.UUID
 	if env != nil {
 		p, err := s.gateOf(ctx, q, st.run, st.rows[i], *env)

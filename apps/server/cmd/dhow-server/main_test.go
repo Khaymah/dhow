@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -88,4 +89,12 @@ func TestRunDispatchesMigrate(t *testing.T) {
 	err := run(context.Background(), []string{"migrate", "status"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "DHOW_DATABASE_URL")
+}
+
+func TestVersionPrintsTheBuildAndRunsWithoutAConfiguration(t *testing.T) {
+	var out strings.Builder
+	require.NoError(t, printVersion(&out))
+	assert.True(t, strings.HasPrefix(out.String(), "dhow-server "), out.String())
+	require.NoError(t, run(context.Background(), []string{"version"}))
+	assert.Error(t, run(context.Background(), []string{"version", "--now"}))
 }

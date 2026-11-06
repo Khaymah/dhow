@@ -351,3 +351,36 @@ SELECT EXISTS (SELECT 1
                WHERE rj."EnvironmentId" = @environment_id AND rj."OrganizationId" = @organization_id
                  AND rj."Gate" = 'environment_busy' AND rj."State" = 'waiting' AND NOT rj."IsDeleted"
                  AND r."State" = 'running' AND NOT r."IsDeleted" AND r."Id" <> @run_id AND r."Number" < @number)::boolean;
+
+-- name: InsertSyntheticRun :one
+INSERT INTO "PipelineRuns" ("OrganizationId", "ProjectId", "Number", "Trigger", "Ref", "Actor", "Inputs", "DefinitionPath", "DefinitionSource",
+                            "DefinitionDigest", "State", "TriggeredByUserId")
+VALUES (@organization_id, @project_id, @number, @trigger, @ref, sqlc.narg('actor')::text, '{}', @definition_path, @definition_source,
+        @definition_digest, 'pending', @triggered_by_user_id)
+RETURNING *;
+
+-- name: LatestEnvironmentRef :one
+SELECT d."Ref"
+FROM "Deployments" d
+WHERE d."EnvironmentId" = @environment_id AND d."OrganizationId" = @organization_id AND NOT d."IsDeleted"
+  AND NOT EXISTS (SELECT 1 FROM "PipelineRuns" r WHERE r."Id" = d."RunId" AND r."Trigger" = 'check')
+ORDER BY d."CreatedAt" DESC, d."Id" DESC
+LIMIT 1;
+
+-- name: LockCheckRequests :exec
+SELECT pg_advisory_xact_lock(hashtextextended(@key::text, 0));
+
+-- name: FindActiveCheckRun :one
+SELECT *
+FROM "PipelineRuns"
+WHERE "ProjectId" = @project_id AND "OrganizationId" = @organization_id AND "Trigger" = 'check' AND "DefinitionSource" = @definition_source
+  AND "State" NOT IN ('succeeded', 'failed', 'canceled', 'skipped') AND NOT "IsDeleted"
+ORDER BY "CreatedAt" DESC, "Id" DESC
+LIMIT 1;
+
+-- name: TargetBusyInRun :one
+SELECT EXISTS (SELECT 1
+               FROM "RunJobs" rj
+               JOIN "Jobs" j ON j."Id" = rj."CurrentJobId" AND j."OrganizationId" = rj."OrganizationId"
+               WHERE rj."RunId" = @run_id AND rj."OrganizationId" = @organization_id AND rj."Id" <> @run_job_id AND rj."State" = 'active'
+                 AND j."Spec" @> jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('target_id', @target_id::text))))::boolean AS "Busy";

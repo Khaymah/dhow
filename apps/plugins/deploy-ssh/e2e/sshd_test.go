@@ -92,13 +92,13 @@ func startSshd(t *testing.T, image string) *sshd {
 	return startSshdWith(t, image, private, authorized)
 }
 
-func startSshdWith(t *testing.T, image string, private []byte, authorized string) *sshd {
+func startSshdWith(t *testing.T, image string, private []byte, authorized string, extra ...string) *sshd {
 	t.Helper()
 	keys := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(keys, "authorized_keys"), []byte("restrict "+authorized+"\n"), 0o644))
 	require.NoError(t, os.Chmod(keys, 0o755))
 	name := fmt.Sprintf("dhow-e2e-sshd-%d", time.Now().UnixNano())
-	docker(t, "run", "-d", "--rm", "--name", name, "-v", keys+":/keys:ro", image)
+	docker(t, append(append([]string{"run", "-d", "--rm", "--name", name, "-v", keys + ":/keys:ro"}, extra...), image)...)
 	started = append(started, name)
 	s := &sshd{name: name, clientKey: private}
 	s.ip = docker(t, "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", name)

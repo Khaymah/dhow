@@ -147,9 +147,10 @@ FOR UPDATE OF l;
 
 -- name: LockLeaseForCompletion :one
 SELECT l."Id", l."AttemptId", l."JobId", l."State", (l."ExpiresAt" > now())::boolean AS "Live",
-       a."State" AS "AttemptState", a."CompletionDigest"
+       a."State" AS "AttemptState", a."CompletionDigest", j."Spec"
 FROM "Leases" l
 JOIN "JobAttempts" a ON a."Id" = l."AttemptId"
+JOIN "Jobs" j ON j."Id" = l."JobId"
 WHERE l."Id" = @lease_id AND l."FencingToken" = @fencing_token AND l."RunnerId" = @runner_id AND NOT l."IsDeleted"
 FOR UPDATE OF l;
 
