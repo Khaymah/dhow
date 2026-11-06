@@ -1,8 +1,12 @@
+import { useState } from 'react';
+
+import { isApiError } from '@/Core/Api/ApiError';
 import { Button } from '@/Core/Ui/Button';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { useT } from '@/I18n/useT';
-import { putSecret, type ISecretScope, type TSecret } from '@/Modules/Secrets/Api/SecretsApi';
+import { putSecret, type ISecretInput, type ISecretScope, type TSecret } from '@/Modules/Secrets/Api/SecretsApi';
 import { FormGate, FormLookup } from '@/Modules/Secrets/Components/FormGate';
+import { SecretFactorPanel } from '@/Modules/Secrets/Components/SecretFactorPanel';
 import { SecretFields } from '@/Modules/Secrets/Components/SecretFields';
 import { SecretRemoveZone } from '@/Modules/Secrets/Components/SecretRemoveZone';
 import { useSecretDraft, type ISecretDraft } from '@/Modules/Secrets/Hooks/useSecretDraft';
@@ -17,6 +21,8 @@ export interface ISecretFormBodyProps {
   name?: string;
   onDone: () => void;
 }
+
+const TARGET_KEY_NEEDS_FACTOR = 'TARGET_KEY_NEEDS_FACTOR';
 
 interface ISecretFormProps {
   scope: ISecretScope;
@@ -42,23 +48,30 @@ const SecretForm = ({ scope, existing, onDone }: ISecretFormProps) => {
   const editing = existing !== undefined;
   const organization = scope.ProjectId === null;
   const secretName = existing?.Name ?? draft.Name.trim();
+  const [Asking, setAsking] = useState(false);
+
+  const input = (): ISecretInput => ({
+    Value: draft.Value,
+    Description: draft.Description,
+    AvailableToPullRequests: draft.Pulls,
+    Visibility: draft.Visibility,
+    ProjectIds: draft.ProjectIds,
+  });
 
   const HandleSubmit = () => {
     const problem = draftProblem(t, draft, secretName, editing, organization);
     save.SetNotice(problem);
     if (problem !== null) return;
     save.Save(
-      () =>
-        putSecret(scope, secretName, {
-          Value: draft.Value,
-          Description: draft.Description,
-          AvailableToPullRequests: draft.Pulls,
-          Visibility: draft.Visibility,
-          ProjectIds: draft.ProjectIds,
-        }),
+      () => putSecret(scope, secretName, input()),
       t('secrets.saved', { name: secretName }),
       () => {
         draft.SetValue('');
+      },
+      (error) => {
+        const needed = isApiError(error) && error.Code === TARGET_KEY_NEEDS_FACTOR;
+        setAsking(needed);
+        return needed;
       },
     );
   };
@@ -81,10 +94,24 @@ const SecretForm = ({ scope, existing, onDone }: ISecretFormProps) => {
           pullRequests={scope.EnvironmentName === undefined}
           busy={save.Busy}
         />
-        <Button type="submit" variant="primary" iconStart="check" className="justify-self-start" disabled={save.Busy}>
+        <Button type="submit" variant="primary" iconStart="check" className="justify-self-start" disabled={save.Busy || Asking}>
           {save.Busy ? t('secrets.form.submitting') : editing ? t('secrets.form.submit.edit') : t('secrets.form.submit')}
         </Button>
       </form>
+      {Asking ? (
+        <SecretFactorPanel
+          run={(factor) => putSecret(scope, secretName, input(), factor)}
+          onDone={() => {
+            setAsking(false);
+            void save.Succeed(t('secrets.saved', { name: secretName }), () => {
+              draft.SetValue('');
+            });
+          }}
+          onCancel={() => {
+            setAsking(false);
+          }}
+        />
+      ) : null}
       {existing ? <SecretRemoveZone scope={scope} name={existing.Name} disabled={save.Busy} onRemoved={onDone} /> : null}
     </div>
   );

@@ -38,6 +38,7 @@ const (
 	envDirs     = "DHOW_LEAK_SWEEP_DIRS"
 	envIdentity = "DHOW_LEAK_SWEEP_RUNNER_IDENTITY"
 	envKeyring  = "DHOW_LEAK_SWEEP_KEYRING_FILE"
+	envTargets  = "DHOW_LEAK_SWEEP_EXPECT_TARGETS"
 	tokenChars  = `[A-Za-z0-9_-]`
 )
 
@@ -114,11 +115,53 @@ func plainNeedles(t *testing.T, spec keys.Spec, name string, plain []byte) []lea
 		}
 		return out
 	}
+	if leaksweep.LooksLikePrivateKey(plain) {
+		out, err := leaksweep.PrivateKey(name, plain)
+		require.NoError(t, err)
+		return out
+	}
 	if len(plain) < leaksweep.MinValueBytes {
 		t.Logf("the %s is shorter than %d bytes; it is not looked for", name, leaksweep.MinValueBytes)
 		return nil
 	}
 	return []leaksweep.Needle{checked{t}.needle(leaksweep.Encoded(name, plain))}
+}
+
+func pendingHostKeyNeedles(t *testing.T, pool *pgxpool.Pool) []leaksweep.Needle {
+	t.Helper()
+	rows, err := pool.Query(context.Background(),
+		`SELECT "Host", "Port", "PendingHostKey" FROM "DeployTargetHosts" WHERE "PendingHostKey" IS NOT NULL AND NOT "IsDeleted"`)
+	require.NoError(t, err)
+	defer rows.Close()
+	var out []leaksweep.Needle
+	for rows.Next() {
+		var host, key string
+		var port int
+		require.NoError(t, rows.Scan(&host, &port, &key))
+		needles, err := leaksweep.PendingHostKey(host, port, key)
+		require.NoError(t, err)
+		out = append(out, needles...)
+	}
+	require.NoError(t, rows.Err())
+	return out
+}
+
+func deployTargetsWithAKey(t *testing.T, pool *pgxpool.Pool) int {
+	t.Helper()
+	var n int
+	require.NoError(t, pool.QueryRow(context.Background(),
+		`SELECT count(*) FROM "DeployTargets" WHERE "KeySecretName" IS NOT NULL AND NOT "IsDeleted"`).Scan(&n))
+	return n
+}
+
+func privateKeyNeedles(needles []leaksweep.Needle) []leaksweep.Needle {
+	var out []leaksweep.Needle
+	for _, n := range needles {
+		if strings.Contains(n.Name, " secret of row ") && strings.HasSuffix(n.Name, "(private seed)") {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 type sealedSet struct {
@@ -299,7 +342,15 @@ func buildWorld(t *testing.T) world {
 	listed := listedNeedles(t, required(t, envNeedles))
 	needles = append(needles, listed...)
 	needles = append(needles, runnerKeys(t, required(t, envIdentity))...)
+	needles = append(needles, pendingHostKeyNeedles(t, pool)...)
 	require.Empty(t, uncoveredSealed(t, pool), "the demo made sealed values that no value location covers; register these columns")
+	targets := deployTargetsWithAKey(t, pool)
+	if os.Getenv(envTargets) != "" {
+		require.Positive(t, targets, "%s is set, but the demo made no deploy target with a key", envTargets)
+	}
+	if targets > 0 {
+		assert.NotEmpty(t, privateKeyNeedles(needles), "the demo has %d deploy targets with a key, but the sweep opened no private key", targets)
+	}
 	for _, kind := range scopedKinds {
 		require.Positive(t, sealed.opened[kind], "the demo stored no %s, so the sweep would prove nothing about it", kind)
 		var found bool
@@ -366,5 +417,48 @@ func TestEachKindOfCredentialIsCaughtWhenPlanted(t *testing.T) {
 			require.NoError(t, err)
 			assert.NotEmpty(t, hits, "a %s planted as base64 is not found", kind)
 		})
+	}
+}
+
+func TestAPrivateKeyOfATargetIsCaughtWhenPlanted(t *testing.T) {
+	w := buildWorld(t)
+	planted := privateKeyNeedles(w.needles)
+	if len(planted) == 0 {
+		require.Empty(t, os.Getenv(envTargets), "the demo made no deploy target with a key")
+		t.Skip("the demo made no deploy target with a key")
+	}
+	for _, n := range planted {
+		dir := t.TempDir()
+		file := filepath.Join(dir, "leak.log")
+		require.NoError(t, os.WriteFile(file, append(append([]byte(`{"msg":"x","value":"`), n.Forms[0]...), []byte("\"}\n")...), 0o600))
+		hits, _, err := leaksweep.Sweep([]string{dir}, w.needles, nil, leaksweep.DefaultLimits())
+		require.NoError(t, err)
+		assert.NotEmpty(t, hits, "the %s planted on purpose is not found", n.Name)
+	}
+}
+
+func TestAPendingHostKeyIsCaughtWhenPlantedAndAllowedInItsRowOnly(t *testing.T) {
+	w := buildWorld(t)
+	var pending []leaksweep.Needle
+	for _, n := range w.needles {
+		if strings.HasPrefix(n.Name, "pending host key of ") {
+			pending = append(pending, n)
+		}
+	}
+	if len(pending) == 0 {
+		t.Skip("the demo left no pending host key")
+	}
+	for _, n := range pending {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "pg_dump"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "pg_dump", "DeployTargetHosts.sql"), n.Forms[0], 0o600))
+		hits, _, err := leaksweep.Sweep([]string{dir}, pending, nil, leaksweep.DefaultLimits())
+		require.NoError(t, err)
+		assert.Empty(t, hits, "the row of the host may hold its own pending key")
+		file := filepath.Join(dir, "server.log")
+		require.NoError(t, os.WriteFile(file, n.Forms[0], 0o600))
+		hits, _, err = leaksweep.Sweep([]string{dir}, pending, nil, leaksweep.DefaultLimits())
+		require.NoError(t, err)
+		assert.NotEmpty(t, hits, "the %s planted on purpose is not found", n.Name)
 	}
 }

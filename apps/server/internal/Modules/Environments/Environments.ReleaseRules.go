@@ -101,7 +101,7 @@ func redactMessage(v string) string {
 
 func validEvent(ev *runnerv1.DeployEvent) *rejection {
 	switch {
-	case ev == nil || ev.GetKind() == runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_UNSPECIFIED:
+	case ev == nil || ev.GetKind() == runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_UNSPECIFIED || runnerv1.DeployEventKind_name[int32(ev.GetKind())] == "":
 		return errInvalidReport("Kind")
 	case ev.GetKind() == runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_CHECKED:
 		return validCheck(ev)
@@ -181,3 +181,7 @@ func groupEnd(kind runnerv1.DeployEventKind, states []string) groupVerdict {
 		return groupVerdict{rejected: true}
 	}
 }
+
+func ValidDeployEvent(ev *runnerv1.DeployEvent) bool { return validEvent(ev) == nil }
+
+func ReportMessage(v string) string { return redactMessage(cleanMessage(v)) }

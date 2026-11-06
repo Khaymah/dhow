@@ -175,7 +175,7 @@ The same server with the same port and path never appears in two targets of the 
 
 ### The access key
 
-`.../targets/{targetName}/generate-key` with `CurrentFactor` makes an ed25519 key and keeps its private half as the secret `<TARGET>_SSH_KEY` of the environment, so nobody ever sees its value. The answer carries only the public key in `PublicKey`, to put in `authorized_keys` on every server. Doing it again makes a new key and a new version of the same secret. If the environment already has a secret with that name that Dhow did not make for this target, the answer is `TARGET_KEY_NAME_TAKEN` and nothing is written. Two targets that would give the same name to the secret, such as `web-1` and `web_1`, cannot exist together: `TARGET_DUPLICATE`.
+`.../targets/{targetName}/generate-key` with `CurrentFactor` makes an ed25519 key and keeps its private half as the secret `<TARGET>_SSH_KEY` of the environment, so nobody ever sees its value. The answer carries only the public key in `PublicKey`, to put in `authorized_keys` on every server. Doing it again makes a new key and a new version of the same secret. Writing the value of this secret from the secrets page needs `CurrentFactor` too (`TARGET_KEY_NEEDS_FACTOR`). If the environment already has a secret with that name that Dhow did not make for this target, the answer is `TARGET_KEY_NAME_TAKEN` and nothing is written. Two targets that would give the same name to the secret, such as `web-1` and `web_1`, cannot exist together: `TARGET_DUPLICATE`.
 
 ### Pin the key of a server
 

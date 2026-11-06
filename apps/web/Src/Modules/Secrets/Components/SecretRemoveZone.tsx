@@ -1,10 +1,12 @@
 import { useState } from 'react';
 
+import { isApiError } from '@/Core/Api/ApiError';
 import { Button } from '@/Core/Ui/Button';
 import { Icon } from '@/Core/Ui/Icon';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { useT } from '@/I18n/useT';
 import { removeSecret, type ISecretScope } from '@/Modules/Secrets/Api/SecretsApi';
+import { SecretFactorPanel } from '@/Modules/Secrets/Components/SecretFactorPanel';
 import { useRemoval } from '@/Modules/Secrets/Hooks/useRemoval';
 
 export interface ISecretRemoveZoneProps {
@@ -18,6 +20,7 @@ export const SecretRemoveZone = ({ scope, name, disabled, onRemoved }: ISecretRe
   const t = useT();
   const removal = useRemoval();
   const [Asking, setAsking] = useState(false);
+  const [NeedsFactor, setNeedsFactor] = useState(false);
 
   return (
     <section aria-labelledby="secret-danger" className="grid gap-3 rounded-md border border-bad-line p-card">
@@ -35,9 +38,18 @@ export const SecretRemoveZone = ({ scope, name, disabled, onRemoved }: ISecretRe
               size="sm"
               variant="danger"
               iconStart="trash"
-              disabled={disabled || removal.Busy}
+              disabled={disabled || removal.Busy || NeedsFactor}
               onClick={() => {
-                removal.Confirm(name, () => removeSecret(scope, name).then(onRemoved), t('secrets.removed', { name }));
+                removal.Confirm(
+                  name,
+                  () => removeSecret(scope, name).then(onRemoved),
+                  t('secrets.removed', { name }),
+                  (error) => {
+                    const needed = isApiError(error) && error.Code === 'TARGET_KEY_NEEDS_FACTOR';
+                    setNeedsFactor(needed);
+                    return needed;
+                  },
+                );
               }}
             >
               {t('secrets.remove.confirm')}
@@ -53,6 +65,20 @@ export const SecretRemoveZone = ({ scope, name, disabled, onRemoved }: ISecretRe
               {t('mfa.cancel')}
             </Button>
           </div>
+          {NeedsFactor ? (
+            <SecretFactorPanel
+              removal
+              run={(factor) => removeSecret(scope, name, factor)}
+              onDone={() => {
+                setNeedsFactor(false);
+                onRemoved();
+                void removal.Succeed(name, t('secrets.removed', { name }));
+              }}
+              onCancel={() => {
+                setNeedsFactor(false);
+              }}
+            />
+          ) : null}
         </div>
       ) : (
         <Button

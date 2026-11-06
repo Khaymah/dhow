@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 )
 
 const (
@@ -50,6 +52,7 @@ type PutSecretInput struct {
 	AvailableToPullRequests *bool
 	Visibility              *string
 	ProjectIDs              *[]uuid.UUID
+	Factor                  *auth.Factor
 }
 
 type Variable struct {

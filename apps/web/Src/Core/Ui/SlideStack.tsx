@@ -218,7 +218,7 @@ export const SlideStack = ({ slides, ...handlers }: ISlideStackProps) => {
                 ...ghosts.map((ghost) => (
                   <SlideView
                     key={ghost.slide.id}
-                    slide={ghost.slide}
+                    slide={{ id: ghost.slide.id, title: ghost.slide.title, subtitle: ghost.slide.subtitle, children: null }}
                     index={ghost.index}
                     total={ghost.total}
                     trail={ghost.trail}

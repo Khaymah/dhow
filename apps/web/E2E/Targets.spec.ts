@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import type { components } from '../Src/Core/Api/Schema';
 import { DESKTOP, expectClean, expectNowhere, open, PHONE, shot, signInPage, type IView } from './Guard';
-import { newHostKey } from './HostKey';
+import { newHostKey, newPrivateKey } from './HostKey';
 import { call, field, list, signIn, stack, text, type ISession } from './Stack';
 
 test.describe.configure({ mode: 'serial' });
@@ -11,7 +11,7 @@ const ENVIRONMENT = 'targets-e2e';
 const TARGET = 'api';
 const ADDRESS = 'deploy.example.test';
 const KEY_SECRET = 'API_SSH_KEY';
-const KEY_MATERIAL = 'e2e-fake-deploy-key-material-0123456789';
+const KEY_MATERIAL = newPrivateKey();
 const HOST_KEY = newHostKey(ADDRESS);
 
 let owner: ISession;
@@ -107,7 +107,7 @@ test('the private key goes into the environment secret once and is never shown a
   await signInPage(view, stack().Owner, owner);
   await page.goto(targetPath());
 
-  await page.getByRole('textbox', { name: T['targets.keySecret.value'], exact: true }).fill(KEY_MATERIAL);
+  await page.getByRole('textbox', { name: T['targets.keySecret.value'], exact: true }).fill(KEY_MATERIAL.Pem);
   await page.getByRole('button', { name: T['targets.keySecret.submit'] }).click();
   await expect(page.getByRole('textbox', { name: T['targets.keySecret.value'], exact: true })).toHaveValue('');
 
@@ -119,12 +119,12 @@ test('the private key goes into the environment secret once and is never shown a
   await panel.getByRole('button', { name: T['targets.keySecret.attach.confirm'] }).click();
 
   await expect(page.getByText(T['targets.key.secret'].replace('{name}', isolated(KEY_SECRET)))).toBeVisible();
-  await expectNowhere(view, KEY_MATERIAL);
+  await expectNowhere(view, KEY_MATERIAL.Body);
   const saved = (await call('GET', apiPath(), undefined, owner)).Data;
   expect(text(saved, 'KeySecretName')).toBe(KEY_SECRET);
-  expect(JSON.stringify(saved)).not.toContain(KEY_MATERIAL);
+  expect(JSON.stringify(saved)).not.toContain(KEY_MATERIAL.Body);
   const listed = await call('GET', `/organizations/${stack().OrgId}/projects/${stack().ProjectId}/environments/${ENVIRONMENT}/secrets`, undefined, owner);
-  expect(JSON.stringify(listed.Data)).not.toContain(KEY_MATERIAL);
+  expect(JSON.stringify(listed.Data)).not.toContain(KEY_MATERIAL.Body);
   await close(view);
 });
 

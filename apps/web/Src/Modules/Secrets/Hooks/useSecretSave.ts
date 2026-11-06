@@ -9,7 +9,8 @@ export interface ISecretSave {
   Busy: boolean;
   Notice: string | null;
   SetNotice: (notice: string | null) => void;
-  Save: (task: () => Promise<unknown>, saved: string, clear: () => void) => void;
+  Save: (task: () => Promise<unknown>, saved: string, clear: () => void, handled?: (error: unknown) => boolean) => void;
+  Succeed: (saved: string, clear: () => void) => Promise<void>;
 }
 
 export const useSecretSave = (onDone: () => void): ISecretSave => {
@@ -19,26 +20,29 @@ export const useSecretSave = (onDone: () => void): ISecretSave => {
   const [Busy, setBusy] = useState(false);
   const [Notice, setNotice] = useState<string | null>(null);
 
+  const Succeed = async (saved: string, clear: () => void) => {
+    clear();
+    await client.invalidateQueries({ queryKey: ALL_SECRETS_KEY });
+    Push({
+      Id: `secrets-saved-${Date.now()}`,
+      Accent: 'live',
+      Title: saved,
+    });
+    onDone();
+  };
+
   return {
     Busy,
     Notice,
     SetNotice: setNotice,
-    Save: (task, saved, clear) => {
+    Succeed,
+    Save: (task, saved, clear, handled) => {
       setBusy(true);
       setNotice(null);
       task()
-        .then(async () => {
-          clear();
-          await client.invalidateQueries({ queryKey: ALL_SECRETS_KEY });
-          Push({
-            Id: `secrets-saved-${Date.now()}`,
-            Accent: 'live',
-            Title: saved,
-          });
-          onDone();
-        })
+        .then(() => Succeed(saved, clear))
         .catch((error: unknown) => {
-          setNotice(errorText(error));
+          if (handled?.(error) !== true) setNotice(errorText(error));
         })
         .finally(() => {
           setBusy(false);

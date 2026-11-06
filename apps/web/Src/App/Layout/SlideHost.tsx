@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useState } from 'react';
 import { buildSlide } from '@/App/Layout/SlideCatalog';
 import { useSlide } from '@/App/Navigation/useSlide';
 import { isEnvironmentName, isUuid } from '@/App/Pages/Params';
-import { isThemeEditSlide, slideAllowed, themeOf, type TSlideId } from '@/App/Panels';
+import { isProjectSlide, isThemeEditSlide, slideAllowed, slideScopeOf, themeOf, type TSlideId } from '@/App/Panels';
 import { useCurrentMembership } from '@/Core/Auth/useMe';
 import type { ICustomTheme } from '@/Core/Theme/ThemeTokens';
 import { useThemeStore } from '@/Core/Theme/useThemeStore';
@@ -43,11 +43,13 @@ export const SlideHost = () => {
     setMissing(themeMissing(slide, customThemes));
   }
   const badEnvironment = environmentName !== undefined && !isEnvironmentName(environmentName);
-  const ingestSlide = slide === 'ingest-token-new' && membership !== undefined && isUuid(projectId);
-  const project = useProject(ingestSlide ? membership.OrganizationId : '', ingestSlide ? projectId : '');
+  const projectSlide = slide !== null && isProjectSlide(slide) && isUuid(projectId);
+  const project = useProject(projectSlide && membership !== undefined ? membership.OrganizationId : '', projectSlide ? projectId : '');
+  const projectPending = projectSlide && project.data === undefined && !project.isError;
   const projectRole = project.data?.CallerRole;
   const projectActive = project.isError ? false : project.data === undefined ? undefined : project.data.State === 'active';
-  const refused = slide !== null && (badEnvironment || !slideAllowed(slide, role, projectRole));
+  const scope = slideScopeOf(isUuid(projectId), isEnvironmentName(environmentName));
+  const refused = slide !== null && (badEnvironment || (!projectPending && !slideAllowed(slide, role, projectRole, scope)));
   const editing = slide !== null && isThemeEditSlide(slide);
 
   const rejectLink = useEffectEvent(() => {
@@ -69,7 +71,7 @@ export const SlideHost = () => {
   }, [invalid, Missing, refused]);
 
   const slides =
-    slide === null || refused || Missing
+    slide === null || refused || Missing || projectPending
       ? []
       : [
           buildSlide(slide, {
