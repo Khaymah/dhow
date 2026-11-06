@@ -12,7 +12,11 @@ func (c *checker) volumesAlways(name string, svc map[string]any) error {
 		return always("BIND_OUTSIDE", name)
 	}
 	for _, item := range list {
-		if code := c.mount(item); code != "" {
+		code := c.mount(item)
+		if code == invalidEntry {
+			return invalid("a volume entry of service %s is not valid", name)
+		}
+		if code != "" {
 			return always(code, name)
 		}
 	}
@@ -29,10 +33,19 @@ func (c *checker) mount(item any) string {
 			return "INTERPOLATION"
 		}
 		parts := strings.Split(v, ":")
+		if len(parts) > 3 {
+			return invalidEntry
+		}
+		readOnly := false
+		if len(parts) == 3 {
+			var ok bool
+			if readOnly, ok = parseMode(parts[2]); !ok {
+				return invalidEntry
+			}
+		}
 		if len(parts) < 2 || !isBindSource(parts[0]) {
 			return ""
 		}
-		readOnly := len(parts) >= 3 && hasOption(parts[2], "ro") && !hasOption(parts[2], "rw")
 		return c.mountCode(parts[0], !readOnly)
 	case map[string]any:
 		return c.longMount(v)
@@ -40,11 +53,10 @@ func (c *checker) mount(item any) string {
 	return "BIND_OUTSIDE"
 }
 
-func hasOption(options, want string) bool {
-	return slices.Contains(strings.Split(options, ","), want)
-}
-
 func (c *checker) longMount(m map[string]any) string {
+	if !validMountTexts(m) {
+		return invalidEntry
+	}
 	kind, _ := m["type"].(string)
 	source, _ := m["source"].(string)
 	target, _ := m["target"].(string)

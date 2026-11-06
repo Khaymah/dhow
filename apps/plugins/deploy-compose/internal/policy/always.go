@@ -38,6 +38,9 @@ func sortedKeys(m map[string]any) []string {
 }
 
 func (c *checker) always(doc map[string]any, names []string, services map[string]any) error {
+	if err := c.interpolation(doc); err != nil {
+		return err
+	}
 	if err := c.topAlways(doc); err != nil {
 		return err
 	}
@@ -92,6 +95,9 @@ func (c *checker) topAlways(doc map[string]any) error {
 
 func topItem(kind, name string, item map[string]any) error {
 	where := kind + "." + name
+	if err := typedBool(item, "external", where); err != nil {
+		return err
+	}
 	if _, ok := item["name"]; ok || truthy(item["external"]) {
 		return always("EXTERNAL", where)
 	}
@@ -110,6 +116,9 @@ func topItem(kind, name string, item map[string]any) error {
 }
 
 func (c *checker) serviceAlways(name string, svc map[string]any) error {
+	if err := c.typed(name, svc); err != nil {
+		return err
+	}
 	for _, key := range sortedKeys(svc) {
 		switch {
 		case key == "extends":

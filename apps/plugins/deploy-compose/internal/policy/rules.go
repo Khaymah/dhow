@@ -47,21 +47,8 @@ func present(v any) bool {
 }
 
 func truthy(v any) bool {
-	switch x := v.(type) {
-	case nil:
-		return false
-	case bool:
-		return x
-	case string:
-		switch strings.ToLower(strings.TrimSpace(x)) {
-		case "", "false", "no", "n", "off", "0":
-			return false
-		}
-		return true
-	case int:
-		return x != 0
-	}
-	return true
+	b, _ := v.(bool)
+	return b
 }
 
 func hostKey(key string) func(map[string]any) bool {

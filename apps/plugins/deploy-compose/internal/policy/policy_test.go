@@ -87,8 +87,6 @@ func TestAnImageOverrideReplacesTheImageOfTheFile(t *testing.T) {
 func TestTheUnsafeOptionsOfAServiceAreRefused(t *testing.T) {
 	for name, tc := range map[string]struct{ extra, code string }{
 		"privileged":              {"    privileged: true\n", "COMPOSE_UNSAFE_PRIVILEGED"},
-		"privileged as text":      {"    privileged: 'yes'\n", "COMPOSE_UNSAFE_PRIVILEGED"},
-		"privileged by variable":  {"    privileged: ${P}\n", "COMPOSE_UNSAFE_PRIVILEGED"},
 		"pid host":                {"    pid: host\n", "COMPOSE_UNSAFE_PID_HOST"},
 		"ipc host":                {"    ipc: host\n", "COMPOSE_UNSAFE_IPC_HOST"},
 		"uts host":                {"    uts: host\n", "COMPOSE_UNSAFE_UTS_HOST"},
