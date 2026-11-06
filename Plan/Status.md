@@ -101,7 +101,7 @@
 | M6.5 | إضافة Docker Compose بسياسة ملف آمنة، والبيانات في named volumes، وفحص تاني على النموذج النهائي (ADR-0096) | #112 |
 | M6.4ب | الرجوع اليدوي للمجموعة، وإعادة رفع الإصدار من الـ artifact، وقسم أهداف النشر في الواجهة (ADR-0097) | #115 |
 | M6.6 | استقبال الـ artifacts من CI خارجي بتوكن استقبال، و`on.artifact`، وتثبيت الـ artifacts المستخدمة في إصدارات (ADR-0098) | #116 |
-| متابعتان من M6.8 | الخطوة الثانية لكتابة سر هو مفتاح هدف نشر (ADR-0100)، وبوابات الـ slides الأربعة (`secret-new` و`variable-new` و`registry-new` و`environment-new`) بالصلاحية الحقيقية | PR_NUMBER |
+| متابعتان من M6.8 | الخطوة الثانية لكتابة سر هو مفتاح هدف نشر (ADR-0100)، وبوابات الـ slides الأربعة (`secret-new` و`variable-new` و`registry-new` و`environment-new`) بالصلاحية الحقيقية | #122 |
 
 شرط خلاص M2 اتحقق: اختبارات الصلاحيات خضرا، ومفيش finding مفتوح Critical أو High. والمراجعة الخارجية اتنقلت لـ M9 (ADR-0040).
 
@@ -111,7 +111,7 @@
 |---|---|---|---|
 | M6.7: `dhow artifact push` وGitHub Action ونسخها لـ `Khaymah/dhow-action` (ADR-0099) | `feat/artifact-push-m67` | #117 | الـ CI والـ merge |
 | M6.8أ: واجهة الأهداف وسجل النشر وتأكيد بصمة السيرفر | `feat/targets-ui-m68a` | #118 | اتدمج، وبعده M6.8ب |
-| M6.9أ: ثلاث fuzz targets (`FuzzReleaseID` و`FuzzIngestArchive` و`FuzzDeployReport`)، وتوسيع فحص التسريب لمفتاح الهدف وسطر known_hosts المعلّق وتوكنات الاستقبال، والخطوة الثانية لسر المفتاح، وبوابات الـ slides (ADR-0100) | `feat/hardening-m69a` | PR_NUMBER | المراجعة الأمنية والـ CI والـ merge، وبعدها M6.9ب (`deploy/m6-demo`) وM6.9ج (مراجعة التهديدات والـ roadmap) |
+| M6.9أ: ثلاث fuzz targets (`FuzzReleaseID` و`FuzzIngestArchive` و`FuzzDeployReport`)، وتوسيع فحص التسريب لمفتاح الهدف وسطر known_hosts المعلّق وتوكنات الاستقبال، والخطوة الثانية لسر المفتاح، وبوابات الـ slides (ADR-0100) | `feat/hardening-m69a` | #122 | المراجعة الأمنية والـ CI والـ merge، وبعدها M6.9ب (`deploy/m6-demo`) وM6.9ج (مراجعة التهديدات والـ roadmap) |
 | `make proxy-check` مابيشتغلش في الـ CI، وبناء الصورة بيفشل جوه بيئة الجلسة، فإعدادات nginx وCaddy لـ `/ingest/` اتجرّبت بإيد بس | — | — | تشغيله على جهاز فيه Docker بيبني الصورة، أو إضافته للـ CI |
 | `runner.revoked` (إلغاء اللوحة وإلغاء الـ runner لنفسه) بيتنشر على الـ event bus بعد الـ commit، فلو الـ process وقع بينهم الـ audit بيضيع. الـ bus مافيهوش outbox | — | — | outbox للأحداث اللي بتتسجّل، أو نشرها جوه نفس الـ transaction |
 
