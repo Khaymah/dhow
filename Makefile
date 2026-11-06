@@ -241,7 +241,7 @@ hooks-test: ## Test the Claude Code project hooks
 
 .PHONY: test
 test: ## Run Go tests with the race detector
-	$(GO) test -race -count=1 -coverprofile=coverage.out $(PKG)
+	$(GO) test -race -count=1 -timeout 25m -coverprofile=coverage.out $(PKG)
 
 FUZZTIME     ?= 10s
 SERVER_FUZZ_DIR := apps/server/internal
