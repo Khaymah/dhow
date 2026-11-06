@@ -158,7 +158,7 @@ The stages in order:
 3. **Switch batch by batch.** In each batch every server switches, reloads and then checks its health, and the servers of the batch work together. If `health_check_url` has the value `{host}`, each server is checked on its own address. If it does not, the address is checked once for the batch and does not tell one server from another (like the address of a load balancer). After a batch passes, the plugin waits `BatchPauseSeconds` and then starts the next one.
 4. **Success:** after the last batch passes, the plugin records the release in `.dhow/verified` on all servers, deletes the older releases, and releases the locks.
 
-The total of the health budgets of the batches and the waits between them is at most 60 minutes, or the job fails before it starts with `ROLLING_BUDGET_EXCEEDED`.
+The total of the health budgets of the batches and the waits between them is at most 60 minutes, or the job fails before it starts with `ROLLING_BUDGET_EXCEEDED`. This figure covers the health checks and the waits only. Uploads and commands add to it, and the job timeout in Dhow is what limits the whole job.
 
 ### When it fails
 
