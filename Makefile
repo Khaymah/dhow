@@ -27,6 +27,7 @@ WEB_DIST              := apps/server/internal/App/WebDist
 IMAGE                 ?= dhow:dev
 GIT_IMAGE             ?= dhow-git:dev
 DEPLOY_SSH_IMAGE      ?= dhow-deploy-ssh:dev
+DEPLOY_COMPOSE_IMAGE  ?= dhow-deploy-compose:dev
 E2E_BASE              ?= debian:12
 RUNNER_E2E_BASE       ?= debian:13
 DISTRO                ?=
@@ -258,7 +259,8 @@ FUZZ_TARGETS := \
 	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare internal/jobspec:FuzzHealthEndpoints internal/jobspec:FuzzParseEndpoint \
 	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
 	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern internal/archive:FuzzUnpack internal/archive:FuzzWalk \
-	internal/deployrelease:FuzzRemoteCommand internal/deployrelease:FuzzRollingPlan internal/deployrelease:FuzzStateFile
+	internal/deployrelease:FuzzRemoteCommand internal/deployrelease:FuzzRollingPlan internal/deployrelease:FuzzStateFile \
+	apps/plugins/deploy-compose/internal/policy:FuzzComposePolicy
 
 define fuzz_listed
 	@found=$$(grep -rhoE '^func Fuzz[A-Za-z0-9]+' $(1) --include='*_test.go' | sed 's/^func //' | sort); \
@@ -275,12 +277,12 @@ endef
 
 .PHONY: fuzz
 fuzz: ## Fuzz the server and shared inputs, FUZZTIME per target (default 10s; the M2.5 bar is 60s, the nightly run 30m)
-	$(call fuzz_listed,$(SERVER_FUZZ_DIR) internal,$(FUZZ_TARGETS),FUZZ_TARGETS)
+	$(call fuzz_listed,$(SERVER_FUZZ_DIR) internal apps/plugins,$(FUZZ_TARGETS),FUZZ_TARGETS)
 	$(call fuzz_run,$(FUZZ_TARGETS))
 
 .PHONY: fuzz-list
 fuzz-list: ## Print every fuzz target, server and runner, as a JSON list for the nightly workflow
-	$(call fuzz_listed,$(SERVER_FUZZ_DIR) internal,$(FUZZ_TARGETS),FUZZ_TARGETS)
+	$(call fuzz_listed,$(SERVER_FUZZ_DIR) internal apps/plugins,$(FUZZ_TARGETS),FUZZ_TARGETS)
 	$(call fuzz_listed,apps/runner,$(RUNNER_FUZZ),RUNNER_FUZZ)
 	@printf '%s\n' $(FUZZ_TARGETS) $(RUNNER_FUZZ) | sed 's/.*/"&"/' | paste -sd, - | sed 's/.*/[&]/'
 
@@ -309,12 +311,16 @@ ISOLATION_GIT_ARCHIVE ?=
 ISOLATION_SSHD    ?=
 
 .PHONY: deploy-e2e
-deploy-e2e: ## Deploy real releases to a real sshd in Docker with the dhow-deploy-ssh plugin (health check, rollback, keep_releases, host key); replays the reports into the server when DHOW_TEST_DATABASE_URL is set
+deploy-e2e: ## Deploy real releases to a real sshd with dhow-deploy-ssh and Compose projects to Docker in Docker hosts with dhow-deploy-compose (health check, rollback, policy, host key; DHOW_E2E_SKIP_COMPOSE=1 skips the privileged hosts); replays the reports into the server when DHOW_TEST_DATABASE_URL is set
 	bash deploy/e2e-targets/run.sh
 
 .PHONY: deploy-ssh-image
 deploy-ssh-image: ## Build the dhow-deploy-ssh plugin image locally (DEPLOY_SSH_IMAGE=dhow-deploy-ssh:dev)
 	docker build --tag $(DEPLOY_SSH_IMAGE) -f apps/plugins/deploy-ssh/Dockerfile .
+
+.PHONY: deploy-compose-image
+deploy-compose-image: ## Build the dhow-deploy-compose plugin image locally (DEPLOY_COMPOSE_IMAGE=dhow-deploy-compose:dev)
+	docker build --tag $(DEPLOY_COMPOSE_IMAGE) -f apps/plugins/deploy-compose/Dockerfile .
 
 .PHONY: runner-isolation
 runner-isolation: ## Run the escape and limits suites on rootless Podman (Podman 5.4+, cgroup v2 delegation, subuids, busybox-static)

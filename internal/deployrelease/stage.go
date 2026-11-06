@@ -40,7 +40,7 @@ func (d *run) stageRelease(ctx context.Context) *Failure {
 			return f
 		}
 	}
-	return nil
+	return d.prepareRelease(ctx)
 }
 
 func (d *run) clearLeftovers() *Failure {

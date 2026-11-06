@@ -191,14 +191,18 @@ func (g *group) emitStarted() {
 }
 
 func (g *group) execute(ctx context.Context) *Failure {
+	var totals scan
 	if g.f.Config.ArchivePath != "" {
-		totals, f := g.members[0].d.scanArchive()
-		if f != nil {
+		var f *Failure
+		if totals, f = g.members[0].d.scanArchive(); f != nil {
 			return g.stop(ctx, f, nil)
 		}
-		for _, m := range g.members {
-			m.d.totals = totals
-		}
+	}
+	if f := g.inspect(ctx); f != nil {
+		return g.stop(ctx, f, nil)
+	}
+	for _, m := range g.members {
+		m.d.totals = totals
 	}
 	if f, bad := g.preflight(ctx); f != nil {
 		return g.stop(ctx, f, bad)

@@ -64,6 +64,9 @@ func (d *run) switchTo(id string) error {
 }
 
 func (d *run) activate(ctx context.Context) *Failure {
+	if f := d.activateRelease(ctx, d.releaseDir, d.cfg.ReleaseID, d.previous); f != nil {
+		return f
+	}
 	if d.cfg.ReloadCommand != "" {
 		if f := d.hook(ctx, "reload", d.cfg.ReloadCommand, d.releaseDir, d.cfg.ReleaseID, d.previous); f != nil {
 			return f
@@ -124,6 +127,9 @@ func (d *run) rollBack(ctx context.Context) error {
 	d.writeState("rolling_back", d.previous, d.cfg.ReleaseID)
 	if err := d.switchTo(d.previous); err != nil {
 		return err
+	}
+	if f := d.activateRelease(ctx, d.releases+"/"+d.previous, d.previous, d.cfg.ReleaseID); f != nil {
+		return f
 	}
 	if d.cfg.ReloadCommand != "" {
 		if f := d.hook(ctx, "reload", d.cfg.ReloadCommand, d.releases+"/"+d.previous, d.previous, d.cfg.ReleaseID); f != nil {

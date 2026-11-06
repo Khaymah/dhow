@@ -87,6 +87,7 @@ type Config struct {
 	ArchiveDigest string
 	Limits        archive.Limits
 	Rollback      bool
+	Activator     Activator
 }
 
 func (c Config) Validate() error {
