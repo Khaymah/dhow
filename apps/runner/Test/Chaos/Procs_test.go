@@ -93,6 +93,7 @@ type stack struct {
 	work, bin, publicURL, serverAddr string
 	dbURL, secretKey                 string
 	runnerDir                        string
+	keyring                          string
 	runnerProxy                      *faultyProxy
 	mu                               sync.Mutex
 	server, runner                   *process
@@ -101,9 +102,20 @@ type stack struct {
 func (s *stack) serverEnv() []string {
 	return []string{
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		"DHOW_DATABASE_URL=" + s.dbURL, "DHOW_SECRET_KEY=" + s.secretKey, "DHOW_PUBLIC_URL=" + s.publicURL,
+		"DHOW_DATABASE_URL=" + s.dbURL, "DHOW_SECRET_KEY=" + s.secretKey, "DHOW_KEYRING_FILE=" + s.keyring,
+		"DHOW_PUBLIC_URL=" + s.publicURL,
 		"DHOW_LISTEN_ADDR=" + s.serverAddr, "DHOW_DEV=true", "DHOW_BREACHED_PASSWORD_CHECK=false", "DHOW_LOG_LEVEL=debug",
 	}
+}
+
+func (s *stack) initKeyring() error {
+	s.keyring = filepath.Join(s.work, "keyring")
+	cmd := exec.Command(filepath.Join(s.bin, "dhow-server"), "keys", "init", "--file", s.keyring)
+	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("create the server keyring: %w: %s", err, out)
+	}
+	return nil
 }
 
 func (s *stack) startServer() (string, error) {
