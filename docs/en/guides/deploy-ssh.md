@@ -82,7 +82,9 @@ deploy:
 | Input | Required | Default | Meaning |
 |---|---|---|---|
 | `target` | Yes | | The name of the target in the environment of the job |
-| `artifact` | Yes | | The name of the file to deploy |
+| `artifact` | Yes | | The name of the file to deploy. Not written for a check or a rollback: in a rollback the server sets it |
+| `mode` | No | `deploy` | `deploy`, `check` (check of the target) or `rollback`. A check and a rollback start from the server only, and the server does not accept `rollback` in a pipeline file (`ROLLBACK_MODE_NOT_ALLOWED`) |
+| `release` | Only in `rollback` | | The number of the release the target goes back to, set by the server |
 | `strategy` | No | `atomic-symlink` | The only supported way |
 | `keep_releases` | No | The value of the target | How many releases to keep. It can be lower than the value of the target and never higher |
 | `health_check_url` | No | | An `http` or `https` address that is checked after the switch. Without an address there is no check |
@@ -214,6 +216,24 @@ The state of each server in the record of the release is one of: `pending`, `upl
 - **If the rollback fails on a server**, the group is on different releases. Dhow records the reason for each server and writes an audit record with high severity at once. Fix it with a new successful deploy to the target. The new deploy starts by reading the release of each server and writes a warning, and it fixes what is left.
 - **A lock for each server.** It is taken in the order of the servers and stays for the whole deploy, and the plugin releases it on every path. Another deploy that holds the lock of one server stops this deploy with `TARGET_LOCKED` before any change.
 
+## Rolling back to an earlier release
+
+A manual rollback puts the whole target, every one of its servers, back on a release that succeeded on it before. It never rebuilds. It starts with a `POST` to the path of the target followed by `/rollback`, with `ReleaseId` and `CurrentFactor` in its body. The action is `deployment.rollback` for owners, admins and maintainers, and it needs a second factor. The request returns `202` with `RunId` and `RunNumber`. The page of the environment has the list of releases and a button "Roll back to this release", with the second factor and a confirmation question, next to a button "Check the target", the result of the last check of each server, and a badge "The group is on different releases".
+
+Dhow refuses the request with `ROLLBACK_RELEASE_NOT_ELIGIBLE` when the release is not a deploy that succeeded on this target: a release that failed, was rolled back or is `unknown`, a release that is itself a rollback, or a number the target does not know. It refuses it with `ENVIRONMENT_PAUSED` when deploys are paused in the environment. If this build of Dhow has no official plugin image it returns `ROLLBACK_UNAVAILABLE`.
+
+The request starts a run of one job (its `Trigger` is `rollback`) that runs the official plugin image in `rollback` mode on every server of the target. The run goes through the gate of the environment like any deploy, and it skips only the reviewers and the wait timer. So the lock of the environment, the rules of the branch, the secrets and the network limits that the server computes all still apply. The release is recorded with `Kind = rollback` and the release it went back to (`RestoredReleaseId`), and the audit entry `deployment.rollback_requested` is written with a high severity. This run is never run again by `rerun-failed` (it returns `ROLLBACK_RUN_NOT_RERUNNABLE`): ask for a new rollback.
+
+On each server the plugin uses the same batches, the same order and the same health gate as a deploy:
+
+- **A server that still has the directory of the release** switches `current` to it, reloads and checks the health. It uploads nothing.
+- **A server that removed the directory** (because of `keep_releases`) gets the release again from the artifact that Dhow kept for it, after the plugin checks the digest, and then switches. This is the redeploy. The pre-switch command does not run in a rollback.
+- If a server of the target lost the directory of the release and the artifact is no longer kept, the plugin fails before any server changes.
+
+Dhow keeps the artifact of every release that succeeded for as long as the release is among the last `keep_releases` successful releases of the target, even after its normal retention ended. The health check of the rollback is the one of the last successful deploy on the target. Releases deployed before this version of Dhow have no stored health check, so a rollback to them runs without a health check.
+
+If the rollback fails on a server it stops at once: no new batch starts, and the group becomes `rollback_failed` with the same alert and the high severity audit entry (`DEPLOY_ROLLBACK_FAILED`). Dhow does not put the servers that switched back by itself, and it does not try again on its own. The servers that switched and whose health was not confirmed are marked `unknown`. Check the target to see which release each server is on, then roll back again or deploy.
+
 ## Result codes
 
 The plugin writes the code in the log of the step and exits with the matching number.
@@ -253,6 +273,6 @@ Dhow keeps, for each release, the target, the release id, the previous release, 
 
 - The first deploy to a group goes back to nothing if it fails in the middle: the servers that switched stay on the new release.
 - If a run has a second job that deploys to the same target, it waits for the first to end and shows "Target busy", and it does not fail. Between two different runs the lock of the environment stops them.
-- No manual rollback yet. The only rollback is the automatic one during a deploy. The check of a target is available in the API, and its button in the interface comes later.
+- A manual rollback puts back files and reloads only. It does not undo changes outside the files, such as database migrations. And a manual rollback that failed is not rolled back by itself.
 - Dhow does not write application secrets on the server. Put the `.env` file in `shared/` yourself.
 - The commands written by the Admin run in the login shell of the deploy account on the server. This is the only exception to the rule "no text goes through a shell", and it is written in the architecture decision.
