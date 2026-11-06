@@ -156,16 +156,18 @@ func (d *run) writeOwner(dir string) *Failure {
 	return nil
 }
 
-func (d *run) putOwner(dir string) error {
+func (d *run) putOwner(dir string) error { return d.putOwnerOn(d.r, dir) }
+
+func (d *run) putOwnerOn(r Remote, dir string) error {
 	raw, err := json.Marshal(lockOwner{Release: d.cfg.ReleaseID, ExpiresAt: d.now().Add(LockTTL).UTC()})
 	if err != nil {
 		return err
 	}
-	return WriteFile(d.r, dir+"/"+ownerName, raw, 0o600)
+	return WriteFile(r, dir+"/"+ownerName, raw, 0o600)
 }
 
-func (d *run) ownsLock(dir string) bool {
-	raw, err := d.r.ReadFile(dir+"/"+ownerName, maxSmallFile)
+func (d *run) ownsLockOn(r Remote, dir string) bool {
+	raw, err := r.ReadFile(dir+"/"+ownerName, maxSmallFile)
 	if err != nil {
 		return false
 	}
@@ -180,6 +182,8 @@ func (d *run) keepLock() {
 	}
 	stop := make(chan struct{})
 	done := make(chan struct{})
+	base := d.r
+	limit := d.lockTimeout()
 	d.stopRenew = func() {
 		close(stop)
 		<-done
@@ -194,16 +198,33 @@ func (d *run) keepLock() {
 			case <-stop:
 				return
 			case <-t.C:
-				if !d.ownsLock(dir) {
-					d.e.Log.Warn("the lock of the target is no longer ours, so it is not renewed")
+				if !d.renewLock(base, dir, limit) {
 					return
-				}
-				if err := d.putOwner(dir); err != nil {
-					d.e.Log.Warn("the lock of the target could not be renewed")
 				}
 			}
 		}
 	}()
+}
+
+func (d *run) lockTimeout() time.Duration {
+	if d.e.LockTimeout > 0 {
+		return d.e.LockTimeout
+	}
+	return DefaultLockTimeout
+}
+
+func (d *run) renewLock(base Remote, dir string, limit time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), limit)
+	defer cancel()
+	r := boundRemote{Remote: base, ctx: ctx}
+	if !d.ownsLockOn(r, dir) {
+		d.e.Log.Warn("the lock of the target is no longer ours, or could not be read, so it is not renewed")
+		return ctx.Err() != nil
+	}
+	if err := d.putOwnerOn(r, dir); err != nil {
+		d.e.Log.Warn("the lock of the target could not be renewed")
+	}
+	return true
 }
 
 func (d *run) lockExpired(dir string) bool {
@@ -225,12 +246,15 @@ func (d *run) unlock() {
 		d.stopRenew()
 		d.stopRenew = nil
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), d.lockTimeout())
+	defer cancel()
+	r := boundRemote{Remote: d.r, ctx: ctx}
 	dir := d.dhow + "/" + lockName
-	if !d.ownsLock(dir) {
-		d.e.Log.Warn("the lock of the target belongs to another deployment now, so it is left alone")
+	if !d.ownsLockOn(r, dir) {
+		d.e.Log.Warn("the lock of the target belongs to another deployment now, or could not be read, so it is left alone")
 		return
 	}
-	if err := d.r.RemoveAll(dir); err != nil {
+	if err := r.RemoveAll(dir); err != nil {
 		d.e.Log.Warn("the lock of the target could not be removed")
 	}
 }

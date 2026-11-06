@@ -22,14 +22,19 @@ func line(host string) string {
 }
 
 func host(name string) *runnerv1.TargetHost {
-	return &runnerv1.TargetHost{HostId: "0190a1b2-0000-7000-8000-000000000001", Host: name, Port: 22, KnownHostsLine: line(name)}
+	return &runnerv1.TargetHost{HostId: "0190a1b2-0000-7000-8000-00000000000" + name[4:5], Host: name, Port: 22, KnownHostsLine: line(name)}
 }
 
 func env(t *testing.T, hosts []*runnerv1.TargetHost, extra map[string]string) func(string) string {
 	t.Helper()
+	return envRolling(t, hosts, 1, 0, extra)
+}
+
+func envRolling(t *testing.T, hosts []*runnerv1.TargetHost, batch, pause int32, extra map[string]string) func(string) string {
+	t.Helper()
 	vars, err := jobspec.TargetEnv(&runnerv1.StepTarget{
 		Name: "prod", Kind: "ssh", User: "deploy", DeployPath: "/srv/app", ReleaseId: "12-abcdef12-1", KeepReleases: 5, Hosts: hosts,
-		Settings: &runnerv1.TargetSettings{BatchSize: 1, ReloadCommand: "systemctl reload app", Shared: []string{".env"}},
+		Settings: &runnerv1.TargetSettings{BatchSize: batch, BatchPauseSeconds: pause, ReloadCommand: "systemctl reload app", Shared: []string{".env"}},
 	}, 0, "/run/dhow/secrets")
 	require.NoError(t, err)
 	vars["DHOW_INPUT_ARTIFACT_FILE"] = "/run/dhow/inputs/site.tgz"
@@ -84,13 +89,38 @@ func TestKeepReleasesFromTheStepCannotKeepMoreThanTheTarget(t *testing.T) {
 	assert.Equal(t, 5, s.Deploy.Keep)
 }
 
-func TestWhatThePluginCannotDoYetFailsClearly(t *testing.T) {
+func TestAGroupOfServersKeepsItsBatchSettings(t *testing.T) {
+	three := []*runnerv1.TargetHost{host("web-1.example.com"), host("web-2.example.com"), host("web-3.example.com")}
+	s, err := config.Parse(envRolling(t, three, 2, 30, nil))
+	require.NoError(t, err)
+	assert.Len(t, s.Step.Hosts, 3)
+	assert.Equal(t, 2, s.BatchSize)
+	assert.Equal(t, 30*time.Second, s.BatchPause)
+
+	s, err = config.Parse(envRolling(t, three, 0, 0, nil))
+	require.NoError(t, err)
+	assert.Equal(t, 1, s.BatchSize, "a zero batch size is one server at a time")
+
+	_, err = config.Parse(envRolling(t, three, 4, 0, nil))
+	assert.Error(t, err, "a batch larger than the group")
+	_, err = config.Parse(envRolling(t, three, 1, 601, nil))
+	assert.Error(t, err, "a pause over ten minutes")
+	long := map[string]string{"DHOW_INPUT_HEALTH_CHECK_URL": "https://x.example.com/h", "DHOW_INPUT_HEALTH_CHECK_RETRIES": "15", "DHOW_INPUT_HEALTH_CHECK_TIMEOUT": "30s"}
+	ten := make([]*runnerv1.TargetHost, 0, 10)
+	for i := range 10 {
+		ten = append(ten, host("web-"+string(rune('0'+i))+".example.com"))
+	}
+	_, err = config.Parse(envRolling(t, ten, 1, 0, long))
+	assert.Error(t, err, "ten batches of nine minutes are over the hour")
+}
+
+func TestWhatThePluginCannotDoFailsClearly(t *testing.T) {
 	one := []*runnerv1.TargetHost{host("web-1.example.com")}
 	for name, c := range map[string]struct {
 		hosts []*runnerv1.TargetHost
 		extra map[string]string
 	}{
-		"two servers":           {[]*runnerv1.TargetHost{host("web-1.example.com"), host("web-2.example.com")}, nil},
+		"the same server twice": {[]*runnerv1.TargetHost{host("web-1.example.com"), host("web-1.example.com")}, nil},
 		"another strategy":      {one, map[string]string{"DHOW_INPUT_STRATEGY": "blue-green"}},
 		"a compose target":      {one, map[string]string{"DHOW_TARGET_KIND": "compose"}},
 		"a health url on ftp":   {one, map[string]string{"DHOW_INPUT_HEALTH_CHECK_URL": "ftp://x/h"}},

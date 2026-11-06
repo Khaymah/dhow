@@ -15,6 +15,7 @@ import (
 	"github.com/Khaymah/dhow/apps/plugins/deploy-ssh/internal/config"
 	"github.com/Khaymah/dhow/internal/deployrelease"
 	"github.com/Khaymah/dhow/internal/deployrelease/sshremote"
+	"github.com/Khaymah/dhow/internal/jobspec"
 	"github.com/Khaymah/dhow/internal/netguard"
 )
 
@@ -98,27 +99,33 @@ func Run(ctx context.Context, s config.Settings, log *slog.Logger) int {
 		defer func() { _ = out.Close() }()
 		reporter = deployrelease.NewStreamReporter(out)
 	}
-	host := s.Step.Hosts[0]
-	e := &deployrelease.Engine{
-		Config: s.Deploy, Doer: deployrelease.NewHealthClient(transport), Report: reporter, Log: log, Clock: deployrelease.RealClock(),
-		Connect: func(ctx context.Context) (deployrelease.Remote, error) {
-			life, end := context.WithCancel(context.WithoutCancel(ctx))
-			context.AfterFunc(ctx, func() { time.AfterFunc(deployrelease.RollbackBudget+cancelGrace, end) })
-			c, err := sshremote.Connect(life, sshremote.Options{
-				Host: host.Host, Port: host.Port, User: s.Step.User, PrivateKey: key, KnownHostsLine: host.KnownHostsLine, Dial: dial,
-			})
-			if err != nil {
-				end()
-				return nil, err
-			}
-			return c, nil
-		},
+	fleet := &deployrelease.Fleet{
+		Config: s.Deploy, BatchSize: s.BatchSize, BatchPause: s.BatchPause,
+		Doer: deployrelease.NewHealthClient(transport), Report: reporter, Log: log, Clock: deployrelease.RealClock(),
 	}
-	f := e.Run(ctx)
+	for _, h := range s.Step.Hosts {
+		fleet.Hosts = append(fleet.Hosts, deployrelease.Host{ID: h.HostID, Name: h.Host, Connect: connector(s, h, key, dial)})
+	}
+	f := fleet.Run(ctx)
 	if f == nil {
-		log.Info("the release is live", "release", s.Deploy.ReleaseID)
+		log.Info("the release is live", "release", s.Deploy.ReleaseID, "servers", len(s.Step.Hosts))
 		return deployrelease.ExitOK
 	}
 	log.Error("deployment failed", "code", Code(f.Exit), "reason", f.Reason, "detail", f.Text)
 	return f.Exit
+}
+
+func connector(s config.Settings, host jobspec.TargetHost, key []byte, dial sshremote.DialFunc) func(context.Context) (deployrelease.Remote, error) {
+	return func(ctx context.Context) (deployrelease.Remote, error) {
+		life, end := context.WithCancel(context.WithoutCancel(ctx))
+		context.AfterFunc(ctx, func() { time.AfterFunc(deployrelease.RollbackBudget+cancelGrace, end) })
+		c, err := sshremote.Connect(life, sshremote.Options{
+			Host: host.Host, Port: host.Port, User: s.Step.User, PrivateKey: key, KnownHostsLine: host.KnownHostsLine, Dial: dial,
+		})
+		if err != nil {
+			end()
+			return nil, err
+		}
+		return c, nil
+	}
 }

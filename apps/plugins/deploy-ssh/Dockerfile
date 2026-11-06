@@ -25,7 +25,7 @@ ARG VERSION=dev
 ARG COMMIT=unknown
 
 LABEL org.opencontainers.image.title="dhow-deploy-ssh" \
-      org.opencontainers.image.description="The official Dhow plugin that deploys a release to one server over SSH with an atomic symlink switch, a health check and an automatic rollback" \
+      org.opencontainers.image.description="The official Dhow plugin that deploys a release to one server or to a group of servers over SSH, in batches, with an atomic symlink switch, a health check per batch and an automatic rollback of every switched server" \
       org.opencontainers.image.source="https://github.com/Khaymah/dhow" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.version="${VERSION}" \

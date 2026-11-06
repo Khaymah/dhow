@@ -158,6 +158,8 @@ func (d *run) verifyUpload(ctx context.Context) *Failure {
 	defer func() { _ = d.r.Remove(d.manifest) }()
 	res, err := d.r.Exec(ctx, []string{"sha256sum", "-c", "--", d.manifest})
 	switch {
+	case err != nil && ctx.Err() != nil:
+		return fail(ExitFailed, CauseCanceled, "the deployment was canceled", err)
 	case err != nil:
 		return fail(ExitFailed, CauseUpload, "cannot check the uploaded files", err)
 	case res.ExitCode != 0:

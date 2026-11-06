@@ -89,6 +89,11 @@ func newClientKey(t *testing.T) (private []byte, authorized string) {
 func startSshd(t *testing.T, image string) *sshd {
 	t.Helper()
 	private, authorized := newClientKey(t)
+	return startSshdWith(t, image, private, authorized)
+}
+
+func startSshdWith(t *testing.T, image string, private []byte, authorized string) *sshd {
+	t.Helper()
 	keys := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(keys, "authorized_keys"), []byte("restrict "+authorized+"\n"), 0o644))
 	require.NoError(t, os.Chmod(keys, 0o755))

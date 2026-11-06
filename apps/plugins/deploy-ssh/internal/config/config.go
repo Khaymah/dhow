@@ -33,6 +33,8 @@ var ErrInput = errors.New("an input of the deploy plugin is not valid")
 type Settings struct {
 	Step         jobspec.TargetStep
 	Deploy       deployrelease.Config
+	BatchSize    int
+	BatchPause   time.Duration
 	KeyFile      string
 	ReportPath   string
 	ProxyURL     string
@@ -46,8 +48,8 @@ func Parse(getenv func(string) string) (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
-	if len(step.Hosts) != 1 {
-		return Settings{}, fmt.Errorf("%w: this version of the plugin deploys to one server, and the target has %d", ErrInput, len(step.Hosts))
+	if !uniqueHosts(step.Hosts) {
+		return Settings{}, fmt.Errorf("%w: two servers of the target have the same id", ErrInput)
 	}
 	if step.Kind != jobspec.TargetKindSSH {
 		return Settings{}, fmt.Errorf("%w: the target is not an ssh target", ErrInput)
@@ -68,8 +70,23 @@ func Parse(getenv func(string) string) (Settings, error) {
 	if err != nil {
 		return Settings{}, fmt.Errorf("%w: %w", ErrInput, err)
 	}
-	s := Settings{Step: step, Deploy: cfg, KeyFile: step.KeyFile, ReportPath: getenv(envReport), ProxyURL: getenv(envProxy), AllowPrivate: allow}
+	batch, pause := max(step.Settings.BatchSize, 1), time.Duration(step.Settings.BatchPauseSeconds)*time.Second
+	if err := deployrelease.ValidateRollout(len(step.Hosts), batch, pause, cfg.Health); err != nil {
+		return Settings{}, fmt.Errorf("%w: %w", ErrInput, err)
+	}
+	s := Settings{Step: step, Deploy: cfg, BatchSize: batch, BatchPause: pause, KeyFile: step.KeyFile, ReportPath: getenv(envReport), ProxyURL: getenv(envProxy), AllowPrivate: allow}
 	return s, cfg.Validate()
+}
+
+func uniqueHosts(hosts []jobspec.TargetHost) bool {
+	seen := map[string]bool{}
+	for _, h := range hosts {
+		if seen[h.HostID] {
+			return false
+		}
+		seen[h.HostID] = true
+	}
+	return true
 }
 
 func deployConfig(step jobspec.TargetStep, in func(string) string) (deployrelease.Config, error) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io/fs"
-	"log/slog"
 	"strings"
 	"time"
 )
@@ -25,7 +24,8 @@ type Engine struct {
 	Log     Logger
 	Clock   Clock
 
-	LockRenew time.Duration
+	LockRenew   time.Duration
+	LockTimeout time.Duration
 }
 
 type run struct {
@@ -47,58 +47,32 @@ type run struct {
 
 	timeoutKnown bool
 	hasTimeout   bool
-	started      bool
+	switched     bool
+	marked       bool
+	batch        int
 	locked       bool
 	stopRenew    func()
 	totals       scan
 }
 
 func (e *Engine) Run(ctx context.Context) *Failure {
+	f := &Fleet{
+		Config: e.Config, Hosts: []Host{{ID: e.Config.HostID, Name: e.Config.HostName, Connect: e.Connect}}, BatchSize: 1,
+		Doer: e.Doer, Report: e.Report, Log: e.Log, Clock: e.Clock, LockRenew: e.LockRenew,
+	}
+	return f.Run(ctx)
+}
+
+func newRun(e *Engine) *run {
 	cfg := e.Config
 	d := &run{e: e, cfg: cfg, base: cfg.DeployPath}
-	if e.Report == nil {
-		e.Report = DiscardReporter{}
-	}
-	if e.Clock.Now == nil {
-		e.Clock = RealClock()
-	}
-	if e.Log == nil {
-		e.Log = slog.Default()
-	}
-	if err := cfg.Validate(); err != nil {
-		return d.abort(fail(ExitInput, CauseOther, "the deployment settings are not valid", err))
-	}
 	d.dhow = d.base + "/" + dirName
 	d.releases = d.base + "/" + releasesName
 	d.current = d.base + "/" + currentName
 	d.releaseDir = d.releases + "/" + cfg.ReleaseID
 	d.incoming = d.releases + "/" + incomingPref + cfg.ReleaseID
 	d.manifest = d.incoming + ".sha256"
-	return d.execute(ctx)
-}
-
-func (d *run) execute(ctx context.Context) *Failure {
-	totals, f := d.scanArchive()
-	if f != nil {
-		return d.abort(f)
-	}
-	d.totals = totals
-	remote, err := d.e.Connect(ctx)
-	if err != nil {
-		return d.abort(connectFailure(err))
-	}
-	d.r = remote
-	defer func() { _ = remote.Close() }()
-	if f := d.preflight(ctx); f != nil {
-		return d.abort(f)
-	}
-	defer d.unlock()
-	d.emitStarted()
-	if f := d.stageRelease(ctx); f != nil {
-		d.cleanStage()
-		return d.abort(f)
-	}
-	return d.cutOver(ctx)
+	return d
 }
 
 func connectFailure(err error) *Failure {
@@ -106,22 +80,6 @@ func connectFailure(err error) *Failure {
 		return fail(ExitHostKeyMismatch, CauseOther, "host key mismatch", err)
 	}
 	return fail(ExitConnect, CauseOther, "cannot connect to the server", err)
-}
-
-func (d *run) emitStarted() {
-	if d.started {
-		return
-	}
-	d.started = true
-	d.e.Report.Emit(Event{Event: EventStarted, ReleaseID: d.cfg.ReleaseID, PreviousReleaseID: d.known, Mode: ModeDeploy})
-}
-
-func (d *run) abort(f *Failure) *Failure {
-	d.emitStarted()
-	d.e.Report.Emit(Event{Event: EventFailed, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID, Reason: f.Reason, Message: f.Text})
-	d.e.Report.Emit(Event{Event: EventFailed, ReleaseID: d.cfg.ReleaseID, Reason: f.Reason, Message: f.Text})
-	d.e.Log.Warn("the deployment failed", "reason", f.Reason, "error", f.Error())
-	return f
 }
 
 func (d *run) cleanStage() {

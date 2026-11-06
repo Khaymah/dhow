@@ -156,18 +156,27 @@ func (d *target) deploy(scenario string, s spec) result {
 	key := filepath.Join(work, jobspec.TargetKeyFile(0))
 	require.NoError(d.t, os.WriteFile(key, d.s.clientKey, 0o400))
 	report := filepath.Join(work, "report")
-	cmd := exec.CommandContext(context.Background(), d.plugin)
-	cmd.Env = d.env(s, key, archivePath, digest, report)
+	var watch func(*exec.Cmd)
+	if s.stopAt != "" {
+		watch = func(cmd *exec.Cmd) { go d.stopWhenCurrentIs(cmd, s.stopAt) }
+	}
+	return runPlugin(d.t, d.plugin, d.env(s, key, archivePath, digest, report), report, scenario, watch)
+}
+
+func runPlugin(t *testing.T, plugin string, env []string, report, scenario string, watch func(*exec.Cmd)) result {
+	t.Helper()
+	cmd := exec.CommandContext(context.Background(), plugin)
+	cmd.Env = env
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	exit := 0
-	require.NoError(d.t, cmd.Start())
-	if s.stopAt != "" {
-		go d.stopWhenCurrentIs(cmd, s.stopAt)
+	require.NoError(t, cmd.Start())
+	if watch != nil {
+		watch(cmd)
 	}
 	if err := cmd.Wait(); err != nil {
 		var ee *exec.ExitError
-		require.ErrorAs(d.t, err, &ee)
+		require.ErrorAs(t, err, &ee)
 		exit = ee.ExitCode()
 	}
 	raw, _ := os.ReadFile(report)
@@ -177,21 +186,22 @@ func (d *target) deploy(scenario string, s spec) result {
 			continue
 		}
 		var e deployrelease.Event
-		require.NoError(d.t, json.Unmarshal([]byte(line), &e), line)
+		require.NoError(t, json.Unmarshal([]byte(line), &e), line)
 		res.events = append(res.events, e)
 	}
-	d.keepReport(scenario, raw, exit)
+	keepReport(t, scenario, raw, exit)
 	return res
 }
 
-func (d *target) keepReport(scenario string, raw []byte, exit int) {
+func keepReport(t *testing.T, scenario string, raw []byte, exit int) {
+	t.Helper()
 	dir := os.Getenv(envReport)
-	if dir == "" {
+	if dir == "" || scenario == "" {
 		return
 	}
-	require.NoError(d.t, os.MkdirAll(dir, 0o755))
-	require.NoError(d.t, os.WriteFile(filepath.Join(dir, scenario+".jsonl"), raw, 0o644))
-	require.NoError(d.t, os.WriteFile(filepath.Join(dir, scenario+".exit"), []byte(fmt.Sprint(exit)), 0o644))
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, scenario+".jsonl"), raw, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, scenario+".exit"), []byte(fmt.Sprint(exit)), 0o644))
 }
 
 func (r result) kinds() []string {

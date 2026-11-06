@@ -30,6 +30,8 @@ const (
 	MaxHookTimeout     = 600 * time.Second
 	LockTTL            = 30 * time.Minute
 	RollbackBudget     = 3 * time.Minute
+	CleanupBudget      = 30 * time.Second
+	DefaultLockTimeout = 10 * time.Second
 )
 
 var (
