@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import type { components } from '../Src/Core/Api/Schema';
 import { DESKTOP, expectClean, expectNowhere, open, PHONE, shot, signInPage, type IView } from './Guard';
 import { newHostKey } from './HostKey';
 import { call, field, list, signIn, stack, text, type ISession } from './Stack';
@@ -121,10 +122,10 @@ test('the private key goes into the environment secret once and is never shown a
   await close(view);
 });
 
-test('the history marks a deploy that rolled back by itself, with the reason and each server', async ({ browser }) => {
+test('the history renders a rolled-back release (served by a stub of the releases endpoint) with the reason and each server', async ({ browser }) => {
   const saved = (await call('GET', apiPath(), undefined, owner)).Data;
   const hostId = text(list(saved, 'Hosts')[0], 'Id');
-  const releases = {
+  const releases: components['schemas']['DeployTargetReleases'] = {
     CurrentReleaseId: '1-aaaaaaaa-1',
     Partial: false,
     Releases: [

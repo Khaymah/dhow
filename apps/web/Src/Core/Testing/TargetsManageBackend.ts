@@ -18,6 +18,7 @@ export interface ITargetsManageState {
   fetchFailure: Response | null;
   writes: ITargetWrite[];
   secrets: ISecretWrite[];
+  secretFailure: Response | null;
 }
 
 export const newTargetsManageState = (over: Record<string, unknown> = {}): ITargetsManageState => ({
@@ -34,6 +35,7 @@ export const newTargetsManageState = (over: Record<string, unknown> = {}): ITarg
   fetchFailure: null,
   writes: [],
   secrets: [],
+  secretFailure: null,
 });
 
 const PATH =
@@ -102,6 +104,7 @@ export const targetsManageRoute =
     return bodyOf(request).then((body) => {
       state.writes.push({ Method: request.method, Path: url.pathname.replace(/^\/api\/v1/, ''), Body: body });
       if (secretName !== undefined) {
+        if (state.secretFailure) return state.secretFailure.clone();
         state.secrets.push({ Name: secretName, Value: String(body.Value) });
         return ok({ Name: secretName, Scope: 'environment' });
       }

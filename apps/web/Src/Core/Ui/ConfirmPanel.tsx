@@ -46,7 +46,7 @@ export const ConfirmPanel = <TResult,>({
     <div ref={panelRef} className="grid gap-3 px-card pb-card">
       <p className="m-0 text-body-sm text-secondary">{question}</p>
       {children}
-      {action.Notice ? <InlineAlert accent="failed" title={action.Notice} /> : null}
+      {action.Notice ? <InlineAlert focus accent="failed" title={action.Notice} /> : null}
       <FactorFields methods={methods} draft={action.Draft} onChange={action.SetDraft} disabled={action.Busy} />
       <div className="flex flex-wrap gap-2">
         {danger ? (

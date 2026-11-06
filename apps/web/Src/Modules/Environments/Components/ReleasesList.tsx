@@ -7,8 +7,11 @@ import { useT } from '@/I18n/useT';
 import type { TReleaseHost, TTargetRelease, TTargetReleases } from '@/Modules/Environments/Api/TargetsApi';
 import {
   canRollBackTo,
+  hostStateKey,
   hostStatusOf,
   isAutomaticRollback,
+  releaseKindKey,
+  releaseStateKey,
   releaseStatusOf,
   rollbackReasonOf,
 } from '@/Modules/Environments/Types/TargetState';
@@ -31,7 +34,7 @@ const reasonText = (reason: string | undefined, t: TTranslate): string | null =>
 };
 
 const hostsLine = (release: TTargetRelease, t: TTranslate): string =>
-  release.Hosts.map((host) => `${t('targets.release.hostRow', { position: host.Position })}: ${t(`targets.release.host.${host.State}`)}`).join(' · ');
+  release.Hosts.map((host) => `${t('targets.release.hostRow', { position: host.Position })}: ${t(hostStateKey(host.State))}`).join(' · ');
 
 const HostDetail = ({ host, name, t }: { host: TReleaseHost; name: string; t: TTranslate }) => {
   const reason = reasonText(host.RollbackReason, t);
@@ -41,7 +44,7 @@ const HostDetail = ({ host, name, t }: { host: TReleaseHost; name: string; t: TT
       <bdi dir="ltr" className="font-mono">
         {name}
       </bdi>
-      <StatusDot status={hostStatusOf(host.State)}>{t(`targets.release.host.${host.State}`)}</StatusDot>
+      <StatusDot status={hostStatusOf(host.State)}>{t(hostStateKey(host.State))}</StatusDot>
       {note ? <span>{note}</span> : null}
     </span>
   );
@@ -65,7 +68,7 @@ const subOf = (release: TTargetRelease, props: IReleasesListProps, t: TTranslate
   const kind =
     release.Kind === 'rollback' && release.RestoredReleaseId
       ? t('targets.release.kind.rollback', { release: release.RestoredReleaseId })
-      : t(`targets.release.kind.${release.Kind}`, { release: '' });
+      : t(releaseKindKey(release.Kind), { release: '' });
   return (
     <>
       {kind}
@@ -109,7 +112,7 @@ export const ReleasesList = (props: IReleasesListProps) => {
           end={
             <>
               <StateBadges release={release} />
-              <StatusDot status={releaseStatusOf(release.State)}>{t(`targets.release.state.${release.State}`)}</StatusDot>
+              <StatusDot status={releaseStatusOf(release.State)}>{t(releaseStateKey(release.State))}</StatusDot>
               {canRollBack && canRollBackTo(release, releases.CurrentReleaseId, partial) ? (
                 <Button
                   size="sm"

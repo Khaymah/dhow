@@ -55,7 +55,7 @@ const PasteForm = ({ scope, target, host, onDone }: IHostKeyFlowProps & { onDone
         });
       }}
     >
-      {paste.Failure ? <InlineAlert accent="failed" title={errorText(paste.Failure)} /> : null}
+      {paste.Failure ? <InlineAlert focus accent="failed" title={errorText(paste.Failure)} /> : null}
       <Field label={t('targets.hostkey.paste.label')}>
         <Textarea
           dir="ltr"
@@ -152,7 +152,7 @@ export const HostKeyFlow = (props: IHostKeyFlowProps) => {
       ) : (
         <InlineAlert accent="awaiting" title={t('targets.hostkey.unpinned')} />
       )}
-      {fetched.Failure ? <InlineAlert accent="failed" title={errorText(fetched.Failure)} /> : null}
+      {fetched.Failure ? <InlineAlert focus accent="failed" title={errorText(fetched.Failure)} /> : null}
       {host.PendingHostKeyFingerprint ? <PendingConfirm key={host.PendingHostKeyFingerprint} {...props} /> : null}
       {canManage && !Pasting ? (
         <div className="flex flex-wrap gap-2">

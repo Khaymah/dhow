@@ -51,8 +51,8 @@ const Form = ({ scope, methods, onCreated }: ITargetCreateFormProps & { methods:
         HandleSubmit();
       }}
     >
-      {Problem ? <InlineAlert accent="failed" title={Problem} /> : null}
-      {action.Notice ? <InlineAlert accent="failed" title={action.Notice} /> : null}
+      {Problem ? <InlineAlert focus accent="failed" title={Problem} /> : null}
+      {action.Notice ? <InlineAlert focus accent="failed" title={action.Notice} /> : null}
       <TargetFields form={form} creating disabled={action.Busy} />
       <HostRowsField form={form} disabled={action.Busy} />
       <InlineAlert accent="building" title={t('targets.form.afterCreate')} />

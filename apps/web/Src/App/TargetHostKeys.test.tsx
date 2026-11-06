@@ -280,4 +280,45 @@ describe('the deploy key', () => {
       Body: { CurrentFactor: { Method: 'password', Password: PASSWORD } },
     });
   });
+
+});
+
+describe('the key secret', () => {
+  it('sends only the value, so the description of the secret is kept', async () => {
+    const manage = newTargetsManageState({ KeySecretName: 'WEB_SSH_KEY' });
+    const view = mountTargets({ url: TARGET_URL, manage });
+    const main = await findPage('web');
+    await view.user.click(await within(main).findByLabelText(Ar['targets.keySecret.value']));
+    await view.user.paste(KEY_MATERIAL);
+    await view.user.click(within(main).getByRole('button', { name: Ar['targets.keySecret.submit'] }));
+
+    await waitFor(() => {
+      expect(view.manage.writes).toHaveLength(1);
+    });
+    expect(view.manage.writes[0]?.Path).toBe(`${API}/secrets/WEB_SSH_KEY`);
+    expect(view.manage.writes[0]?.Body).toEqual({ Value: KEY_MATERIAL });
+    expect(view.manage.writes[0]?.Body).not.toHaveProperty('Description');
+  });
+
+  it('keeps the key in the box after a failed save, moves focus to the error, and drops the key when the page is left', async () => {
+    const manage = newTargetsManageState({ KeySecretName: 'WEB_SSH_KEY' });
+    manage.secretFailure = backendFailure('SECRET_TOO_LARGE', 'السر كبير جدًا.', 422);
+    const view = mountTargets({ url: TARGET_URL, manage });
+    const main = await findPage('web');
+    const box = await within(main).findByLabelText(Ar['targets.keySecret.value']);
+    await view.user.click(box);
+    await view.user.paste(KEY_MATERIAL);
+    await view.user.click(within(main).getByRole('button', { name: Ar['targets.keySecret.submit'] }));
+
+    const alert = await within(main).findByText('السر كبير جدًا.');
+    expect(box).toHaveValue(KEY_MATERIAL);
+    await waitFor(() => {
+      expect(alert.closest('[role="alert"]')).toHaveFocus();
+    });
+
+    await view.user.click(within(main).getByRole('link', { name: Ar['targets.page.back'] }));
+    await findPage('production');
+    expect(document.body.innerHTML).not.toContain('fake-key-material');
+    expect(box).toHaveValue('');
+  });
 });

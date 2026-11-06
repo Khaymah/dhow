@@ -134,6 +134,9 @@ describe('making a target', () => {
     await view.user.type(await within(main).findByLabelText(Ar['factor.method.password']), PASSWORD);
     await view.user.click(within(main).getByRole('button', { name: Ar['targets.form.create'] }));
     expect(await within(main).findByText(Ar['targets.form.error.name'])).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(main).getByText(Ar['targets.form.error.name']).closest('[role="alert"]')).toHaveFocus();
+    });
 
     await view.user.clear(within(main).getByLabelText(Ar['targets.form.name']));
     await view.user.type(within(main).getByLabelText(Ar['targets.form.name']), 'good');
@@ -267,6 +270,28 @@ describe('the history of a target', () => {
     expect(within(failed).getAllByText(Ar['targets.release.state.rollback_failed']).length).toBeGreaterThan(0);
     expect(await within(main).findByText(arText('targets.history.check.problems', { count: 1 }))).toBeInTheDocument();
     expect(within(main).getAllByText(Ar['targets.history.kind.check']).length).toBeGreaterThan(0);
+  });
+
+  it('never shows a raw key for a kind or a state the interface does not know', async () => {
+    const targets = newTargetsState();
+    targets.releases = {
+      CurrentReleaseId: '12-aaaaaaaa-1',
+      Partial: false,
+      Releases: [
+        releaseFixture('15-ffffffff-1', {
+          Kind: 'future',
+          State: 'future',
+          Hosts: [{ HostId: HOST_ONE, Position: 1, State: 'future' }],
+        }),
+      ],
+    };
+    mountTargets({ url: TARGET_URL, targets });
+    const main = await findPage('web');
+    const row = (await within(main).findByText('15-ffffffff-1')).closest('li');
+    if (!row) throw new Error('no row');
+    expect(row.textContent).not.toMatch(/targets\./);
+    expect(within(row).getAllByText(Ar['targets.release.state.unknown']).length).toBeGreaterThan(0);
+    expect(within(row).getByText(new RegExp(Ar['targets.release.kind.deploy']))).toBeInTheDocument();
   });
 
   it('shows the automatic rollback on the environment page too, without the per-server details', async () => {

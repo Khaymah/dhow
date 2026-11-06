@@ -147,6 +147,6 @@ export const putTargetKeySecret = (scope: ITargetScope, secretName: string, valu
   request(() =>
     ApiClient.PUT('/organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets/{secretName}', {
       params: { path: { ...base(scope), secretName } },
-      body: { Value: value, Description: '' },
+      body: { Value: value },
     }),
   );

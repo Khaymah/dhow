@@ -13,6 +13,7 @@ import { useT } from '@/I18n/useT';
 import type { TTarget } from '@/Modules/Environments/Api/TargetsApi';
 import { putTargetKeySecret, updateTarget, type ITargetScope } from '@/Modules/Environments/Api/TargetWritesApi';
 import { TargetFactorPanel } from '@/Modules/Environments/Components/TargetFactorPanel';
+import { useClearOnUnmount } from '@/Modules/Environments/Hooks/useClearOnUnmount';
 import { useTargetRefresh } from '@/Modules/Environments/Hooks/useTargetRefresh';
 import { defaultKeySecretName, SECRET_NAME_PATTERN } from '@/Modules/Environments/Types/TargetDraft';
 
@@ -32,6 +33,7 @@ export const KeySecretForm = ({ scope, target }: IKeySecretFormProps) => {
   const [Attach, setAttach] = useState<string | null>(null);
   const nameFixed = target.KeySecretName !== undefined && target.KeySecretName !== '';
   const nameOk = SECRET_NAME_PATTERN.test(Name);
+  useClearOnUnmount(valueRef);
   const save = useAction((name: string, value: string) => putTargetKeySecret(scope, name, value));
 
   const HandleSubmit = () => {
@@ -58,7 +60,7 @@ export const KeySecretForm = ({ scope, target }: IKeySecretFormProps) => {
           HandleSubmit();
         }}
       >
-        {save.Failure ? <InlineAlert accent="failed" title={errorText(save.Failure)} /> : null}
+        {save.Failure ? <InlineAlert focus accent="failed" title={errorText(save.Failure)} /> : null}
         <Field label={t('targets.keySecret.name')}>
           <Input
             dir="ltr"

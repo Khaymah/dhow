@@ -49,8 +49,8 @@ const Form = ({ scope, target, methods }: ITargetEditFormProps & { methods: read
         HandleSubmit();
       }}
     >
-      {Problem ? <InlineAlert accent="failed" title={Problem} /> : null}
-      {action.Notice ? <InlineAlert accent="failed" title={action.Notice} /> : null}
+      {Problem ? <InlineAlert focus accent="failed" title={Problem} /> : null}
+      {action.Notice ? <InlineAlert focus accent="failed" title={action.Notice} /> : null}
       <TargetFields form={form} creating={false} disabled={action.Busy} />
       <FactorSubmit methods={methods} action={action} label={t('targets.form.save')} busyLabel={t('targets.form.saving')} icon="check" />
     </form>

@@ -108,6 +108,19 @@ export const lastCheckOf = (check: TTargetCheck | undefined): ILastCheck | null 
   return { At: latest, Problems: checked.filter((host) => host.Reason !== 'ok').length, Hosts: check?.Hosts.length ?? checked.length };
 };
 
+const RELEASE_STATES = ['running', 'succeeded', 'failed', 'rolled_back', 'rollback_failed', 'unknown'] as const;
+const HOST_STATES = ['pending', 'uploaded', 'switched', 'verified', 'failed', 'rolled_back', 'rollback_failed', 'unknown', 'skipped'] as const;
+const RELEASE_KINDS = ['deploy', 'rollback'] as const;
+
+export const releaseStateKey = (state: string): `targets.release.state.${(typeof RELEASE_STATES)[number]}` =>
+  `targets.release.state.${RELEASE_STATES.find((known) => known === state) ?? 'unknown'}`;
+
+export const hostStateKey = (state: string): `targets.release.host.${(typeof HOST_STATES)[number]}` =>
+  `targets.release.host.${HOST_STATES.find((known) => known === state) ?? 'unknown'}`;
+
+export const releaseKindKey = (kind: string): `targets.release.kind.${(typeof RELEASE_KINDS)[number]}` =>
+  `targets.release.kind.${RELEASE_KINDS.find((known) => known === kind) ?? 'deploy'}`;
+
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
 
 export const formatSize = (bytes: number): string => {
