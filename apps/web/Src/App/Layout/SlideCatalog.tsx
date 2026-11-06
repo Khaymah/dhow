@@ -2,6 +2,7 @@ import {
   LazyDecisionBody,
   LazyEnvironmentNewBody,
   LazyInviteBody,
+  LazyIngestTokenNewBody,
   LazyInviteFooter,
   LazyLeaveBody,
   LazyMemberRemoveBody,
@@ -168,6 +169,11 @@ const BUILDERS: Record<Exclude<TStaticSlideId, 'theme-edit'>, TBuilder> = {
         }}
       />
     ),
+  }),
+  'ingest-token-new': ({ t, projectId, close }) => ({
+    title: t('ingest.new.title'),
+    subtitle: <span>{t('ingest.new.subtitle')}</span>,
+    children: <LazyIngestTokenNewBody projectId={projectId} onDone={close} />,
   }),
   'account-token-new': ({ t, close }) => ({
     title: t('tokens.slide.title'),
