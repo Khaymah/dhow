@@ -58,7 +58,7 @@ type deployWorld struct {
 
 func newDeployWorld(t *testing.T) deployWorld {
 	t.Helper()
-	w := newWorld(t)
+	w := newWorldWith(t, apptest.Options{DeploySSHImage: sshPlugin})
 	envID := w.env.SeedEnvironment(w.project, "production")
 	w.env.SeedSecret(apptest.SecretRef(w.org, &w.project, "production"), keySecretName, targetKeyValue)
 	w.env.SeedVariable(apptest.SecretRef(w.org, &w.project, "production"), "TARGET", "web")

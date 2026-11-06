@@ -21,7 +21,11 @@ import (
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
-const hostCount = 3
+const (
+	hostCount   = 3
+	lowDiskName = "checklow"
+	lowDiskPath = "/srv/app/" + lowDiskName
+)
 
 var (
 	fleetOnce sync.Once
@@ -32,8 +36,12 @@ func sharedFleet(t *testing.T, image string) []*sshd {
 	t.Helper()
 	fleetOnce.Do(func() {
 		private, authorized := newClientKey(t)
-		for range hostCount {
-			fleetSshd = append(fleetSshd, startSshdWith(t, image, private, authorized))
+		for i := range hostCount {
+			var extra []string
+			if i == hostCount-1 {
+				extra = []string{"--tmpfs", lowDiskPath + ":rw,size=1m,mode=1777"}
+			}
+			fleetSshd = append(fleetSshd, startSshdWith(t, image, private, authorized, extra...))
 		}
 	})
 	require.Len(t, fleetSshd, hostCount, "the three test servers did not start")
@@ -81,6 +89,7 @@ type rolling struct {
 	port       map[int]int
 	stopAtHost int
 	stopAt     string
+	hard       bool
 }
 
 func (g *group) env(r rolling, key, archivePath, digest, report string) []string {
@@ -122,7 +131,7 @@ func (g *group) deploy(scenario string, r rolling) result {
 	report := filepath.Join(work, "report")
 	var watch func(*exec.Cmd)
 	if r.stopAt != "" {
-		watch = func(cmd *exec.Cmd) { go g.stopWhenCurrentIs(cmd, r.stopAtHost, r.stopAt) }
+		watch = func(cmd *exec.Cmd) { go g.stopWhenCurrentIs(cmd, r.stopAtHost, r.stopAt, r.hard) }
 	}
 	if scenario != "" {
 		scenario = "rolling-" + scenario
@@ -130,11 +139,15 @@ func (g *group) deploy(scenario string, r rolling) result {
 	return runPlugin(g.t, g.plugin, g.env(r, key, archivePath, digest, report), report, scenario, watch)
 }
 
-func (g *group) stopWhenCurrentIs(cmd *exec.Cmd, host int, want string) {
+func (g *group) stopWhenCurrentIs(cmd *exec.Cmd, host int, want string, hard bool) {
 	deadline := time.Now().Add(90 * time.Second)
 	for time.Now().Before(deadline) {
 		if g.target(host).current() == want {
-			_ = cmd.Process.Signal(syscall.SIGTERM)
+			sig := syscall.SIGTERM
+			if hard {
+				sig = syscall.SIGKILL
+			}
+			_ = cmd.Process.Signal(sig)
 			return
 		}
 		time.Sleep(200 * time.Millisecond)

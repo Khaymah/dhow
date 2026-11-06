@@ -2845,7 +2845,7 @@ paths:
         the server computes. The plugin connects to every host with the pinned host key and reads `current`, the last release that passed
         its health check, the free disk space and the lock, and changes nothing on the host. The answer is 202 with the number of the run;
         read the result with GET on this path once the run ends. A host whose release was left `unknown` by a runner that died is
-        written from what the check found. Answers 503 `TARGET_CHECK_UNAVAILABLE` when this build of the server has no pinned image of
+        written from what the check found. Answers 422 `TARGET_CHECK_UNAVAILABLE` when this build of the server has no pinned image of
         the plugin.
       security:
         - SessionCookie: []

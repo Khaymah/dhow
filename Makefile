@@ -4,10 +4,12 @@ PKG      := ./...
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT   ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null)
 CHECKOUT_IMAGE ?=
+DEPLOY_SSH_PINNED ?=
 LDFLAGS  := -s -w \
 	-X github.com/Khaymah/dhow/internal/buildinfo.version=$(VERSION) \
 	-X github.com/Khaymah/dhow/internal/buildinfo.commit=$(COMMIT) \
-	-X github.com/Khaymah/dhow/internal/buildinfo.checkoutImage=$(CHECKOUT_IMAGE)
+	-X github.com/Khaymah/dhow/internal/buildinfo.checkoutImage=$(CHECKOUT_IMAGE) \
+	-X github.com/Khaymah/dhow/internal/buildinfo.deploySSHImage=$(DEPLOY_SSH_PINNED)
 GOLANGCI_LINT_VERSION := v2.15.0
 GOVULNCHECK_VERSION   := v1.8.0
 ACTIONLINT_VERSION    := v1.7.12
@@ -63,8 +65,8 @@ release: ## Build bin/dhow-server with the web app embedded
 	$(MAKE) build
 
 .PHONY: dist
-dist: ## Build reproducible release archives and SHA256SUMS in dist/ (run make web first; CHECKOUT_IMAGE=ghcr.io/khaymah/dhow-git@sha256:...)
-	CHECKOUT_IMAGE='$(CHECKOUT_IMAGE)' deploy/release/dist.sh $(VERSION) $(COMMIT)
+dist: ## Build reproducible release archives and SHA256SUMS in dist/ (run make web first; CHECKOUT_IMAGE=ghcr.io/khaymah/dhow-git@sha256:... DEPLOY_SSH_PINNED=ghcr.io/khaymah/dhow-deploy-ssh@sha256:...)
+	CHECKOUT_IMAGE='$(CHECKOUT_IMAGE)' DEPLOY_SSH_PINNED='$(DEPLOY_SSH_PINNED)' deploy/release/dist.sh $(VERSION) $(COMMIT)
 
 .PHONY: git-image
 git-image: ## Build the dhow-git checkout image locally (GIT_IMAGE=dhow-git:dev)
@@ -256,7 +258,7 @@ FUZZ_TARGETS := \
 	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare internal/jobspec:FuzzHealthEndpoints internal/jobspec:FuzzParseEndpoint \
 	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
 	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern internal/archive:FuzzUnpack internal/archive:FuzzWalk \
-	internal/deployrelease:FuzzRemoteCommand internal/deployrelease:FuzzRollingPlan
+	internal/deployrelease:FuzzRemoteCommand internal/deployrelease:FuzzRollingPlan internal/deployrelease:FuzzStateFile
 
 define fuzz_listed
 	@found=$$(grep -rhoE '^func Fuzz[A-Za-z0-9]+' $(1) --include='*_test.go' | sed 's/^func //' | sort); \

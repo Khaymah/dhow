@@ -81,8 +81,11 @@ func (sc *reportScope) checked(ctx context.Context, ev *runnerv1.DeployEvent) er
 }
 
 func (sc *reportScope) repair(ctx context.Context, host uuid.UUID, ev *runnerv1.DeployEvent) (bool, error) {
-	current, verified := ev.GetCurrentReleaseId(), ev.GetVerifiedReleaseId()
-	if (ev.GetReason() != checkOK && ev.GetReason() != checkDiverged) || current == "" || current != verified {
+	return sc.writeTruth(ctx, host, ev.GetCurrentReleaseId(), ev.GetVerifiedReleaseId())
+}
+
+func (sc *reportScope) writeTruth(ctx context.Context, host uuid.UUID, current, verified string) (bool, error) {
+	if current == "" || current != verified {
 		return false, nil
 	}
 	rows, err := sc.q.LockUnknownReleaseHosts(ctx, sqlc.LockUnknownReleaseHostsParams{HostID: host, OrganizationID: sc.lease.OrganizationId, TargetID: sc.tid})
@@ -136,4 +139,13 @@ func (sc *reportScope) settleRepaired(ctx context.Context, release uuid.UUID) er
 		OrganizationIDs: []uuid.UUID{sc.lease.OrganizationId}, TargetType: targetRelease, TargetID: release.String(),
 		Data: map[string]string{"TargetId": sc.tid.String(), "State": to}, Tx: sc.q,
 	}})
+}
+
+func (sc *reportScope) settleOlderUnknown(ctx context.Context) error {
+	for hid := range sc.hosts {
+		if _, err := sc.writeTruth(ctx, hid, sc.rel.ReleaseId, sc.rel.ReleaseId); err != nil {
+			return err
+		}
+	}
+	return nil
 }

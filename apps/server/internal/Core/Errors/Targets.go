@@ -67,5 +67,5 @@ const (
 )
 
 func TargetCheckUnavailable() *AppError {
-	return New(http.StatusServiceUnavailable, CodeTargetCheckUnavailable, KeyTargetCheckUnavailable)
+	return New(http.StatusUnprocessableEntity, CodeTargetCheckUnavailable, KeyTargetCheckUnavailable)
 }

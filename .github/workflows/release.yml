@@ -266,7 +266,7 @@ jobs:
 
   binaries:
     name: Build the binaries
-    needs: git-image
+    needs: [git-image, deploy-ssh-image]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -304,14 +304,16 @@ jobs:
           VERSION: ${{ steps.meta.outputs.version }}
           COMMIT: ${{ github.sha }}
           CHECKOUT_IMAGE: ${{ env.GIT_IMAGE_NAME }}@${{ needs.git-image.outputs.digest }}
-        run: make dist VERSION="$VERSION" COMMIT="$COMMIT" CHECKOUT_IMAGE="$CHECKOUT_IMAGE"
+          DEPLOY_SSH_PINNED: ${{ env.DEPLOY_SSH_IMAGE_NAME }}@${{ needs.deploy-ssh-image.outputs.digest }}
+        run: make dist VERSION="$VERSION" COMMIT="$COMMIT" CHECKOUT_IMAGE="$CHECKOUT_IMAGE" DEPLOY_SSH_PINNED="$DEPLOY_SSH_PINNED"
       - name: Check that a second build is byte for byte identical
         env:
           VERSION: ${{ steps.meta.outputs.version }}
           COMMIT: ${{ github.sha }}
           CHECKOUT_IMAGE: ${{ env.GIT_IMAGE_NAME }}@${{ needs.git-image.outputs.digest }}
+          DEPLOY_SSH_PINNED: ${{ env.DEPLOY_SSH_IMAGE_NAME }}@${{ needs.deploy-ssh-image.outputs.digest }}
         run: |
-          DIST_DIR="$RUNNER_TEMP/dist-again" make dist VERSION="$VERSION" COMMIT="$COMMIT" CHECKOUT_IMAGE="$CHECKOUT_IMAGE"
+          DIST_DIR="$RUNNER_TEMP/dist-again" make dist VERSION="$VERSION" COMMIT="$COMMIT" CHECKOUT_IMAGE="$CHECKOUT_IMAGE" DEPLOY_SSH_PINNED="$DEPLOY_SSH_PINNED"
           diff dist/SHA256SUMS "$RUNNER_TEMP/dist-again/SHA256SUMS"
       - name: Check the archives
         env:

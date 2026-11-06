@@ -140,6 +140,38 @@ After the switch a rollback has one of three causes: the health check failed, `R
 
 Dhow does not undo changes outside the files, such as a database migration. Design the releases so that the previous one works with the new database.
 
+## Cancel and interruption
+
+If you cancel the job during the deploy step after the switch happened, the plugin goes back to the last trusted release, and then the job is recorded as `canceled`. Dhow gives the deploy step a cancel grace longer than the other steps, about 4 minutes. It is computed from the rollback budget (3 minutes) plus closing the connections and releasing the locks, so Dhow does not cut the plugin in the middle of the rollback. The other steps keep the normal cancel grace.
+
+If the runner itself dies (`SIGKILL`) after the switch, nobody can go back. Dhow marks the release and its servers that did not finish as `unknown`, and never assumes they succeeded. On the server, `.dhow/state.json` stays in the state `switching` and `.dhow/verified` stays on the previous release. One of two things fixes this:
+
+- **Check the target:** it reads the state of each server. If `current` matches `.dhow/verified`, Dhow writes the real state: `verified` if the server is on the interrupted release, and `rolled_back` if it is on another one. If the two differ the state is not clear, so the server stays `unknown` and you see `diverged` in the result of the check.
+- **A new successful deploy:** if it fails it goes back to `.dhow/verified`. If it succeeds, Dhow closes every old release that stayed `unknown` on its servers.
+
+The remote lock that a dead runner left ends after 30 minutes, and then the next deploy takes it with a warning.
+
+## Checking a target
+
+A check reads the state of the servers and changes nothing on them. Start it with a `POST` on the path of the target followed by `/check` (the action `deployment.check`, for the owner, the admin and the maintainer), and read its result with a `GET` on the same path. The request goes through the gate of the environment like any deploy: its rules, its lock and its approvals, and it runs the official plugin image that is pinned in the server. A check needs no artifact.
+
+The plugin connects to each server with the pinned key and reads `current`, `.dhow/verified`, the state in `.dhow/state.json`, the free disk space and the lock. Then it writes one reason for each server:
+
+| Reason | Meaning |
+|---|---|
+| `ok` | The server is ready for a deploy |
+| `host_key_mismatch` | The key of the server is not the pinned one, and nothing was read from it |
+| `unreachable` | The server could not be reached |
+| `auth_failed` | The server did not accept the key of the target |
+| `path_missing` | The deploy path is not a directory on the server |
+| `current_not_symlink` | `current` is not a link to a release |
+| `state_corrupt` | A file of Dhow inside `.dhow` is damaged |
+| `disk_low` | The free space is under 64 megabytes |
+| `locked` | Another deploy holds the lock and has not ended |
+| `diverged` | `current` is not the last release that passed its check, or a deploy was interrupted. This is not a failure |
+
+The job fails with `TARGET_CHECK_FAILED` if the reason of any server is something other than `ok` and `diverged`. The result of each server stays saved, with `current`, the last trusted release, the free space, and whether the check wrote the state of the server in the records of Dhow (`Repaired`).
+
 ## Deploy to a group of servers
 
 If the target has more than one server, the plugin deploys one release (one number and one digest) to all of them, from one step on one runner. Each server has its own record in Dhow with its state and the result of its check.
@@ -196,8 +228,12 @@ The plugin writes the code in the log of the step and exits with the matching nu
 | `TARGET_LOCKED` | 15 | Another deploy holds the lock of the target |
 | `CURRENT_NOT_A_SYMLINK` | 16 | `current` is not a symbolic link and we did not touch it |
 | `TARGET_HOST_UNREACHABLE` | 17 | The connection to the server failed |
+| `TARGET_STATE_CORRUPT` | 18 | A file of Dhow on the server is damaged, and nothing was written |
+| `TARGET_CHECK_FAILED` | 19 | The check of the target found a server that is not ready |
 | `PLUGIN_INPUT_INVALID` | 2 | An input or a setting is not valid |
 | `DEPLOY_FAILED` | 1 | Another failure before the switch |
+
+Dhow shows these same codes as the reason a job failed, without opening the log, in Arabic and English. A cancel stays `canceled` even if the plugin went back and exited with its own number.
 
 Dhow keeps, for each release, the target, the release id, the previous release, the result of the check and the reason for the rollback. It keeps no key and no text of the answer of the server.
 
@@ -209,12 +245,14 @@ Dhow keeps, for each release, the target, the release id, the previous release, 
 - **The check fails with `refused`:** the service has not started yet. Raise `health_check_start_delay` or `health_check_retries`.
 - **The check fails with `certificate`:** the certificate of the address is not valid or does not match the name. The check never skips the certificate.
 - **A server of the group does not connect (`TARGET_HOST_UNREACHABLE`):** the deploy fails before any server switches and nothing changes. Fix the connection or start the server and deploy again.
+- **`TARGET_STATE_CORRUPT`:** the plugin checks `.dhow/state.json`, `.dhow/verified` and `.dhow/history` before any change. If one of them is damaged (not written the way Dhow writes it) it stops and changes nothing, because it does not guess which release to go back to. Check the target to find the server, open the file on the server, and then delete it or fix it. The next deploy writes it again.
+- **A server that does not accept the key (`auth_failed` in the check):** put the public half of the key of the target in `authorized_keys` on the server, and make sure the deploy account is the one in the target.
 - **The group is on different releases after `DEPLOY_ROLLBACK_FAILED`:** open the record of the release to see the server that did not go back and the reason, fix the reason, and then deploy a new release. The new deploy brings the group to one release.
 
 ## Limits of this version
 
 - The first deploy to a group goes back to nothing if it fails in the middle: the servers that switched stay on the new release.
-- A second job on the same target in one run does not wait for the first to end. The lock of the servers stops it with `TARGET_LOCKED`.
-- No manual rollback and no "check the target" button yet. The only rollback is the automatic one during a deploy.
+- If a run has a second job that deploys to the same target, it waits for the first to end and shows "Target busy", and it does not fail. Between two different runs the lock of the environment stops them.
+- No manual rollback yet. The only rollback is the automatic one during a deploy. The check of a target is available in the API, and its button in the interface comes later.
 - Dhow does not write application secrets on the server. Put the `.env` file in `shared/` yourself.
 - The commands written by the Admin run in the login shell of the deploy account on the server. This is the only exception to the rule "no text goes through a shell", and it is written in the architecture decision.
