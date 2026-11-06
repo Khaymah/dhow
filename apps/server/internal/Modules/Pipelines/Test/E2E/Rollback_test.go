@@ -295,6 +295,15 @@ func TestAManualRollbackNeedsAMaintainerAndASecondFactor(t *testing.T) {
 	assert.Equal(t, 1, runs, "only the request with the factor created a run")
 }
 
+func TestAManualRollbackIsOnlyForSshTargets(t *testing.T) {
+	d := newDeployWorld(t)
+	s := d.shipped(t)
+	d.sql(t, `UPDATE "DeployTargets" SET "Kind" = 'compose' WHERE "Id" = $1`, d.target.ID)
+	res := d.askForRollback(s.owner, earlier, apptest.PasswordFactor(s.pass))
+	assert.Equal(t, http.StatusUnprocessableEntity, res.Status, string(res.Raw))
+	assert.Contains(t, string(res.Raw), "ROLLBACK_NOT_SUPPORTED")
+}
+
 func TestAPipelineCannotAskForTheRollbackModeItself(t *testing.T) {
 	d := newDeployWorld(t)
 	yaml := strings.Replace(deployPipeline, "          target: web\n", "          target: web\n          mode: rollback\n          release: "+earlier+"\n", 1)

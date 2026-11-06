@@ -2878,7 +2878,7 @@ paths:
         kept for it, and the plugin checks the digest. The run goes through the same gate as any deployment, but it skips the reviewers and
         the wait timer of the environment. If it fails on a host the group is left `rollback_failed` and nothing is tried again by itself.
         The run is never run again by `rerun-failed`. The answer is 202 with the number of the run. Answers 422 `ROLLBACK_UNAVAILABLE` when
-        this build of the server has no pinned image of the plugin.
+        this build of the server has no pinned image of the plugin, and 422 `ROLLBACK_NOT_SUPPORTED` for a target that is not an SSH target.
       security:
         - SessionCookie: []
           CsrfToken: []

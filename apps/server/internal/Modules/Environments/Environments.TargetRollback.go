@@ -15,6 +15,7 @@ import (
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments/Models"
+	"github.com/Khaymah/dhow/internal/jobspec"
 )
 
 const (
@@ -53,6 +54,9 @@ func (s *Service) RequestTargetRollback(ctx context.Context, org, project uuid.U
 	row, err := q.GetDeployTarget(ctx, sqlc.GetDeployTargetParams{EnvironmentID: env.Id, OrganizationID: org, Name: name})
 	if err != nil {
 		return models.CheckStarted{}, notFoundOr(err)
+	}
+	if row.Kind != jobspec.TargetKindSSH {
+		return models.CheckStarted{}, apperrors.RollbackNotSupported()
 	}
 	if env.PausedAt != nil {
 		return models.CheckStarted{}, apperrors.EnvironmentPaused()

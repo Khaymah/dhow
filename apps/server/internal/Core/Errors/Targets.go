@@ -86,6 +86,8 @@ const (
 	KeyRollbackNotEligible       = "errors.rollbackNotEligible"
 	CodeRollbackUnavailable      = "ROLLBACK_UNAVAILABLE"
 	KeyRollbackUnavailable       = "errors.rollbackUnavailable"
+	CodeRollbackNotSupported     = "ROLLBACK_NOT_SUPPORTED"
+	KeyRollbackNotSupported      = "errors.rollbackNotSupported"
 	CodeEnvironmentPaused        = "ENVIRONMENT_PAUSED"
 	KeyEnvironmentPaused         = "errors.environmentPaused"
 )
@@ -100,6 +102,10 @@ func RollbackNotEligible() *AppError {
 
 func RollbackUnavailable() *AppError {
 	return New(http.StatusUnprocessableEntity, CodeRollbackUnavailable, KeyRollbackUnavailable)
+}
+
+func RollbackNotSupported() *AppError {
+	return New(http.StatusUnprocessableEntity, CodeRollbackNotSupported, KeyRollbackNotSupported)
 }
 
 func EnvironmentPaused() *AppError {
