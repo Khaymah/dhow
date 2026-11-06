@@ -16,7 +16,7 @@ func TestTheSecondServerFailingInTheSecondBatchRollsTheFirstBack(t *testing.T) {
 	one.setBad(t, v1, "")
 	two.setBad(t, v1, "")
 
-	first := d.deploy("rolling-compose-first", spec{release: releaseOne, compose: d.compose(v1, stateCheck(), ""), batch: 1, health: true})
+	first := d.deploy("", spec{release: releaseOne, compose: d.compose(v1, stateCheck(), ""), batch: 1, health: true})
 	require.Equal(t, 0, first.exit, first.output)
 	for _, h := range d.hosts {
 		assert.Equal(t, "v1", h.served(d.port), h.name)
