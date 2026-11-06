@@ -112,7 +112,7 @@ with:
 | `COMPOSE_UNSAFE_LOGGING` | `logging` بـ driver غير `json-file` و`local`، أو بخيار غير `max-size` و`max-file` و`compress` |
 | `COMPOSE_BIND_SOURCE` | مصدر ربط أو ملف مقروء غير موجود على السيرفر قبل التشغيل، أو هو رابط رمزي أو ليس مجلدًا أو ملفًا عاديًا |
 | `COMPOSE_UNSAFE_BIND_SYMLINK` | ربط مسار يمرّ برابط رمزي جاء من الأرشيف |
-| `COMPOSE_UNSAFE_INTERPOLATION` | متغير `${...}` في مسار ربط أو ملف |
+| `COMPOSE_UNSAFE_INTERPOLATION` | متغير `${...}` في أي مكان خارج `environment` و`command` و`entrypoint` و`labels` و`healthcheck.test` |
 | `COMPOSE_UNSAFE_INCLUDE` | `include` في أعلى الملف |
 | `COMPOSE_UNSAFE_EXTENDS` | `extends` في خدمة |
 | `COMPOSE_UNSAFE_PROVIDER` | `provider` في خدمة |
@@ -128,7 +128,7 @@ with:
 | `COMPOSE_UNSAFE_CGROUP_PARENT` و`_RUNTIME` و`_SYSCTLS` و`_GROUP_ADD` و`_EXTRA_HOSTS` و`_EXTERNAL_LINKS` و`_MODELS` | المفاتيح `cgroup_parent` و`runtime` و`sysctls` و`group_add` و`extra_hosts` و`external_links` و`models` |
 | `COMPOSE_FILE_CHANGED` | ملف Compose أو `compose.dhow.yaml` على السيرفر لا يطابق ما فُحص، أو لا يوجد سجل بصماتهما |
 | `COMPOSE_ENV_FORBIDDEN` | متغير يبدأ بـ `COMPOSE_` في `shared/.env`، أو سطر فيه لا تستطيع الإضافة قراءته |
-| `COMPOSE_INVALID` | ملف ليس YAML صحيحًا، أو فيه أكثر من مستند، أو مفتاح مكرر، أو بلا خدمات، أو أكبر من 256 KiB، أو غير موجود في الأرشيف |
+| `COMPOSE_INVALID` | ملف ليس YAML صحيحًا، أو فيه أكثر من مستند، أو مفتاح مكرر، أو بلا خدمات، أو أكبر من 256 KiB، أو غير موجود في الأرشيف، أو فيه نص حيث يجب أن تكون القيمة `true` أو `false` (مثل `read_only: "true"`)، أو وضع ربط غير معروف في `volumes` |
 
 - الربط المسموح: volume مسمّى، أو volume بلا اسم مثل `/data`، أو `tmpfs`، أو مجلد فرعي داخل مجلد الإصدار للقراءة فقط مثل `./conf:/conf:ro`. لا يُسمح بربط مجلد الإصدار نفسه ولا ملفات Compose ولا أي شيء تحت `shared` ولا إصدار آخر ولا مسار مطلق.
 - `env_file` وملفات `secrets` و`configs` تقرأ من داخل مجلد الإصدار أو من `shared/.env` بالضبط، وتكون ملفات عادية وليست روابط.
@@ -166,7 +166,10 @@ volumes:
 - إذا لم يوجد `shared/.env` تمرّر الإضافة `/dev/null`، فلا يُحمَّل ملف `.env` الموجود داخل الأرشيف أبدًا.
 - المتغير غير المعرّف يصبح فارغًا، ويحذّر Compose.
 - ملف `shared/.env` فيه متغير يبدأ بـ `COMPOSE_` يوقف النشر بـ `COMPOSE_ENV_FORBIDDEN`، لأن هذه المتغيرات تغيّر ما يقرؤه Compose. والإضافة تقرأ الملف بقواعد Compose نفسها (`export` ومسافات وأسطر Windows)، وأي سطر لا تستطيع قراءته يوقف النشر بالرمز نفسه. لا تستخدم قيمًا من عدة أسطر في هذا الملف.
-- المتغيرات غير مقبولة في اسم الصورة ولا في مسارات الربط ولا في الخيارات الحساسة مثل `privileged`.
+- أين يُسمح بـ `${...}`: في قيم `environment` (قائمة أو خريطة)، وفي `command` و`entrypoint` و`labels` و`healthcheck.test` فقط. هذه نصوص تخص الحاوية ولا تصبح مسارات على السيرفر ولا إعدادات أمان. في أي مكان آخر، مثل `image` و`ports` و`networks` و`volumes` و`read_only` و`privileged`، يفشل النشر بـ `COMPOSE_UNSAFE_INTERPOLATION` حتى مع `AllowUnsafeCompose`.
+- السبب: تفحص الإضافة الملف كما هو، أما Compose فيحسب المتغيرات بعد ذلك. قيمة مثل `read_only: "${RO:-false}"` تبدو للفاحص نصًا، وتصبح `false` عند Compose، فيُربط المجلد للكتابة. لذلك لا تُقبل المتغيرات حيث تؤثر القيمة على السيرفر.
+- لكتابة علامة `$` حرفيًا اكتب `$$`. الكتابة `$$$X` تعني `$` حرفيًا ثم متغير، فتُرفض خارج الأماكن المسموحة.
+- القيم المنطقية والأرقام التي تقرؤها الإضافة يجب أن تكون من نوعها في YAML (`true` و`false` بلا علامات اقتباس). وقيمة الوضع في `volumes` مثل `:ro` تقبل الرموز المعروفة فقط (`ro` و`rw` و`z` و`Z` وخيارات الانتشار)، ولا يزيد الإدخال على ثلاثة أجزاء.
 
 ## مدخلات الإضافة
 

@@ -85,6 +85,20 @@ func TestAWritableBindThatPlantsALinkIsRefusedAndNamedVolumesDeployFine(t *testi
 	assert.Equal(t, "v1", h.served(d.port))
 }
 
+func TestAReadOnlyThatIsOnlyReadOnlyAfterInterpolationIsRefusedBeforeTheServerIsTouched(t *testing.T) {
+	d := newDeployment(t, "interp", 8093, 1)
+	h := d.hosts[0]
+	v1 := publishApp(t, "v1")
+	writer := "      - type: bind\n        source: ./data\n        target: /data\n        read_only: \"${RO:-false}\"\n"
+	exploit := d.plantAndFollow(v1, "unused:/unused", "./data/l:/x:ro", "")
+	exploit = strings.Replace(exploit, "      - 'unused:/unused'\n", writer, 1)
+	res := d.deploy("compose-single-interpolated-read-only-refused", spec{release: releaseOne, compose: exploit, extra: map[string]string{"data/keep": "x"}})
+	assert.Equal(t, exitPolicy, res.exit, res.output)
+	assert.Contains(t, res.output, "COMPOSE_UNSAFE_INTERPOLATION")
+	assert.Empty(t, h.releases(d.path), "refused before anything reached the server")
+	assert.Empty(t, h.runningImages(d.project))
+}
+
 func TestTheEnvironmentOfTheServerAndTheEnvFileOfTheArtifactNeverReachCompose(t *testing.T) {
 	d := newDeployment(t, "envleak", 8089, 1)
 	h := d.hosts[0]

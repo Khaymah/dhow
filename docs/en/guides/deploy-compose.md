@@ -112,7 +112,7 @@ Because the Compose file comes from a commit and runs with Docker rights, the pl
 | `COMPOSE_UNSAFE_LOGGING` | `logging` with a driver other than `json-file` and `local`, or with an option other than `max-size`, `max-file` and `compress` |
 | `COMPOSE_BIND_SOURCE` | a bind source or a file that is read is not on the server before the start, or is a symbolic link, or is not an ordinary folder or file |
 | `COMPOSE_UNSAFE_BIND_SYMLINK` | a bind of a path that passes through a symbolic link that came from the archive |
-| `COMPOSE_UNSAFE_INTERPOLATION` | a `${...}` variable in a bind path or a file path |
+| `COMPOSE_UNSAFE_INTERPOLATION` | a `${...}` variable anywhere other than `environment`, `command`, `entrypoint`, `labels` and `healthcheck.test` |
 | `COMPOSE_UNSAFE_INCLUDE` | `include` at the top of the file |
 | `COMPOSE_UNSAFE_EXTENDS` | `extends` in a service |
 | `COMPOSE_UNSAFE_PROVIDER` | `provider` in a service |
@@ -128,7 +128,7 @@ Because the Compose file comes from a commit and runs with Docker rights, the pl
 | `COMPOSE_UNSAFE_CGROUP_PARENT`, `_RUNTIME`, `_SYSCTLS`, `_GROUP_ADD`, `_EXTRA_HOSTS`, `_EXTERNAL_LINKS` and `_MODELS` | the keys `cgroup_parent`, `runtime`, `sysctls`, `group_add`, `extra_hosts`, `external_links` and `models` |
 | `COMPOSE_FILE_CHANGED` | the Compose file or `compose.dhow.yaml` on the server does not match what was checked, or the record of their checksums is missing |
 | `COMPOSE_ENV_FORBIDDEN` | a variable that starts with `COMPOSE_` in `shared/.env`, or a line in it that the plugin cannot read |
-| `COMPOSE_INVALID` | a file that is not valid YAML, has more than one document, has a repeated key, has no services, is larger than 256 KiB, or is not in the archive |
+| `COMPOSE_INVALID` | a file that is not valid YAML, has more than one document, has a repeated key, has no services, is larger than 256 KiB, is not in the archive, has text where the value must be `true` or `false` (such as `read_only: "true"`), or has a mount mode in `volumes` that is not known |
 
 - Allowed mounts: a named volume, an unnamed volume such as `/data`, `tmpfs`, or a subfolder inside the release folder, read only, such as `./conf:/conf:ro`. A bind of the release folder itself, of the Compose files, of anything under `shared`, of another release, or of an absolute path is not allowed.
 - `env_file` and the files of `secrets` and `configs` are read from inside the release folder or from exactly `shared/.env`, and they are ordinary files, not links.
@@ -166,7 +166,10 @@ volumes:
 - If `shared/.env` does not exist, the plugin passes `/dev/null`, so a `.env` file inside the archive is never loaded.
 - A variable that is not defined becomes empty, and Compose warns.
 - A `shared/.env` with a variable that starts with `COMPOSE_` stops the deploy with `COMPOSE_ENV_FORBIDDEN`, because those variables change what Compose reads. The plugin reads the file by the same rules as Compose (`export`, spaces and Windows line ends), and a line that it cannot read stops the deploy with the same code. Do not use multi-line values in this file.
-- Variables are not accepted in an image name, in bind paths or in sensitive options such as `privileged`.
+- Where `${...}` is allowed: in the values of `environment` (list or map), and in `command`, `entrypoint`, `labels` and `healthcheck.test` only. These are strings that belong to the container, and they never become paths on the server or security settings. Anywhere else, such as `image`, `ports`, `networks`, `volumes`, `read_only` and `privileged`, the deploy fails with `COMPOSE_UNSAFE_INTERPOLATION`, even with `AllowUnsafeCompose`.
+- The reason: the plugin checks the file as it is, while Compose computes the variables after that. A value such as `read_only: "${RO:-false}"` looks like text to the checker and becomes `false` for Compose, so the folder is bound writable. For this reason variables are not accepted where the value affects the server.
+- To write a literal `$`, write `$$`. Writing `$$$X` means a literal `$` followed by a variable, so it is refused outside the allowed places.
+- Booleans and numbers that the plugin reads must be of their YAML type (`true` and `false` without quotes). The mode in a `volumes` entry such as `:ro` accepts the known flags only (`ro`, `rw`, `z`, `Z` and the propagation options), and an entry has at most three parts.
 
 ## Plugin inputs
 
