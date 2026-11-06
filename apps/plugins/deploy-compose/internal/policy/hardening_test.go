@@ -57,6 +57,28 @@ func TestATopLevelNameIsAbsentOrTheProjectName(t *testing.T) {
 	assert.Equal(t, "COMPOSE_UNSAFE_PROJECT_NAME", code, "without a project name nothing is equal")
 }
 
+func TestARelativePathThatLeavesTheReleaseIsRefusedEvenWhenUnsafeIsOpen(t *testing.T) {
+	for _, source := range []string{"..", "../", "../x", "./a/../../x", "a/../.."} {
+		for _, allow := range []bool{false, true} {
+			_, code := check(t, compose("    volumes:\n      - source: "+source+"\n        target: /c\n"), policy.Options{AllowUnsafe: allow})
+			assert.Equal(t, "COMPOSE_UNSAFE_BIND_RELEASE", code, "%s allow=%v", source, allow)
+		}
+	}
+}
+
+func TestABindWithoutASourceIsInvalidEvenWhenUnsafeIsOpen(t *testing.T) {
+	for _, extra := range []string{
+		"    volumes:\n      - type: bind\n        target: /c\n",
+		"    volumes:\n      - type: Bind\n",
+		"    env_file: ''\n",
+	} {
+		for _, allow := range []bool{false, true} {
+			_, code := check(t, compose(extra), policy.Options{AllowUnsafe: allow})
+			assert.Equal(t, policy.CodeInvalid, code, "%q allow=%v", extra, allow)
+		}
+	}
+}
+
 func TestLabelsMayNotUseTheDockerPrefix(t *testing.T) {
 	for name, extra := range map[string]string{
 		"a service map":    "    labels:\n      com.docker.compose.project: other\n",

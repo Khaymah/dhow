@@ -103,7 +103,7 @@ with:
 | `COMPOSE_UNSAFE_SECURITY_OPT` | أي `security_opt` غير `no-new-privileges` |
 | `COMPOSE_UNSAFE_DOCKER_SOCKET` | ربط `docker.sock` بأي مسار، و`use_api_socket` |
 | `COMPOSE_UNSAFE_BIND_ROOT` | ربط `/` |
-| `COMPOSE_UNSAFE_BIND_OUTSIDE` | ربط مسار مطلق، أو مسار نسبي يخرج من مجلد الإصدار، أو `~`. وقراءة `env_file` أو ملف `secrets` أو `configs` من مكان غير مجلد الإصدار و`shared/.env` |
+| `COMPOSE_UNSAFE_BIND_OUTSIDE` | ربط مسار مطلق، أو `~`. وقراءة `env_file` أو ملف `secrets` أو `configs` من مكان غير مجلد الإصدار و`shared/.env` |
 | `COMPOSE_UNSAFE_BIND_WRITABLE` | ربط مجلد من الإصدار بصلاحية كتابة. الربط المسموح للقراءة فقط (`:ro`) |
 | `COMPOSE_UNSAFE_BIND_SHARED_DATA` | ربط مجلد تحت `shared` |
 | `COMPOSE_UNSAFE_BIND_STATE` | ربط `.dhow` |
@@ -122,7 +122,7 @@ with:
 | `COMPOSE_UNSAFE_EXTERNAL` | شبكة أو volume في أعلى الملف يكون `external` أو له `name` |
 | `COMPOSE_UNSAFE_VOLUME_DRIVER` | `driver` لـ volume غير `local` |
 | `COMPOSE_UNSAFE_SECRET_SOURCE` | `secrets` أو `configs` مصدرها غير `file`، مثل `environment` |
-| `COMPOSE_UNSAFE_BIND_RELEASE` | ربط مجلد الإصدار نفسه (`.`)، أو `releases`، أو مجلد إصدار كامل |
+| `COMPOSE_UNSAFE_BIND_RELEASE` | ربط مجلد الإصدار نفسه (`.`)، أو `releases`، أو مجلد إصدار كامل، أو مسار نسبي يخرج من مجلد الإصدار (`..`) |
 | `COMPOSE_UNSAFE_BIND_COMPOSE` | ربط ملف Compose أو `compose.dhow.yaml` أو مجلدًا يحتويهما |
 | `COMPOSE_UNSAFE_BIND_SHARED` | ربط `shared` نفسه أو `shared/.env` |
 | `COMPOSE_UNSAFE_CGROUP_PARENT` و`_RUNTIME` و`_SYSCTLS` و`_GROUP_ADD` و`_EXTRA_HOSTS` و`_EXTERNAL_LINKS` و`_MODELS` | المفاتيح `cgroup_parent` و`runtime` و`sysctls` و`group_add` و`extra_hosts` و`external_links` و`models` |

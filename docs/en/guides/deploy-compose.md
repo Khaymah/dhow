@@ -103,7 +103,7 @@ Because the Compose file comes from a commit and runs with Docker rights, the pl
 | `COMPOSE_UNSAFE_SECURITY_OPT` | any `security_opt` other than `no-new-privileges` |
 | `COMPOSE_UNSAFE_DOCKER_SOCKET` | a bind of `docker.sock` at any path, and `use_api_socket` |
 | `COMPOSE_UNSAFE_BIND_ROOT` | a bind of `/` |
-| `COMPOSE_UNSAFE_BIND_OUTSIDE` | a bind of an absolute path, of a relative path that leaves the release folder, or of `~`; and reading an `env_file` or a `secrets` or `configs` file from anywhere other than the release folder and `shared/.env` |
+| `COMPOSE_UNSAFE_BIND_OUTSIDE` | a bind of an absolute path or of `~`; and reading an `env_file` or a `secrets` or `configs` file from anywhere other than the release folder and `shared/.env` |
 | `COMPOSE_UNSAFE_BIND_WRITABLE` | a bind of a folder of the release with write access. Binds are allowed only read only (`:ro`) |
 | `COMPOSE_UNSAFE_BIND_SHARED_DATA` | a bind of a folder under `shared` |
 | `COMPOSE_UNSAFE_BIND_STATE` | a bind of `.dhow` |
@@ -122,7 +122,7 @@ Because the Compose file comes from a commit and runs with Docker rights, the pl
 | `COMPOSE_UNSAFE_EXTERNAL` | a top-level network or volume that is `external` or has a `name` |
 | `COMPOSE_UNSAFE_VOLUME_DRIVER` | a volume `driver` other than `local` |
 | `COMPOSE_UNSAFE_SECRET_SOURCE` | `secrets` or `configs` with a source other than `file`, such as `environment` |
-| `COMPOSE_UNSAFE_BIND_RELEASE` | a bind of the release folder itself (`.`), of `releases`, or of a whole release folder |
+| `COMPOSE_UNSAFE_BIND_RELEASE` | a bind of the release folder itself (`.`), of `releases`, of a whole release folder, or of a relative path that leaves the release folder (`..`) |
 | `COMPOSE_UNSAFE_BIND_COMPOSE` | a bind of the Compose file, of `compose.dhow.yaml`, or of a folder that holds them |
 | `COMPOSE_UNSAFE_BIND_SHARED` | a bind of `shared` itself or of `shared/.env` |
 | `COMPOSE_UNSAFE_CGROUP_PARENT`, `_RUNTIME`, `_SYSCTLS`, `_GROUP_ADD`, `_EXTRA_HOSTS`, `_EXTERNAL_LINKS` and `_MODELS` | the keys `cgroup_parent`, `runtime`, `sysctls`, `group_add`, `extra_hosts`, `external_links` and `models` |

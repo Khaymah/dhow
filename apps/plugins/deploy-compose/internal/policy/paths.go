@@ -63,7 +63,7 @@ func (c *checker) absoluteCode(p string, strict bool) string {
 
 func (c *checker) relativeCode(p string, strict bool) string {
 	if p == ".." || strings.HasPrefix(p, "../") {
-		return "BIND_OUTSIDE"
+		return "BIND_RELEASE"
 	}
 	if strict {
 		if p == "." {

@@ -113,6 +113,9 @@ func (c *checker) envFileItem(item any) string {
 }
 
 func (c *checker) mountCode(p string, writable bool) string {
+	if p == "" {
+		return invalidEntry
+	}
 	code := c.structCode(p, true)
 	if hardCodes[code] {
 		return code
@@ -136,6 +139,9 @@ func (c *checker) mountCode(p string, writable bool) string {
 }
 
 func (c *checker) fileCode(p string) string {
+	if p == "" {
+		return invalidEntry
+	}
 	code := c.structCode(p, false)
 	if hardCodes[code] {
 		return code

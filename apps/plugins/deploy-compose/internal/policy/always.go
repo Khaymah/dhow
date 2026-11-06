@@ -25,6 +25,9 @@ var (
 )
 
 func always(code, service string) error {
+	if code == invalidEntry {
+		return invalid("an entry of %s is not valid", service)
+	}
 	return &Violation{Code: unsafePrefix + code, Service: service}
 }
 
