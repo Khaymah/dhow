@@ -309,12 +309,16 @@ ISOLATION_GIT_ARCHIVE ?=
 ISOLATION_SSHD    ?=
 
 .PHONY: deploy-e2e
-deploy-e2e: ## Deploy real releases to a real sshd in Docker with the dhow-deploy-ssh plugin (health check, rollback, keep_releases, host key); replays the reports into the server when DHOW_TEST_DATABASE_URL is set
+deploy-e2e: ## Deploy real releases to a real sshd with dhow-deploy-ssh and Compose projects to Docker in Docker hosts with dhow-deploy-compose (health check, rollback, policy, host key; DHOW_E2E_SKIP_COMPOSE=1 skips the privileged hosts); replays the reports into the server when DHOW_TEST_DATABASE_URL is set
 	bash deploy/e2e-targets/run.sh
 
 .PHONY: deploy-ssh-image
 deploy-ssh-image: ## Build the dhow-deploy-ssh plugin image locally (DEPLOY_SSH_IMAGE=dhow-deploy-ssh:dev)
 	docker build --tag $(DEPLOY_SSH_IMAGE) -f apps/plugins/deploy-ssh/Dockerfile .
+
+.PHONY: deploy-compose-image
+deploy-compose-image: ## Build the dhow-deploy-compose plugin image locally (DEPLOY_COMPOSE_IMAGE=dhow-deploy-compose:dev)
+	docker build --tag $(DEPLOY_COMPOSE_IMAGE) -f apps/plugins/deploy-compose/Dockerfile .
 
 .PHONY: runner-isolation
 runner-isolation: ## Run the escape and limits suites on rootless Podman (Podman 5.4+, cgroup v2 delegation, subuids, busybox-static)

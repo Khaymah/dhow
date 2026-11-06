@@ -86,17 +86,41 @@ func (f *fakeHost) ReadDir(name string) ([]deployrelease.FileInfo, error) {
 	return out, nil
 }
 
-func (f *fakeHost) Readlink(name string) (string, error)      { return os.Readlink(f.path(name)) }
-func (f *fakeHost) Mkdir(name string, mode fs.FileMode) error { return os.Mkdir(f.path(name), mode) }
+func (f *fakeHost) Readlink(name string) (string, error) {
+	return os.Readlink(f.path(name))
+}
+
+func (f *fakeHost) Mkdir(name string, mode fs.FileMode) error {
+	return os.Mkdir(f.path(name), mode)
+}
+
 func (f *fakeHost) MkdirAll(name string, mode fs.FileMode) error {
 	return os.MkdirAll(f.path(name), mode)
 }
-func (f *fakeHost) Symlink(target, name string) error { return os.Symlink(target, f.path(name)) }
-func (f *fakeHost) Rename(a, b string) error          { return os.Rename(f.path(a), f.path(b)) }
-func (f *fakeHost) Remove(name string) error          { return os.Remove(f.path(name)) }
-func (f *fakeHost) RemoveAll(name string) error       { return os.RemoveAll(f.path(name)) }
-func (f *fakeHost) FreeBytes(string) (uint64, error)  { return 1 << 40, nil }
-func (f *fakeHost) Close() error                      { return nil }
+
+func (f *fakeHost) Symlink(target, name string) error {
+	return os.Symlink(target, f.path(name))
+}
+
+func (f *fakeHost) Rename(a, b string) error {
+	return os.Rename(f.path(a), f.path(b))
+}
+
+func (f *fakeHost) Remove(name string) error {
+	return os.Remove(f.path(name))
+}
+
+func (f *fakeHost) RemoveAll(name string) error {
+	return os.RemoveAll(f.path(name))
+}
+
+func (f *fakeHost) FreeBytes(string) (uint64, error) {
+	return 1 << 40, nil
+}
+
+func (f *fakeHost) Close() error {
+	return nil
+}
 
 func (f *fakeHost) Create(name string, mode fs.FileMode) (io.WriteCloser, error) {
 	return os.OpenFile(f.path(name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
