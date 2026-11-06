@@ -157,6 +157,9 @@ func (s *Service) Complete(ctx context.Context, in CompleteInput) error {
 		if subtle.ConstantTimeCompare(want, in.Digest) != 1 {
 			return runnerauth.ValidationFailed("Digest")
 		}
+		if err := requireTargetForReason(row.Spec, in.Reason); err != nil {
+			return err
+		}
 		if models.AttemptFinished(row.AttemptState) {
 			switch {
 			case bytes.Equal(row.CompletionDigest, in.Digest):
@@ -263,4 +266,18 @@ func decide(job sqlc.Job, attempt sqlc.JobAttempt) (string, string) {
 	default:
 		return final, models.ReasonRetriesExhausted
 	}
+}
+
+func requireTargetForReason(raw []byte, reason runnerv1.FailureReason) error {
+	if !slices.Contains(deployReasons(), reason) {
+		return nil
+	}
+	spec, err := decodeSpec(raw)
+	if err != nil {
+		return err
+	}
+	if len(spec.GetTargets()) == 0 {
+		return runnerauth.ValidationFailed("FailureReason")
+	}
+	return nil
 }
