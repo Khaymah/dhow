@@ -68,6 +68,7 @@ A host needs at least 1 CPU core, 2 GiB of memory and 5 GiB of free disk (2 core
 | [Follow jobs in the web app](docs/en/guides/jobs.md) | The job list, stuck jobs without a runner, stopping a job, the live log, attempts and settings |
 | [Projects and runs](docs/en/guides/projects.md) | Create a project, link a Git repository step by step, runs and their stages, manual runs and artifacts |
 | [Environments](docs/en/guides/environments.md) | Environments and their server-side protection rules, who manages them, pause and resume, and the API |
+| [Deploy to a server over SSH](docs/en/guides/deploy-ssh.md) | The official deploy plugin: atomic releases, a health check, an automatic rollback, and how to prepare the server |
 | [Secrets and variables](docs/en/guides/secrets.md) | Write-only secrets, their places and order, versions, variables, and registry credentials |
 | [Your organization and your account](docs/en/guides/organization.md) | Members and teams beside their details, invitations, API keys, organization settings, and your profile and security |
 | [Server settings](docs/en/guides/instance-settings.md) | Mail, organization creation, the breached-password check, rate limits and log limits from the dashboard, and how the environment locks them |
