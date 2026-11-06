@@ -157,7 +157,7 @@ func pull(id string) string { return args(id, "pull", "--quiet") }
 func onlyDocker(lines []string) []string {
 	var out []string
 	for _, l := range lines {
-		if strings.HasPrefix(l, "env -i ") {
+		if strings.HasPrefix(l, "env -i ") && !strings.HasSuffix(l, " config --format json") {
 			out = append(out, l)
 		}
 	}

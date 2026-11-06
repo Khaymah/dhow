@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Khaymah/dhow/apps/plugins/deploy-compose/internal/policy"
+	"github.com/Khaymah/dhow/apps/plugins/deploy-compose/internal/resolved"
 	"github.com/Khaymah/dhow/internal/deployrelease"
 )
 
@@ -24,6 +25,7 @@ const (
 	MaxWaitTimeout     = 10 * time.Minute
 	DefaultPullTimeout = 10 * time.Minute
 	execGrace          = 30 * time.Second
+	resolveLimit       = time.Minute
 	maxLogged          = 4 << 10
 	sharedEnvFile      = "shared/.env"
 	noEnvFile          = "/dev/null"
@@ -58,6 +60,7 @@ func (a *Activator) options(deployPath string, links []string) policy.Options {
 	opt := a.Policy
 	opt.File = a.File
 	opt.DeployPath = deployPath
+	opt.Project = a.Project
 	opt.Links = links
 	return opt
 }
@@ -75,6 +78,9 @@ func (a *Activator) Prepare(ctx context.Context, r deployrelease.Remote, rel dep
 	if err != nil {
 		return refusal(err)
 	}
+	if err := checkSources(r, rel, res, opt.AllowUnsafe); err != nil {
+		return err
+	}
 	override, err := policy.Override(res.Images)
 	if err != nil {
 		return refusal(err)
@@ -86,6 +92,9 @@ func (a *Activator) Prepare(ctx context.Context, r deployrelease.Remote, rel dep
 		return fmt.Errorf("write the record of the compose files: %w", err)
 	}
 	a.pruneRecords(r, rel)
+	if err := a.resolve(ctx, r, rel, res.Images, opt.AllowUnsafe); err != nil {
+		return err
+	}
 	return a.run(ctx, r, rel, a.pullTimeout(), "pull", "--quiet")
 }
 
@@ -104,7 +113,7 @@ func (a *Activator) Activate(ctx context.Context, r deployrelease.Remote, rel de
 			return err
 		}
 	}
-	if err := a.verify(r, rel); err != nil {
+	if err := a.verify(ctx, r, rel); err != nil {
 		return err
 	}
 	wait := a.waitTimeout()
@@ -123,7 +132,7 @@ func (a *Activator) readRegular(r deployrelease.Remote, file string, limit int64
 	return raw, nil
 }
 
-func (a *Activator) verify(r deployrelease.Remote, rel deployrelease.Release) error {
+func (a *Activator) verify(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release) error {
 	rec, err := readRecord(r, rel)
 	if err != nil {
 		return err
@@ -152,7 +161,10 @@ func (a *Activator) verify(r deployrelease.Remote, rel deployrelease.Release) er
 	if !maps.Equal(res.Images, images) {
 		return changed("the image override does not pin every service of the release")
 	}
-	return checkSources(r, rel, res, opt.AllowUnsafe)
+	if err := checkSources(r, rel, res, opt.AllowUnsafe); err != nil {
+		return err
+	}
+	return a.resolve(ctx, r, rel, images, opt.AllowUnsafe)
 }
 
 func checkSources(r deployrelease.Remote, rel deployrelease.Release, res policy.Result, allowUnsafe bool) error {
@@ -272,14 +284,14 @@ func (a *Activator) envFile(r deployrelease.Remote, rel deployrelease.Release) (
 	return file, nil
 }
 
-func (a *Activator) run(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release, limit time.Duration, tail ...string) error {
+func (a *Activator) exec(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release, limit time.Duration, tail ...string) (deployrelease.ExecResult, error) {
 	home, err := a.home(ctx, r)
 	if err != nil {
-		return err
+		return deployrelease.ExecResult{}, err
 	}
 	envFile, err := a.envFile(r, rel)
 	if err != nil {
-		return err
+		return deployrelease.ExecResult{}, err
 	}
 	argv := append(Isolated(home), a.Argv(rel, envFile, tail...)...)
 	cctx, cancel := context.WithTimeout(ctx, limit)
@@ -287,13 +299,39 @@ func (a *Activator) run(ctx context.Context, r deployrelease.Remote, rel deployr
 	started := time.Now()
 	res, err := r.Exec(cctx, argv)
 	if err != nil {
-		return fmt.Errorf("%w: docker compose %s: %w", ErrCommand, tail[0], err)
+		return res, fmt.Errorf("%w: docker compose %s: %w", ErrCommand, tail[0], err)
 	}
 	if a.Log != nil {
-		a.Log.Info("docker compose finished", "command", tail[0], "exit", res.ExitCode, "seconds", int(time.Since(started).Seconds()), "output", logged(res.Output))
+		output := logged(res.Output)
+		if tail[0] == "config" {
+			output = ""
+		}
+		a.Log.Info("docker compose finished", "command", tail[0], "exit", res.ExitCode, "seconds", int(time.Since(started).Seconds()), "output", output)
+	}
+	return res, nil
+}
+
+func (a *Activator) run(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release, limit time.Duration, tail ...string) error {
+	res, err := a.exec(ctx, r, rel, limit, tail...)
+	if err != nil {
+		return err
 	}
 	if res.ExitCode != 0 {
 		return fmt.Errorf("%w: docker compose %s exited with %d", ErrCommand, tail[0], res.ExitCode)
+	}
+	return nil
+}
+
+func (a *Activator) resolve(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release, images map[string]string, allowUnsafe bool) error {
+	res, err := a.exec(ctx, r, rel, resolveLimit, "config", "--format", "json")
+	if err != nil {
+		return err
+	}
+	if res.ExitCode != 0 {
+		return refusal(&policy.Violation{Code: resolved.Code, Detail: "docker compose could not resolve the project"})
+	}
+	if err := resolved.Check(res.Output, resolved.Expect{Project: a.Project, ReleaseDir: rel.Path, Images: images, AllowUnsafe: allowUnsafe}); err != nil {
+		return refusal(err)
 	}
 	return nil
 }

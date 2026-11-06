@@ -27,8 +27,10 @@ func checkEnv(raw string) error {
 		if key == "" || (rest != "" && rest[0] != '=' && rest[0] != ':') {
 			return refusal(&policy.Violation{Code: CodeEnvForbidden, Detail: "a line of shared/.env cannot be parsed"})
 		}
-		if strings.HasPrefix(strings.ToUpper(key), "COMPOSE_") {
-			return refusal(&policy.Violation{Code: CodeEnvForbidden, Detail: "shared/.env sets a COMPOSE_ variable"})
+		for _, prefix := range []string{"COMPOSE_", "DOCKER_", "LD_"} {
+			if strings.HasPrefix(strings.ToUpper(key), prefix) {
+				return refusal(&policy.Violation{Code: CodeEnvForbidden, Detail: "shared/.env sets a " + prefix + " variable"})
+			}
 		}
 	}
 	return nil

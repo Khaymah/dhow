@@ -46,12 +46,14 @@ func (l *execLog) forHost(host string) []string {
 }
 
 type fakeHost struct {
-	t      *testing.T
-	name   string
-	root   string
-	log    *execLog
-	docker func(argv []string) deployrelease.ExecResult
-	home   string
+	t        *testing.T
+	name     string
+	root     string
+	log      *execLog
+	docker   func(argv []string) deployrelease.ExecResult
+	home     string
+	resolve  func(model map[string]any)
+	noConfig bool
 }
 
 func newFakeHost(t *testing.T, name string, log *execLog) *fakeHost {
@@ -147,6 +149,9 @@ func (f *fakeHost) Exec(_ context.Context, argv []string) (deployrelease.ExecRes
 	case "printenv":
 		return deployrelease.ExecResult{Output: []byte(f.homeDir() + "\n")}, nil
 	case "env":
+		if isConfig(argv) && !f.noConfig {
+			return f.resolvedConfig(argv), nil
+		}
 		if f.docker != nil {
 			return f.docker(argv), nil
 		}
