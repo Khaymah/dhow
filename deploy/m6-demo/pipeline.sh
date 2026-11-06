@@ -57,7 +57,7 @@ jobs:
           health_check_timeout: 3s
           health_check_stable: "2"
 YAML
-  chmod -R a+rX "$work/repo"
+  readable_repo
 }
 
 first_push() {

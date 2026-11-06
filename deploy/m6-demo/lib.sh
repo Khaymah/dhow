@@ -40,6 +40,10 @@ plugin_images() {
   export DHOW_DEMO_DEPLOY_SSH_IMAGE=$ssh_plugin
 }
 
+readable_repo() {
+  find "$work/repo" -path "$work/repo/.git" -prune -o -exec chmod a+rX -- {} +
+}
+
 hosts_up() {
   local service ready
   for service in sshd compose-host; do
@@ -205,7 +209,7 @@ write_site() {
   printf '%s\n' "$version" >"$work/repo/index.html"
   rm -f -- "$work/repo/unhealthy"
   if [[ $broken == broken ]]; then : >"$work/repo/unhealthy"; fi
-  chmod -R a+rX "$work/repo"
+  readable_repo
 }
 
 push_and_wait() {

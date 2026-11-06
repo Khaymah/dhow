@@ -27,7 +27,7 @@ services:
       retries: 2
       start_period: 1s
 YAML
-  chmod -R a+rX "$work/repo"
+  readable_repo
 }
 
 write_compose_pipeline() {
@@ -59,7 +59,7 @@ jobs:
           target: shop
           wait_timeout: 60s
 YAML
-  chmod -R a+rX "$work/repo"
+  readable_repo
 }
 
 compose_runs() {
