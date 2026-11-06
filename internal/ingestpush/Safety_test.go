@@ -84,3 +84,16 @@ func TestPlainHTTPMustResolveToLoopbackOnly(t *testing.T) {
 	_, err = ingestpush.Push(context.Background(), o, path)
 	require.NoError(t, err)
 }
+
+func TestPlainHTTPTriesEveryLoopbackAddressInTurn(t *testing.T) {
+	path, digest := writeArchive(t, map[string]string{"a": "b"})
+	srv := newFake(t, stored(digest, true))
+	_, port, err := net.SplitHostPort(srv.Listener.Addr().String())
+	require.NoError(t, err)
+	o := options("http://localhost:" + port)
+	o.Retries = 0
+	o.Resolver = fixedResolver{addrs: []netip.Addr{netip.MustParseAddr("::1"), netip.MustParseAddr("127.0.0.2"), netip.MustParseAddr("127.0.0.1")}}
+	_, err = ingestpush.Push(context.Background(), o, path)
+	require.NoError(t, err, "localhost often answers ::1 first while the server listens on 127.0.0.1 only")
+	assert.Len(t, srv.requests(), 1)
+}

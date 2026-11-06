@@ -252,7 +252,15 @@ func dialer(resolver Resolver, loopbackOnly bool) func(context.Context, string, 
 				return nil, ErrNotLoopback
 			}
 		}
-		return d.DialContext(ctx, network, net.JoinHostPort(addrs[0].String(), port))
+		var errs []error
+		for _, a := range addrs {
+			conn, err := d.DialContext(ctx, network, net.JoinHostPort(a.String(), port))
+			if err == nil {
+				return conn, nil
+			}
+			errs = append(errs, err)
+		}
+		return nil, errors.Join(errs...)
 	}
 }
 
