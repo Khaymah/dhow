@@ -13,7 +13,11 @@ usage() {
   printf 'unwrapping, the keyring keys (KEKs), the server key, the artifact grant key, the API token, the runner registration token, the\n' >&2
   printf 'session cookie, the CSRF token, the owner password and the runner keys (allowed only in its identity file),\n' >&2
   printf 'and anything shaped like an API, runner access or registration token or a download grant (input grants are\n' >&2
-  printf 'kept in the job spec of the Jobs table on purpose and allowed there only). Not covered: the\n' >&2
+  printf 'kept in the job spec of the Jobs table on purpose and allowed there only). A deploy target adds the private key of its\n' >&2
+  printf 'key secret (in every form, even on one line), a pending host key and its known_hosts line (allowed in the\n' >&2
+  printf 'DeployTargetHosts row only), and any ingest token by its shape or from the needles file (ingest token=...).\n' >&2
+  printf 'DHOW_DEMO_SWEEP_EXTRA is a colon separated list of folders (API responses, event captures) swept as well, and\n' >&2
+  printf 'DHOW_DEMO_EXPECT_TARGETS=1 fails the sweep when the stack has no deploy target with a key. Not covered: the\n' >&2
   printf 'setup token, which the server prints on purpose, Forgejo and its password, the container images of Docker\n' >&2
   printf 'itself, and memory. deploy/m4-demo/run.sh runs it at the end; to run it alone, keep a stack with\n' >&2
   printf 'DHOW_DEMO_KEEP=1 and set DHOW_DEMO_WORK to its folder.\n' >&2
@@ -26,7 +30,7 @@ usage() {
 work=${DHOW_DEMO_WORK:?set DHOW_DEMO_WORK to the folder of a running demo stack}
 sweep=$work/sweep
 canary=$work/canary
-dirs="$sweep:/sweep/runner-state:/sweep/runner-dev:/sweep/blobs"
+dirs="$sweep:/sweep/runner-state:/sweep/runner-dev:/sweep/blobs${DHOW_DEMO_SWEEP_EXTRA:+:$DHOW_DEMO_SWEEP_EXTRA}"
 package=./apps/server/internal/App/LeakSweep
 
 sweep_test() {
@@ -37,6 +41,7 @@ sweep_test() {
     -e DHOW_LEAK_SWEEP_KEYRING_FILE="$work/server/keyring" \
     -e DHOW_LEAK_SWEEP_NEEDLES="$work/needles" \
     -e DHOW_LEAK_SWEEP_RUNNER_IDENTITY=/sweep/runner-state/identity \
+    -e DHOW_LEAK_SWEEP_EXPECT_TARGETS="${DHOW_DEMO_EXPECT_TARGETS:-}" \
     -e DHOW_LEAK_SWEEP_DIRS="$where" \
     tools go test -tags leaksweep -count=1 -v -run "^${only}\$" "$package" </dev/null
 }
@@ -75,6 +80,8 @@ plant() {
   printf '{"msg":"deploy","env":"%s"}\n' "$(grep -m1 '^environment secret=' "$work/needles" | cut -d= -f2-)" >"$canary/secret/job.log"
   printf '{"msg":"pull","auth":"%s"}\n' "$(printf 'demo:%s' "$(grep -m1 '^registry password=' "$work/needles" | cut -d= -f2-)" | base64 | tr -d '\n')" >"$canary/registry/pull.log"
   printf '{"msg":"unseal","key":"%s"}\n' "$(awk 'NR == 1 { print $3 }' "$work/server/keyring")" >"$canary/kek/server.log"
+  install -d -m 0700 "$canary/ingest"
+  printf '{"msg":"upload","Authorization":"Bearer dhow_ing_%s"}\n' "$(od -An -tx1 -N24 /dev/urandom | tr -d ' \n')" >"$canary/ingest/upload.log"
   printf '{"msg":"renewed","token":"dhow_rat_%s"}\n' "$(od -An -tx1 -N24 /dev/urandom | tr -d ' \n')" >"$canary/shape/runner.log"
 }
 
@@ -108,6 +115,13 @@ if ! sweep_test "$work" TestEachKindOfCredentialIsCaughtWhenPlanted >"$work/cana
   exit 1
 fi
 printf '    caught: a data key, a keyring key, a secret of every scope and a registry password planted by the test\n'
+caught ingest "found the ingest token in clear in $canary/ingest/upload.log"
+if ! sweep_test "$work" '(TestAPrivateKeyOfATargetIsCaughtWhenPlanted|TestAPendingHostKeyIsCaughtWhenPlantedAndAllowedInItsRowOnly)' >"$work/canary-targets.out" 2>&1; then
+  printf '    the sweep did not catch a deploy target key or a pending host key planted by the test:\n' >&2
+  tail -n 30 "$work/canary-targets.out" >&2
+  exit 1
+fi
+printf '    caught: the private key of a deploy target and a pending host key planted by the test\n'
 caught shape "found the runner access token in clear in $canary/shape/runner.log"
 say "Sweeping"
 sweep_test "$dirs" | tee "$work/sweep.out"
