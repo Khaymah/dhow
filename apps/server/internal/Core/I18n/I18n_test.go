@@ -83,6 +83,7 @@ func TestCatalogsCoverTheSameKeys(t *testing.T) {
 		"mfa.passkey.renamed",
 		"mfa.passkey.removed",
 		"errors.secondFactorRequired",
+		"errors.targetKeyNeedsFactor",
 		"identity.secondFactor.saved",
 	}
 	for _, k := range keys {

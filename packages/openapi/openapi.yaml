@@ -3913,6 +3913,9 @@ paths:
         scope whatever their case, and names that start with `DHOW_` answer `SECRET_NAME_RESERVED`. The
         value of a version older than the last five, or replaced more than 30 days ago, is erased.
         Only jobs that name this environment receive it, once the environment lets them deploy.
+        When the secret is the key of a deploy target of the environment, writing a value needs a fresh
+        `CurrentFactor`: without one the answer is 403 `TARGET_KEY_NEEDS_FACTOR`, and with a wrong one 403
+        `INVALID_CURRENT_FACTOR`. An API token cannot confirm a factor, so it cannot write such a secret.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -3943,7 +3946,9 @@ paths:
       summary: Remove a secret of an environment
       description: >-
         Needs `environment.manage`. Marks the secret deleted and erases the values of all its versions in the same
-        transaction. The name can be used again.
+        transaction. The name can be used again. The body is optional: when the secret is the key of a deploy target
+        of the environment, it needs a fresh `CurrentFactor` like writing a value (403 `TARGET_KEY_NEEDS_FACTOR`
+        without one, `INVALID_CURRENT_FACTOR` with a wrong one) and nothing is removed.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -3952,6 +3957,12 @@ paths:
         - $ref: "#/components/parameters/ProjectId"
         - $ref: "#/components/parameters/EnvironmentName"
         - $ref: "#/components/parameters/SecretName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
       responses:
         "200":
           description: The removed secret, as it was.
@@ -3968,7 +3979,8 @@ paths:
       summary: Restore an earlier version of a secret of an environment
       description: >-
         Needs `environment.manage`. Writes the value of an earlier version as a new version. A version whose value
-        was erased answers 409 `SECRET_VERSION_ERASED`.
+        was erased answers 409 `SECRET_VERSION_ERASED`. When the secret is the key of a deploy target of the
+        environment, it needs a fresh `CurrentFactor` like writing a value (403 `TARGET_KEY_NEEDS_FACTOR`).
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -4530,7 +4542,7 @@ paths:
         Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts
         to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer
         only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409
-        `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true`, otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`.
+        `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true`, otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`, whose `Details` carry one `ProtectedReach` entry for each such environment, with its name as `Message`.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -5824,7 +5836,7 @@ components:
             `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`,
             `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT`, `REVIEWER_NOT_ELIGIBLE`, `TARGET_EXISTS`, `TARGET_DUPLICATE`,
             `TARGET_VERSION_CONFLICT`, `TARGET_HOST_BLOCKED`, `TARGET_HOST_UNREACHABLE`, `TARGET_KEY_NOT_FOUND`,
-            `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
+            `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `TARGET_KEY_NEEDS_FACTOR`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
           example: INTERNAL
         Message:
           type: string
@@ -9867,6 +9879,8 @@ components:
           type: string
           writeOnly: true
           description: UTF-8 without NUL, 8 bytes to 32 KiB. Never returned.
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
         Description:
           type: string
           maxLength: 256
@@ -9889,6 +9903,8 @@ components:
         Version:
           type: integer
           minimum: 1
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
     Variable:
       type: object
       additionalProperties: false

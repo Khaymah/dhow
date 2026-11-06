@@ -112,6 +112,9 @@ func (s *Service) PutSecret(ctx context.Context, ref models.Ref, name string, in
 		if err := checkSecretInput(t.Scope, in); err != nil {
 			return err
 		}
+		if err := s.guardTargetKey(ctx, q, p, t, name, in.Factor); err != nil {
+			return err
+		}
 		res, err := s.writeSecret(ctx, q, p, t, name, in, []byte(in.Value))
 		if err != nil {
 			return err

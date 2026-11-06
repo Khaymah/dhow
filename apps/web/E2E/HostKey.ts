@@ -20,3 +20,14 @@ export const newHostKey = (host: string): IHostKey => {
   const fingerprint = `SHA256:${createHash('sha256').update(blob).digest('base64').replace(/=+$/, '')}`;
   return { Line: `${host} ssh-ed25519 ${blob.toString('base64')}`, Fingerprint: fingerprint };
 };
+
+export interface IPrivateKey {
+  Pem: string;
+  Body: string;
+}
+
+export const newPrivateKey = (): IPrivateKey => {
+  const { privateKey } = generateKeyPairSync('ed25519');
+  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+  return { Pem: pem, Body: pem.split('\n')[1] ?? '' };
+};

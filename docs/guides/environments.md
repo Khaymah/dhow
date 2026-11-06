@@ -175,7 +175,7 @@ POST /api/v1/organizations/{id}/projects/{projectId}/environments/{environmentNa
 
 ### مفتاح الدخول
 
-`.../targets/{targetName}/generate-key` مع `CurrentFactor` ينشئ مفتاح ed25519 ويحفظ نصفه الخاص كسر في البيئة باسم `<TARGET>_SSH_KEY`، فلا يرى أحد قيمته أبدًا. الرد يحمل المفتاح العام فقط في `PublicKey`، فضعه في `authorized_keys` على كل سيرفر. التوليد مرة ثانية ينشئ مفتاحًا جديدًا وإصدارًا جديدًا من السر نفسه. وإذا وجد داو في البيئة سرًا بهذا الاسم لم ينشئه لهذا الهدف، يرجع `TARGET_KEY_NAME_TAKEN` ولا يكتب شيئًا. ولا يمكن إنشاء هدفين يعطيان الاسم نفسه للسر، مثل `web-1` و`web_1`: `TARGET_DUPLICATE`.
+`.../targets/{targetName}/generate-key` مع `CurrentFactor` ينشئ مفتاح ed25519 ويحفظ نصفه الخاص كسر في البيئة باسم `<TARGET>_SSH_KEY`، فلا يرى أحد قيمته أبدًا. الرد يحمل المفتاح العام فقط في `PublicKey`، فضعه في `authorized_keys` على كل سيرفر. التوليد مرة ثانية ينشئ مفتاحًا جديدًا وإصدارًا جديدًا من السر نفسه. وكتابة قيمة هذا السر من صفحة الأسرار تحتاج إلى `CurrentFactor` أيضًا (`TARGET_KEY_NEEDS_FACTOR`). وإذا وجد داو في البيئة سرًا بهذا الاسم لم ينشئه لهذا الهدف، يرجع `TARGET_KEY_NAME_TAKEN` ولا يكتب شيئًا. ولا يمكن إنشاء هدفين يعطيان الاسم نفسه للسر، مثل `web-1` و`web_1`: `TARGET_DUPLICATE`.
 
 ### تثبيت مفتاح السيرفر
 

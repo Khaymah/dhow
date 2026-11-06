@@ -70,6 +70,10 @@ export const SecretsAr = {
   'secrets.form.notFound': 'لم نجد هذا السر. ربما حُذف.',
   'secrets.form.forbidden': 'كتابة أسرار المؤسسة للمدير وصاحب المؤسسة فقط.',
   'secrets.saved': 'حفظنا السر {name}',
+  'secrets.factor.question': 'هذا السر هو مفتاح هدف نشر. أكّد هويتك لنحفظ القيمة الجديدة.',
+  'secrets.factor.confirm': 'أكّد واحفظ',
+  'secrets.factor.remove.question': 'هذا السر هو مفتاح هدف نشر. أكّد هويتك لنحذفه، وسيتوقف النشر على الهدف حتى ينشأ مفتاح جديد.',
+  'secrets.factor.remove.confirm': 'أكّد واحذف',
   'secrets.removed': 'حذفنا السر {name}',
 
   'secrets.danger.title': 'منطقة الخطر',

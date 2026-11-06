@@ -267,6 +267,17 @@ describe('SlideStack accessibility', () => {
 });
 
 describe('SlideStack motion', () => {
+  it('keeps nothing of the body of a leaving slide, so a value shown once goes the moment it closes', async () => {
+    const { user } = renderWithProviders(<Harness initial={['a', 'b']} />);
+    await screen.findByRole('dialog', { name: 'Bravo' });
+    expect(screen.getByText('Body b')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    const leaving = document.querySelector('[data-leaving]');
+    expect(leaving).not.toBeNull();
+    expect(leaving?.textContent ?? '').not.toContain('Body b');
+    expect(screen.queryByText('Body b')).toBeNull();
+  });
+
   it('animates a leaving slide out and removes it afterwards', async () => {
     const { user } = renderWithProviders(<Harness initial={['a', 'b']} />);
     await screen.findByRole('dialog', { name: 'Bravo' });

@@ -13,6 +13,7 @@ import (
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
+	deployments "github.com/Khaymah/dhow/apps/server/internal/Core/Deployments"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
@@ -45,6 +46,8 @@ type Service struct {
 	secrets  *keys.Column
 	registry *keys.Column
 	envelope *keys.Envelope
+	targets  deployments.Targets
+	factors  auth.FactorConfirmer
 	bus      Publisher
 	log      *slog.Logger
 	now      func() time.Time

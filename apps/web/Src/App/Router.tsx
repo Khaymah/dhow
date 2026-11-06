@@ -51,6 +51,7 @@ const projectRoute = page('projects/$projectId', SHELL_PAGES.project);
 const projectSettingsRoute = page('projects/$projectId/settings', SHELL_PAGES.projectSettings);
 const projectSecretsRoute = page('projects/$projectId/secrets', SHELL_PAGES.projectSecrets);
 const projectEnvironmentsRoute = page('projects/$projectId/environments', SHELL_PAGES.projectEnvironments);
+const projectIngestRoute = page('projects/$projectId/ingest', SHELL_PAGES.projectIngest);
 const environmentRoute = page('projects/$projectId/environments/$environmentName', SHELL_PAGES.environment);
 const targetRoute = page('projects/$projectId/environments/$environmentName/targets/$targetName', SHELL_PAGES.target);
 const newTargetRoute = page('projects/$projectId/environments/$environmentName/new-target', SHELL_PAGES.target);
@@ -135,6 +136,7 @@ const routeTree = rootRoute.addChildren([
     projectSettingsRoute,
     projectSecretsRoute,
     projectEnvironmentsRoute,
+    projectIngestRoute,
     environmentRoute,
     targetRoute,
     newTargetRoute,

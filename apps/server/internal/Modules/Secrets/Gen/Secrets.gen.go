@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -16,6 +17,30 @@ import (
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for FactorMethod.
+const (
+	Passkey      FactorMethod = "passkey"
+	Password     FactorMethod = "password"
+	RecoveryCode FactorMethod = "recovery_code"
+	Totp         FactorMethod = "totp"
+)
+
+// Valid indicates whether the value is a known member of the FactorMethod enum.
+func (e FactorMethod) Valid() bool {
+	switch e {
+	case Passkey:
+		return true
+	case Password:
+		return true
+	case RecoveryCode:
+		return true
+	case Totp:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for SecretScope.
 const (
@@ -63,6 +88,24 @@ type CreateRegistryCredentialRequest struct {
 	Username string  `json:"Username"`
 }
 
+// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+type CurrentFactor struct {
+	// ChallengeId From `POST /me/mfa/passkey-options`, for method `passkey`.
+	ChallengeId *openapi_types.UUID `json:"ChallengeId,omitempty"`
+	Code        *string             `json:"Code,omitempty"`
+
+	// Credential A W3C WebAuthn JSON structure (`PublicKeyCredentialCreationOptionsJSON`, `PublicKeyCredentialRequestOptionsJSON` or the `toJSON()` form of a `PublicKeyCredential`). It keeps the camelCase names of the WebAuthn specification, the only place where the API does not use PascalCase.
+	Credential *WebAuthnJson `json:"Credential,omitempty"`
+	Method     FactorMethod  `json:"Method"`
+	Password   *string       `json:"Password,omitempty"`
+}
+
+// CurrentFactorRequest defines model for CurrentFactorRequest.
+type CurrentFactorRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+}
+
 // Envelope defines model for Envelope.
 type Envelope struct {
 	Error *ErrorDetail `json:"Error,omitempty"`
@@ -77,7 +120,7 @@ type Envelope struct {
 
 // ErrorDetail defines model for ErrorDetail.
 type ErrorDetail struct {
-	// Code Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`, `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT`, `REVIEWER_NOT_ELIGIBLE`, `TARGET_EXISTS`, `TARGET_DUPLICATE`, `TARGET_VERSION_CONFLICT`, `TARGET_HOST_BLOCKED`, `TARGET_HOST_UNREACHABLE`, `TARGET_KEY_NOT_FOUND`, `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
+	// Code Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`, `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT`, `REVIEWER_NOT_ELIGIBLE`, `TARGET_EXISTS`, `TARGET_DUPLICATE`, `TARGET_VERSION_CONFLICT`, `TARGET_HOST_BLOCKED`, `TARGET_HOST_UNREACHABLE`, `TARGET_KEY_NOT_FOUND`, `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `TARGET_KEY_NEEDS_FACTOR`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
 	//
 	// Example: INTERNAL
 	Code    string              `json:"Code"`
@@ -107,6 +150,9 @@ type ErrorResponse struct {
 	Success bool      `json:"Success"`
 }
 
+// FactorMethod defines model for FactorMethod.
+type FactorMethod string
+
 // PageMeta defines model for PageMeta.
 type PageMeta struct {
 	Limit int `json:"Limit"`
@@ -117,9 +163,12 @@ type PageMeta struct {
 // PutSecretRequest defines model for PutSecretRequest.
 type PutSecretRequest struct {
 	// AvailableToPullRequests Organization and project secrets. Environments decide this in their rules.
-	AvailableToPullRequests *bool                 `json:"AvailableToPullRequests,omitempty"`
-	Description             *string               `json:"Description,omitempty"`
-	ProjectIds              *[]openapi_types.UUID `json:"ProjectIds,omitempty"`
+	AvailableToPullRequests *bool `json:"AvailableToPullRequests,omitempty"`
+
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor *CurrentFactor        `json:"CurrentFactor,omitempty"`
+	Description   *string               `json:"Description,omitempty"`
+	ProjectIds    *[]openapi_types.UUID `json:"ProjectIds,omitempty"`
 
 	// Value UTF-8 without NUL, 8 bytes to 32 KiB. Never returned.
 	Value *string `json:"Value,omitempty"`
@@ -174,7 +223,9 @@ type RegistryCredentialResponse struct {
 
 // RestoreSecretVersionRequest defines model for RestoreSecretVersionRequest.
 type RestoreSecretVersionRequest struct {
-	Version int `json:"Version"`
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor *CurrentFactor `json:"CurrentFactor,omitempty"`
+	Version       int            `json:"Version"`
 }
 
 // Secret A secret without its value. No response carries a value, a hash or a fingerprint.
@@ -274,6 +325,9 @@ type VariableResponse struct {
 	Success bool      `json:"Success"`
 }
 
+// WebAuthnJson A W3C WebAuthn JSON structure (`PublicKeyCredentialCreationOptionsJSON`, `PublicKeyCredentialRequestOptionsJSON` or the `toJSON()` form of a `PublicKeyCredential`). It keeps the camelCase names of the WebAuthn specification, the only place where the API does not use PascalCase.
+type WebAuthnJson = json.RawMessage
+
 // EnvironmentName defines model for EnvironmentName.
 type EnvironmentName = string
 
@@ -351,6 +405,9 @@ type ListOrganizationVariablesParams struct {
 
 // PutEnvironmentSecretJSONRequestBody defines body for PutEnvironmentSecret for application/json ContentType.
 type PutEnvironmentSecretJSONRequestBody = PutSecretRequest
+
+// RemoveEnvironmentSecretJSONRequestBody defines body for RemoveEnvironmentSecret for application/json ContentType.
+type RemoveEnvironmentSecretJSONRequestBody = CurrentFactorRequest
 
 // RestoreEnvironmentSecretVersionJSONRequestBody defines body for RestoreEnvironmentSecretVersion for application/json ContentType.
 type RestoreEnvironmentSecretVersionJSONRequestBody = RestoreSecretVersionRequest
@@ -2344,6 +2401,7 @@ type RemoveEnvironmentSecretRequestObject struct {
 	ProjectId       ProjectId       `json:"projectId"`
 	EnvironmentName EnvironmentName `json:"environmentName"`
 	SecretName      SecretName      `json:"secretName"`
+	Body            *RemoveEnvironmentSecretJSONRequestBody
 }
 
 type RemoveEnvironmentSecretResponseObject interface {
@@ -3653,6 +3711,16 @@ func (sh *strictHandler) RemoveEnvironmentSecret(w http.ResponseWriter, r *http.
 	request.ProjectId = projectId
 	request.EnvironmentName = environmentName
 	request.SecretName = secretName
+
+	var body RemoveEnvironmentSecretJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.RemoveEnvironmentSecret(ctx, request.(RemoveEnvironmentSecretRequestObject))

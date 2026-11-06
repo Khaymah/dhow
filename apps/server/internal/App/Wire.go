@@ -163,6 +163,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
+	runs.secrets.UseTargetKeyGuard(runs.envs.Targets(), sessionService)
 
 	ingestService, err := ingestFor(in, runs, bus, limiter, sessionService)
 	if err != nil {

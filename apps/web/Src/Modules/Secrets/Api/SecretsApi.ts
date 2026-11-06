@@ -1,5 +1,6 @@
 import { ApiClient, request } from '@/Core/Api/Client';
 import type { components } from '@/Core/Api/Schema';
+import type { TCurrentFactor } from '@/Core/Auth/Factor';
 import {
   listEnvironmentSecrets,
   listEnvironmentVariables,
@@ -82,10 +83,14 @@ export const listSecrets = (scope: ISecretScope): Promise<TSecret[]> => {
       );
 };
 
-export const putSecret = (scope: ISecretScope, name: string, input: ISecretInput): Promise<TSecret> => {
+export const putSecret = (scope: ISecretScope, name: string, input: ISecretInput, factor?: TCurrentFactor): Promise<TSecret> => {
   const environment = environmentOf(scope);
   if (environment !== null) {
-    return putEnvironmentSecret(environment, name, { Value: input.Value, Description: input.Description });
+    return putEnvironmentSecret(environment, name, {
+      Value: input.Value,
+      Description: input.Description,
+      ...(factor === undefined ? {} : { CurrentFactor: factor }),
+    });
   }
   const common = {
     Value: input.Value,
@@ -115,9 +120,9 @@ export const putSecret = (scope: ISecretScope, name: string, input: ISecretInput
   );
 };
 
-export const removeSecret = (scope: ISecretScope, name: string): Promise<TSecret> => {
+export const removeSecret = (scope: ISecretScope, name: string, factor?: TCurrentFactor): Promise<TSecret> => {
   const environment = environmentOf(scope);
-  if (environment !== null) return removeEnvironmentSecret(environment, name);
+  if (environment !== null) return removeEnvironmentSecret(environment, name, factor);
   return scope.ProjectId === null
     ? request(() =>
         ApiClient.POST('/organizations/{id}/secrets/{secretName}/remove', {

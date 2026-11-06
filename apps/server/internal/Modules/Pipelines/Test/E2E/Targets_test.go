@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"context"
+	"net/http"
 	"regexp"
 	"strings"
 	"testing"
@@ -429,7 +430,11 @@ func TestAKeyRotatedBeforeStartIsDeliveredAsTheNewVersion(t *testing.T) {
 	run := d.built(t, deployPipeline)
 	require.Equal(t, "active", d.env.RunJobs(run)["deploy"].State)
 	g := d.leaseDeploy(t)
-	d.env.SeedSecret(apptest.SecretRef(d.org, &d.project, "production"), keySecretName, "the-rotated-key-value")
+	res := d.owner.Do(apptest.Request{
+		Method: http.MethodPut, Path: apptest.OrgPath(d.org, "/projects/"+d.project.String()+"/environments/production/secrets/"+keySecretName),
+		Body: map[string]any{"Value": "the-rotated-key-value", "CurrentFactor": map[string]any{"Method": "password", "Password": d.pass}},
+	})
+	require.Equal(t, http.StatusOK, res.Status, string(res.Raw))
 	start, err := d.runner.Start(g)
 	require.NoError(t, err)
 	assert.Equal(t, "the-rotated-key-value", openStart(t, d.runner, g, start)["dhow.target.0.key"])
