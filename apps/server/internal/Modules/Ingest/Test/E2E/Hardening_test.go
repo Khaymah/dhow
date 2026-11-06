@@ -86,6 +86,13 @@ func TestATokenThatReachesAProtectedEnvironmentNeedsAnExplicitYes(t *testing.T) 
 	assert.Equal(t, http.StatusUnprocessableEntity, res.Status, string(res.Raw))
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "INGEST_TOKEN_REACH_UNCONFIRMED", res.Error.Code)
+	var reached []string
+	for _, d := range res.Error.Details {
+		if d.Field == "ProtectedReach" {
+			reached = append(reached, d.Message)
+		}
+	}
+	assert.Equal(t, []string{"production"}, reached)
 	assert.Equal(t, 1, w.countTokens(t), "only the seeded token")
 
 	body["AcknowledgeProtectedReach"] = true

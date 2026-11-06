@@ -2,6 +2,7 @@ import {
   LazyDecisionBody,
   LazyEnvironmentNewBody,
   LazyInviteBody,
+  LazyIngestTokenNewBody,
   LazyInviteFooter,
   LazyLeaveBody,
   LazyMemberRemoveBody,
@@ -35,6 +36,7 @@ import {
   type TSlideId,
   type TStaticSlideId,
 } from '@/App/Panels';
+import type { TRole } from '@/Core/Auth/AuthTypes';
 import type { ICustomTheme } from '@/Core/Theme/ThemeTokens';
 import type { ISlide } from '@/Core/Ui/SlideStack';
 import type { TTranslate } from '@/I18n/I18nContext';
@@ -50,6 +52,8 @@ export interface ISlideContext {
   draftName: string | undefined;
   customThemes: readonly ICustomTheme[];
   projectId: string | undefined;
+  projectRole: TRole | undefined;
+  projectActive: boolean | undefined;
   openProject: (projectId: string) => void;
   openRun: (projectId: string, runId: string) => void;
   environmentName: string | undefined;
@@ -168,6 +172,11 @@ const BUILDERS: Record<Exclude<TStaticSlideId, 'theme-edit'>, TBuilder> = {
         }}
       />
     ),
+  }),
+  'ingest-token-new': ({ t, projectId, projectRole, projectActive, close }) => ({
+    title: t('ingest.new.title'),
+    subtitle: <span>{t('ingest.new.subtitle')}</span>,
+    children: <LazyIngestTokenNewBody projectId={projectId} role={projectRole} active={projectActive} onDone={close} />,
   }),
   'account-token-new': ({ t, close }) => ({
     title: t('tokens.slide.title'),

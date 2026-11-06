@@ -14,6 +14,7 @@ import { useToastStore } from '@/Core/Store/useToastStore';
 import { SlideStack } from '@/Core/Ui/SlideStack';
 import { OVERVIEW_QUERY_KEY } from '@/Modules/Overview/Hooks/useOverview';
 import { runsKey } from '@/Modules/Projects/Api/RunsApi';
+import { useProject } from '@/Modules/Projects/Hooks/useProjects';
 import { useT } from '@/I18n/useT';
 
 const themeMissing = (slide: TSlideId | null, themes: readonly ICustomTheme[]): boolean => {
@@ -42,7 +43,11 @@ export const SlideHost = () => {
     setMissing(themeMissing(slide, customThemes));
   }
   const badEnvironment = environmentName !== undefined && !isEnvironmentName(environmentName);
-  const refused = slide !== null && (badEnvironment || !slideAllowed(slide, role));
+  const ingestSlide = slide === 'ingest-token-new' && membership !== undefined && isUuid(projectId);
+  const project = useProject(ingestSlide ? membership.OrganizationId : '', ingestSlide ? projectId : '');
+  const projectRole = project.data?.CallerRole;
+  const projectActive = project.isError ? false : project.data === undefined ? undefined : project.data.State === 'active';
+  const refused = slide !== null && (badEnvironment || !slideAllowed(slide, role, projectRole));
   const editing = slide !== null && isThemeEditSlide(slide);
 
   const rejectLink = useEffectEvent(() => {
@@ -86,6 +91,8 @@ export const SlideHost = () => {
               void navigate({ to: '/' });
             },
             projectId: isUuid(projectId) ? projectId : undefined,
+            projectRole,
+            projectActive,
             openProject: (id) => {
               void navigate({ to: '/projects/$projectId', params: { projectId: id } });
             },

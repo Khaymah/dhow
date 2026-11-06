@@ -3,8 +3,9 @@ import { useNavigate } from '@tanstack/react-router';
 import { canReadSecrets, type TRole } from '@/Core/Auth/AuthTypes';
 import { SectionNav } from '@/Core/Ui/SectionNav';
 import { useT } from '@/I18n/useT';
+import { canReadIngested } from '@/Modules/Ingest/Types/IngestAccess';
 
-export type TProjectTab = 'runs' | 'environments' | 'secrets' | 'settings';
+export type TProjectTab = 'runs' | 'environments' | 'ingest' | 'secrets' | 'settings';
 
 export const ProjectNav = ({ projectId, current, role }: { projectId: string; current: TProjectTab; role?: TRole }) => {
   const t = useT();
@@ -31,6 +32,19 @@ export const ProjectNav = ({ projectId, current, role }: { projectId: string; cu
             void navigate({ to: '/projects/$projectId/environments', params: { projectId } });
           },
         },
+        ...(canReadIngested(role)
+          ? [
+              {
+                id: 'ingest',
+                label: t('projects.nav.ingest'),
+                href: `/projects/${projectId}/ingest`,
+                current: current === 'ingest',
+                onSelect: () => {
+                  void navigate({ to: '/projects/$projectId/ingest', params: { projectId } });
+                },
+              },
+            ]
+          : []),
         ...(canReadSecrets(role)
           ? [
               {

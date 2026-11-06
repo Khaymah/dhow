@@ -72,12 +72,15 @@ func (s *Service) environmentsOf(ctx context.Context, q *sqlc.Queries, org, proj
 	return out, nil
 }
 
-func reachOf(patterns []models.RefPattern, envs []reachEnv) (names []string, protected bool) {
+func reachOf(patterns []models.RefPattern, envs []reachEnv) (names []string, protected []string) {
 	names = []string{}
+	protected = []string{}
 	for _, e := range envs {
 		if patternsReach(patterns, e.refs) {
 			names = append(names, e.name)
-			protected = protected || e.protected
+			if e.protected {
+				protected = append(protected, e.name)
+			}
 		}
 	}
 	return names, protected
