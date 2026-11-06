@@ -144,7 +144,7 @@ func (a *Activator) verify(r deployrelease.Remote, rel deployrelease.Release) er
 		return refusal(err)
 	}
 	opt := a.options(rel.DeployPath, rec.Links)
-	opt.AllowUnsafe, opt.Images = rec.AllowUnsafe, images
+	opt.AllowUnsafe, opt.Images = rec.AllowUnsafe && a.Policy.AllowUnsafe, images
 	res, err := policy.Check(compose, opt)
 	if err != nil {
 		return refusal(err)
@@ -152,24 +152,51 @@ func (a *Activator) verify(r deployrelease.Remote, rel deployrelease.Release) er
 	if !maps.Equal(res.Images, images) {
 		return changed("the image override does not pin every service of the release")
 	}
-	return checkSources(r, rel, res, rec.AllowUnsafe)
+	return checkSources(r, rel, res, opt.AllowUnsafe)
 }
 
 func checkSources(r deployrelease.Remote, rel deployrelease.Release, res policy.Result, allowUnsafe bool) error {
 	for _, p := range res.Binds {
-		info, err := r.Lstat(rel.Path + "/" + p)
-		switch {
-		case err != nil && allowUnsafe && errors.Is(err, fs.ErrNotExist):
-		case err != nil || info.IsSymlink() || (!info.IsDir() && !info.Mode.IsRegular()):
-			return source("a bind source is missing, a link or not a folder or file")
+		if err := walkPath(r, rel.Path, p, allowUnsafe, false); err != nil {
+			return err
 		}
 	}
 	for _, p := range res.Files {
-		if !strings.HasPrefix(p, "/") {
-			p = rel.Path + "/" + p
+		base, rest := rel.Path, p
+		if strings.HasPrefix(p, "/") {
+			base, rest = rel.DeployPath, strings.TrimPrefix(p, rel.DeployPath+"/")
+			if rest == p {
+				return walkPath(r, "", p, false, true)
+			}
 		}
-		if info, err := r.Lstat(p); err != nil || !info.Mode.IsRegular() {
-			return source("a file that Compose reads is missing or is not a regular file")
+		if err := walkPath(r, base, rest, false, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func walkPath(r deployrelease.Remote, base, rest string, allowMissingLast, wantFile bool) error {
+	parts := strings.Split(rest, "/")
+	cur := base
+	for i, comp := range parts {
+		if comp == "" || comp == "." {
+			continue
+		}
+		cur += "/" + comp
+		last := i == len(parts)-1
+		info, err := r.Lstat(cur)
+		switch {
+		case err != nil && last && allowMissingLast && errors.Is(err, fs.ErrNotExist):
+			return nil
+		case err != nil || info.IsSymlink():
+			return source("a bind source or a file that Compose reads is missing or has a link in its path")
+		case !last && !info.IsDir():
+			return source("a part of the path of a bind source or of a file that Compose reads is not a folder")
+		case last && wantFile && !info.Mode.IsRegular():
+			return source("a file that Compose reads is not a regular file")
+		case last && !wantFile && !info.IsDir() && !info.Mode.IsRegular():
+			return source("a bind source is not a folder or a file")
 		}
 	}
 	return nil

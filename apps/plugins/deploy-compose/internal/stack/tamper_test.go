@@ -152,6 +152,73 @@ func TestAFileOrBindSourceThatIsALinkIsNotStarted(t *testing.T) {
 	}
 }
 
+func TestEveryComponentOfAPathIsCheckedForLinks(t *testing.T) {
+	for name, tc := range map[string]struct {
+		extra string
+		plant func(t *testing.T, h *fakeHost)
+	}{
+		"a link in the middle of a bind source": {
+			"    volumes: ['./data/sub:/d:ro']\n",
+			func(t *testing.T, h *fakeHost) {
+				require.NoError(t, os.RemoveAll(h.path("/srv/app/releases/r1/data")))
+				require.NoError(t, os.Symlink("/etc", h.path("/srv/app/releases/r1/data")))
+			},
+		},
+		"a file in the middle of a bind source": {
+			"    volumes: ['./data/sub:/d:ro']\n",
+			func(t *testing.T, h *fakeHost) {
+				require.NoError(t, os.RemoveAll(h.path("/srv/app/releases/r1/data")))
+				require.NoError(t, os.WriteFile(h.path("/srv/app/releases/r1/data"), []byte("x"), 0o644))
+			},
+		},
+		"a link in the middle of an env file": {
+			"    env_file: ./data/sub/a.env\n",
+			func(t *testing.T, h *fakeHost) {
+				require.NoError(t, os.RemoveAll(h.path("/srv/app/releases/r1/data")))
+				require.NoError(t, os.Symlink("/etc", h.path("/srv/app/releases/r1/data")))
+			},
+		},
+		"shared that became a link": {
+			"    env_file: /srv/app/shared/.env\n",
+			func(t *testing.T, h *fakeHost) {
+				require.NoError(t, os.RemoveAll(h.path("/srv/app/shared")))
+				require.NoError(t, os.Symlink("/etc", h.path("/srv/app/shared")))
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t, "a")
+			h := r.hosts[0]
+			require.NoError(t, h.MkdirAll("/srv/app/shared", 0o755))
+			require.NoError(t, os.WriteFile(h.path("/srv/app/shared/.env"), []byte("A=1\n"), 0o600))
+			f, _ := r.deploy("r1", rollout{files: map[string]string{"compose.yaml": composeFile(1, tc.extra), "data/sub/a.env": "A=1\n"}})
+			require.Nil(t, f)
+			tc.plant(t, h)
+			act := &stack.Activator{Project: project, File: "compose.yaml"}
+			err := act.Activate(context.Background(), h, deployrelease.Release{DeployPath: "/srv/app", Path: "/srv/app/releases/r1", ID: "r1"})
+			require.Error(t, err)
+			assert.Equal(t, stack.CodeSource, violationCode(t, err))
+		})
+	}
+}
+
+func TestARollbackUsesTheStricterOfTheRecordAndTheCurrentPolicy(t *testing.T) {
+	r := newRig(t, "a")
+	r.policy.AllowUnsafe = true
+	f, _ := r.deploy("r1", rollout{files: map[string]string{"compose.yaml": composeFile(1, "    volumes: ['./data:/data']\n"), "data/x": "x"}})
+	require.Nil(t, f, "the administrator had opened the policy for r1")
+
+	r.policy.AllowUnsafe = false
+	r.hosts[0].docker = failUp("r2")
+	mark := len(r.log.forHost("a"))
+	f, _ = r.deploy("r2", rollout{files: map[string]string{"compose.yaml": composeFile(2, "")}})
+	require.NotNil(t, f)
+	assert.Equal(t, deployrelease.ExitRollbackFailed, f.Exit, "the policy is closed now, so the writable bind of r1 is not started again")
+	for _, line := range onlyDocker(r.log.forHost("a")[mark:]) {
+		assert.NotContains(t, line, "releases/r1")
+	}
+}
+
 func TestAnEnvFileOfTheServerIsParsedLikeComposeParsesIt(t *testing.T) {
 	for name, body := range map[string]string{
 		"carriage returns":     "A=1\rCOMPOSE_FILE=x\r",
