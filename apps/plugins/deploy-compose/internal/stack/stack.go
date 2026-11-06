@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Khaymah/dhow/apps/plugins/deploy-compose/internal/policy"
@@ -14,7 +17,7 @@ import (
 const (
 	ExitPolicy = 30
 
-	OverrideFile = "compose.dhow.yaml"
+	OverrideFile = policy.OverrideFile
 
 	DefaultWaitTimeout = 120 * time.Second
 	MaxWaitTimeout     = 10 * time.Minute
@@ -22,11 +25,19 @@ const (
 	execGrace          = 30 * time.Second
 	maxLogged          = 4 << 10
 	sharedEnvFile      = "shared/.env"
+	noEnvFile          = "/dev/null"
+	maxEnvBytes        = 64 << 10
+	safePath           = "/usr/local/bin:/usr/bin:/bin"
+
+	CodeChanged      = "COMPOSE_FILE_CHANGED"
+	CodeEnvForbidden = "COMPOSE_ENV_FORBIDDEN"
 )
 
 var (
 	ErrCommand = errors.New("docker compose did not finish")
 	ErrFile    = errors.New("the compose file on the server is not a regular file")
+
+	homePattern = regexp.MustCompile(`^/[A-Za-z0-9._/-]{0,200}$`)
 )
 
 type Activator struct {
@@ -40,20 +51,20 @@ type Activator struct {
 	links []string
 }
 
-func (a *Activator) Prepare(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release) error {
-	file := rel.Path + "/" + a.File
-	info, err := r.Lstat(file)
-	if err != nil || !info.Mode.IsRegular() {
-		return &deployrelease.Failure{Exit: ExitPolicy, Reason: deployrelease.CauseOther, Text: "the compose file is not on the server as a regular file", Err: errors.Join(ErrFile, err)}
-	}
-	raw, err := r.ReadFile(file, policy.MaxFileBytes+1)
-	if err != nil {
-		return fmt.Errorf("read the compose file: %w", err)
-	}
+func (a *Activator) options(deployPath string, links []string) policy.Options {
 	opt := a.Policy
-	opt.DeployPath = rel.DeployPath
-	opt.Links = a.links
-	res, err := policy.Check(raw, opt)
+	opt.File = a.File
+	opt.DeployPath = deployPath
+	opt.Links = links
+	return opt
+}
+
+func (a *Activator) Prepare(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release) error {
+	raw, err := a.readRegular(r, rel.Path+"/"+a.File, policy.MaxFileBytes+1)
+	if err != nil {
+		return err
+	}
+	res, err := policy.Check(raw, a.options(rel.DeployPath, a.links))
 	if err != nil {
 		return refusal(err)
 	}
@@ -64,12 +75,66 @@ func (a *Activator) Prepare(ctx context.Context, r deployrelease.Remote, rel dep
 	if err := deployrelease.WriteFile(r, rel.Path+"/"+OverrideFile, override, 0o644); err != nil {
 		return fmt.Errorf("write the image override: %w", err)
 	}
+	if err := writeRecord(r, rel, newRecord(raw, override, a.links, a.Policy.AllowUnsafe)); err != nil {
+		return fmt.Errorf("write the record of the compose files: %w", err)
+	}
 	return a.run(ctx, r, rel, a.pullTimeout(), "pull", "--quiet")
 }
 
 func (a *Activator) Activate(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release) error {
+	if err := a.verify(r, rel); err != nil {
+		return err
+	}
 	wait := a.waitTimeout()
 	return a.run(ctx, r, rel, wait+execGrace, "up", "--detach", "--wait", "--no-build", "--wait-timeout="+strconv.Itoa(int(wait.Seconds())))
+}
+
+func (a *Activator) readRegular(r deployrelease.Remote, file string, limit int64) ([]byte, error) {
+	info, err := r.Lstat(file)
+	if err != nil || !info.Mode.IsRegular() {
+		return nil, &deployrelease.Failure{Exit: ExitPolicy, Reason: deployrelease.CauseOther, Text: "the compose file is not on the server as a regular file", Err: errors.Join(ErrFile, err)}
+	}
+	raw, err := r.ReadFile(file, limit)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", file, err)
+	}
+	return raw, nil
+}
+
+func (a *Activator) verify(r deployrelease.Remote, rel deployrelease.Release) error {
+	rec, err := readRecord(r, rel)
+	if err != nil {
+		return err
+	}
+	compose, err := a.readRegular(r, rel.Path+"/"+a.File, policy.MaxFileBytes+1)
+	if err != nil {
+		return err
+	}
+	override, err := a.readRegular(r, rel.Path+"/"+OverrideFile, policy.MaxFileBytes+1)
+	if err != nil {
+		return err
+	}
+	if sum(compose) != rec.ComposeSum || sum(override) != rec.OverrideSum {
+		return changed("a compose file of the release is not the one that was checked")
+	}
+	images, err := policy.ParseOverride(override)
+	if err != nil {
+		return refusal(err)
+	}
+	opt := a.options(rel.DeployPath, rec.Links)
+	opt.AllowUnsafe, opt.Images = rec.AllowUnsafe, images
+	res, err := policy.Check(compose, opt)
+	if err != nil {
+		return refusal(err)
+	}
+	if !maps.Equal(res.Images, images) {
+		return changed("the image override does not pin every service of the release")
+	}
+	return nil
+}
+
+func changed(detail string) *deployrelease.Failure {
+	return refusal(&policy.Violation{Code: CodeChanged, Detail: detail})
 }
 
 func refusal(err error) *deployrelease.Failure {
@@ -90,23 +155,63 @@ func (a *Activator) pullTimeout() time.Duration {
 	return a.PullTimeout
 }
 
-func (a *Activator) Argv(rel deployrelease.Release, envFile bool, tail ...string) []string {
+func (a *Activator) Argv(rel deployrelease.Release, envFile string, tail ...string) []string {
 	argv := []string{
 		"docker", "compose",
 		"--project-name=" + a.Project,
 		"--project-directory=" + rel.Path,
 		"--file=" + rel.Path + "/" + a.File,
 		"--file=" + rel.Path + "/" + OverrideFile,
-	}
-	if envFile {
-		argv = append(argv, "--env-file="+rel.DeployPath+"/"+sharedEnvFile)
+		"--env-file=" + envFile,
 	}
 	return append(argv, tail...)
 }
 
+func Isolated(home string) []string {
+	return []string{"env", "-i", "PATH=" + safePath, "DOCKER_CONFIG=" + home + "/.docker"}
+}
+
+func (a *Activator) home(ctx context.Context, r deployrelease.Remote) (string, error) {
+	res, err := r.Exec(ctx, []string{"printenv", "HOME"})
+	home := strings.TrimSpace(string(res.Output))
+	if err != nil || res.ExitCode != 0 || !homePattern.MatchString(home) {
+		return "", fmt.Errorf("%w: the home folder of the deploy account is not known", ErrCommand)
+	}
+	return strings.TrimSuffix(home, "/"), nil
+}
+
+func (a *Activator) envFile(r deployrelease.Remote, rel deployrelease.Release) (string, error) {
+	file := rel.DeployPath + "/" + sharedEnvFile
+	info, err := r.Lstat(file)
+	if err != nil {
+		return noEnvFile, nil
+	}
+	if !info.Mode.IsRegular() {
+		return "", fmt.Errorf("%w: shared/.env is not a regular file", ErrFile)
+	}
+	raw, err := r.ReadFile(file, maxEnvBytes+1)
+	if err != nil || len(raw) > maxEnvBytes {
+		return "", fmt.Errorf("%w: shared/.env cannot be read", ErrFile)
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimPrefix(strings.TrimSpace(line), "export ")
+		if strings.HasPrefix(strings.TrimSpace(line), "COMPOSE_") {
+			return "", refusal(&policy.Violation{Code: CodeEnvForbidden, Detail: "shared/.env sets a COMPOSE_ variable"})
+		}
+	}
+	return file, nil
+}
+
 func (a *Activator) run(ctx context.Context, r deployrelease.Remote, rel deployrelease.Release, limit time.Duration, tail ...string) error {
-	info, err := r.Lstat(rel.DeployPath + "/" + sharedEnvFile)
-	argv := a.Argv(rel, err == nil && info.Mode.IsRegular(), tail...)
+	home, err := a.home(ctx, r)
+	if err != nil {
+		return err
+	}
+	envFile, err := a.envFile(r, rel)
+	if err != nil {
+		return err
+	}
+	argv := append(Isolated(home), a.Argv(rel, envFile, tail...)...)
 	cctx, cancel := context.WithTimeout(ctx, limit)
 	defer cancel()
 	started := time.Now()

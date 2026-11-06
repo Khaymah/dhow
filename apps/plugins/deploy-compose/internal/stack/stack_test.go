@@ -142,8 +142,9 @@ func release(n int) string { return fmt.Sprintf("r%d", n) }
 func args(id string, tail ...string) string {
 	base := "/srv/app/releases/" + id
 	return strings.Join(append([]string{
+		"env", "-i", "PATH=/usr/local/bin:/usr/bin:/bin", "DOCKER_CONFIG=/home/deploy/.docker",
 		"docker", "compose", "--project-name=" + project, "--project-directory=" + base,
-		"--file=" + base + "/compose.yaml", "--file=" + base + "/compose.dhow.yaml",
+		"--file=" + base + "/compose.yaml", "--file=" + base + "/compose.dhow.yaml", "--env-file=/dev/null",
 	}, tail...), " ")
 }
 
@@ -156,7 +157,7 @@ func pull(id string) string { return args(id, "pull", "--quiet") }
 func onlyDocker(lines []string) []string {
 	var out []string
 	for _, l := range lines {
-		if strings.HasPrefix(l, "docker ") {
+		if strings.HasPrefix(l, "env -i ") {
 			out = append(out, l)
 		}
 	}
@@ -340,7 +341,7 @@ func TestTheEnvFileOfTheServerIsUsedWhenItIsThere(t *testing.T) {
 
 func TestEveryArgumentIsOneWordOrOneQuotedWord(t *testing.T) {
 	act := &stack.Activator{Project: project, File: "deploy/my app.yaml"}
-	argv := act.Argv(deployrelease.Release{DeployPath: "/srv/app", Path: "/srv/app/releases/r1"}, false, "up")
+	argv := act.Argv(deployrelease.Release{DeployPath: "/srv/app", Path: "/srv/app/releases/r1"}, "/dev/null", "up")
 	line, err := deployrelease.Command(argv...)
 	require.NoError(t, err)
 	assert.Contains(t, line, "'--file=/srv/app/releases/r1/deploy/my app.yaml'")

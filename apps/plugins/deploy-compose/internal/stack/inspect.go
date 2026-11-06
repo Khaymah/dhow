@@ -56,10 +56,7 @@ func (a *Activator) Inspect(ctx context.Context, cfg deployrelease.Config) error
 	if !found {
 		return refusal(&policy.Violation{Code: policy.CodeInvalid, Detail: fmt.Sprint(ErrMissingFile)})
 	}
-	opt := a.Policy
-	opt.DeployPath = cfg.DeployPath
-	opt.Links = links
-	if _, err := policy.Check(raw, opt); err != nil {
+	if _, err := policy.Check(raw, a.options(cfg.DeployPath, links)); err != nil {
 		return refusal(err)
 	}
 	a.links = links

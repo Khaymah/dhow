@@ -51,6 +51,7 @@ type fakeHost struct {
 	root   string
 	log    *execLog
 	docker func(argv []string) deployrelease.ExecResult
+	home   string
 }
 
 func newFakeHost(t *testing.T, name string, log *execLog) *fakeHost {
@@ -143,12 +144,21 @@ func (f *fakeHost) Exec(_ context.Context, argv []string) (deployrelease.ExecRes
 	switch argv[0] {
 	case "sha256sum":
 		return f.checksums(argv[len(argv)-1]), nil
-	case "docker":
+	case "printenv":
+		return deployrelease.ExecResult{Output: []byte(f.homeDir() + "\n")}, nil
+	case "env":
 		if f.docker != nil {
 			return f.docker(argv), nil
 		}
 	}
 	return deployrelease.ExecResult{}, nil
+}
+
+func (f *fakeHost) homeDir() string {
+	if f.home != "" {
+		return f.home
+	}
+	return "/home/deploy"
 }
 
 func (f *fakeHost) checksums(manifest string) deployrelease.ExecResult {
