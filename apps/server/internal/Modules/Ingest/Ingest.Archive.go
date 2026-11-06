@@ -38,3 +38,14 @@ func (c *archiveCheck) finish() error {
 func unsafeArchive(err error) bool {
 	return errors.Is(err, archive.ErrUnsafe) || errors.Is(err, archive.ErrTooLarge)
 }
+
+func IsUnsafeArchive(err error) bool { return unsafeArchive(err) }
+
+func CheckArchive(src io.Reader, limits archive.Limits) error {
+	check := startArchiveCheck(limits)
+	_, copyErr := io.Copy(io.Discard, check.tee(src))
+	if err := check.finish(); err != nil {
+		return err
+	}
+	return copyErr
+}
