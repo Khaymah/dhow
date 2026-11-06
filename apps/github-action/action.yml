@@ -1,0 +1,101 @@
+name: Dhow artifact push
+description: Upload a finished build to a Dhow server, so Dhow can deploy exactly these bytes by their digest.
+author: Khaymah
+branding:
+  icon: upload-cloud
+  color: blue
+
+inputs:
+  server:
+    description: The address of your Dhow server, such as https://dhow.example.com.
+    required: true
+  token:
+    description: An ingest token for the project. Pass it from a secret, never as text in the workflow file.
+    required: true
+  path:
+    description: A folder to pack, or a .tar.gz file you already built, relative to the workspace.
+    required: true
+  name:
+    description: The artifact name. A job lists it under ingested in the pipeline.
+    required: true
+  ref:
+    description: The branch or tag that was built.
+    default: ${{ github.ref_name }}
+  ref-kind:
+    description: branch or tag.
+    default: ${{ github.ref_type }}
+  sha:
+    description: The commit that was built.
+    default: ${{ github.sha }}
+  trigger:
+    description: Set to false to store the file without starting a run.
+    default: "true"
+  retries:
+    description: Retries after a temporary failure, from 0 to 10.
+    default: "3"
+  ca-file:
+    description: A PEM file of extra certificate authorities, for a Dhow server behind your own CA.
+    default: ""
+  allow-privileged-trigger:
+    description: The action refuses workflow_run and issue_comment events, which can run with secrets after input from a stranger. Set true only if you checked what the workflow builds. pull_request_target is always refused.
+    default: "false"
+  release-base-url:
+    description: Where to download the pinned dhow release from. Leave empty. The checksum pinned in the action is checked either way.
+    default: ""
+
+outputs:
+  digest:
+    description: The SHA-256 of the archive, in hex. It is the digest Dhow recorded.
+    value: ${{ steps.push.outputs.digest }}
+  size:
+    description: The size of the archive in bytes.
+    value: ${{ steps.push.outputs.size }}
+  created:
+    description: true for a new file, false if Dhow already had this exact upload.
+    value: ${{ steps.push.outputs.created }}
+  triggered:
+    description: true if a run was started or already exists for this upload.
+    value: ${{ steps.push.outputs.triggered }}
+  run-id:
+    description: The id of the Dhow run, when there is one.
+    value: ${{ steps.push.outputs.run-id }}
+  run-number:
+    description: The number of the Dhow run, when there is one.
+    value: ${{ steps.push.outputs.run-number }}
+  run-url:
+    description: The address of the Dhow run, when there is one.
+    value: ${{ steps.push.outputs.run-url }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        DHOW_RELEASE_BASE_URL: ${{ inputs.release-base-url }}
+      run: bash "$ACTION_PATH/scripts/install.sh"
+    - id: push
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        DHOW_BIN: ${{ steps.install.outputs.bin }}
+        DHOW_INGEST_TOKEN: ${{ inputs.token }}
+        DHOW_ACTION_SERVER: ${{ inputs.server }}
+        DHOW_ACTION_PATH: ${{ inputs.path }}
+        DHOW_ACTION_NAME: ${{ inputs.name }}
+        DHOW_ACTION_REF: ${{ inputs.ref }}
+        DHOW_ACTION_REF_KIND: ${{ inputs.ref-kind }}
+        DHOW_ACTION_SHA: ${{ inputs.sha }}
+        DHOW_ACTION_TRIGGER: ${{ inputs.trigger }}
+        DHOW_ACTION_RETRIES: ${{ inputs.retries }}
+        DHOW_ACTION_CA_FILE: ${{ inputs.ca-file }}
+        DHOW_ACTION_ALLOW_PRIVILEGED: ${{ inputs.allow-privileged-trigger }}
+        DHOW_PROV_REPOSITORY: ${{ github.repository }}
+        DHOW_PROV_RUN_ID: ${{ github.run_id }}
+        DHOW_PROV_RUN_ATTEMPT: ${{ github.run_attempt }}
+        DHOW_PROV_WORKFLOW: ${{ github.workflow }}
+        DHOW_PROV_ACTOR: ${{ github.actor }}
+        DHOW_PROV_EVENT: ${{ github.event_name }}
+        DHOW_PROV_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: bash "$ACTION_PATH/scripts/push.sh"

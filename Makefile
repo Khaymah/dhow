@@ -216,7 +216,7 @@ help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
 .PHONY: check
-check: lint lint-runner lint-actions proto-lint test test-runner vuln hooks-test docs-check ## Everything CI checks
+check: lint lint-runner lint-actions test-action proto-lint test test-runner vuln hooks-test docs-check ## Everything CI checks
 
 .PHONY: fmt
 fmt: ## Format Go code
@@ -233,6 +233,11 @@ lint-runner: ## Run golangci-lint on the runner with the fake driver build tag
 .PHONY: lint-actions
 lint-actions: ## Lint GitHub Actions workflows
 	$(GO) run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
+
+.PHONY: test-action
+test-action: ## ShellCheck the GitHub Action scripts and test them offline with a stub dhow and a stub curl
+	shellcheck -x apps/github-action/scripts/*.sh apps/github-action/test/*.sh deploy/ingest-e2e/*.sh
+	bash apps/github-action/test/action_test.sh
 
 .PHONY: docs-check
 docs-check: ## Check that the Arabic docs and their English mirror in docs/en have the same files, headings, tables, code and links

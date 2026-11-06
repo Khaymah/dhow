@@ -26,6 +26,8 @@ If you build in another CI, for example GitHub Actions, you can hand the finishe
 
 ## Upload with curl
 
+In GitHub, use the ready-made Action. In any other CI, use the `dhow artifact push` command: it packs the folder, computes the digest, retries safely and explains every refusal. Both are described in [uploading with the command and the Action](ingest-action.md). The example below shows the protocol itself, for anyone who wants to write their own tool.
+
 ```sh
 digest=$(sha256sum build.tar.gz | cut -d' ' -f1)
 curl --fail-with-body --request PUT \

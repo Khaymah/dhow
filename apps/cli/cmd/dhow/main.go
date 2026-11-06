@@ -7,5 +7,8 @@ import (
 )
 
 func main() {
-	os.Exit(app.Main(os.Args[1:], app.Env{Getenv: os.Getenv, Out: os.Stdout, Err: os.Stderr}))
+	ctx, stop := app.SignalContext()
+	code := app.Main(os.Args[1:], app.Env{Getenv: os.Getenv, In: os.Stdin, Out: os.Stdout, Err: os.Stderr, Ctx: ctx})
+	stop()
+	os.Exit(code)
 }

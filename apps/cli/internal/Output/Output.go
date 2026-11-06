@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -24,9 +25,15 @@ type Catalog struct {
 
 func NewCatalog(lang string) Catalog {
 	if lang == LangAr {
-		return Catalog{Lang: LangAr, table: arMessages, codes: arCodes}
+		return Catalog{Lang: LangAr, table: merged(arMessages, arPushMessages), codes: arCodes}
 	}
-	return Catalog{Lang: LangEn, table: enMessages}
+	return Catalog{Lang: LangEn, table: merged(enMessages, enPushMessages)}
+}
+
+func merged(base, extra map[Key]string) map[Key]string {
+	out := maps.Clone(base)
+	maps.Copy(out, extra)
+	return out
 }
 
 func ValidLang(lang string) bool {

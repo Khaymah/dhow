@@ -26,6 +26,8 @@
 
 ## الرفع بـ curl
 
+في GitHub، استخدم الـ Action الجاهزة. وفي أي CI آخر، استخدم الأمر `dhow artifact push`: يعبّئ المجلد، ويحسب البصمة، ويعيد المحاولة بأمان، ويشرح كل رفض. وهما موصوفان في [الرفع بالأمر وبالـ Action](ingest-action.md). والمثال التالي يبيّن البروتوكول نفسه لمن يريد أن يكتب أداته.
+
 ```sh
 digest=$(sha256sum build.tar.gz | cut -d' ' -f1)
 curl --fail-with-body --request PUT \
