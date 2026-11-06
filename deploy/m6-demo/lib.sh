@@ -41,13 +41,21 @@ plugin_images() {
 }
 
 hosts_up() {
-  local service
+  local service ready
   for service in sshd compose-host; do
+    ready=
     for _ in $(seq 240); do
-      docker compose exec -T "$service" test -s /etc/ssh/ssh_host_ed25519_key.pub </dev/null 2>/dev/null &&
-        docker compose exec -T "$service" nc -z 127.0.0.1 22 </dev/null 2>/dev/null && break
+      if docker compose exec -T "$service" test -s /etc/ssh/ssh_host_ed25519_key.pub </dev/null 2>/dev/null &&
+        docker compose exec -T "$service" nc -z 127.0.0.1 22 </dev/null 2>/dev/null; then
+        ready=1
+        break
+      fi
       sleep 1
     done
+    if [[ -z $ready ]]; then
+      why "sshd on $service never became ready"
+      return 1
+    fi
   done
   for _ in $(seq 240); do
     docker compose exec -T compose-host docker info </dev/null >/dev/null 2>&1 &&
