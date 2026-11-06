@@ -15,7 +15,7 @@ import (
 )
 
 func (d *run) stageRelease(ctx context.Context) *Failure {
-	if d.resumed {
+	if d.resumed || d.present {
 		d.e.Report.Emit(Event{Event: EventUploaded, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID})
 		return nil
 	}
@@ -35,7 +35,7 @@ func (d *run) stageRelease(ctx context.Context) *Failure {
 		return fail(ExitFailed, CauseUpload, "cannot put the release in place", err)
 	}
 	d.e.Report.Emit(Event{Event: EventUploaded, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID})
-	if d.cfg.PreSwitch != "" {
+	if d.cfg.PreSwitch != "" && !d.cfg.Rollback {
 		if f := d.hook(ctx, "pre-switch", d.cfg.PreSwitch, d.releaseDir, d.cfg.ReleaseID, d.previous); f != nil {
 			return f
 		}
