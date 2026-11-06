@@ -19,13 +19,31 @@ func (d *run) switchOver(batch int) *Failure {
 	if !d.resumed {
 		d.writeState("switching", d.cfg.ReleaseID, d.previous)
 		if err := d.switchTo(d.cfg.ReleaseID); err != nil {
-			return fail(ExitFailed, CauseSwitch, "cannot switch to the new release", err)
+			failure := fail(ExitFailed, CauseSwitch, "cannot switch to the new release", err)
+			if !d.landed() {
+				return failure
+			}
+			d.markSwitched(batch)
+			return failure
 		}
 	}
+	d.markSwitched(batch)
+	return nil
+}
+
+func (d *run) landed() bool {
+	link, err := d.r.Readlink(d.current)
+	if err != nil {
+		return false
+	}
+	id, ok := releaseOfLink(d.base, link)
+	return ok && id == d.cfg.ReleaseID
+}
+
+func (d *run) markSwitched(batch int) {
 	d.switched = true
 	d.batch = batch
 	d.e.Report.Emit(Event{Event: EventSwitched, HostID: d.cfg.HostID, ReleaseID: d.cfg.ReleaseID, PreviousReleaseID: d.known, Batch: batch})
-	return nil
 }
 
 func (d *run) switchTo(id string) error {

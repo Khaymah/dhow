@@ -35,7 +35,10 @@ type Fleet struct {
 	Log        Logger
 	Clock      Clock
 
-	LockRenew time.Duration
+	LockRenew      time.Duration
+	LockTimeout    time.Duration
+	RollbackBudget time.Duration
+	CleanupBudget  time.Duration
 }
 
 func ValidateRollout(hosts, batchSize int, pause time.Duration, h Health) error {
@@ -142,7 +145,7 @@ func (f *Fleet) newGroup() *group {
 		cfg.HostID, cfg.HostName = h.ID, h.Name
 		e := &Engine{
 			Config: cfg, Connect: h.Connect, Doer: f.Doer, Report: g.rep, Log: hostLog{Logger: f.Log, host: h.Name},
-			Clock: f.Clock, LockRenew: f.LockRenew,
+			Clock: f.Clock, LockRenew: f.LockRenew, LockTimeout: f.LockTimeout,
 		}
 		g.members = append(g.members, &member{host: h, d: newRun(e)})
 	}
@@ -150,12 +153,18 @@ func (f *Fleet) newGroup() *group {
 }
 
 func (g *group) release() {
+	var wg sync.WaitGroup
 	for _, m := range g.members {
-		m.d.unlock()
-		if m.d.r != nil {
-			_ = m.d.r.Close()
-		}
+		wg.Go(func() {
+			m.d.unlock()
+			if m.d.r != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), m.d.lockTimeout())
+				defer cancel()
+				_ = boundRemote{Remote: m.d.r, ctx: ctx}.Close()
+			}
+		})
 	}
+	wg.Wait()
 }
 
 func (g *group) releaseID() string { return g.f.Config.ReleaseID }
@@ -241,7 +250,7 @@ func (g *group) parallel(ctx context.Context, ms []*member, limit int, fn func(c
 			mu.Lock()
 			defer mu.Unlock()
 			m.err = f
-			m.collateral = ctx.Err() == nil && first != nil && f.Reason == CauseCanceled
+			m.collateral = first != nil && cctx.Err() != nil
 			if first == nil {
 				first, culprit = f, m
 				cancel()
@@ -328,6 +337,9 @@ func (g *group) runBatch(ctx context.Context, batch []*member, n int) (*Failure,
 }
 
 func (g *group) commit(ctx context.Context) *Failure {
+	if err := ctx.Err(); err != nil {
+		return g.stop(ctx, fail(ExitFailed, CauseCanceled, "the deployment was canceled", err), nil)
+	}
 	for _, m := range g.members {
 		if err := m.d.markVerified(); err != nil {
 			return g.stop(ctx, fail(ExitFailed, CauseOther, "cannot record the verified release", err), nil)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sort"
 	"sync"
+	"time"
 )
 
 const (
@@ -35,13 +36,10 @@ func (g *group) switched() []*member {
 	return out
 }
 
-func (g *group) settleUnswitched() {
+func (g *group) reportUnswitched() {
 	for _, m := range g.members {
 		if m.d.switched {
 			continue
-		}
-		if m.staging {
-			m.d.cleanStage()
 		}
 		if m.err != nil && !m.collateral {
 			g.rep.Emit(Event{Event: EventFailed, HostID: m.d.cfg.HostID, ReleaseID: g.releaseID(), Reason: m.err.Reason, Message: m.err.Text})
@@ -51,17 +49,38 @@ func (g *group) settleUnswitched() {
 	}
 }
 
+func (g *group) cleanUnswitched(ctx context.Context) {
+	budget := g.f.CleanupBudget
+	if budget <= 0 {
+		budget = CleanupBudget
+	}
+	cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), budget)
+	defer cancel()
+	var wg sync.WaitGroup
+	for _, m := range g.members {
+		if m.d.switched || !m.staging {
+			continue
+		}
+		wg.Go(func() { m.d.bounded(cctx, m.d.cleanStage) })
+	}
+	wg.Wait()
+}
+
 func (g *group) stop(ctx context.Context, cause *Failure, culprit *member) *Failure {
 	g.assign(cause, culprit)
 	g.emitStarted()
 	switched := g.switched()
-	g.settleUnswitched()
+	g.reportUnswitched()
+	var out *Failure
 	if len(switched) > 0 {
-		return g.rollBackGroup(ctx, cause, switched)
+		out = g.rollBackGroup(ctx, cause, switched)
+	} else {
+		g.rep.Emit(Event{Event: EventFailed, ReleaseID: g.releaseID(), Reason: cause.Reason, Message: cause.Text})
+		g.log.Warn("the deployment failed", "reason", cause.Reason, "error", cause.Error())
+		out = cause
 	}
-	g.rep.Emit(Event{Event: EventFailed, ReleaseID: g.releaseID(), Reason: cause.Reason, Message: cause.Text})
-	g.log.Warn("the deployment failed", "reason", cause.Reason, "error", cause.Error())
-	return cause
+	g.cleanUnswitched(ctx)
+	return out
 }
 
 func (g *group) rollBackGroup(ctx context.Context, cause *Failure, switched []*member) *Failure {
@@ -80,7 +99,7 @@ func (g *group) rollBackGroup(ctx context.Context, cause *Failure, switched []*m
 	for _, m := range stuck {
 		g.rep.Emit(Event{Event: EventRollbackFailed, HostID: m.d.cfg.HostID, ReleaseID: g.releaseID(), Reason: cause.Reason, Message: messageNoPrevious})
 	}
-	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), RollbackBudget)
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), g.rollbackBudget())
 	defer cancel()
 	errs := g.revert(rctx, back, cause)
 	if len(errs) == 0 && len(stuck) == 0 {
@@ -112,7 +131,7 @@ func (g *group) revert(ctx context.Context, back []*member, cause *Failure) []er
 		} else {
 			var wg sync.WaitGroup
 			for i, m := range ms {
-				wg.Go(func() { results[i] = m.d.rollBack(ctx) })
+				wg.Go(func() { m.d.bounded(ctx, func() { results[i] = m.d.rollBack(ctx) }) })
 			}
 			wg.Wait()
 		}
@@ -149,4 +168,11 @@ func (g *group) keepFirstRelease(cause *Failure, stuck []*member) *Failure {
 		exit = ExitHealthFailed
 	}
 	return fail(exit, cause.Reason, text, cause)
+}
+
+func (g *group) rollbackBudget() time.Duration {
+	if g.f.RollbackBudget > 0 {
+		return g.f.RollbackBudget
+	}
+	return RollbackBudget
 }

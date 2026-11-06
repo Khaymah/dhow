@@ -24,7 +24,8 @@ type Engine struct {
 	Log     Logger
 	Clock   Clock
 
-	LockRenew time.Duration
+	LockRenew   time.Duration
+	LockTimeout time.Duration
 }
 
 type run struct {

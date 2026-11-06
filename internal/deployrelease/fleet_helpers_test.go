@@ -87,6 +87,7 @@ type rollout struct {
 	size          int
 	pause         time.Duration
 	cancelOnPause bool
+	fleet         func(*deployrelease.Fleet)
 	edit          func(*deployrelease.Config)
 }
 
@@ -120,6 +121,9 @@ func (r *rig) roll(id, body string, doer deployrelease.Doer, o rollout) fleetOut
 	}
 	for _, i := range o.hosts {
 		f.Hosts = append(f.Hosts, r.host(i))
+	}
+	if o.fleet != nil {
+		o.fleet(f)
 	}
 	return fleetOutcome{failure: f.Run(ctx), events: rec}
 }
