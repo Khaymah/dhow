@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	response "github.com/Khaymah/dhow/apps/server/internal/Core/Response"
 	gen "github.com/Khaymah/dhow/apps/server/internal/Modules/Secrets/Gen"
@@ -62,12 +63,33 @@ func toSecret(s models.Secret) gen.Secret {
 	}
 }
 
+func factorOf(f *gen.CurrentFactor) *auth.Factor {
+	if f == nil {
+		return nil
+	}
+	out := auth.Factor{Method: string(f.Method)}
+	if f.Password != nil {
+		out.Password = *f.Password
+	}
+	if f.Code != nil {
+		out.Code = *f.Code
+	}
+	if f.ChallengeId != nil {
+		out.ChallengeID = *f.ChallengeId
+	}
+	if f.Credential != nil {
+		out.Credential = *f.Credential
+	}
+	return &out
+}
+
 func secretInput(body *gen.PutSecretRequest) (models.PutSecretInput, error) {
 	if body == nil || body.Value == nil {
 		return models.PutSecretInput{}, invalid(fieldValue, messageValue)
 	}
 	in := models.PutSecretInput{
 		Value: *body.Value, Description: body.Description, AvailableToPullRequests: body.AvailableToPullRequests, ProjectIDs: body.ProjectIds,
+		Factor: factorOf(body.CurrentFactor),
 	}
 	if body.Visibility != nil {
 		in.Visibility = ptrOf(string(*body.Visibility))
@@ -75,11 +97,11 @@ func secretInput(body *gen.PutSecretRequest) (models.PutSecretInput, error) {
 	return in, nil
 }
 
-func versionOf(body *gen.RestoreSecretVersionRequest) (int, error) {
+func versionOf(body *gen.RestoreSecretVersionRequest) (int, *auth.Factor, error) {
 	if body == nil {
-		return 0, apperrors.BadRequest()
+		return 0, nil, apperrors.BadRequest()
 	}
-	return body.Version, nil
+	return body.Version, factorOf(body.CurrentFactor), nil
 }
 
 func (c *Controller) listSecrets(ctx context.Context, ref models.Ref, pageIn, limitIn *int) (gen.SecretListResponse, error) {
@@ -107,11 +129,11 @@ func (c *Controller) putSecret(ctx context.Context, ref models.Ref, name string,
 }
 
 func (c *Controller) restoreSecret(ctx context.Context, ref models.Ref, name string, body *gen.RestoreSecretVersionRequest) (gen.SecretResponse, error) {
-	version, err := versionOf(body)
+	version, factor, err := versionOf(body)
 	if err != nil {
 		return gen.SecretResponse{}, err
 	}
-	s, err := c.service.RestoreSecretVersion(ctx, ref, name, version)
+	s, err := c.service.RestoreSecretVersion(ctx, ref, name, version, factor)
 	return secretResponse(s, messageRestored), err
 }
 

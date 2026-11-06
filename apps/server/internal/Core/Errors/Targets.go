@@ -117,3 +117,12 @@ func RollbackSettingsInvalid() *AppError {
 func EnvironmentPaused() *AppError {
 	return New(http.StatusConflict, CodeEnvironmentPaused, KeyEnvironmentPaused)
 }
+
+const (
+	CodeTargetKeyNeedsFactor = "TARGET_KEY_NEEDS_FACTOR"
+	KeyTargetKeyNeedsFactor  = "errors.targetKeyNeedsFactor"
+)
+
+func TargetKeyNeedsFactor() *AppError {
+	return New(http.StatusForbidden, CodeTargetKeyNeedsFactor, KeyTargetKeyNeedsFactor)
+}

@@ -3,6 +3,7 @@ package secrets
 import (
 	"context"
 
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
@@ -60,7 +61,7 @@ func (s *Service) RemoveSecret(ctx context.Context, ref models.Ref, name string)
 	return out, err
 }
 
-func (s *Service) RestoreSecretVersion(ctx context.Context, ref models.Ref, name string, version int) (models.Secret, error) {
+func (s *Service) RestoreSecretVersion(ctx context.Context, ref models.Ref, name string, version int, factor *auth.Factor) (models.Secret, error) {
 	p, err := principalOf(ctx)
 	if err != nil {
 		return models.Secret{}, err
@@ -69,6 +70,9 @@ func (s *Service) RestoreSecretVersion(ctx context.Context, ref models.Ref, name
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		t, row, err := s.lockedSecret(ctx, q, ref, name)
 		if err != nil {
+			return err
+		}
+		if err := s.guardTargetKey(ctx, q, p, t, name, factor); err != nil {
 			return err
 		}
 		if version < 1 || version > int(row.CurrentVersion) {

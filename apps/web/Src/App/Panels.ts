@@ -1,7 +1,17 @@
-import { canApproveDeployments, canCreateProjects, canManageMembers, canManageRunners, canManageTokens, type TRole } from '@/Core/Auth/AuthTypes';
+import {
+  canApproveDeployments,
+  canCreateProjects,
+  canManageMembers,
+  canManageOrganizationSecrets,
+  canManageProjectSecrets,
+  canManageRunners,
+  canManageTokens,
+  type TRole,
+} from '@/Core/Auth/AuthTypes';
 import { isCustomThemeId } from '@/Core/Theme/ThemeIds';
 import { canBypassDeployments } from '@/Modules/Approvals/Types/ApprovalAccess';
 import type { TDecision } from '@/Modules/Approvals/Types/Gate';
+import { canManageEnvironments } from '@/Modules/Environments/Types/EnvironmentAccess';
 
 export const UNKNOWN_SLIDE = 'unknown';
 
@@ -39,6 +49,7 @@ const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const CREDENTIAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export type TStaticSlideId = (typeof STATIC_SLIDES)[number];
+export type TSlideScope = 'organization' | 'project' | 'environment';
 export type TThemeEditSlideId = `theme-edit-${string}`;
 export type TOidcEditSlideId = `oidc-edit-${string}`;
 export type TSecretEditSlideId = `secret-edit-${string}`;
@@ -119,6 +130,21 @@ export const themeOf = (id: TSlideId): string | null =>
 
 export const isThemeEditSlide = (id: TSlideId): boolean => id === 'theme-edit' || id.startsWith(THEME_EDIT_PREFIX);
 
+const PROJECT_SLIDES: readonly TStaticSlideId[] = ['secret-new', 'variable-new', 'registry-new', 'environment-new'];
+
+export const isProjectSlide = (id: TSlideId): boolean => PROJECT_SLIDES.some((slide) => slide === id);
+
+export const slideScopeOf = (hasProject: boolean, hasEnvironment: boolean): TSlideScope => {
+  if (!hasProject) return 'organization';
+  return hasEnvironment ? 'environment' : 'project';
+};
+
+const SECRET_GATES: Record<TSlideScope, (role: TRole | undefined) => boolean> = {
+  organization: canManageOrganizationSecrets,
+  project: canManageProjectSecrets,
+  environment: canManageEnvironments,
+};
+
 const SLIDE_GATES: Partial<Record<TStaticSlideId, (role: TRole | undefined) => boolean>> = {
   'runner-new': canManageRunners,
   'project-new': canCreateProjects,
@@ -130,19 +156,20 @@ const SLIDE_GATES: Partial<Record<TStaticSlideId, (role: TRole | undefined) => b
   'organization-transfer': (role) => role === 'owner',
   'member-remove': canManageMembers,
   'organization-leave': (role) => role !== undefined,
-  'secret-new': (role) => role !== undefined,
-  'variable-new': (role) => role !== undefined,
-  'registry-new': (role) => role !== undefined,
-  'environment-new': (role) => role !== undefined,
+  'environment-new': canManageEnvironments,
 };
 
 const isStaticSlide = (id: TSlideId): id is TStaticSlideId => STATIC_SLIDES.some((slide) => slide === id);
 
-export const slideAllowed = (id: TSlideId, role: TRole | undefined): boolean => {
+const SECRET_SLIDES: readonly TStaticSlideId[] = ['secret-new', 'variable-new', 'registry-new'];
+
+export const slideAllowed = (id: TSlideId, role: TRole | undefined, projectRole?: TRole, scope: TSlideScope = 'organization'): boolean => {
   const decision = decisionTargetOf(id);
   if (decision !== null) return decision.Decision === 'bypass' ? canBypassDeployments(role) : canApproveDeployments(role);
+  const acting = scope === 'organization' ? role : (projectRole ?? role);
+  if (SECRET_SLIDES.some((slide) => slide === id)) return SECRET_GATES[scope](acting);
   const gate = isStaticSlide(id) ? SLIDE_GATES[id] : undefined;
-  return gate === undefined || gate(role);
+  return gate === undefined || gate(acting);
 };
 
 const legacyStack = (raw: unknown): string | undefined => {

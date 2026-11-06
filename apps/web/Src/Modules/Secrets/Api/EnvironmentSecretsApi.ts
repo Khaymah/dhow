@@ -1,5 +1,6 @@
 import { ApiClient, request } from '@/Core/Api/Client';
 import type { components } from '@/Core/Api/Schema';
+import type { TCurrentFactor } from '@/Core/Auth/Factor';
 
 type TSchemas = components['schemas'];
 
@@ -27,7 +28,7 @@ export const listEnvironmentSecrets = (scope: IEnvironmentScope): Promise<TSchem
 export const putEnvironmentSecret = (
   scope: IEnvironmentScope,
   name: string,
-  body: { Value: string; Description: string },
+  body: { Value: string; Description: string; CurrentFactor?: TCurrentFactor },
 ): Promise<TSchemas['Secret']> =>
   request(() =>
     ApiClient.PUT('/organizations/{id}/projects/{projectId}/environments/{environmentName}/secrets/{secretName}', {

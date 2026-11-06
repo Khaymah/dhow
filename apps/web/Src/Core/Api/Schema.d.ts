@@ -2490,7 +2490,7 @@ export interface paths {
         get?: never;
         /**
          * Create a secret of an environment, or write a new version
-         * @description Needs `environment.manage`. Creates the secret or a new version of it. The value is UTF-8 without NUL, 8 bytes (`SECRET_TOO_SHORT`) to 32 KiB (`SECRET_TOO_LARGE`), and is never returned. Names are unique in the scope whatever their case, and names that start with `DHOW_` answer `SECRET_NAME_RESERVED`. The value of a version older than the last five, or replaced more than 30 days ago, is erased. Only jobs that name this environment receive it, once the environment lets them deploy.
+         * @description Needs `environment.manage`. Creates the secret or a new version of it. The value is UTF-8 without NUL, 8 bytes (`SECRET_TOO_SHORT`) to 32 KiB (`SECRET_TOO_LARGE`), and is never returned. Names are unique in the scope whatever their case, and names that start with `DHOW_` answer `SECRET_NAME_RESERVED`. The value of a version older than the last five, or replaced more than 30 days ago, is erased. Only jobs that name this environment receive it, once the environment lets them deploy. When the secret is the key of a deploy target of the environment, writing a value needs a fresh `CurrentFactor`: without one the answer is 403 `TARGET_KEY_NEEDS_FACTOR`, and with a wrong one 403 `INVALID_CURRENT_FACTOR`. An API token cannot confirm a factor, so it cannot write such a secret.
          */
         put: operations["putEnvironmentSecret"];
         post?: never;
@@ -2531,7 +2531,7 @@ export interface paths {
         put?: never;
         /**
          * Restore an earlier version of a secret of an environment
-         * @description Needs `environment.manage`. Writes the value of an earlier version as a new version. A version whose value was erased answers 409 `SECRET_VERSION_ERASED`.
+         * @description Needs `environment.manage`. Writes the value of an earlier version as a new version. A version whose value was erased answers 409 `SECRET_VERSION_ERASED`. When the secret is the key of a deploy target of the environment, it needs a fresh `CurrentFactor` like writing a value (403 `TARGET_KEY_NEEDS_FACTOR`).
          */
         post: operations["restoreEnvironmentSecretVersion"];
         delete?: never;
@@ -3449,7 +3449,7 @@ export interface components {
         };
         ErrorDetail: {
             /**
-             * @description Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`, `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT`, `REVIEWER_NOT_ELIGIBLE`, `TARGET_EXISTS`, `TARGET_DUPLICATE`, `TARGET_VERSION_CONFLICT`, `TARGET_HOST_BLOCKED`, `TARGET_HOST_UNREACHABLE`, `TARGET_KEY_NOT_FOUND`, `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
+             * @description Stable machine-readable UPPER_SNAKE code: `INTERNAL`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `BAD_REQUEST`, `VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `UNAUTHENTICATED`, `FORBIDDEN`, `CSRF_FAILED`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `PASSWORD_BREACHED`, `SETUP_COMPLETED`, `SETUP_TOKEN_INVALID`, `CONFLICT`, `MFA_CHALLENGE_EXPIRED`, `INVALID_MFA_CODE`, `INVALID_CURRENT_FACTOR`, `ENROLLMENT_EXPIRED`, `PASSKEY_REJECTED`, `LAST_OWNER`, `ROLE_NOT_ALLOWED`, `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_ACCOUNT_EXISTS`, `SECOND_FACTOR_REQUIRED`, `SETTING_LOCKED_BY_ENV`, `SETTING_CHANGED`, `SETTING_INVALID`, `MAIL_NOT_CONFIGURED`, `MAIL_TEST_FAILED`, `OIDC_PROVIDER_EXISTS`, `OIDC_PROVIDER_LIMIT`, `OIDC_PROVIDER_LINKED`, `OIDC_PROVIDER_ONLY_SIGN_IN`, `PROJECT_ARCHIVED`, `FORK_POLICY_NOT_ALLOWED`, `ENVIRONMENT_EXISTS`, `ENVIRONMENT_VERSION_CONFLICT`, `REVIEWER_NOT_ELIGIBLE`, `TARGET_EXISTS`, `TARGET_DUPLICATE`, `TARGET_VERSION_CONFLICT`, `TARGET_HOST_BLOCKED`, `TARGET_HOST_UNREACHABLE`, `TARGET_KEY_NOT_FOUND`, `DEPLOY_PATH_INVALID`, `TARGET_KEY_NAME_TAKEN`, `TARGET_KEY_NEEDS_FACTOR`, `HOST_KEY_NOT_PENDING` or `HOST_KEY_FINGERPRINT_MISMATCH`.
              * @example INTERNAL
              */
             Code: string;
@@ -5424,6 +5424,7 @@ export interface components {
         PutSecretRequest: {
             /** @description UTF-8 without NUL, 8 bytes to 32 KiB. Never returned. */
             Value: string;
+            CurrentFactor?: components["schemas"]["CurrentFactor"];
             Description?: string;
             /** @description Organization and project secrets. Environments decide this in their rules. */
             AvailableToPullRequests?: boolean;
@@ -5432,6 +5433,7 @@ export interface components {
         };
         RestoreSecretVersionRequest: {
             Version: number;
+            CurrentFactor?: components["schemas"]["CurrentFactor"];
         };
         Variable: {
             Name: string;

@@ -72,6 +72,8 @@ export const SecretsEn: Record<keyof typeof SecretsAr, string> = {
   'secrets.form.notFound': 'We could not find this secret. It may have been removed.',
   'secrets.form.forbidden': 'Only admins and the owner can write organization secrets.',
   'secrets.saved': 'Saved the secret {name}',
+  'secrets.factor.question': 'This secret is the key of a deploy target. Confirm it is you to save the new value.',
+  'secrets.factor.confirm': 'Confirm and save',
   'secrets.removed': 'Removed the secret {name}',
 
   'secrets.danger.title': 'Danger zone',

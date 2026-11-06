@@ -32,6 +32,8 @@ Runs of pull requests from a fork never get any secret or variable. Runs of pull
 
 API keys never write a secret. Writing works from a browser session only, and needs a second factor when your organization's policy asks for one.
 
+A secret that a deploy target uses as the key to log in to its servers has a stricter rule. Writing its value or restoring an older version of it always needs `CurrentFactor`, whether or not the organization's policy asks for one. Without it the answer is `TARGET_KEY_NEEDS_FACTOR` (403) and nothing is saved, and with a wrong proof it is `INVALID_CURRENT_FACTOR`. The web UI shows the confirm step then and keeps the value you typed. Removing this secret needs no second factor, but it stops deploys to the target until the key is made again.
+
 ## Write a secret
 
 ```http

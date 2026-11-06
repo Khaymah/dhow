@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useState } from 'react';
 import { buildSlide } from '@/App/Layout/SlideCatalog';
 import { useSlide } from '@/App/Navigation/useSlide';
 import { isEnvironmentName, isUuid } from '@/App/Pages/Params';
-import { isThemeEditSlide, slideAllowed, themeOf, type TSlideId } from '@/App/Panels';
+import { isProjectSlide, isThemeEditSlide, slideAllowed, slideScopeOf, themeOf, type TSlideId } from '@/App/Panels';
 import { useCurrentMembership } from '@/Core/Auth/useMe';
 import type { ICustomTheme } from '@/Core/Theme/ThemeTokens';
 import { useThemeStore } from '@/Core/Theme/useThemeStore';
@@ -14,6 +14,7 @@ import { useToastStore } from '@/Core/Store/useToastStore';
 import { SlideStack } from '@/Core/Ui/SlideStack';
 import { OVERVIEW_QUERY_KEY } from '@/Modules/Overview/Hooks/useOverview';
 import { runsKey } from '@/Modules/Projects/Api/RunsApi';
+import { useProject } from '@/Modules/Projects/Hooks/useProjects';
 import { useT } from '@/I18n/useT';
 
 const themeMissing = (slide: TSlideId | null, themes: readonly ICustomTheme[]): boolean => {
@@ -42,7 +43,11 @@ export const SlideHost = () => {
     setMissing(themeMissing(slide, customThemes));
   }
   const badEnvironment = environmentName !== undefined && !isEnvironmentName(environmentName);
-  const refused = slide !== null && (badEnvironment || !slideAllowed(slide, role));
+  const projectSlide = slide !== null && isProjectSlide(slide) && isUuid(projectId);
+  const project = useProject(projectSlide && membership !== undefined ? membership.OrganizationId : '', projectSlide ? projectId : '');
+  const projectPending = projectSlide && project.data === undefined && !project.isError;
+  const scope = slideScopeOf(isUuid(projectId), isEnvironmentName(environmentName));
+  const refused = slide !== null && (badEnvironment || (!projectPending && !slideAllowed(slide, role, project.data?.CallerRole, scope)));
   const editing = slide !== null && isThemeEditSlide(slide);
 
   const rejectLink = useEffectEvent(() => {
@@ -64,7 +69,7 @@ export const SlideHost = () => {
   }, [invalid, Missing, refused]);
 
   const slides =
-    slide === null || refused || Missing
+    slide === null || refused || Missing || projectPending
       ? []
       : [
           buildSlide(slide, {
