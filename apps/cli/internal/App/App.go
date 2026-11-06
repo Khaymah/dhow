@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -20,8 +21,10 @@ const (
 
 type Env struct {
 	Getenv func(string) string
+	In     io.Reader
 	Out    io.Writer
 	Err    io.Writer
+	Ctx    context.Context
 }
 
 func Main(args []string, env Env) int {
@@ -31,12 +34,17 @@ func Main(args []string, env Env) int {
 	if env.Err == nil {
 		env.Err = io.Discard
 	}
+	if env.Getenv == nil {
+		env.Getenv = func(string) string { return "" }
+	}
 	if len(args) == 0 {
 		return usage(env.Err, catalog("", env), ExitUsage)
 	}
 	switch args[0] {
 	case CommandLint:
 		return runLint(args[1:], env)
+	case CommandArtifact:
+		return runArtifact(args[1:], env)
 	case CommandVersion:
 		info := buildinfo.Get()
 		if _, err := fmt.Fprintf(env.Out, "dhow %s (%s, %s)\n", info.Version, info.Commit, info.GoVersion); err != nil {
@@ -57,7 +65,11 @@ func catalog(flagLang string, env Env) output.Catalog {
 }
 
 func usage(w io.Writer, c output.Catalog, code int) int {
-	if _, err := io.WriteString(w, c.T(output.KeyUsage)); err != nil {
+	return usageFor(w, c, output.KeyUsage, code)
+}
+
+func usageFor(w io.Writer, c output.Catalog, key output.Key, code int) int {
+	if _, err := io.WriteString(w, c.T(key)); err != nil {
 		return ExitUsage
 	}
 	return code

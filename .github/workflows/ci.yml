@@ -115,6 +115,8 @@ jobs:
         run: make vuln
       - name: Lint workflows
         run: make lint-actions
+      - name: Test the GitHub Action scripts offline
+        run: make test-action
       - name: Build
         run: make build
       - name: Build the runner

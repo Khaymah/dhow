@@ -88,13 +88,32 @@ func TestTheCommandLinksOnlyTheAllowedPackages(t *testing.T) {
 	require.NoError(t, err)
 	want := strings.Fields(string(raw))
 	extra, missing := difference(got, want), difference(want, got)
-	assert.Empty(t, extra, "the CLI links packages that are not in %s. Check that none of them can reach the network "+
-		"or start a process, then run go test ./apps/cli/cmd/dhow -run Allowed -update-deps", allowed)
+	assert.Empty(t, extra, "the CLI links packages that are not in %s. Check that none of them can start a process and that "+
+		"only internal/ingestpush reaches the network (ADR-0099), then run go test ./apps/cli/cmd/dhow -run Allowed -update-deps", allowed)
 	assert.Empty(t, missing, "%s lists packages the CLI no longer links: run go test ./apps/cli/cmd/dhow -run Allowed -update-deps", allowed)
 	for _, d := range got {
-		assert.NotContains(t, []string{"net", "net/http", "net/rpc", "net/smtp", "crypto/tls", "os/exec", "plugin", "runtime/cgo"}, d)
-		for _, prefix := range []string{"net/http/", "golang.org/x/net/", "golang.org/x/sys/", "google.golang.org/grpc", "connectrpc.com/"} {
+		assert.NotContains(t, []string{"net/rpc", "net/smtp", "os/exec", "plugin", "runtime/cgo"}, d)
+		for _, prefix := range []string{"golang.org/x/net/", "golang.org/x/sys/", "google.golang.org/grpc", "connectrpc.com/"} {
 			assert.False(t, strings.HasPrefix(d, prefix), "the CLI must not link %s", d)
+		}
+	}
+}
+
+const pushPackage = "github.com/Khaymah/dhow/internal/ingestpush"
+
+func TestOnlyThePushClientImportsTheNetworkPackages(t *testing.T) {
+	cmd := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}} {{join .Imports \" \"}}", ".")
+	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0")
+	out, err := cmd.Output()
+	require.NoError(t, err)
+	network := []string{"net", "net/http", "crypto/tls", "crypto/x509"}
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || !strings.HasPrefix(fields[0], "github.com/Khaymah/dhow/") || fields[0] == pushPackage {
+			continue
+		}
+		for _, imp := range fields[1:] {
+			assert.NotContains(t, network, imp, "%s imports %s: only %s may talk to the network", fields[0], imp, pushPackage)
 		}
 	}
 }
@@ -109,13 +128,12 @@ func difference(a, b []string) []string {
 	return out
 }
 
-func TestTheBinaryHoldsNoNetworkOrProcessSymbols(t *testing.T) {
+func TestTheBinaryHoldsNoProcessSymbols(t *testing.T) {
 	symbols, err := exec.Command("go", "tool", "nm", binary(t)).Output()
 	require.NoError(t, err)
 	require.Contains(t, string(symbols), " main.main")
 	prefixes := []string{
-		"net.", "crypto/tls.", "os/exec.", "os.StartProcess", "os.startProcess", "syscall.ForkExec", "syscall.forkExec",
-		"syscall.Exec", "syscall.StartProcess", "syscall.Bind", "syscall.Sendto", "syscall.Socket", "syscall.Connect",
+		"os/exec.", "os.StartProcess", "os.startProcess", "syscall.ForkExec", "syscall.forkExec", "syscall.Exec", "syscall.StartProcess",
 	}
 	for _, line := range strings.Split(string(symbols), "\n") {
 		fields := strings.Fields(line)
@@ -123,8 +141,7 @@ func TestTheBinaryHoldsNoNetworkOrProcessSymbols(t *testing.T) {
 			continue
 		}
 		name := fields[len(fields)-1]
-		lower := strings.ToLower(name)
-		bad := strings.Contains(lower, "socket") || strings.Contains(lower, "connect") || strings.Contains(lower, "getaddrinfo")
+		bad := false
 		for _, p := range prefixes {
 			bad = bad || strings.HasPrefix(name, p)
 		}
@@ -150,7 +167,7 @@ func isolation(t *testing.T) []string {
 	if os.Getenv(requireNetnsEnv) == "1" {
 		t.Fatalf("%s=1 but unshare cannot create a network namespace here", requireNetnsEnv)
 	}
-	t.Skip("unshare cannot create a network namespace here; TestTheCommandLinksNoNetworkCode still covers the CLI")
+	t.Skip("unshare cannot create a network namespace here")
 	return nil
 }
 
@@ -239,5 +256,27 @@ func TestLintInANetworkNamespaceMakesNoNetworkCall(t *testing.T) {
 				assert.Contains(t, string(got), "execve(\""+bin+"\"")
 			}
 		})
+	}
+}
+
+func TestAPushDryRunInANetworkNamespaceMakesNoNetworkCall(t *testing.T) {
+	prefix := isolation(t)
+	bin := binary(t)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "index.html"), []byte("hi"), 0o600))
+	trace := filepath.Join(t.TempDir(), "trace")
+	strace := tracer(t, trace)
+	args := []string{
+		"artifact", "push", "--dry-run", "--format", "json", "--server", "https://dhow.example.com",
+		"--name", "web", "--ref", "main", "--sha", strings.Repeat("a", 40), "--", dir,
+	}
+	out, code := runIsolated(t, append(append(prefix, strace...), bin), []string{"HTTPS_PROXY=http://127.0.0.1:9"}, args...)
+	assert.Zero(t, code)
+	assert.Contains(t, out, `"DryRun":true`)
+	if strace != nil {
+		got, err := os.ReadFile(trace)
+		require.NoError(t, err)
+		assert.Empty(t, networkCalls.FindAllString(string(got), -1), "dhow artifact push --dry-run made network system calls")
+		assert.Len(t, execCalls.FindAllString(string(got), -1), 1, "dhow artifact push started another program: %s", got)
 	}
 }

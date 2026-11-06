@@ -74,8 +74,9 @@ def check_cli_imports(rel, added, old, **_):
             return (f"{rel}: the CLI never imports server, runner or web code. Shared code lives in internal/ "
                     "(pipelinespec, buildinfo).")
         if NETWORK_IMPORT.search(line):
-            return (f"{rel}: dhow lint works offline, so the CLI never imports network, process or raw system "
+            return (f"{rel}: dhow lint works offline, so the CLI's own code never imports network, process or raw system "
                     "packages (net, net/http, crypto/tls, os/exec, syscall, golang.org/x/sys, unsafe, cgo). "
+                    "Uploads go through internal/ingestpush, the one package that talks to the network (ADR-0099). "
                     "The no-network test in apps/cli/cmd/dhow proves it.")
         for m in GO_IMPORT_PATH.finditer(line):
             target = m.group(1).split("/")[0]

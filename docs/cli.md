@@ -2,7 +2,7 @@
 
 # أداة سطر الأوامر `dhow`
 
-`dhow` ملف تنفيذي واحد ثابت لـ Linux وmacOS وWindows، لمعماريتي `amd64` و`arm64`. أول أمر فيه هو `dhow lint`: يفحص ملف `.dhow.yml` بالمدقق نفسه الذي يستخدمه سيرفر داو (`internal/pipelinespec`)، فالملف الذي يقبله يقبله السيرفر أيضًا. ويعمل دون شبكة: لا يفتح أي اتصال، ولا يتصل بأي سيرفر.
+`dhow` ملف تنفيذي واحد ثابت لـ Linux وmacOS وWindows، لمعماريتي `amd64` و`arm64`. أول أمر فيه هو `dhow lint`: يفحص ملف `.dhow.yml` بالمدقق نفسه الذي يستخدمه سيرفر داو (`internal/pipelinespec`)، فالملف الذي يقبله يقبله السيرفر أيضًا. ويعمل دون شبكة: لا يفتح أي اتصال، ولا يتصل بأي سيرفر. والأمر الثاني هو `dhow artifact push`: يرفع ملفًا ناتجًا إلى سيرفر داو ([الشرح](guides/ingest-action.md)). وهو الأمر الوحيد الذي يستخدم الشبكة.
 
 ## التثبيت
 
@@ -126,13 +126,14 @@ dhow lint --format json --lang en .dhow.yml
 
 لا يستخدم `dhow lint` الشبكة أبدًا. لا يفحص ملفات manifest للإضافات، ولا ينزّل الصور، فيفحص `uses:` و`image:` بشكلهما فقط (والـ digest مطلوب في `uses:`). ثلاثة اختبارات تضمن ذلك:
 
-- الأمر يربط فقط الـ packages المكتوبة في `apps/cli/cmd/dhow/testdata/deps.linux-amd64.txt`، فأي package جديد يُفشل الاختبار حتى يراجعه أحد. ولا يوجد بينها `net` أو `net/http` أو `crypto/tls` أو `os/exec`، ولا يوجد في الملف التنفيذي أي رمز للـ sockets، ولا `os.StartProcess` ولا `syscall.ForkExec` ولا `syscall.Exec`؛
-- يشغّل الاختبار الملف التنفيذي على كل ملف خاطئ من اختبارات المدقق، داخل network namespace بلا أي شبكة، وتحت `strace`، فلا يظهر في السجل أي system call للشبكة، ولا أي `execve` بعد الأول، والنتيجة هي نفسها خارج الـ namespace. وبرنامج صغير يفتح socket في الإعداد نفسه يثبت أن `strace` سيراه؛
-- يرفض hook في المشروع داخل `apps/cli` أي استيراد لهذه الـ packages، أو لـ `syscall` و`golang.org/x/sys` و`unsafe` وcgo، وأي استدعاء لـ `os.StartProcess` أو `syscall.Exec` أو `syscall.ForkExec`.
+- الأمر يربط فقط الـ packages المكتوبة في `apps/cli/cmd/dhow/testdata/deps.linux-amd64.txt`، فأي package جديد يُفشل الاختبار حتى يراجعه أحد. وبعد ADR-0099 صارت فيها حزم الشبكة (`net` و`net/http` و`crypto/tls`) لأن `dhow artifact push` يحتاجها، وحزمة واحدة فقط من الكود هي التي تستوردها: `internal/ingestpush`، ويفحص اختبار ذلك. أما `os/exec` فليس بينها، ولا يوجد في الملف التنفيذي `os.StartProcess` ولا `syscall.ForkExec` ولا `syscall.Exec`؛
+- يشغّل الاختبار الملف التنفيذي على كل ملف خاطئ من اختبارات المدقق، داخل network namespace بلا أي شبكة، وتحت `strace`، فلا يظهر في السجل أي system call للشبكة، ولا أي `execve` بعد الأول، والنتيجة هي نفسها خارج الـ namespace. وبرنامج صغير يفتح socket في الإعداد نفسه يثبت أن `strace` سيراه. ويجري الاختبار نفسه على `dhow artifact push --dry-run`، فلا يتصل بالشبكة قبل الإرسال؛
+- يرفض hook في المشروع داخل `apps/cli` أي استيراد لحزم الشبكة، أو لـ `syscall` و`golang.org/x/sys` و`unsafe` وcgo، وأي استدعاء لـ `os.StartProcess` أو `syscall.Exec` أو `syscall.ForkExec`. فكود الأوامر في `apps/cli` لا يستورد الشبكة بنفسه، بل عبر `internal/ingestpush`.
 
 ## الأوامر الأخرى
 
 | الأمر | المعنى |
 |---|---|
+| `dhow artifact push` | يعبّئ مجلدًا أو يأخذ `.tar.gz` ويرفعه إلى سيرفر داو بتوكن استقبال. انظر [رفع الملفات الناتجة](guides/ingest-action.md). |
 | `dhow version` | يطبع الإصدار، والـ commit، وإصدار Go. |
 | `dhow help` | يعرض الأوامر وأكواد الخروج. |

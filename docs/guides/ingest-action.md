@@ -1,0 +1,186 @@
+[English](../en/guides/ingest-action.md)
+
+# رفع الملفات الناتجة بأمر `dhow` وبـ GitHub Action
+
+يشرح [دليل الاستقبال](ingest.md) كيف يستقبل داو ملفًا ناتجًا من CI خارجي. هذه الصفحة تشرح أداتين ترفعان الملف نيابة عنك: الأمر `dhow artifact push` في أي CI، والـ GitHub Action التي تستخدمه لك في GitHub.
+
+## الأمر `dhow artifact push`
+
+```sh
+dhow artifact push \
+  --server https://dhow.example.com \
+  --name web --ref main --sha "$GIT_SHA" \
+  --provenance Provider=jenkins --provenance BuildUrl="$BUILD_URL" \
+  -- dist/web
+```
+
+يعبّئ الأمر المجلد في أرشيف `tar.gz` بقواعد داو الآمنة نفسها، أو يأخذ ملف `.tar.gz` جاهزًا. ثم يحسب SHA-256، ويفحص الأرشيف بالقواعد نفسها التي يفحص بها السيرفر، ويرفعه إلى `PUT /ingest/v1/artifacts/{sha256}` مع الترويسات المطلوبة. التعبئة تعطي الأرشيف نفسه، بالبايتات نفسها، كلما كان المجلد نفسه.
+
+### الخيارات
+
+| الخيار | المعنى |
+|---|---|
+| `--server URL` | عنوان سيرفر داو. بديله المتغير `DHOW_SERVER`. يجب أن يبدأ بـ `https://`. ويُقبل `http://` مع `localhost` فقط. |
+| `--name NAME` | اسم الملف الناتج، كما يكتبه الـ pipeline تحت `ingested`. مطلوب. |
+| `--ref REF` | الفرع أو العلامة التي بُنيت. مطلوب. |
+| `--ref-kind KIND` | `branch` (الافتراضي) أو `tag`. |
+| `--sha COMMIT` | الـ commit الذي بُني، كاملًا بأحرف صغيرة. مطلوب. |
+| `--provenance K=V` | معلومة نصية عن الـ CI. كرّر الخيار لكل معلومة. الحد 16 معلومة، والقيمة 256 حرفًا. |
+| `--no-trigger` | يحفظ الملف دون أن يبدأ تشغيلًا. |
+| `--token-stdin` | يقرأ التوكن من الدخل القياسي بدل المتغير. |
+| `--ca-file FILE` | ملف PEM فيه جهات اعتماد إضافية. بديله المتغير `DHOW_CA_FILE`. |
+| `--retries N` | عدد إعادات المحاولة بعد فشل مؤقت، من 0 إلى 10. الافتراضي 3. |
+| `--dry-run` | يعبّئ ويطبع البصمة والترويسات ولا يرسل شيئًا. |
+| `--format text\|json` | شكل النتيجة. الافتراضي `text`. |
+| `--lang en\|ar` | لغة الرسائل. الافتراضي من `LC_ALL` أو `LANG`. |
+
+### التوكن
+
+- يأتي التوكن من المتغير `DHOW_INGEST_TOKEN`، أو من الدخل القياسي مع `--token-stdin`. لا يوجد خيار `--token`، ولا يقبل الأمر التوكن في سطر الأوامر: الخيارات تظهر في قوائم العمليات وفي سجلات كثير من أنظمة CI.
+- إذا كتبت `--token` عن طريق الخطأ، يرفض الأمر ولا يطبع القيمة.
+- لا يطبع الأمر التوكن في أي رسالة أو خطأ. حتى `--dry-run` يكتب `Authorization: Bearer (hidden)`.
+- خزّن التوكن في مخزن أسرار الـ CI، كما في [دليل الاستقبال](ingest.md).
+
+### تجربة دون إرسال
+
+```sh
+dhow artifact push --dry-run --lang en --name web --ref main --sha 1111111111111111111111111111111111111111 -- dist/web
+```
+
+```text
+Dry run: nothing was sent.
+Digest: sha256:bcf1b360142a05fd4c67a88c9a5ed236bea9b3d8ea8a6c01027d36fb1ccee9df
+Size: 100 bytes
+  Authorization: Bearer (hidden)
+  Content-Length: 100
+  Content-Type: application/gzip
+  Dhow-Ingest-Name: web
+  Dhow-Ingest-Ref: main
+  Dhow-Ingest-Ref-Kind: branch
+  Dhow-Ingest-Sha: 1111111111111111111111111111111111111111
+```
+
+لا يحتاج `--dry-run` إلى توكن ولا إلى اتصال. وإذا أعطيته `--server` يطبع عنوان الطلب أيضًا.
+
+### التكرار وإعادة المحاولة
+
+- الرفع الذي نجح قبل ثانية ونجح مرة أخرى هو `200` وليس خطأ، والتكرار لا ينشئ تشغيلًا ثانيًا. لذلك الأمر آمن للتكرار.
+- يعيد الأمر المحاولة عند: انقطاع الشبكة، وانتهاء المهلة، و`408` و`429` و`503` وأي `5xx`. ينتظر ثانية، ثم ثانيتين، ثم أربعًا، حتى 30 ثانية، أو يلتزم بترويسة `Retry-After` إذا أرسلها السيرفر.
+- إذا طلب السيرفر انتظارًا أطول من دقيقتين، يتوقف الأمر ويخرج بالكود 4 ويكتب مدة الانتظار المطلوبة.
+- لا يعيد الأمر المحاولة عند أي `4xx` آخر، لأن الإعادة لن تغيّر الجواب.
+- لا يتبع الأمر أي تحويل (`3xx`)، حتى لا يصل التوكن إلى سيرفر لم تسمّه.
+
+### أكواد الخروج
+
+| الكود | المعنى |
+|---|---|
+| `0` | حُفظ الملف (`201`)، أو كان محفوظًا من قبل (`200`). |
+| `1` | رفض السيرفر الملف أو بياناته: `DIGEST_MISMATCH` و`ARCHIVE_UNSAFE` و`ARTIFACT_TOO_LARGE` و`ARTIFACT_QUOTA_EXCEEDED` و`INGEST_TOKEN_QUOTA` و`LENGTH_REQUIRED` و`VALIDATION_FAILED` و`PROJECT_ARCHIVED` وأي `4xx` غير معروف. |
+| `2` | الأمر أو مدخلاته غير صحيحة، أو لا يمكن قراءة المجلد، أو لا يثق الأمر بشهادة السيرفر. لم يُرسل شيء. |
+| `3` | لا يقبل السيرفر التوكن: `INGEST_TOKEN_INVALID` و`INGEST_TOKEN_REVOKED` و`INGEST_TOKEN_EXPIRED`، أو لا يسمح به لهذا الـ ref: `REF_NOT_ALLOWED_FOR_TOKEN`. |
+| `4` | فشل مؤقت بقي بعد إعادة المحاولة: `NETWORK` و`TIMEOUT` و`UPLOAD_TOO_SLOW` و`RATE_LIMITED` و`SERVICE_UNAVAILABLE` وأي `5xx`. |
+| `5` | الرد ليس ما يرسله سيرفر داو: صفحة غير JSON، أو تحويل، أو بصمة مختلفة في الرد. لا يعيد الأمر المحاولة، لأن السيرفر ربما حفظ الملف. افحص `GET /ingest/v1/artifacts/{sha256}`. |
+
+تُكتب الرسائل في `stderr` بلغتك، ومعها الكود بين قوسين، مثل `(REF_NOT_ALLOWED_FOR_TOKEN)`. ويُكتب الرد الناجح في `stdout` فقط. أما مع `--format json` فيكتب `stdout` كائنًا واحدًا فيه `Digest` و`SizeBytes` و`Created` و`Triggered` و`RunId` و`RunNumber` و`RunUrl` و`Attempts`.
+
+### الشبكة والشهادات
+
+- يحترم الأمر `HTTPS_PROXY` و`NO_PROXY` من بيئته.
+- يستخدم الأمر جهات الاعتماد الموثوقة في النظام. إذا كان سيرفرك خلف جهة اعتماد خاصة بشركتك، فمرّر ملف PEM الخاص بها بـ `--ca-file` أو `DHOW_CA_FILE`. وهي تُضاف إلى جهات النظام، ولا تحل محلها.
+- لا يوجد خيار لتعطيل فحص الشهادة.
+- لا يعمل الأمر `dhow lint` بالشبكة أبدًا، ولا يتغير ذلك. انظر [أداة سطر الأوامر](../cli.md).
+
+## GitHub Action
+
+تنزّل الـ Action ملف `dhow` التنفيذي بالإصدار المثبّت فيها، وتفحص SHA-256 لأرشيفه قبل أن تشغّل أي شيء، ثم تستدعي `dhow artifact push` بمعلومات GitHub.
+
+```yaml
+name: Ship
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: make build
+      - id: dhow
+        uses: Khaymah/dhow-action@v1.0.0
+        with:
+          server: https://dhow.example.com
+          token: ${{ secrets.DHOW_INGEST_TOKEN }}
+          path: dist/web
+          name: web
+      - run: echo "Dhow stored sha256:${{ steps.dhow.outputs.digest }}"
+```
+
+ثبّت الـ Action على رقم commit كامل بدل الوسم إذا أردت أعلى أمان. فالوسم يشير إلى إصدار واحد لا يتحرك أبدًا، لكن الـ commit هو الأوضح للمراجعة.
+
+### المدخلات
+
+| المدخل | المعنى |
+|---|---|
+| `server` | عنوان سيرفر داو. مطلوب. |
+| `token` | توكن الاستقبال، من سر. مطلوب. |
+| `path` | مجلد يُعبّأ، أو ملف `.tar.gz` جاهز، نسبة إلى مجلد العمل. مطلوب. |
+| `name` | اسم الملف الناتج. مطلوب. |
+| `ref` | الفرع أو العلامة. الافتراضي `github.ref_name`. |
+| `ref-kind` | `branch` أو `tag`. الافتراضي `github.ref_type`. |
+| `sha` | الـ commit. الافتراضي `github.sha`. |
+| `trigger` | `false` يحفظ الملف دون تشغيل. الافتراضي `true`. |
+| `retries` | إعادات المحاولة بعد فشل مؤقت. الافتراضي `3`. |
+| `ca-file` | ملف PEM لجهات اعتماد إضافية. |
+| `release-base-url` | يترك فارغًا. مكان تنزيل `dhow` للاختبارات، ويبقى فحص SHA-256 المثبّت يعمل معه. |
+
+تضيف الـ Action إلى `Dhow-Ingest-Provenance` هذه الحقول النصية من سياق GitHub: `Provider` (وقيمته `github-actions`) و`Repository` و`RunId` و`RunAttempt` و`Workflow` و`Actor` و`Event` و`RunUrl`. تُحذف منها الأحرف الخفية وتُقصّ عند 200 بايت. وتذكّر أن داو يعرضها على أنها معلَنة من الـ CI وغير متحقَّق منها.
+
+### المخرجات
+
+| المخرج | المعنى |
+|---|---|
+| `digest` | SHA-256 للأرشيف بأحرف hex. هو نفسه الذي سجّله داو. |
+| `size` | حجم الأرشيف بالبايت. |
+| `created` | `true` لملف جديد، و`false` إذا كان هذا الرفع محفوظًا من قبل. |
+| `triggered` | `true` إذا بدأ تشغيل أو كان موجودًا لهذا الرفع. |
+| `run-id` | معرّف التشغيل في داو، إن وُجد. |
+| `run-number` | رقم التشغيل، إن وُجد. |
+| `run-url` | عنوان التشغيل في داو، إن وُجد. |
+
+تتحقق الـ Action من كل مخرج قبل أن تكتبه: البصمة 64 حرف hex، والمعرّف UUID، والعنوان `http` أو `https` بلا أحرف تحكم. فلا يستطيع رد غريب أن يكتب مخرجات أخرى في الـ workflow.
+
+### كيف يُثبَّت الملف التنفيذي
+
+- في الـ Action ملف `dhow.pin` فيه الإصدار، وSHA-256 لأرشيف كل منصة (`linux_amd64` و`linux_arm64` و`darwin_amd64` و`darwin_arm64`). يكتبه workflow الإصدار من `SHA256SUMS` الذي بناه.
+- ينزّل `scripts/install.sh` الأرشيف من إصدار GitHub في `Khaymah/dhow` بـ `https` فقط، ويحسب SHA-256، ولا يفك الأرشيف إلا إذا طابق القيمة المثبّتة. وإذا لم يطابق، تفشل الخطوة برسالة تقول إنه لم يُشغَّل شيء، ولا يصل التوكن إلى أي برنامج.
+- ثم يفك الملف `dhow` وحده، ويتأكد أنه ملف عادي وليس رابطًا، ويتأكد أن `dhow version` يقول الإصدار المثبّت.
+- نسخة الـ Action في مستودع `Khaymah/dhow` نفسه فيها `version=unreleased`، فتفشل عمدًا. استخدم `Khaymah/dhow-action` بوسم إصدار.
+- تعمل الـ Action على مشغّلات Linux وmacOS، بمعالج x64 أو ARM64. وتحتاج إلى `curl` و`tar` و`jq`، وكلها موجودة على المشغّلات التي تستضيفها GitHub.
+- لا تفحص الـ Action توقيع cosign. إذا أردت ذلك، فحمّل الأرشيف وافحص `SHA256SUMS.sigstore.json` كما في [أداة سطر الأوامر](../cli.md).
+
+### الأمان
+
+- شغّل الـ Action من حدث `push` على فرع أو وسم، أو من `workflow_dispatch` أو `release`. هذه الأحداث تشغّل كود مستودعك أنت.
+- **لا تستخدم `pull_request_target`.** يعطي هذا الحدث أسرار المستودع لـ workflow قد يشغّل كودًا من طلب دمج كتبه غريب. ترفض الـ Action أن تعمل تحته وتفشل برسالة واضحة.
+- لا تصل أسرار المستودع إلى طلبات الدمج من نسخ fork في الحدث `pull_request`. فيكون `token` فارغًا وتفشل الـ Action، وهذا هو المطلوب.
+- لا تشغّل الرفع من `workflow_run` إلا بعد أن تتأكد أن الـ workflow الأول بنى فرعًا موثوقًا وليس طلب دمج.
+- أعطِ التوكن أضيق أنماط ممكنة (`main` أو `release/*`)، ومدة قصيرة، وبدّله من وقت لآخر. وضعه في سر بيئة (environment secret) يحميه قاعدة فروع.
+- يصل التوكن إلى الأمر في متغير بيئة لخطوة الرفع وحدها. لا يظهر في سطر الأوامر، ولا يطبعه الأمر ولا السكربت.
+- اجعل `permissions: contents: read`، فالـ Action لا تحتاج إلى أكثر منها.
+
+### نشر الـ Action (للمشرفين)
+
+يعيد workflow الإصدار نسخ `apps/github-action` إلى مستودع `Khaymah/dhow-action` عند كل وسم إصدار، بعد نشر الملفات التنفيذية. يكتب `dhow.pin` بـ SHA-256 للإصدار، ويثبّت الإصدار كأن مستخدمًا يستخدمه، ثم يدفع commit ووسمًا بالاسم نفسه. لا يُحرَّك وسم أبدًا، وإذا وُجد الوسم يفشل الـ job.
+
+الإعداد مرة واحدة:
+
+1. أنشئ المستودع العام `Khaymah/dhow-action`.
+2. أنشئ زوج مفاتيح مخصصًا لهذا الغرض: `ssh-keygen -t ed25519 -N '' -C dhow-action-mirror -f dhow-action-mirror`.
+3. أضف الملف `dhow-action-mirror.pub` في `Khaymah/dhow-action` تحت Settings ثم Deploy keys، مع تفعيل Allow write access.
+4. أضف محتوى الملف `dhow-action-mirror` سرًّا باسم `DHOW_ACTION_DEPLOY_KEY` في `Khaymah/dhow`، ثم احذف الملفين من جهازك.
+
+إذا لم يوجد السر، يُتخطى الـ job برسالة `Action not mirrored` في ملخص التشغيل، ويكمل الإصدار. وهو يعمل على الوسوم فقط، بصلاحية `contents: read`، ولا يصل السر إلا إلى خطوة التحقق من وجوده وخطوة الدفع، عبر متغير بيئة.

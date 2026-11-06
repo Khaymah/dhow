@@ -2,7 +2,7 @@
 
 # The `dhow` CLI
 
-`dhow` is a single static binary for Linux, macOS and Windows, on `amd64` and `arm64`. Its first command is `dhow lint`: it checks a `.dhow.yml` file with the same validator as the Dhow server (`internal/pipelinespec`), so a file it accepts is a file the server accepts. It works offline: it never opens a network connection and never contacts a server.
+`dhow` is a single static binary for Linux, macOS and Windows, on `amd64` and `arm64`. Its first command is `dhow lint`: it checks a `.dhow.yml` file with the same validator as the Dhow server (`internal/pipelinespec`), so a file it accepts is a file the server accepts. It works offline: it never opens a network connection and never contacts a server. The second command is `dhow artifact push`: it uploads a build to a Dhow server ([guide](guides/ingest-action.md)). It is the only command that uses the network.
 
 ## Install
 
@@ -126,13 +126,14 @@ Control characters (C0 and C1) and invisible direction characters in a file name
 
 `dhow lint` never uses the network. It does not check plugin manifests and does not fetch images, so `uses:` and `image:` are checked by their form only (a digest is required for `uses:`). Three tests keep it that way:
 
-- the command links only the packages listed in `apps/cli/cmd/dhow/testdata/deps.linux-amd64.txt`, so any new package fails the test until someone reviews it. None of them is `net`, `net/http`, `crypto/tls` or `os/exec`, and the binary has no socket symbol and no `os.StartProcess`, `syscall.ForkExec` or `syscall.Exec`;
-- the binary runs every invalid file of the validator tests in a network namespace without any network, under `strace`, and the trace has no network system call and no `execve` after the first, while the result is the same as outside. A probe that opens a socket in the same setup shows that `strace` would see one;
-- a project hook refuses any import of these packages, of `syscall`, `golang.org/x/sys`, `unsafe` and cgo, and any call to `os.StartProcess`, `syscall.Exec` or `syscall.ForkExec` under `apps/cli`.
+- the command links only the packages listed in `apps/cli/cmd/dhow/testdata/deps.linux-amd64.txt`, so any new package fails the test until someone reviews it. Since ADR-0099 the network packages (`net`, `net/http` and `crypto/tls`) are in that list because `dhow artifact push` needs them, and only one package of our code imports them: `internal/ingestpush`, which a test checks. `os/exec` is not in the list, and the binary has no `os.StartProcess`, `syscall.ForkExec` or `syscall.Exec`;
+- the binary runs every invalid file of the validator tests in a network namespace without any network, under `strace`, and the trace has no network system call and no `execve` after the first, while the result is the same as outside. A probe that opens a socket in the same setup shows that `strace` would see one. The same test runs on `dhow artifact push --dry-run`, so it makes no connection before it sends;
+- a project hook refuses any import of the network packages, of `syscall`, `golang.org/x/sys`, `unsafe` and cgo, and any call to `os.StartProcess`, `syscall.Exec` or `syscall.ForkExec` under `apps/cli`. So the command code in `apps/cli` never imports the network itself, only through `internal/ingestpush`.
 
 ## Other commands
 
 | Command | Meaning |
 |---|---|
+| `dhow artifact push` | Packs a folder or takes a `.tar.gz` and uploads it to a Dhow server with an ingest token. See [uploading artifacts](guides/ingest-action.md). |
 | `dhow version` | Prints the version, the commit and the Go version. |
 | `dhow help` | Shows the commands and the exit codes. |

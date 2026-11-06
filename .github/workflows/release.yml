@@ -575,3 +575,105 @@ jobs:
           fi
           gh release upload "$TAG" --clobber \
             dist/*.tar.gz dist/*.tar.gz.spdx.json dist/SHA256SUMS dist/SHA256SUMS.sigstore.json
+
+  mirror-action:
+    name: Mirror the GitHub Action to Khaymah/dhow-action
+    needs: [binaries, publish-binaries]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.binaries.outputs.version }}
+      TAG: ${{ github.ref_name }}
+      MIRROR_REPO: Khaymah/dhow-action
+    steps:
+      - name: Check that the deploy key is set
+        id: gate
+        env:
+          DEPLOY_KEY: ${{ secrets.DHOW_ACTION_DEPLOY_KEY }}
+        run: |
+          if [[ -z "$DEPLOY_KEY" ]]; then
+            echo "::notice title=Action not mirrored::The secret DHOW_ACTION_DEPLOY_KEY is not set, so apps/github-action was not copied to $MIRROR_REPO. See docs/guides/ingest-action.md (Publishing the Action)."
+            echo "mirror=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "mirror=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.gate.outputs.mirror == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.gate.outputs.mirror == 'true'
+        with:
+          name: dhow-signed
+          path: dist
+      - name: Check the archives against SHA256SUMS
+        if: steps.gate.outputs.mirror == 'true'
+        working-directory: dist
+        run: sha256sum --check --strict SHA256SUMS
+      - name: Build the tree of the mirror with the checksums of this release pinned
+        if: steps.gate.outputs.mirror == 'true'
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::tag $TAG is not a semantic version such as v1.2.3"
+            exit 1
+          fi
+          tree="$RUNNER_TEMP/mirror-tree"
+          mkdir -p "$tree"
+          cp -R apps/github-action/. "$tree/"
+          rm -rf "$tree/test"
+          cp LICENSE "$tree/LICENSE"
+          {
+            echo "version=$VERSION"
+            for platform in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64; do
+              line=$(grep -E "^[0-9a-f]{64}  dhow_${VERSION}_${platform}\.tar\.gz$" dist/SHA256SUMS)
+              echo "${platform}=${line%% *}"
+            done
+          } > "$tree/dhow.pin"
+          cat "$tree/dhow.pin"
+          {
+            echo "# Dhow artifact push"
+            echo
+            echo "A GitHub Action that uploads a finished build to a Dhow server, so Dhow can deploy exactly these bytes."
+            echo "This repository is a read-only mirror of apps/github-action in Khaymah/dhow, published for each release."
+            echo "Open issues and pull requests in Khaymah/dhow. The guide is docs/guides/ingest-action.md there."
+            echo
+            echo "Pin it to a commit SHA, or to a release tag such as $TAG. Each release pins the SHA-256 of its own dhow binary."
+          } > "$tree/README.md"
+      - name: Install the pinned release the way a workflow would, and check it against the pin
+        if: steps.gate.outputs.mirror == 'true'
+        env:
+          ACTION_PATH: ${{ runner.temp }}/mirror-tree
+          RUNNER_OS: Linux
+          RUNNER_ARCH: X64
+        run: bash "$ACTION_PATH/scripts/install.sh"
+      - name: Push the tree and the tag to the mirror
+        if: steps.gate.outputs.mirror == 'true'
+        env:
+          DEPLOY_KEY: ${{ secrets.DHOW_ACTION_DEPLOY_KEY }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          key="$RUNNER_TEMP/mirror-deploy-key"
+          known="$RUNNER_TEMP/mirror-known-hosts"
+          (umask 077 && printf '%s\n' "$DEPLOY_KEY" > "$key")
+          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$known"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$known -o StrictHostKeyChecking=yes"
+          repo="$RUNNER_TEMP/mirror-repo"
+          git clone --quiet -- "git@github.com:${MIRROR_REPO}.git" "$repo"
+          if git -C "$repo" ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null 2>&1; then
+            echo "::error::$MIRROR_REPO already has the tag $TAG. A mirror tag is never moved."
+            exit 1
+          fi
+          find "$repo" -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf -- {} +
+          cp -R "$RUNNER_TEMP/mirror-tree/." "$repo/"
+          git -C "$repo" add --all
+          git -C "$repo" commit --quiet --signoff --message "chore(release): mirror the action for $TAG"
+          git -C "$repo" tag -- "$TAG"
+          git -C "$repo" push origin HEAD:refs/heads/main "refs/tags/$TAG"
+      - name: Remove the deploy key from the runner
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/mirror-deploy-key"

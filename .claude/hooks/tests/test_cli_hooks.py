@@ -89,6 +89,13 @@ class CliImportRules(unittest.TestCase):
             for rel in (CLI + "Lint/Lint.go", CLI + "App/App.go", "apps/cli/cmd/dhow/main.go"):
                 self.assertIn("works offline", edit(rel, std(path)), rel + " -> " + path)
 
+    def test_the_upload_package_is_the_only_way_to_the_network(self):
+        src = 'package x\n\nimport "github.com/Khaymah/dhow/internal/ingestpush"\n'
+        for rel in (CLI + "App/PushCommand.go", CLI + "App/PushOutput.go"):
+            self.assertIsNone(edit(rel, src), rel)
+        self.assertIn("internal/ingestpush", edit(CLI + "App/PushCommand.go", std("net/http")))
+        self.assertIsNone(edit("internal/ingestpush/Client.go", std("net/http")))
+
     def test_backquoted_imports_are_caught(self):
         for path in ("net", "os/exec", "syscall", "golang.org/x/sys/unix"):
             self.assertIn("works offline", edit(CLI + "Lint/Lint.go", "package x\n\nimport `" + path + "`\n"), path)

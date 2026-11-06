@@ -18,7 +18,10 @@ on:
       - deploy/m5-demo/**
       - deploy/e2e/**
       - deploy/e2e-targets/**
+      - deploy/ingest-e2e/**
       - apps/plugins/**
+      - apps/cli/**
+      - apps/github-action/**
       - deploy/ci/demo-areas.sh
       - apps/web/**
       - packages/openapi/**
@@ -42,6 +45,7 @@ jobs:
       demos: ${{ steps.scope.outputs.demos }}
       e2e: ${{ steps.scope.outputs.e2e }}
       deploy: ${{ steps.scope.outputs.deploy }}
+      ingest: ${{ steps.scope.outputs.ingest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -131,6 +135,106 @@ jobs:
           grep -q PLUGIN_INPUT_INVALID stderr.txt
       - name: Deploy to the sshd and to the Docker hosts, and replay the reports into the server
         run: make deploy-e2e
+
+  ingest-e2e:
+    needs: changes
+    if: needs.changes.outputs.ingest == 'true'
+    name: The GitHub Action uploads a build to a dev server
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Make a web build to upload
+        run: |
+          mkdir -p "$RUNNER_TEMP/web/assets"
+          printf '<h1>ingest e2e</h1>\n' > "$RUNNER_TEMP/web/index.html"
+          printf 'console.log(1)\n' > "$RUNNER_TEMP/web/assets/app.js"
+      - name: Build the CLI as a release and pin its checksum in the action
+        id: release
+        run: deploy/ingest-e2e/release.sh build "$RUNNER_TEMP/web"
+      - name: Start Postgres, the server and Forgejo, then make a project and an ingest token
+        id: stack
+        run: deploy/ingest-e2e/stack.sh up
+      - name: Upload with the action from this checkout
+        id: push
+        uses: ./apps/github-action
+        with:
+          server: ${{ steps.stack.outputs.server }}
+          token: ${{ steps.stack.outputs.token }}
+          path: ${{ runner.temp }}/web
+          name: web
+          ref: main
+          ref-kind: branch
+          sha: ${{ steps.stack.outputs.head-sha }}
+          release-base-url: ${{ steps.release.outputs.release-base-url }}
+      - name: The digest in the outputs is the one the server recorded, and a run was made for it
+        env:
+          EXPECTED_DIGEST: ${{ steps.push.outputs.digest }}
+          EXPECTED_RUN_ID: ${{ steps.push.outputs.run-id }}
+          LOCAL_DIGEST: ${{ steps.release.outputs.expected-digest }}
+          CREATED: ${{ steps.push.outputs.created }}
+          TRIGGERED: ${{ steps.push.outputs.triggered }}
+        run: |
+          test "$EXPECTED_DIGEST" = "$LOCAL_DIGEST"
+          test "$CREATED" = true
+          test "$TRIGGERED" = true
+          test -n "$EXPECTED_RUN_ID"
+          deploy/ingest-e2e/stack.sh verify
+      - name: Upload the same build again
+        id: again
+        uses: ./apps/github-action
+        with:
+          server: ${{ steps.stack.outputs.server }}
+          token: ${{ steps.stack.outputs.token }}
+          path: ${{ runner.temp }}/web
+          name: web
+          ref: main
+          ref-kind: branch
+          sha: ${{ steps.stack.outputs.head-sha }}
+          release-base-url: ${{ steps.release.outputs.release-base-url }}
+      - name: A repeated upload is a duplicate of the same run, not a second run
+        env:
+          FIRST_DIGEST: ${{ steps.push.outputs.digest }}
+          FIRST_RUN: ${{ steps.push.outputs.run-id }}
+          AGAIN_DIGEST: ${{ steps.again.outputs.digest }}
+          AGAIN_RUN: ${{ steps.again.outputs.run-id }}
+          AGAIN_CREATED: ${{ steps.again.outputs.created }}
+        run: |
+          test "$AGAIN_CREATED" = false
+          test "$AGAIN_DIGEST" = "$FIRST_DIGEST"
+          test "$AGAIN_RUN" = "$FIRST_RUN"
+      - name: Pin a wrong checksum
+        run: deploy/ingest-e2e/release.sh tamper
+      - name: Upload with the wrong checksum, which must fail before anything runs
+        id: tampered
+        continue-on-error: true
+        uses: ./apps/github-action
+        with:
+          server: ${{ steps.stack.outputs.server }}
+          token: ${{ steps.stack.outputs.token }}
+          path: ${{ runner.temp }}/web
+          name: web
+          ref: main
+          ref-kind: branch
+          sha: ${{ steps.stack.outputs.head-sha }}
+          release-base-url: ${{ steps.release.outputs.release-base-url }}
+      - name: The wrong checksum failed the action and the server still has one upload
+        env:
+          OUTCOME: ${{ steps.tampered.outcome }}
+          EXPECTED_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          test "$OUTCOME" = failure
+          deploy/ingest-e2e/stack.sh verify
+      - name: Stop the stack
+        if: always()
+        run: |
+          deploy/ingest-e2e/release.sh stop
+          deploy/ingest-e2e/stack.sh down
 
   e2e:
     needs: changes
