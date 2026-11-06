@@ -103,6 +103,9 @@ func Connect(ctx context.Context, o Options) (*Client, error) {
 	sc, chans, reqs, err := ssh.NewClientConn(conn, jobspec.Endpoint(o.Host, o.Port), cfg)
 	if err != nil {
 		_ = conn.Close()
+		if strings.Contains(err.Error(), "unable to authenticate") {
+			return nil, fmt.Errorf("log in to the server: %w", errors.Join(deployrelease.ErrAuthFailed, err))
+		}
 		return nil, fmt.Errorf("log in to the server: %w", err)
 	}
 	if err := conn.SetDeadline(time.Time{}); err != nil {

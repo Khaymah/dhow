@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
+	deployments "github.com/Khaymah/dhow/apps/server/internal/Core/Deployments"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
@@ -53,15 +54,16 @@ type Options struct {
 }
 
 type Service struct {
-	db      DB
-	factors auth.FactorConfirmer
-	bus     Publisher
-	log     *slog.Logger
-	now     func() time.Time
-	reopen  func(ctx context.Context, run uuid.UUID) error
-	dialer  netguard.Dialer
-	limiter ratelimit.Limiter
-	secrets secretstore.EnvironmentWriter
+	db        DB
+	factors   auth.FactorConfirmer
+	bus       Publisher
+	log       *slog.Logger
+	now       func() time.Time
+	reopen    func(ctx context.Context, run uuid.UUID) error
+	dialer    netguard.Dialer
+	limiter   ratelimit.Limiter
+	secrets   secretstore.EnvironmentWriter
+	synthetic deployments.Synthetic
 }
 
 func NewService(o Options) *Service {

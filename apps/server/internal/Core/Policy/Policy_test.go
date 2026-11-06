@@ -20,7 +20,7 @@ func TestMatrix(t *testing.T) {
 			policy.LogRead: true, policy.ProjectRead: true, policy.ProjectManage: true,
 			policy.RunRead: true, policy.RunTrigger: true, policy.RunCancel: true, policy.RunApprove: true, policy.ArtifactRead: true,
 			policy.EnvironmentManage: true, policy.EnvironmentPause: true, policy.EnvironmentBypass: true, policy.DeploymentApprove: true,
-			policy.DeploymentRollback: true, policy.SecretRead: true, policy.SecretManage: true, policy.OrgSecretManage: true,
+			policy.DeploymentRollback: true, policy.DeploymentCheck: true, policy.SecretRead: true, policy.SecretManage: true, policy.OrgSecretManage: true,
 		},
 		policy.RoleAdmin: {
 			policy.OrgRead: true, policy.OrgUpdate: true, policy.OrgLeave: true, policy.MemberRead: true, policy.MemberManage: true,
@@ -28,14 +28,14 @@ func TestMatrix(t *testing.T) {
 			policy.JobRead: true, policy.JobCreate: true, policy.JobCancel: true, policy.LogRead: true, policy.ProjectRead: true,
 			policy.ProjectManage: true, policy.RunRead: true, policy.RunTrigger: true, policy.RunCancel: true, policy.RunApprove: true,
 			policy.ArtifactRead: true, policy.EnvironmentManage: true, policy.EnvironmentPause: true, policy.EnvironmentBypass: true,
-			policy.DeploymentApprove: true, policy.DeploymentRollback: true, policy.SecretRead: true, policy.SecretManage: true,
+			policy.DeploymentApprove: true, policy.DeploymentRollback: true, policy.DeploymentCheck: true, policy.SecretRead: true, policy.SecretManage: true,
 			policy.OrgSecretManage: true,
 		},
 		policy.RoleMaintainer: {
 			policy.OrgRead: true, policy.OrgLeave: true, policy.MemberRead: true, policy.RunnerRead: true, policy.JobRead: true,
 			policy.JobCancel: true, policy.LogRead: true, policy.TokenCreate: true, policy.ProjectRead: true, policy.ProjectManage: true,
 			policy.RunRead: true, policy.RunTrigger: true, policy.RunCancel: true, policy.RunApprove: true, policy.ArtifactRead: true,
-			policy.EnvironmentPause: true, policy.DeploymentApprove: true, policy.DeploymentRollback: true, policy.SecretRead: true,
+			policy.EnvironmentPause: true, policy.DeploymentApprove: true, policy.DeploymentRollback: true, policy.DeploymentCheck: true, policy.SecretRead: true,
 			policy.SecretManage: true,
 		},
 		policy.RoleDeveloper: {

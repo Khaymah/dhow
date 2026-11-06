@@ -21,6 +21,7 @@ enum DeployEventKind {
   DEPLOY_EVENT_KIND_BATCH_PASSED = 9;
   DEPLOY_EVENT_KIND_FAILED = 10;
   DEPLOY_EVENT_KIND_SKIPPED = 11;
+  DEPLOY_EVENT_KIND_CHECKED = 12;
 }
 
 message DeployHealth {
@@ -42,6 +43,10 @@ message DeployEvent {
   string reason = 7;
   string message = 8;
   DeployHealth health = 9;
+  string current_release_id = 10;
+  string verified_release_id = 11;
+  int64 free_bytes = 12;
+  bool locked = 13;
 }
 
 message ReleaseServiceReportRequest {

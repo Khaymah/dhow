@@ -100,6 +100,10 @@ func validEvent(ev *runnerv1.DeployEvent) *rejection {
 	switch {
 	case ev == nil || ev.GetKind() == runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_UNSPECIFIED:
 		return errInvalidReport("Kind")
+	case ev.GetKind() == runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_CHECKED:
+		return validCheck(ev)
+	case ev.GetCurrentReleaseId() != "" || ev.GetVerifiedReleaseId() != "" || ev.GetFreeBytes() != 0 || ev.GetLocked():
+		return errInvalidReport("Kind")
 	case ev.GetBatch() < 0 || ev.GetBatch() > maxBatch:
 		return errInvalidReport("Batch")
 	case ev.GetReleaseId() != "" && !releaseIDShape.MatchString(ev.GetReleaseId()):

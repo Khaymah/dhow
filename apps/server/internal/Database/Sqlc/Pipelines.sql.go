@@ -726,6 +726,104 @@ func (q *Queries) InsertRunJob(ctx context.Context, arg InsertRunJobParams) (Run
 	return i, err
 }
 
+const insertSyntheticRun = `-- name: InsertSyntheticRun :one
+INSERT INTO "PipelineRuns" ("OrganizationId", "ProjectId", "Number", "Trigger", "Ref", "Actor", "Inputs", "DefinitionPath", "DefinitionSource",
+                            "DefinitionDigest", "State", "TriggeredByUserId")
+VALUES ($1, $2, $3, $4, $5, $6::text, '{}', $7, $8,
+        $9, 'pending', $10)
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt", "Round"
+`
+
+type InsertSyntheticRunParams struct {
+	OrganizationID    uuid.UUID
+	ProjectID         uuid.UUID
+	Number            int64
+	Trigger           string
+	Ref               string
+	Actor             pgtype.Text
+	DefinitionPath    string
+	DefinitionSource  pgtype.Text
+	DefinitionDigest  []byte
+	TriggeredByUserID *uuid.UUID
+}
+
+func (q *Queries) InsertSyntheticRun(ctx context.Context, arg InsertSyntheticRunParams) (PipelineRun, error) {
+	row := q.db.QueryRow(ctx, insertSyntheticRun,
+		arg.OrganizationID,
+		arg.ProjectID,
+		arg.Number,
+		arg.Trigger,
+		arg.Ref,
+		arg.Actor,
+		arg.DefinitionPath,
+		arg.DefinitionSource,
+		arg.DefinitionDigest,
+		arg.TriggeredByUserID,
+	)
+	var i PipelineRun
+	err := row.Scan(
+		&i.Id,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.OrganizationId,
+		&i.ProjectId,
+		&i.RepositoryId,
+		&i.Provider,
+		&i.Number,
+		&i.Trigger,
+		&i.Ref,
+		&i.BaseRef,
+		&i.Sha,
+		&i.BaseSha,
+		&i.IsFork,
+		&i.PrNumber,
+		&i.Actor,
+		&i.Inputs,
+		&i.DefinitionPath,
+		&i.DefinitionSha,
+		&i.DefinitionDigest,
+		&i.DefinitionSource,
+		&i.ImagePins,
+		&i.Issues,
+		&i.State,
+		&i.FailureReason,
+		&i.ConcurrencyGroup,
+		&i.CancelInProgress,
+		&i.DeliveryId,
+		&i.TriggeredByUserId,
+		&i.ApprovedByUserId,
+		&i.ApprovedAt,
+		&i.CancelRequestedAt,
+		&i.CancelRequestedBy,
+		&i.ClaimedUntil,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Round,
+	)
+	return i, err
+}
+
+const latestEnvironmentRef = `-- name: LatestEnvironmentRef :one
+SELECT d."Ref"
+FROM "Deployments" d
+WHERE d."EnvironmentId" = $1 AND d."OrganizationId" = $2 AND NOT d."IsDeleted"
+ORDER BY d."CreatedAt" DESC, d."Id" DESC
+LIMIT 1
+`
+
+type LatestEnvironmentRefParams struct {
+	EnvironmentID  uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) LatestEnvironmentRef(ctx context.Context, arg LatestEnvironmentRefParams) (string, error) {
+	row := q.db.QueryRow(ctx, latestEnvironmentRef, arg.EnvironmentID, arg.OrganizationID)
+	var Ref string
+	err := row.Scan(&Ref)
+	return Ref, err
+}
+
 const latestTrustedSha = `-- name: LatestTrustedSha :one
 SELECT "Sha"::text
 FROM "PipelineRuns"
@@ -1547,6 +1645,33 @@ WHERE "Id" = $1 AND "State" IN ('pending', 'queued')
 func (q *Queries) StartRun(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, startRun, id)
 	return err
+}
+
+const targetBusyInRun = `-- name: TargetBusyInRun :one
+SELECT EXISTS (SELECT 1
+               FROM "RunJobs" rj
+               JOIN "Jobs" j ON j."Id" = rj."CurrentJobId" AND j."OrganizationId" = rj."OrganizationId"
+               WHERE rj."RunId" = $1 AND rj."OrganizationId" = $2 AND rj."Id" <> $3 AND rj."State" = 'active'
+                 AND j."Spec" @> jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('target_id', $4::text))))::boolean AS "Busy"
+`
+
+type TargetBusyInRunParams struct {
+	RunID          uuid.UUID
+	OrganizationID uuid.UUID
+	RunJobID       uuid.UUID
+	TargetID       string
+}
+
+func (q *Queries) TargetBusyInRun(ctx context.Context, arg TargetBusyInRunParams) (bool, error) {
+	row := q.db.QueryRow(ctx, targetBusyInRun,
+		arg.RunID,
+		arg.OrganizationID,
+		arg.RunJobID,
+		arg.TargetID,
+	)
+	var Busy bool
+	err := row.Scan(&Busy)
+	return Busy, err
 }
 
 const touchRun = `-- name: TouchRun :exec

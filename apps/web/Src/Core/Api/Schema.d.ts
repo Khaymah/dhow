@@ -1748,6 +1748,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the last check of every host of a deploy target
+         * @description Needs `project.read`. For each host of the target, in order, the answer says whether a check has run and what it found: `Reason` is `ok`, or `host_key_mismatch`, `unreachable`, `auth_failed`, `path_missing`, `current_not_symlink`, `state_corrupt`, `disk_low`, `locked` or `diverged`. It also gives the release `current` points to, the last release that passed its health check, the free disk space, and whether the state of Dhow for this host was written from this check (`Repaired`). A host that was never checked has `Checked` false and no other fact.
+         */
+        get: operations["getDeployTargetCheck"];
+        put?: never;
+        /**
+         * Check a deploy target
+         * @description Needs `deployment.check`. Starts a run of one job that runs the official deploy plugin in `check` mode on the target. The run goes through the same gate as any deployment: the rules of the environment, its lock, approvals, and the secrets and egress that the server computes. The plugin connects to every host with the pinned host key and reads `current`, the last release that passed its health check, the free disk space and the lock, and changes nothing on the host. The answer is 202 with the number of the run; read the result with GET on this path once the run ends. A host whose release was left `unknown` by a runner that died is written from what the check found. Answers 503 `TARGET_CHECK_UNAVAILABLE` when this build of the server has no pinned image of the plugin.
+         */
+        post: operations["startDeployTargetCheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts": {
         parameters: {
             query?: never;
@@ -4629,6 +4653,40 @@ export interface components {
             /** Format: date-time */
             UpdatedAt: string;
         };
+        DeployTargetHostCheck: {
+            /** Format: uuid */
+            HostId: string;
+            Position: number;
+            Host: string;
+            Port: number;
+            Checked: boolean;
+            /** @enum {string} */
+            Reason?: "ok" | "host_key_mismatch" | "unreachable" | "auth_failed" | "path_missing" | "current_not_symlink" | "state_corrupt" | "disk_low" | "locked" | "diverged";
+            Message?: string;
+            CurrentReleaseId?: string;
+            VerifiedReleaseId?: string;
+            /** Format: int64 */
+            FreeBytes?: number;
+            Locked: boolean;
+            Repaired: boolean;
+            /** Format: date-time */
+            CheckedAt?: string;
+        };
+        DeployTargetCheck: {
+            Hosts: components["schemas"]["DeployTargetHostCheck"][];
+        };
+        DeployTargetCheckResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DeployTargetCheck"];
+        };
+        DeployTargetCheckStarted: {
+            /** Format: uuid */
+            RunId: string;
+            /** Format: int64 */
+            RunNumber: number;
+        };
+        DeployTargetCheckStartedResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DeployTargetCheckStarted"];
+        };
         DeployTargetResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["DeployTarget"];
         };
@@ -4810,10 +4868,10 @@ export interface components {
         /** @enum {string} */
         RunJobState: "waiting" | "active" | "succeeded" | "failed" | "canceled" | "skipped";
         /**
-         * @description Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the environment to be resumed, or for another run that holds the environment.
+         * @description Why a `waiting` job on an environment does not start yet: it waits for a reviewer, for the wait timer, for the environment to be resumed, for another run that holds the environment, or (`target_busy`) for another job of the same run that is deploying to the same target.
          * @enum {string}
          */
-        RunJobGate: "approval" | "timer" | "paused" | "environment_busy";
+        RunJobGate: "approval" | "timer" | "paused" | "environment_busy" | "target_busy";
         RunIssue: {
             /** @description A stable code such as `UNKNOWN_KEY` or `IMAGE_NOT_PINNED`, the same that `dhow lint` prints. */
             Code: string;
@@ -7914,6 +7972,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeployTargetResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getDeployTargetCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The last check of every host. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetCheckResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    startDeployTargetCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The check run was created. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetCheckStartedResponse"];
                 };
             };
             default: components["responses"]["Error"];

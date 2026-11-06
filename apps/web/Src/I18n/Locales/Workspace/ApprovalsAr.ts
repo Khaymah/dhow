@@ -52,6 +52,8 @@ export const ApprovalsAr = {
   'approvals.gate.timer.unknown': 'ينتظر انتهاء مؤقت البيئة.',
   'approvals.gate.busy.badge': 'البيئة مشغولة',
   'approvals.gate.busy.body': 'ينتظر تنفيذًا آخر ينهي عمله على بيئة {environment}.',
+  'approvals.gate.targetBusy.badge': 'الهدف مشغول',
+  'approvals.gate.targetBusy.body': 'ينتظر مهمة أخرى في هذا التشغيل تنشر على الهدف نفسه.',
   'approvals.gate.paused.badge': 'النشر متوقف',
   'approvals.gate.paused.body': 'النشر على بيئة {environment} متوقف الآن. يبدأ بعد أن يستأنف المدير النشر عليها.',
 

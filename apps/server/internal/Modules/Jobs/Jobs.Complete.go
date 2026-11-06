@@ -43,7 +43,25 @@ type resultRule struct {
 	reasons  []runnerv1.FailureReason
 }
 
+func deployReasons() []runnerv1.FailureReason {
+	return []runnerv1.FailureReason{
+		runnerv1.FailureReason_FAILURE_REASON_DEPLOY_FAILED, runnerv1.FailureReason_FAILURE_REASON_DEPLOY_ROLLED_BACK,
+		runnerv1.FailureReason_FAILURE_REASON_DEPLOY_HEALTH_FAILED, runnerv1.FailureReason_FAILURE_REASON_DEPLOY_ROLLBACK_FAILED,
+		runnerv1.FailureReason_FAILURE_REASON_TARGET_LOCKED, runnerv1.FailureReason_FAILURE_REASON_CURRENT_NOT_A_SYMLINK,
+		runnerv1.FailureReason_FAILURE_REASON_TARGET_HOST_UNREACHABLE, runnerv1.FailureReason_FAILURE_REASON_TARGET_STATE_CORRUPT,
+		runnerv1.FailureReason_FAILURE_REASON_TARGET_CHECK_FAILED,
+	}
+}
+
 func resultRules() map[runnerv1.AttemptResult]resultRule {
+	rules := baseRules()
+	failed := rules[runnerv1.AttemptResult_ATTEMPT_RESULT_FAILED]
+	failed.reasons = append(failed.reasons, deployReasons()...)
+	rules[runnerv1.AttemptResult_ATTEMPT_RESULT_FAILED] = failed
+	return rules
+}
+
+func baseRules() map[runnerv1.AttemptResult]resultRule {
 	unspecified := runnerv1.FailureReason_FAILURE_REASON_UNSPECIFIED
 	return map[runnerv1.AttemptResult]resultRule{
 		runnerv1.AttemptResult_ATTEMPT_RESULT_SUCCEEDED: {models.AttemptSucceeded, unspecified, nil},
@@ -74,14 +92,15 @@ func resultRules() map[runnerv1.AttemptResult]resultRule {
 }
 
 func stepReasons() []runnerv1.FailureReason {
-	return []runnerv1.FailureReason{
+	return append(deployReasons(), []runnerv1.FailureReason{
 		runnerv1.FailureReason_FAILURE_REASON_UNSPECIFIED, runnerv1.FailureReason_FAILURE_REASON_STEP_FAILED,
 		runnerv1.FailureReason_FAILURE_REASON_OOM_KILLED, runnerv1.FailureReason_FAILURE_REASON_PIDS_LIMIT_REACHED,
 		runnerv1.FailureReason_FAILURE_REASON_TIMED_OUT, runnerv1.FailureReason_FAILURE_REASON_CANCELED,
 		runnerv1.FailureReason_FAILURE_REASON_SHELL_NOT_FOUND, runnerv1.FailureReason_FAILURE_REASON_IMAGE_PULL_FAILED,
 		runnerv1.FailureReason_FAILURE_REASON_SANDBOX_FAILED, runnerv1.FailureReason_FAILURE_REASON_PLUGIN_INPUT_INVALID,
 		runnerv1.FailureReason_FAILURE_REASON_PLUGIN_MANIFEST_INVALID,
-	}
+		runnerv1.FailureReason_FAILURE_REASON_HOST_KEY_MISMATCH, runnerv1.FailureReason_FAILURE_REASON_ARTIFACT_UNSAFE,
+	}...)
 }
 
 func outcomeOf(in CompleteInput) (models.Outcome, error) {

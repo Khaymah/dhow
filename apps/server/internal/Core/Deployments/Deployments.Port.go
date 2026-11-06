@@ -16,6 +16,9 @@ const (
 	GateTimer           = "timer"
 	GatePaused          = "paused"
 	GateEnvironmentBusy = "environment_busy"
+	GateTargetBusy      = "target_busy"
+
+	SyntheticCheck = "check"
 
 	ApprovalPassed     = "passed"
 	ApprovalBypassed   = "bypassed"
@@ -144,4 +147,22 @@ type DeployTarget struct {
 type Targets interface {
 	Find(ctx context.Context, tx *sqlc.Queries, org, environment uuid.UUID, name string) (DeployTarget, bool, error)
 	KeyNames(ctx context.Context, tx *sqlc.Queries, org, environment uuid.UUID) ([]string, error)
+}
+
+type SyntheticRequest struct {
+	OrganizationID  uuid.UUID
+	ProjectID       uuid.UUID
+	EnvironmentID   uuid.UUID
+	EnvironmentName string
+	TargetName      string
+	Kind            string
+}
+
+type SyntheticRun struct {
+	RunID  uuid.UUID
+	Number int64
+}
+
+type Synthetic interface {
+	StartSynthetic(ctx context.Context, r SyntheticRequest) (SyntheticRun, error)
 }

@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Khaymah/dhow/internal/jobspec"
@@ -20,6 +21,7 @@ const (
 	MaxArgBytes       = 4 << 10
 	MaxOutputs        = 64
 	MaxOutputValue    = 1 << 10
+	maxExitReasons    = 32
 	InputEnvPrefix    = "DHOW_INPUT_"
 	EnvOutput         = "DHOW_OUTPUT"
 	EnvDeployReport   = "DHOW_DEPLOY_REPORT"
@@ -53,6 +55,18 @@ type Manifest struct {
 	Inputs     map[string]Input `json:"Inputs"`
 	Outputs    []string         `json:"Outputs"`
 	Mutating   bool             `json:"Mutating"`
+
+	ExitReasons map[string]string `json:"ExitReasons"`
+}
+
+var deployReasons = []string{
+	"DEPLOY_FAILED", "DEPLOY_ROLLED_BACK", "DEPLOY_HEALTH_FAILED", "DEPLOY_ROLLBACK_FAILED", "TARGET_LOCKED", "CURRENT_NOT_A_SYMLINK",
+	"TARGET_HOST_UNREACHABLE", "TARGET_STATE_CORRUPT", "TARGET_CHECK_FAILED", "HOST_KEY_MISMATCH", "ARTIFACT_UNSAFE", "PLUGIN_INPUT_INVALID",
+}
+
+func (m Manifest) ExitReason(code int32) (string, bool) {
+	name, ok := m.ExitReasons[strconv.Itoa(int(code))]
+	return name, ok && m.Mutating
 }
 
 func Parse(label string) (Manifest, error) {
@@ -94,13 +108,29 @@ func (m Manifest) check() error {
 		if in.Kind != "" && in.Kind != KindValue && in.Kind != KindArtifact {
 			return fmt.Errorf("%w: input %s has the unknown kind %q", ErrManifest, name, in.Kind)
 		}
-		if in.IsArtifact() && (in.Default != nil || !in.Required) {
-			return fmt.Errorf("%w: the artifact input %s must be required and have no default", ErrManifest, name)
+		if in.IsArtifact() && (in.Default != nil || (!in.Required && !m.Mutating)) {
+			return fmt.Errorf("%w: the artifact input %s must have no default and, unless the plugin is mutating, be required", ErrManifest, name)
 		}
 	}
 	for _, o := range m.Outputs {
 		if !outputPattern.MatchString(o) {
 			return ErrManifest
+		}
+	}
+	return m.checkExitReasons()
+}
+
+func (m Manifest) checkExitReasons() error {
+	if len(m.ExitReasons) > 0 && !m.Mutating {
+		return fmt.Errorf("%w: only a mutating plugin maps exit codes to failure reasons", ErrManifest)
+	}
+	if len(m.ExitReasons) > maxExitReasons {
+		return ErrManifest
+	}
+	for code, name := range m.ExitReasons {
+		n, err := strconv.Atoi(code)
+		if err != nil || n < 1 || n > 255 || strconv.Itoa(n) != code || !slices.Contains(deployReasons, name) {
+			return fmt.Errorf("%w: the exit code %q maps to an unknown failure reason", ErrManifest, code)
 		}
 	}
 	return nil

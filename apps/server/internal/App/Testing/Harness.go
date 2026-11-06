@@ -139,22 +139,23 @@ func NewWithPool(t *testing.T, pool *pgxpool.Pool) *Env {
 }
 
 type Options struct {
-	Pool          *pgxpool.Pool
-	Params        *auth.Params
-	Mailer        mailer.Sender
-	Profile       func(*config.Config)
-	Clock         *Clock
-	OidcTransport http.RoundTripper
-	Secrets       *FakeSecrets
-	Triggers      triggers.Sink
-	GitLookup     netguard.Lookup
-	GitDial       netguard.DialFunc
-	Definitions   pipelines.Definitions
-	Images        pipelines.ImageResolver
-	CheckoutImage string
-	RegistryTLS   *tls.Config
-	NoManualJobs  bool
-	PinBudget     time.Duration
+	Pool           *pgxpool.Pool
+	Params         *auth.Params
+	Mailer         mailer.Sender
+	Profile        func(*config.Config)
+	Clock          *Clock
+	OidcTransport  http.RoundTripper
+	Secrets        *FakeSecrets
+	Triggers       triggers.Sink
+	GitLookup      netguard.Lookup
+	GitDial        netguard.DialFunc
+	Definitions    pipelines.Definitions
+	Images         pipelines.ImageResolver
+	CheckoutImage  string
+	DeploySSHImage string
+	RegistryTLS    *tls.Config
+	NoManualJobs   bool
+	PinBudget      time.Duration
 
 	LogStreamWriteWait time.Duration
 	LogReadWait        time.Duration
@@ -213,7 +214,7 @@ func NewWithOptions(t *testing.T, o Options) *Env {
 		Config: cfg, Log: log, Pool: pool, Migrations: fakeMigrations{}, Build: buildinfo.Info{Version: "test", Commit: "test"},
 		Breach: breach, HashParams: &params, Now: clock.Now, Mailer: o.Mailer, OidcTransport: o.OidcTransport,
 		LogStreamWriteWait: o.LogStreamWriteWait, LogReadWait: o.LogReadWait, Triggers: o.Triggers, GitLookup: o.GitLookup, GitDial: o.GitDial,
-		Definitions: o.Definitions, Images: o.Images, CheckoutImage: o.CheckoutImage, RegistryTLS: o.RegistryTLS, ManualJobs: !o.NoManualJobs,
+		Definitions: o.Definitions, Images: o.Images, CheckoutImage: o.CheckoutImage, DeploySSHImage: o.DeploySSHImage, RegistryTLS: o.RegistryTLS, ManualJobs: !o.NoManualJobs,
 		PinBudget: o.PinBudget,
 	}
 	if o.Secrets != nil {

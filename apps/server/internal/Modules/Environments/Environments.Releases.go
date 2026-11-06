@@ -34,6 +34,7 @@ type reportScope struct {
 	hids   []uuid.UUID
 	step   int32
 	digest []byte
+	mode   string
 	hosts  map[uuid.UUID]*sqlc.DeploymentReleaseHost
 	rel    *sqlc.DeploymentRelease
 }
@@ -106,6 +107,10 @@ func (s *Service) reportScope(q *sqlc.Queries, row sqlc.LockReleaseLeaseRow, ste
 		}
 		sc.hids = append(sc.hids, hid)
 	}
+	if step < 0 || int(step) >= len(spec.GetSteps()) {
+		return nil, reject(connect.CodePermissionDenied, CodeNotTargetStep)
+	}
+	sc.mode = spec.GetSteps()[step].GetPlugin().GetInputs()[jobspec.TargetModeInput]
 	if name := spec.GetSteps()[step].GetPlugin().GetInputs()[jobspec.TargetArtifactInput]; name != "" {
 		for _, in := range spec.GetInputs() {
 			if raw, err := hex.DecodeString(in.GetDigest()); err == nil && in.GetName() == name && len(raw) == 32 {
@@ -118,6 +123,12 @@ func (s *Service) reportScope(q *sqlc.Queries, row sqlc.LockReleaseLeaseRow, ste
 
 func (sc *reportScope) apply(ctx context.Context, ev *runnerv1.DeployEvent) error {
 	kind := ev.GetKind()
+	if kind == runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_CHECKED {
+		return sc.checked(ctx, ev)
+	}
+	if sc.mode == jobspec.TargetModeCheck {
+		return reject(connect.CodeFailedPrecondition, CodeIllegalTransition)
+	}
 	if rid := ev.GetReleaseId(); rid != "" && rid != sc.target.GetReleaseId() {
 		return errInvalidReport("ReleaseId")
 	}
