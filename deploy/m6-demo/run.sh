@@ -44,7 +44,7 @@ export DHOW_DEMO_COMPOSE_EXTRA="$m6_dir/compose.yaml"
 # shellcheck source=deploy/m6-demo/compose-target.sh
 . "$m6_dir/compose-target.sh"
 
-leak_sweep() { bash "$demo_dir/leak-sweep.sh"; }
+leak_sweep() { DHOW_DEMO_EXPECT_TARGETS=1 bash "$demo_dir/leak-sweep.sh"; }
 
 prerequisites
 prepare_work
