@@ -160,7 +160,7 @@ func checkSources(r deployrelease.Remote, rel deployrelease.Release, res policy.
 		info, err := r.Lstat(rel.Path + "/" + p)
 		switch {
 		case err != nil && allowUnsafe && errors.Is(err, fs.ErrNotExist):
-		case err != nil || info.IsSymlink() || !(info.IsDir() || info.Mode.IsRegular()):
+		case err != nil || info.IsSymlink() || (!info.IsDir() && !info.Mode.IsRegular()):
 			return source("a bind source is missing, a link or not a folder or file")
 		}
 	}

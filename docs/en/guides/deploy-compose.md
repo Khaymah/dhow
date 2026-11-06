@@ -103,7 +103,14 @@ Because the Compose file comes from a commit and runs with Docker rights, the pl
 | `COMPOSE_UNSAFE_SECURITY_OPT` | any `security_opt` other than `no-new-privileges` |
 | `COMPOSE_UNSAFE_DOCKER_SOCKET` | a bind of `docker.sock` at any path, and `use_api_socket` |
 | `COMPOSE_UNSAFE_BIND_ROOT` | a bind of `/` |
-| `COMPOSE_UNSAFE_BIND_OUTSIDE` | a bind of a path outside the deploy folder, of the deploy folder itself, of `.dhow`, a relative path that leaves the release folder, or `~` |
+| `COMPOSE_UNSAFE_BIND_OUTSIDE` | a bind of an absolute path, of a relative path that leaves the release folder, or of `~`; and reading an `env_file` or a `secrets` or `configs` file from anywhere other than the release folder and `shared/.env` |
+| `COMPOSE_UNSAFE_BIND_WRITABLE` | a bind of a folder of the release with write access. Binds are allowed only read only (`:ro`) |
+| `COMPOSE_UNSAFE_BIND_SHARED_DATA` | a bind of a folder under `shared` |
+| `COMPOSE_UNSAFE_BIND_STATE` | a bind of `.dhow` |
+| `COMPOSE_UNSAFE_VOLUME_OPTS` | `driver_opts` in a volume |
+| `COMPOSE_UNSAFE_NETWORK_DRIVER` and `_NETWORK_OPTS` | a top-level network with a `driver` other than `bridge`, or with `driver_opts` or `ipam` |
+| `COMPOSE_UNSAFE_LOGGING` | `logging` with a driver other than `json-file` and `local`, or with an option other than `max-size`, `max-file` and `compress` |
+| `COMPOSE_BIND_SOURCE` | a bind source or a file that is read is not on the server before the start, or is a symbolic link, or is not an ordinary folder or file |
 | `COMPOSE_UNSAFE_BIND_SYMLINK` | a bind of a path that passes through a symbolic link that came from the archive |
 | `COMPOSE_UNSAFE_INTERPOLATION` | a `${...}` variable in a bind path or a file path |
 | `COMPOSE_UNSAFE_INCLUDE` | `include` at the top of the file |
@@ -120,14 +127,37 @@ Because the Compose file comes from a commit and runs with Docker rights, the pl
 | `COMPOSE_UNSAFE_BIND_SHARED` | a bind of `shared` itself or of `shared/.env` |
 | `COMPOSE_UNSAFE_CGROUP_PARENT`, `_RUNTIME`, `_SYSCTLS`, `_GROUP_ADD`, `_EXTRA_HOSTS`, `_EXTERNAL_LINKS` and `_MODELS` | the keys `cgroup_parent`, `runtime`, `sysctls`, `group_add`, `extra_hosts`, `external_links` and `models` |
 | `COMPOSE_FILE_CHANGED` | the Compose file or `compose.dhow.yaml` on the server does not match what was checked, or the record of their checksums is missing |
-| `COMPOSE_ENV_FORBIDDEN` | a variable that starts with `COMPOSE_` in `shared/.env` |
+| `COMPOSE_ENV_FORBIDDEN` | a variable that starts with `COMPOSE_` in `shared/.env`, or a line in it that the plugin cannot read |
 | `COMPOSE_INVALID` | a file that is not valid YAML, has more than one document, has a repeated key, has no services, is larger than 256 KiB, or is not in the archive |
 
-- Allowed binds: a named volume, `tmpfs`, a subfolder inside the release folder such as `./conf`, or a named subfolder under `shared` such as `/srv/shop/shared/uploads`. A bind of the release folder itself, of the Compose files, of `shared` itself or of `shared/.env` is not allowed, so a container cannot change the files that were checked.
+- Allowed mounts: a named volume, an unnamed volume such as `/data`, `tmpfs`, or a subfolder inside the release folder, read only, such as `./conf:/conf:ro`. A bind of the release folder itself, of the Compose files, of anything under `shared`, of another release, or of an absolute path is not allowed.
+- `env_file` and the files of `secrets` and `configs` are read from inside the release folder or from exactly `shared/.env`, and they are ordinary files, not links.
+- In named volumes: `driver` is `local` only, with no `driver_opts`.
+- Top-level networks use the default driver (`bridge`) with no `driver_opts` or `ipam`, and `logging` uses `json-file` or `local` with the options `max-size`, `max-file` and `compress` only. `${...}` variables in any `volumes` entry, and in `network_mode`, `pid`, `ipc` and `uts`, are always refused.
 - YAML references `&` and `<<` are expanded before the check, so they cannot hide an option.
 - The keys that are allowed are a fixed list: `image`, `command`, `entrypoint`, `environment`, `env_file`, `ports`, `expose`, `volumes`, `networks`, `depends_on`, `healthcheck`, `restart`, `labels`, `logging`, `deploy` (`resources` and `restart_policy` only), `user`, `working_dir`, `read_only`, `tmpfs`, `stop_signal`, `stop_grace_period`, `init`, `hostname`, `domainname`, `mem_limit`, `cpus`, `ulimits`, `shm_size`, `secrets`, `configs`, `profiles` and anything that starts with `x-`. Any other key fails with `COMPOSE_UNSAFE_UNKNOWN_KEY`.
-- The administrator can open the `COMPOSE_UNSAFE_*` rules for one target with the `AllowUnsafeCompose` option; these are the keys that need wider rights, such as `privileged`, `cap_add`, `devices` and `sysctls`. This option does not open image pinning, the ban on `build`, `COMPOSE_INVALID`, or the rules about pulling in other files, sharing namespaces or using outside resources: `include`, `extends`, `provider`, `volumes_from`, `container:`, `service:`, anything about `external`, and the sources of `secrets`.
+- The administrator can open the `COMPOSE_UNSAFE_*` rules for one target with the `AllowUnsafeCompose` option; these are the keys that need wider rights, such as `privileged`, `cap_add`, `devices` and `sysctls`. The option also reopens writable binds under the deploy folder. Warning: a container that can write in a bound folder can put a symbolic link to `/` in it, and Docker then follows it as root in any later bind from that folder. Open the option only for an application that you trust as much as the server itself. The option never opens a bind of `.dhow`, of the Compose files or of the release folder, and it does not open image pinning, the ban on `build`, `COMPOSE_INVALID`, or the rules about pulling in other files, sharing namespaces or using outside resources: `include`, `extends`, `provider`, `volumes_from`, `container:`, `service:`, anything about `external`, and the sources of `secrets`.
 - A refusal stops the job with exit 30 before any connection or write on the server, and writes the code and the service name in the log. In the report the deploy appears as failed with a fixed message.
+
+## Persistent data: use named volumes
+
+A container that writes in a server folder bound into it can put a symbolic link to `/` or to `.dhow` there, and Docker then follows the link as root in a later bind. For this reason the plugin does not allow writing in any server folder: the data that containers write goes in named volumes that Docker manages.
+
+```yaml
+services:
+  web:
+    image: ghcr.io/acme/shop-web@sha256:<digest>
+    volumes:
+      - uploads:/app/uploads
+      - ./conf:/app/conf:ro
+volumes:
+  uploads: {}
+```
+
+- A named volume is declared at the top of the file with no `driver` or with `driver: local`, and with no `driver_opts`.
+- Settings that come with the release are bound read only (`:ro`) from a folder inside the release.
+- Moving data from `./data:/data`: change the entry to `data:/data` and add `data: {}` under `volumes` at the top of the file. To carry the old content over, create the volume on the server and copy the files into it once before the deploy, for example by running a temporary container that binds the old folder read only and the new volume for writing. The name of the volume on the server is `<project name>_data`.
+- Backups work the same way: a temporary container that binds the volume and copies from it.
 
 ## Variables in the Compose file
 
@@ -135,7 +165,7 @@ Because the Compose file comes from a commit and runs with Docker rights, the pl
 
 - If `shared/.env` does not exist, the plugin passes `/dev/null`, so a `.env` file inside the archive is never loaded.
 - A variable that is not defined becomes empty, and Compose warns.
-- A `shared/.env` with a variable that starts with `COMPOSE_` stops the deploy with `COMPOSE_ENV_FORBIDDEN`, because those variables change what Compose reads.
+- A `shared/.env` with a variable that starts with `COMPOSE_` stops the deploy with `COMPOSE_ENV_FORBIDDEN`, because those variables change what Compose reads. The plugin reads the file by the same rules as Compose (`export`, spaces and Windows line ends), and a line that it cannot read stops the deploy with the same code. Do not use multi-line values in this file.
 - Variables are not accepted in an image name, in bind paths or in sensitive options such as `privileged`.
 
 ## Plugin inputs
@@ -209,7 +239,7 @@ The same SSH codes for `DEPLOY_ROLLED_BACK` (10), `DEPLOY_HEALTH_FAILED` (11), `
 - **`DEPLOY_FAILED` with `manifest unknown` in the log:** the image is not in the registry. Make sure the job that built it pushed it before the deploy.
 - **`DEPLOY_FAILED` with `unauthorized` in the log:** the deploy account did not log in to the registry on the server. Run `docker login` as that account.
 - **`DEPLOY_ROLLED_BACK` and an `unhealthy` service:** the `healthcheck` of the service did not succeed within `wait_timeout`. Raise the timeout or fix the check. A service without a `healthcheck` counts as healthy as soon as it runs, and the external `health_check_url` check is then the only protection, so write a `healthcheck` for every service.
-- **`COMPOSE_UNSAFE_BIND_OUTSIDE`:** the file binds a path outside `/srv/shop`. Move the data to `shared/` or use a named volume.
+- **`COMPOSE_UNSAFE_BIND_OUTSIDE` or `COMPOSE_UNSAFE_BIND_WRITABLE`:** the file binds an absolute path or a writable folder. Use a named volume for data, as in [Persistent data](#persistent-data-use-named-volumes).
 - **`TARGET_LOCKED` and `HOST_KEY_MISMATCH`:** as in the SSH guide.
 
 ## Limits of this version

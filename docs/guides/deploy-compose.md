@@ -103,7 +103,14 @@ with:
 | `COMPOSE_UNSAFE_SECURITY_OPT` | أي `security_opt` غير `no-new-privileges` |
 | `COMPOSE_UNSAFE_DOCKER_SOCKET` | ربط `docker.sock` بأي مسار، و`use_api_socket` |
 | `COMPOSE_UNSAFE_BIND_ROOT` | ربط `/` |
-| `COMPOSE_UNSAFE_BIND_OUTSIDE` | ربط مسار خارج مجلد النشر، أو مجلد النشر نفسه، أو `.dhow`، أو مسار نسبي يخرج من مجلد الإصدار، أو `~` |
+| `COMPOSE_UNSAFE_BIND_OUTSIDE` | ربط مسار مطلق، أو مسار نسبي يخرج من مجلد الإصدار، أو `~`. وقراءة `env_file` أو ملف `secrets` أو `configs` من مكان غير مجلد الإصدار و`shared/.env` |
+| `COMPOSE_UNSAFE_BIND_WRITABLE` | ربط مجلد من الإصدار بصلاحية كتابة. الربط المسموح للقراءة فقط (`:ro`) |
+| `COMPOSE_UNSAFE_BIND_SHARED_DATA` | ربط مجلد تحت `shared` |
+| `COMPOSE_UNSAFE_BIND_STATE` | ربط `.dhow` |
+| `COMPOSE_UNSAFE_VOLUME_OPTS` | `driver_opts` في volume |
+| `COMPOSE_UNSAFE_NETWORK_DRIVER` و`_NETWORK_OPTS` | شبكة في أعلى الملف بـ `driver` غير `bridge`، أو فيها `driver_opts` أو `ipam` |
+| `COMPOSE_UNSAFE_LOGGING` | `logging` بـ driver غير `json-file` و`local`، أو بخيار غير `max-size` و`max-file` و`compress` |
+| `COMPOSE_BIND_SOURCE` | مصدر ربط أو ملف مقروء غير موجود على السيرفر قبل التشغيل، أو هو رابط رمزي أو ليس مجلدًا أو ملفًا عاديًا |
 | `COMPOSE_UNSAFE_BIND_SYMLINK` | ربط مسار يمرّ برابط رمزي جاء من الأرشيف |
 | `COMPOSE_UNSAFE_INTERPOLATION` | متغير `${...}` في مسار ربط أو ملف |
 | `COMPOSE_UNSAFE_INCLUDE` | `include` في أعلى الملف |
@@ -120,14 +127,37 @@ with:
 | `COMPOSE_UNSAFE_BIND_SHARED` | ربط `shared` نفسه أو `shared/.env` |
 | `COMPOSE_UNSAFE_CGROUP_PARENT` و`_RUNTIME` و`_SYSCTLS` و`_GROUP_ADD` و`_EXTRA_HOSTS` و`_EXTERNAL_LINKS` و`_MODELS` | المفاتيح `cgroup_parent` و`runtime` و`sysctls` و`group_add` و`extra_hosts` و`external_links` و`models` |
 | `COMPOSE_FILE_CHANGED` | ملف Compose أو `compose.dhow.yaml` على السيرفر لا يطابق ما فُحص، أو لا يوجد سجل بصماتهما |
-| `COMPOSE_ENV_FORBIDDEN` | متغير يبدأ بـ `COMPOSE_` في `shared/.env` |
+| `COMPOSE_ENV_FORBIDDEN` | متغير يبدأ بـ `COMPOSE_` في `shared/.env`، أو سطر فيه لا تستطيع الإضافة قراءته |
 | `COMPOSE_INVALID` | ملف ليس YAML صحيحًا، أو فيه أكثر من مستند، أو مفتاح مكرر، أو بلا خدمات، أو أكبر من 256 KiB، أو غير موجود في الأرشيف |
 
-- الربط المسموح: volume مسمّى، أو `tmpfs`، أو مجلد فرعي داخل مجلد الإصدار مثل `./conf`، أو مجلد فرعي باسم تحت `shared` مثل `/srv/shop/shared/uploads`. لا يُسمح بربط مجلد الإصدار نفسه ولا ملفات Compose ولا `shared` نفسه ولا `shared/.env`، حتى لا تستطيع حاوية أن تعدّل الملفات التي فُحصت.
+- الربط المسموح: volume مسمّى، أو volume بلا اسم مثل `/data`، أو `tmpfs`، أو مجلد فرعي داخل مجلد الإصدار للقراءة فقط مثل `./conf:/conf:ro`. لا يُسمح بربط مجلد الإصدار نفسه ولا ملفات Compose ولا أي شيء تحت `shared` ولا إصدار آخر ولا مسار مطلق.
+- `env_file` وملفات `secrets` و`configs` تقرأ من داخل مجلد الإصدار أو من `shared/.env` بالضبط، وتكون ملفات عادية وليست روابط.
+- في الـ volumes المسماة: `driver` هو `local` فقط، بلا `driver_opts`.
+- الشبكات في أعلى الملف بالـ driver الافتراضي (`bridge`) بلا `driver_opts` ولا `ipam`، و`logging` بـ `json-file` أو `local` وبالخيارات `max-size` و`max-file` و`compress` فقط. المتغيرات `${...}` في أي إدخال من `volumes`، وفي `network_mode` و`pid` و`ipc` و`uts`، مرفوضة دائمًا.
 - المرجعيات `&` و`<<` في YAML تُفكّ قبل الفحص، فلا تخفي خيارًا.
 - المفاتيح المسموحة قائمة محددة: `image` و`command` و`entrypoint` و`environment` و`env_file` و`ports` و`expose` و`volumes` و`networks` و`depends_on` و`healthcheck` و`restart` و`labels` و`logging` و`deploy` (`resources` و`restart_policy` فقط) و`user` و`working_dir` و`read_only` و`tmpfs` و`stop_signal` و`stop_grace_period` و`init` و`hostname` و`domainname` و`mem_limit` و`cpus` و`ulimits` و`shm_size` و`secrets` و`configs` و`profiles` وما يبدأ بـ `x-`. أي مفتاح آخر يفشل بـ `COMPOSE_UNSAFE_UNKNOWN_KEY`.
-- المدير يستطيع فتح قواعد `COMPOSE_UNSAFE_*` لهدف معيّن بالخيار `AllowUnsafeCompose`، وهي المفاتيح التي تتطلب صلاحيات أوسع مثل `privileged` و`cap_add` و`devices` و`sysctls`. هذا الخيار لا يفتح تثبيت الصور ولا منع `build` ولا `COMPOSE_INVALID`، ولا القواعد التي تجلب ملفات أخرى أو تشارك مساحات الأسماء أو تستخدم موارد خارجية: `include` و`extends` و`provider` و`volumes_from` و`container:` و`service:` وما يتعلق بـ `external` وبمصادر `secrets`.
+- المدير يستطيع فتح قواعد `COMPOSE_UNSAFE_*` لهدف معيّن بالخيار `AllowUnsafeCompose`، وهي المفاتيح التي تتطلب صلاحيات أوسع مثل `privileged` و`cap_add` و`devices` و`sysctls`. ويعيد هذا الخيار فتح الربط القابل للكتابة تحت مجلد النشر. تحذير: حاوية تستطيع الكتابة في مجلد مربوط تستطيع أن تضع فيه رابطًا رمزيًا إلى `/`، ثم يتبعه Docker بصلاحيات root عند أي ربط لاحق من هذا المجلد. لا تفتح الخيار إلا لتطبيق تثق به كما تثق بالسيرفر نفسه. الخيار لا يفتح ربط `.dhow` ولا ملفات Compose ولا مجلد الإصدار، ولا يفتح تثبيت الصور ولا منع `build` ولا `COMPOSE_INVALID`، ولا القواعد التي تجلب ملفات أخرى أو تشارك مساحات الأسماء أو تستخدم موارد خارجية: `include` و`extends` و`provider` و`volumes_from` و`container:` و`service:` وما يتعلق بـ `external` وبمصادر `secrets`.
 - الرفض يوقف الـ job بالخروج 30 قبل أي اتصال أو كتابة على السيرفر، ويكتب الرمز واسم الخدمة في السجل. في التقرير يظهر النشر فاشلًا برسالة ثابتة.
+
+## البيانات الدائمة: استخدم volumes مسمّاة
+
+الحاوية التي تكتب في مجلد من السيرفر مربوط بها تستطيع أن تضع فيه رابطًا رمزيًا إلى `/` أو إلى `.dhow`، ثم يتبع Docker الرابط بصلاحيات root في ربط لاحق. لذلك لا تسمح الإضافة بالكتابة في أي مجلد من السيرفر: البيانات التي تكتبها الحاويات توضع في volumes مسمّاة يديرها Docker.
+
+```yaml
+services:
+  web:
+    image: ghcr.io/acme/shop-web@sha256:<digest>
+    volumes:
+      - uploads:/app/uploads
+      - ./conf:/app/conf:ro
+volumes:
+  uploads: {}
+```
+
+- الـ volume المسمّى يُعلن في أعلى الملف بلا `driver` أو بـ `driver: local`، وبلا `driver_opts`.
+- الإعدادات التي تأتي مع الإصدار تُربط للقراءة فقط (`:ro`) من مجلد داخل الإصدار.
+- نقل البيانات من `./data:/data`: غيّر الإدخال إلى `data:/data` وأضف `data: {}` تحت `volumes` في أعلى الملف. لينتقل المحتوى القديم، أنشئ الـ volume على السيرفر وانسخ إليه الملفات مرة واحدة قبل النشر، مثلًا بتشغيل حاوية مؤقتة تربط المجلد القديم للقراءة والـ volume الجديد للكتابة. اسم الـ volume على السيرفر هو `<اسم المشروع>_data`.
+- النسخ الاحتياطي يتم بنفس الطريقة: حاوية مؤقتة تربط الـ volume وتنسخ منه.
 
 ## المتغيرات في ملف Compose
 
@@ -135,7 +165,7 @@ with:
 
 - إذا لم يوجد `shared/.env` تمرّر الإضافة `/dev/null`، فلا يُحمَّل ملف `.env` الموجود داخل الأرشيف أبدًا.
 - المتغير غير المعرّف يصبح فارغًا، ويحذّر Compose.
-- ملف `shared/.env` فيه متغير يبدأ بـ `COMPOSE_` يوقف النشر بـ `COMPOSE_ENV_FORBIDDEN`، لأن هذه المتغيرات تغيّر ما يقرؤه Compose.
+- ملف `shared/.env` فيه متغير يبدأ بـ `COMPOSE_` يوقف النشر بـ `COMPOSE_ENV_FORBIDDEN`، لأن هذه المتغيرات تغيّر ما يقرؤه Compose. والإضافة تقرأ الملف بقواعد Compose نفسها (`export` ومسافات وأسطر Windows)، وأي سطر لا تستطيع قراءته يوقف النشر بالرمز نفسه. لا تستخدم قيمًا من عدة أسطر في هذا الملف.
 - المتغيرات غير مقبولة في اسم الصورة ولا في مسارات الربط ولا في الخيارات الحساسة مثل `privileged`.
 
 ## مدخلات الإضافة
@@ -209,7 +239,7 @@ with:
 - **`DEPLOY_FAILED` وسجل فيه `manifest unknown`:** الصورة غير موجودة في الـ registry. تأكد من أن الـ job الذي بناها دفعها قبل النشر.
 - **`DEPLOY_FAILED` وسجل فيه `unauthorized`:** حساب النشر لم يسجّل الدخول إلى الـ registry على السيرفر. نفّذ `docker login` بحسابه.
 - **`DEPLOY_ROLLED_BACK` وخدمة `unhealthy`:** `healthcheck` الخدمة لم ينجح في `wait_timeout`. زد المهلة أو أصلح الفحص. الخدمة بلا `healthcheck` تُعدّ سليمة بمجرد أن تعمل، ويبقى فحص `health_check_url` الخارجي هو الحماية، فاكتب `healthcheck` لكل خدمة.
-- **`COMPOSE_UNSAFE_BIND_OUTSIDE`:** الملف يربط مسارًا خارج `/srv/shop`. انقل البيانات إلى `shared/` أو استخدم volume مسمّى.
+- **`COMPOSE_UNSAFE_BIND_OUTSIDE` أو `COMPOSE_UNSAFE_BIND_WRITABLE`:** الملف يربط مسارًا مطلقًا أو مجلدًا قابلًا للكتابة. استخدم volume مسمّى للبيانات، كما في [البيانات الدائمة](#البيانات-الدائمة-استخدم-volumes-مسمّاة).
 - **`TARGET_LOCKED` و`HOST_KEY_MISMATCH`:** كما في دليل SSH.
 
 ## حدود هذا الإصدار
