@@ -103,8 +103,13 @@ func PEMKey(name string, pemText []byte) ([]Needle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s does not parse as a private key: %w", name, err)
 	}
-	key, ok := raw.(*ed25519.PrivateKey)
-	if !ok {
+	var key ed25519.PrivateKey
+	switch k := raw.(type) {
+	case *ed25519.PrivateKey:
+		key = *k
+	case ed25519.PrivateKey:
+		key = k
+	default:
 		return nil, fmt.Errorf("%s is not an Ed25519 key", name)
 	}
 	seed, err := Encoded(name+" (private seed)", key.Seed())

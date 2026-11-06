@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
@@ -145,4 +146,19 @@ func TestAPlantedIngestTokenIsFoundByItsShapeAndOrdinaryTextIsNot(t *testing.T) 
 		files = append(files, strings.TrimPrefix(h.File, dir+"/"))
 	}
 	assert.ElementsMatch(t, []string{"clear/server.log", "encoded/server.log"}, files)
+}
+
+func TestAPKCS8Ed25519KeyGivesItsSeedLikeAnOpenSSHKey(t *testing.T) {
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	require.NoError(t, err)
+	text := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+	needles, err := leaksweep.PEMKey("target key", text)
+	require.NoError(t, err)
+	var seed bool
+	for _, n := range needles {
+		seed = seed || strings.HasSuffix(n.Name, "(private seed)")
+	}
+	assert.True(t, seed, "a PKCS8 Ed25519 key must give a seed needle")
 }
