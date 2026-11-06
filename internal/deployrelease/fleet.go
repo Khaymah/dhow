@@ -191,6 +191,9 @@ func (g *group) execute(ctx context.Context) *Failure {
 	if f != nil {
 		return g.stop(ctx, f, nil)
 	}
+	if f := g.inspect(ctx); f != nil {
+		return g.stop(ctx, f, nil)
+	}
 	for _, m := range g.members {
 		m.d.totals = totals
 	}

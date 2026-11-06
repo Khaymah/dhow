@@ -85,6 +85,7 @@ type Config struct {
 	ArchivePath   string
 	ArchiveDigest string
 	Limits        archive.Limits
+	Activator     Activator
 }
 
 func (c Config) Validate() error {

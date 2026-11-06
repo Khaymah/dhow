@@ -81,7 +81,7 @@ jobs:
     if: needs.changes.outputs.deploy == 'true'
     name: Deploy to a real sshd with the dhow-deploy-ssh plugin
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:18
@@ -117,7 +117,19 @@ jobs:
           set -e
           test "$code" = 2
           grep -q PLUGIN_INPUT_INVALID stderr.txt
-      - name: Deploy to the sshd and replay the reports into the server
+      - name: Build the compose plugin image from the Dockerfile that is released
+        run: make deploy-compose-image DEPLOY_COMPOSE_IMAGE=dhow-deploy-compose:ci
+      - name: Check that the compose image carries its manifest, runs as the nonroot user and refuses to start without a target
+        run: |
+          docker image inspect dhow-deploy-compose:ci --format '{{ index .Config.Labels "io.dhow.plugin.manifest" }}' | grep -q '"Mutating":true'
+          test "$(docker image inspect dhow-deploy-compose:ci --format '{{ .Config.User }}')" = 65532:65532
+          set +e
+          docker run --rm --network none dhow-deploy-compose:ci 2> stderr.txt
+          code=$?
+          set -e
+          test "$code" = 2
+          grep -q PLUGIN_INPUT_INVALID stderr.txt
+      - name: Deploy to the sshd and to the Docker hosts, and replay the reports into the server
         run: make deploy-e2e
 
   e2e:
