@@ -110,6 +110,16 @@ SET "IsDeleted" = true, "UpdatedAt" = now()
 WHERE "Id" IN (SELECT a."Id"
                FROM "Artifacts" a
                WHERE a."ExpiresAt" <= now() AND NOT a."IsDeleted"
+                 AND NOT EXISTS (SELECT 1
+                                 FROM "DeploymentReleases" r
+                                 JOIN "DeployTargets" t ON t."Id" = r."TargetId" AND t."OrganizationId" = r."OrganizationId"
+                                 WHERE r."ArtifactDigest" = a."Digest" AND r."OrganizationId" = a."OrganizationId"
+                                   AND r."Kind" = 'deploy' AND r."State" = 'succeeded' AND NOT r."IsDeleted" AND NOT t."IsDeleted"
+                                   AND (SELECT count(*)
+                                        FROM "DeploymentReleases" n
+                                        WHERE n."TargetId" = r."TargetId" AND n."OrganizationId" = r."OrganizationId"
+                                          AND n."Kind" = 'deploy' AND n."State" = 'succeeded' AND NOT n."IsDeleted"
+                                          AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases")
                LIMIT $1
                FOR UPDATE SKIP LOCKED)
 `
@@ -163,6 +173,35 @@ func (q *Queries) FindCacheEntry(ctx context.Context, arg FindCacheEntryParams) 
 		&i.LastUsedAt,
 		&i.HadSecrets,
 	)
+	return i, err
+}
+
+const findRollbackArtifact = `-- name: FindRollbackArtifact :one
+SELECT a."Name", a."Digest", a."SizeBytes"
+FROM "Artifacts" a
+JOIN "Blobs" b ON b."Digest" = a."Digest" AND NOT b."IsDeleted"
+WHERE a."OrganizationId" = $1 AND a."ProjectId" = $2 AND a."Digest" = $3
+  AND NOT a."Untrusted" AND NOT a."IsDeleted"
+ORDER BY a."CreatedAt" DESC, a."Id" DESC
+LIMIT 1
+`
+
+type FindRollbackArtifactParams struct {
+	OrganizationID uuid.UUID
+	ProjectID      uuid.UUID
+	Digest         []byte
+}
+
+type FindRollbackArtifactRow struct {
+	Name      string
+	Digest    []byte
+	SizeBytes int64
+}
+
+func (q *Queries) FindRollbackArtifact(ctx context.Context, arg FindRollbackArtifactParams) (FindRollbackArtifactRow, error) {
+	row := q.db.QueryRow(ctx, findRollbackArtifact, arg.OrganizationID, arg.ProjectID, arg.Digest)
+	var i FindRollbackArtifactRow
+	err := row.Scan(&i.Name, &i.Digest, &i.SizeBytes)
 	return i, err
 }
 

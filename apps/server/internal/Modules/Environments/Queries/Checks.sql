@@ -25,7 +25,7 @@ WHERE c."TargetId" = @target_id AND c."OrganizationId" = @organization_id AND NO
 ORDER BY c."HostId", c."CheckedAt" DESC, c."Id" DESC;
 
 -- name: LockUnknownReleaseHosts :many
-SELECT h."Id", h."ReleaseRowId", h."ReleaseId", h."State", r."State" AS "GroupState", r."TargetId"
+SELECT h."Id", h."ReleaseRowId", COALESCE(r."RestoredReleaseId", h."ReleaseId")::text AS "ReleaseId", h."State", r."State" AS "GroupState", r."TargetId"
 FROM "DeploymentReleaseHosts" h
 JOIN "DeploymentReleases" r ON r."Id" = h."ReleaseRowId" AND r."OrganizationId" = h."OrganizationId"
 WHERE h."HostId" = @host_id AND h."OrganizationId" = @organization_id AND r."TargetId" = @target_id

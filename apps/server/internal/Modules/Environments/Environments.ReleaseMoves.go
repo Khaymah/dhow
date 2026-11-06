@@ -2,6 +2,7 @@ package environments
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 
@@ -13,6 +14,7 @@ import (
 
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
+	"github.com/Khaymah/dhow/internal/jobspec"
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
 
@@ -33,15 +35,15 @@ func (sc *reportScope) start(ctx context.Context, ev *runnerv1.DeployEvent) erro
 	if err := sc.retireStaleRunning(ctx, targetID); err != nil {
 		return err
 	}
-	kind := ev.GetMode()
-	if kind == "" {
-		kind = modeDeploy
+	kind, restored, err := sc.kindAndRestored(ctx, ev)
+	if err != nil {
+		return err
 	}
 	rel, err := sc.q.InsertRelease(ctx, sqlc.InsertReleaseParams{
 		OrganizationID: sc.lease.OrganizationId, DeploymentID: *sc.lease.DeploymentId, RunJobID: *sc.lease.RunJobId, JobID: sc.lease.JobId,
 		LeaseID: sc.lease.LeaseId, TargetID: targetID, StepIndex: sc.step, Kind: kind, ReleaseID: sc.target.GetReleaseId(),
 		PreviousReleaseID: text(ev.GetPreviousReleaseId()), ArtifactDigest: sc.digest,
-		BatchSize: max(sc.target.GetSettings().GetBatchSize(), 1), Now: sc.now,
+		BatchSize: max(sc.target.GetSettings().GetBatchSize(), 1), RestoredReleaseID: text(restored), HealthInputs: sc.healthInputs(), Now: sc.now,
 	})
 	if err != nil {
 		return err
@@ -261,4 +263,37 @@ func (sc *reportScope) auditEnd(ctx context.Context, state, reason string) error
 		data[eventbus.SeverityKey] = eventbus.SeverityHigh
 	}
 	return sc.audit(ctx, name, data)
+}
+
+func (sc *reportScope) kindAndRestored(ctx context.Context, ev *runnerv1.DeployEvent) (string, string, error) {
+	kind := modeDeploy
+	if sc.mode == jobspec.TargetModeRollback {
+		kind = modeRollback
+	}
+	if ev.GetMode() != "" && ev.GetMode() != kind {
+		return "", "", errInvalidReport("Mode")
+	}
+	if kind != modeRollback {
+		return kind, "", nil
+	}
+	restored := sc.inputs[releaseInput]
+	rel, err := sc.q.GetRelease(ctx, sqlc.GetReleaseParams{TargetID: sc.tid, ReleaseID: restored, OrganizationID: sc.lease.OrganizationId})
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (rel.Kind != modeDeploy || rel.State != groupSucceeded)) {
+		return "", "", reject(connect.CodeFailedPrecondition, CodeIllegalTransition)
+	}
+	return kind, restored, err
+}
+
+func (sc *reportScope) healthInputs() []byte {
+	out := map[string]string{}
+	for _, k := range healthInputNames {
+		if v := sc.inputs[k]; v != "" {
+			out[k] = v
+		}
+	}
+	raw, err := json.Marshal(out)
+	if err != nil || len(raw) > maxHealthInputs {
+		return []byte("{}")
+	}
+	return raw
 }

@@ -18,7 +18,8 @@ const (
 	GateEnvironmentBusy = "environment_busy"
 	GateTargetBusy      = "target_busy"
 
-	SyntheticCheck = "check"
+	SyntheticCheck    = "check"
+	SyntheticRollback = "rollback"
 
 	ApprovalPassed     = "passed"
 	ApprovalBypassed   = "bypassed"
@@ -156,6 +157,8 @@ type SyntheticRequest struct {
 	EnvironmentName string
 	TargetName      string
 	Kind            string
+	ReleaseID       string
+	HealthInputs    map[string]string
 }
 
 type SyntheticRun struct {

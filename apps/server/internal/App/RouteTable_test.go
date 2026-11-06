@@ -338,5 +338,5 @@ func TestRouteTableCoversEveryRoleAndScope(t *testing.T) {
 }
 
 func actionsAheadOfTheirRoutes() []policy.Action {
-	return []policy.Action{policy.DeploymentRollback}
+	return nil
 }

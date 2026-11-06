@@ -91,8 +91,52 @@ func (q *Queries) FinishRelease(ctx context.Context, arg FinishReleaseParams) er
 	return err
 }
 
+const getRelease = `-- name: GetRelease :one
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId", "PreviousReleaseId", "ArtifactDigest", "BatchSize", "State", "FailedHostId", "RollbackReason", "Message", "StartedAt", "FinishedAt", "RestoredReleaseId", "HealthInputs"
+FROM "DeploymentReleases"
+WHERE "TargetId" = $1 AND "ReleaseId" = $2 AND "OrganizationId" = $3 AND NOT "IsDeleted"
+`
+
+type GetReleaseParams struct {
+	TargetID       uuid.UUID
+	ReleaseID      string
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) GetRelease(ctx context.Context, arg GetReleaseParams) (DeploymentRelease, error) {
+	row := q.db.QueryRow(ctx, getRelease, arg.TargetID, arg.ReleaseID, arg.OrganizationID)
+	var i DeploymentRelease
+	err := row.Scan(
+		&i.Id,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.OrganizationId,
+		&i.DeploymentId,
+		&i.RunJobId,
+		&i.JobId,
+		&i.LeaseId,
+		&i.TargetId,
+		&i.StepIndex,
+		&i.Kind,
+		&i.ReleaseId,
+		&i.PreviousReleaseId,
+		&i.ArtifactDigest,
+		&i.BatchSize,
+		&i.State,
+		&i.FailedHostId,
+		&i.RollbackReason,
+		&i.Message,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.RestoredReleaseId,
+		&i.HealthInputs,
+	)
+	return i, err
+}
+
 const getReleaseForUpdate = `-- name: GetReleaseForUpdate :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId", "PreviousReleaseId", "ArtifactDigest", "BatchSize", "State", "FailedHostId", "RollbackReason", "Message", "StartedAt", "FinishedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId", "PreviousReleaseId", "ArtifactDigest", "BatchSize", "State", "FailedHostId", "RollbackReason", "Message", "StartedAt", "FinishedAt", "RestoredReleaseId", "HealthInputs"
 FROM "DeploymentReleases"
 WHERE "TargetId" = $1 AND "ReleaseId" = $2 AND "OrganizationId" = $3 AND NOT "IsDeleted"
 FOR UPDATE
@@ -130,12 +174,14 @@ func (q *Queries) GetReleaseForUpdate(ctx context.Context, arg GetReleaseForUpda
 		&i.Message,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.RestoredReleaseId,
+		&i.HealthInputs,
 	)
 	return i, err
 }
 
 const getRunningReleaseOfTarget = `-- name: GetRunningReleaseOfTarget :one
-SELECT r."Id", r."CreatedAt", r."UpdatedAt", r."IsDeleted", r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", r."LeaseId", r."TargetId", r."StepIndex", r."Kind", r."ReleaseId", r."PreviousReleaseId", r."ArtifactDigest", r."BatchSize", r."State", r."FailedHostId", r."RollbackReason", r."Message", r."StartedAt", r."FinishedAt"
+SELECT r."Id", r."CreatedAt", r."UpdatedAt", r."IsDeleted", r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", r."LeaseId", r."TargetId", r."StepIndex", r."Kind", r."ReleaseId", r."PreviousReleaseId", r."ArtifactDigest", r."BatchSize", r."State", r."FailedHostId", r."RollbackReason", r."Message", r."StartedAt", r."FinishedAt", r."RestoredReleaseId", r."HealthInputs"
 FROM "DeploymentReleases" r
 WHERE r."TargetId" = $1 AND r."OrganizationId" = $2 AND r."State" = 'running' AND NOT r."IsDeleted"
 FOR UPDATE OF r
@@ -172,6 +218,8 @@ func (q *Queries) GetRunningReleaseOfTarget(ctx context.Context, arg GetRunningR
 		&i.Message,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.RestoredReleaseId,
+		&i.HealthInputs,
 	)
 	return i, err
 }
@@ -179,13 +227,14 @@ func (q *Queries) GetRunningReleaseOfTarget(ctx context.Context, arg GetRunningR
 const insertRelease = `-- name: InsertRelease :one
 INSERT INTO "DeploymentReleases" (
     "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId",
-    "PreviousReleaseId", "ArtifactDigest", "BatchSize", "StartedAt", "CreatedAt", "UpdatedAt"
+    "PreviousReleaseId", "ArtifactDigest", "BatchSize", "RestoredReleaseId", "HealthInputs", "StartedAt", "CreatedAt", "UpdatedAt"
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9,
-    $10::text, $11::bytea, $12, $13, $13, $13
+    $10::text, $11::bytea, $12, $13::text,
+    $14, $15, $15, $15
 )
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId", "PreviousReleaseId", "ArtifactDigest", "BatchSize", "State", "FailedHostId", "RollbackReason", "Message", "StartedAt", "FinishedAt"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId", "PreviousReleaseId", "ArtifactDigest", "BatchSize", "State", "FailedHostId", "RollbackReason", "Message", "StartedAt", "FinishedAt", "RestoredReleaseId", "HealthInputs"
 `
 
 type InsertReleaseParams struct {
@@ -201,6 +250,8 @@ type InsertReleaseParams struct {
 	PreviousReleaseID pgtype.Text
 	ArtifactDigest    []byte
 	BatchSize         int32
+	RestoredReleaseID pgtype.Text
+	HealthInputs      []byte
 	Now               time.Time
 }
 
@@ -218,6 +269,8 @@ func (q *Queries) InsertRelease(ctx context.Context, arg InsertReleaseParams) (D
 		arg.PreviousReleaseID,
 		arg.ArtifactDigest,
 		arg.BatchSize,
+		arg.RestoredReleaseID,
+		arg.HealthInputs,
 		arg.Now,
 	)
 	var i DeploymentRelease
@@ -244,6 +297,8 @@ func (q *Queries) InsertRelease(ctx context.Context, arg InsertReleaseParams) (D
 		&i.Message,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.RestoredReleaseId,
+		&i.HealthInputs,
 	)
 	return i, err
 }
@@ -287,8 +342,28 @@ func (q *Queries) IsLeaseActive(ctx context.Context, leaseID uuid.UUID) (bool, e
 	return Active, err
 }
 
+const latestDeployHealthInputs = `-- name: LatestDeployHealthInputs :one
+SELECT "HealthInputs"
+FROM "DeploymentReleases"
+WHERE "TargetId" = $1 AND "OrganizationId" = $2 AND "Kind" = 'deploy' AND "State" = 'succeeded' AND NOT "IsDeleted"
+ORDER BY "StartedAt" DESC, "Id" DESC
+LIMIT 1
+`
+
+type LatestDeployHealthInputsParams struct {
+	TargetID       uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func (q *Queries) LatestDeployHealthInputs(ctx context.Context, arg LatestDeployHealthInputsParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, latestDeployHealthInputs, arg.TargetID, arg.OrganizationID)
+	var HealthInputs []byte
+	err := row.Scan(&HealthInputs)
+	return HealthInputs, err
+}
+
 const listDeploymentReleases = `-- name: ListDeploymentReleases :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId", "PreviousReleaseId", "ArtifactDigest", "BatchSize", "State", "FailedHostId", "RollbackReason", "Message", "StartedAt", "FinishedAt"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId", "PreviousReleaseId", "ArtifactDigest", "BatchSize", "State", "FailedHostId", "RollbackReason", "Message", "StartedAt", "FinishedAt", "RestoredReleaseId", "HealthInputs"
 FROM "DeploymentReleases"
 WHERE "DeploymentId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
 ORDER BY "CreatedAt", "Id"
@@ -331,6 +406,8 @@ func (q *Queries) ListDeploymentReleases(ctx context.Context, arg ListDeployment
 			&i.Message,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.RestoredReleaseId,
+			&i.HealthInputs,
 		); err != nil {
 			return nil, err
 		}
@@ -394,6 +471,119 @@ func (q *Queries) ListReleaseHostsForUpdate(ctx context.Context, arg ListRelease
 	return items, nil
 }
 
+const listTargetReleaseHosts = `-- name: ListTargetReleaseHosts :many
+SELECT h."Id", h."CreatedAt", h."UpdatedAt", h."IsDeleted", h."OrganizationId", h."ReleaseRowId", h."HostId", h."ReleaseId", h."Position", h."Batch", h."State", h."PreviousReleaseId", h."Health", h."RollbackReason", h."Message", h."SwitchedAt", h."RolledBackAt", h."FinishedAt"
+FROM "DeploymentReleaseHosts" h
+JOIN "DeploymentReleases" r ON r."Id" = h."ReleaseRowId" AND r."OrganizationId" = h."OrganizationId"
+WHERE r."TargetId" = $1 AND h."OrganizationId" = $2 AND NOT h."IsDeleted" AND NOT r."IsDeleted"
+  AND h."ReleaseRowId" = ANY ($3::uuid[])
+ORDER BY h."ReleaseRowId", h."Position"
+`
+
+type ListTargetReleaseHostsParams struct {
+	TargetID       uuid.UUID
+	OrganizationID uuid.UUID
+	ReleaseRowIds  []uuid.UUID
+}
+
+func (q *Queries) ListTargetReleaseHosts(ctx context.Context, arg ListTargetReleaseHostsParams) ([]DeploymentReleaseHost, error) {
+	rows, err := q.db.Query(ctx, listTargetReleaseHosts, arg.TargetID, arg.OrganizationID, arg.ReleaseRowIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DeploymentReleaseHost{}
+	for rows.Next() {
+		var i DeploymentReleaseHost
+		if err := rows.Scan(
+			&i.Id,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsDeleted,
+			&i.OrganizationId,
+			&i.ReleaseRowId,
+			&i.HostId,
+			&i.ReleaseId,
+			&i.Position,
+			&i.Batch,
+			&i.State,
+			&i.PreviousReleaseId,
+			&i.Health,
+			&i.RollbackReason,
+			&i.Message,
+			&i.SwitchedAt,
+			&i.RolledBackAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTargetReleases = `-- name: ListTargetReleases :many
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId", "PreviousReleaseId", "ArtifactDigest", "BatchSize", "State", "FailedHostId", "RollbackReason", "Message", "StartedAt", "FinishedAt", "RestoredReleaseId", "HealthInputs"
+FROM "DeploymentReleases"
+WHERE "TargetId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+ORDER BY "StartedAt" DESC, "Id" DESC
+LIMIT $3
+`
+
+type ListTargetReleasesParams struct {
+	TargetID       uuid.UUID
+	OrganizationID uuid.UUID
+	MaxRows        int32
+}
+
+func (q *Queries) ListTargetReleases(ctx context.Context, arg ListTargetReleasesParams) ([]DeploymentRelease, error) {
+	rows, err := q.db.Query(ctx, listTargetReleases, arg.TargetID, arg.OrganizationID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DeploymentRelease{}
+	for rows.Next() {
+		var i DeploymentRelease
+		if err := rows.Scan(
+			&i.Id,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsDeleted,
+			&i.OrganizationId,
+			&i.DeploymentId,
+			&i.RunJobId,
+			&i.JobId,
+			&i.LeaseId,
+			&i.TargetId,
+			&i.StepIndex,
+			&i.Kind,
+			&i.ReleaseId,
+			&i.PreviousReleaseId,
+			&i.ArtifactDigest,
+			&i.BatchSize,
+			&i.State,
+			&i.FailedHostId,
+			&i.RollbackReason,
+			&i.Message,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.RestoredReleaseId,
+			&i.HealthInputs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockReleaseLease = `-- name: LockReleaseLease :one
 SELECT l."Id" AS "LeaseId", l."JobId", l."OrganizationId", j."Spec", rj."Id" AS "RunJobId", d."Id" AS "DeploymentId"
 FROM "Leases" l
@@ -435,7 +625,7 @@ func (q *Queries) LockReleaseLease(ctx context.Context, arg LockReleaseLeasePara
 }
 
 const lockRunningReleasesOfRun = `-- name: LockRunningReleasesOfRun :many
-SELECT r."Id", r."CreatedAt", r."UpdatedAt", r."IsDeleted", r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", r."LeaseId", r."TargetId", r."StepIndex", r."Kind", r."ReleaseId", r."PreviousReleaseId", r."ArtifactDigest", r."BatchSize", r."State", r."FailedHostId", r."RollbackReason", r."Message", r."StartedAt", r."FinishedAt"
+SELECT r."Id", r."CreatedAt", r."UpdatedAt", r."IsDeleted", r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", r."LeaseId", r."TargetId", r."StepIndex", r."Kind", r."ReleaseId", r."PreviousReleaseId", r."ArtifactDigest", r."BatchSize", r."State", r."FailedHostId", r."RollbackReason", r."Message", r."StartedAt", r."FinishedAt", r."RestoredReleaseId", r."HealthInputs"
 FROM "DeploymentReleases" r
 JOIN "Deployments" d ON d."Id" = r."DeploymentId"
 JOIN "RunJobs" rj ON rj."Id" = r."RunJobId"
@@ -482,6 +672,8 @@ func (q *Queries) LockRunningReleasesOfRun(ctx context.Context, arg LockRunningR
 			&i.Message,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.RestoredReleaseId,
+			&i.HealthInputs,
 		); err != nil {
 			return nil, err
 		}
@@ -494,7 +686,7 @@ func (q *Queries) LockRunningReleasesOfRun(ctx context.Context, arg LockRunningR
 }
 
 const lockStaleRunningReleases = `-- name: LockStaleRunningReleases :many
-SELECT r."Id", r."CreatedAt", r."UpdatedAt", r."IsDeleted", r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", r."LeaseId", r."TargetId", r."StepIndex", r."Kind", r."ReleaseId", r."PreviousReleaseId", r."ArtifactDigest", r."BatchSize", r."State", r."FailedHostId", r."RollbackReason", r."Message", r."StartedAt", r."FinishedAt"
+SELECT r."Id", r."CreatedAt", r."UpdatedAt", r."IsDeleted", r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", r."LeaseId", r."TargetId", r."StepIndex", r."Kind", r."ReleaseId", r."PreviousReleaseId", r."ArtifactDigest", r."BatchSize", r."State", r."FailedHostId", r."RollbackReason", r."Message", r."StartedAt", r."FinishedAt", r."RestoredReleaseId", r."HealthInputs"
 FROM "DeploymentReleases" r
 WHERE r."State" = 'running' AND NOT r."IsDeleted"
   AND NOT EXISTS (SELECT 1
@@ -537,6 +729,8 @@ func (q *Queries) LockStaleRunningReleases(ctx context.Context) ([]DeploymentRel
 			&i.Message,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.RestoredReleaseId,
+			&i.HealthInputs,
 		); err != nil {
 			return nil, err
 		}
@@ -549,7 +743,7 @@ func (q *Queries) LockStaleRunningReleases(ctx context.Context) ([]DeploymentRel
 }
 
 const lockSucceededReleasesOfFailedJobs = `-- name: LockSucceededReleasesOfFailedJobs :many
-SELECT r."Id", r."CreatedAt", r."UpdatedAt", r."IsDeleted", r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", r."LeaseId", r."TargetId", r."StepIndex", r."Kind", r."ReleaseId", r."PreviousReleaseId", r."ArtifactDigest", r."BatchSize", r."State", r."FailedHostId", r."RollbackReason", r."Message", r."StartedAt", r."FinishedAt"
+SELECT r."Id", r."CreatedAt", r."UpdatedAt", r."IsDeleted", r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", r."LeaseId", r."TargetId", r."StepIndex", r."Kind", r."ReleaseId", r."PreviousReleaseId", r."ArtifactDigest", r."BatchSize", r."State", r."FailedHostId", r."RollbackReason", r."Message", r."StartedAt", r."FinishedAt", r."RestoredReleaseId", r."HealthInputs"
 FROM "DeploymentReleases" r
 JOIN "Deployments" d ON d."Id" = r."DeploymentId"
 JOIN "RunJobs" rj ON rj."Id" = r."RunJobId"
@@ -596,6 +790,8 @@ func (q *Queries) LockSucceededReleasesOfFailedJobs(ctx context.Context, arg Loc
 			&i.Message,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.RestoredReleaseId,
+			&i.HealthInputs,
 		); err != nil {
 			return nil, err
 		}

@@ -318,6 +318,8 @@ type DeploymentRelease struct {
 	Message           pgtype.Text
 	StartedAt         time.Time
 	FinishedAt        *time.Time
+	RestoredReleaseId pgtype.Text
+	HealthInputs      []byte
 }
 
 type DeploymentReleaseHost struct {

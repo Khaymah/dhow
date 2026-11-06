@@ -155,7 +155,11 @@ func (s *Service) checkTarget(
 		return t, denial{reason: models.ReasonTargetKeyNotFound, names: nonEmpty(t.KeySecretName)}, nil
 	}
 	inputs := c.spec.GetSteps()[ts.index].GetPlugin().GetInputs()
-	needsArtifact := isOfficialDeploy(ts.image) && inputs[jobspec.TargetModeInput] != jobspec.TargetModeCheck
+	if inputs[jobspec.TargetModeInput] == jobspec.TargetModeRollback && st.run.Trigger != triggerRollback {
+		return t, denial{reason: models.ReasonRollbackNotAllowed}, nil
+	}
+	needsArtifact := isOfficialDeploy(ts.image) && inputs[jobspec.TargetModeInput] != jobspec.TargetModeCheck &&
+		inputs[jobspec.TargetModeInput] != jobspec.TargetModeRollback
 	if !s.artifactAvailable(st, st.rows[i], inputs[inputArtifact], needsArtifact) {
 		return t, denial{reason: models.ReasonTargetArtifact}, nil
 	}
