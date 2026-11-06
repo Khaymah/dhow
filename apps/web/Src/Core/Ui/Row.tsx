@@ -19,7 +19,7 @@ export interface IRowsProps {
   children: ReactNode;
 }
 
-const INNER = 'flex min-w-0 items-center gap-3 px-card py-3';
+const INNER = 'flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-card py-3';
 
 export const Rows = ({ label, children }: IRowsProps) => (
   <ul aria-label={label} className="m-0 grid list-none p-0">
@@ -32,11 +32,11 @@ export const Row = ({ title, sub, icon, start, end, mono = false, onSelect }: IR
     <>
       {icon ? <Icon name={icon} size={18} className="text-secondary" /> : null}
       {start}
-      <span className="grid min-w-0 flex-1 gap-0.5">
+      <span className="grid min-w-0 flex-1 basis-48 gap-0.5">
         <span className={cx('min-w-0 text-label', mono && 'font-mono')}>{mono ? <bdi dir="ltr">{title}</bdi> : title}</span>
         {sub ? <small className="min-w-0 text-body-sm text-tertiary">{sub}</small> : null}
       </span>
-      {end ? <span className="flex flex-none items-center gap-1.5">{end}</span> : null}
+      {end ? <span className="ms-auto flex max-w-full flex-wrap items-center gap-1.5">{end}</span> : null}
       {onSelect ? <Icon name="next" size={16} className="flex-none text-tertiary" /> : null}
     </>
   );

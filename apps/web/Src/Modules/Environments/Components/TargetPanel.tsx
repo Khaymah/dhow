@@ -10,7 +10,9 @@ import { Button } from '@/Core/Ui/Button';
 import { Card } from '@/Core/Ui/Card';
 import { CardStates, cardStateOf } from '@/Core/Ui/CardStates';
 import { FactorGate } from '@/Core/Ui/FactorGate';
+import { Icon } from '@/Core/Ui/Icon';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
+import { followInApp } from '@/Core/Ui/PlainClick';
 import { useT } from '@/I18n/useT';
 import {
   startTargetCheck,
@@ -18,6 +20,7 @@ import {
   type TTarget,
   type TTargetRelease,
 } from '@/Modules/Environments/Api/TargetsApi';
+import { CheckHistoryRow } from '@/Modules/Environments/Components/CheckHistoryRow';
 import { HostChecks } from '@/Modules/Environments/Components/HostChecks';
 import { ReleasesList } from '@/Modules/Environments/Components/ReleasesList';
 import { RollbackPanel } from '@/Modules/Environments/Components/RollbackPanel';
@@ -31,9 +34,12 @@ export interface ITargetPanelProps {
   target: TTarget;
   canAct: boolean;
   paused: boolean;
+  detailed?: boolean;
+  manageHref?: string;
+  onManage?: () => void;
 }
 
-const CheckSection = ({ organizationId, projectId, environmentName, target, canAct }: ITargetPanelProps) => {
+export const CheckSection = ({ organizationId, projectId, environmentName, target, canAct }: ITargetPanelProps) => {
   const t = useT();
   const errorText = useApiErrorText();
   const client = useQueryClient();
@@ -108,10 +114,11 @@ const CheckSection = ({ organizationId, projectId, environmentName, target, canA
   );
 };
 
-const ReleasesSection = ({ organizationId, projectId, environmentName, target, canAct, paused }: ITargetPanelProps) => {
+export const ReleasesSection = ({ organizationId, projectId, environmentName, target, canAct, paused, detailed = false }: ITargetPanelProps) => {
   const t = useT();
   const errorText = useApiErrorText();
   const releases = useTargetReleases(organizationId, projectId, environmentName, target.Name);
+  const check = useTargetCheck(organizationId, projectId, environmentName, target.Name, null);
   const [Asking, setAsking] = useState<TTargetRelease | null>(null);
   const data = releases.data;
 
@@ -123,6 +130,7 @@ const ReleasesSection = ({ organizationId, projectId, environmentName, target, c
           <InlineAlert accent="awaiting" title={t('targets.paused')} />
         </div>
       ) : null}
+      {detailed ? <CheckHistoryRow check={check.data} /> : null}
       <CardStates
         state={cardStateOf(releases, data?.Releases.length === 0)}
         loadingLabel={t('targets.releases.loading')}
@@ -143,6 +151,11 @@ const ReleasesSection = ({ organizationId, projectId, environmentName, target, c
             canRollBack={canAct && !paused}
             busy={Asking !== null}
             onRollBack={setAsking}
+            detailed={detailed}
+            hostName={(hostId, position) => {
+              const host = target.Hosts.find((item) => item.Id === hostId);
+              return host ? `${host.Host}:${String(host.Port)}` : t('targets.release.hostRow', { position });
+            }}
           />
         ) : null}
       </CardStates>
@@ -167,7 +180,7 @@ const ReleasesSection = ({ organizationId, projectId, environmentName, target, c
   );
 };
 
-const Header = ({ target, current, different }: { target: TTarget; current: string | undefined; different: boolean }) => {
+export const Header = ({ target, current, different }: { target: TTarget; current: string | undefined; different: boolean }) => {
   const t = useT();
   return (
     <div className="grid gap-2 px-card">
@@ -193,7 +206,27 @@ export const TargetPanel = (props: ITargetPanelProps) => {
     <Card
       title={target.Name}
       icon="server"
-      end={different ? <Badge tone="bad" icon="alert">{t('targets.partial')}</Badge> : undefined}
+      end={
+        <span className="flex flex-wrap items-center gap-3">
+          {different ? (
+            <Badge tone="bad" icon="alert">
+              {t('targets.partial')}
+            </Badge>
+          ) : null}
+          {props.manageHref ? (
+            <a
+              href={props.manageHref}
+              onClick={followInApp(() => {
+                props.onManage?.();
+              })}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xs text-label-sm text-secondary no-underline hover:text-primary"
+            >
+              {t('targets.manage')}
+              <Icon name="next" size={14} />
+            </a>
+          ) : null}
+        </span>
+      }
     >
       <div className="grid gap-4 pb-card">
         <Header target={target} current={releases.data?.CurrentReleaseId} different={different} />

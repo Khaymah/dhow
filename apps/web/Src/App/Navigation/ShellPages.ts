@@ -24,6 +24,7 @@ export const SHELL_PAGES = {
     member,
   ),
   environment: lazyPage(() => import('@/App/Pages/EnvironmentPage').then((module) => module.EnvironmentPage), member),
+  target: lazyPage(() => import('@/App/Pages/TargetPage').then((module) => module.TargetPage), member),
   run: lazyPage(() => import('@/App/Pages/RunPage').then((module) => module.RunPage), member),
   jobs: lazyPage(() => import('@/App/Pages/JobsPage').then((module) => module.JobsPage), member),
   approvals: lazyPage(

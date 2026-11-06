@@ -6,6 +6,8 @@ import { approvalsRoute, newApprovalsState } from '@/Core/Testing/ApprovalsBacke
 import { auditFixture, startBackend, type TRouteHandler } from '@/Core/Testing/Backend';
 import { ENVIRONMENT_NAME, environmentsRoute, newEnvironmentsState } from '@/Core/Testing/EnvironmentsBackend';
 import { apiUp } from '@/Core/Testing/Fetch';
+import { newTargetsManageState, targetsManageRoute } from '@/Core/Testing/TargetsManageBackend';
+import { newTargetsState, targetsRoute } from '@/Core/Testing/TargetsBackend';
 import { ok, PROJECT_ID, projectFixture, projectsRoute } from '@/Core/Testing/ProjectsBackend';
 import { Ar } from '@/I18n/Locales/Ar';
 
@@ -19,6 +21,12 @@ interface IPageCase {
 const environmentRoutes = (): TRouteHandler[] => [
   environmentsRoute(newEnvironmentsState()),
   projectsRoute({ project: () => ok(projectFixture({ CallerRole: 'owner' })) }),
+];
+
+const targetRoutes = (): TRouteHandler[] => [
+  targetsManageRoute(newTargetsManageState()),
+  targetsRoute(newTargetsState()),
+  ...environmentRoutes(),
 ];
 
 const approvalRoutes = (): TRouteHandler[] => [approvalsRoute(newApprovalsState())];
@@ -55,6 +63,18 @@ const CASES: IPageCase[] = [
     title: ENVIRONMENT_NAME,
     body: (main) => within(main).findByRole('region', { name: Ar['environments.group.rules'] }),
     routes: environmentRoutes,
+  },
+  {
+    url: `/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}/targets/web`,
+    title: 'web',
+    body: (main) => within(main).findByRole('list', { name: Ar['targets.hosts.title'] }),
+    routes: targetRoutes,
+  },
+  {
+    url: `/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}/new-target`,
+    title: Ar['targets.new.title'],
+    body: (main) => within(main).findByRole('button', { name: Ar['targets.form.create'] }),
+    routes: targetRoutes,
   },
 ];
 
