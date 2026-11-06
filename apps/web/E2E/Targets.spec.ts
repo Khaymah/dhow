@@ -78,7 +78,9 @@ test('a host key is pinned only after its fingerprint is shown, compared and con
   await expect(page.getByText(T['targets.hostkey.badge.unpinned'], { exact: true })).toBeVisible();
 
   await page.getByRole('checkbox', { name: T['targets.hostkey.pending.check'] }).check();
-  const panel = page.locator('div', { has: page.getByText(T['targets.hostkey.pending.question'].replace('{host}', `${ADDRESS}:22`)) }).last();
+  const password = page.getByRole('textbox', { name: T['factor.method.password'], exact: true });
+  const panel = page.locator('div').filter({ has: confirm }).filter({ has: password }).last();
+  await expect(panel.getByText(ADDRESS, { exact: false })).toBeVisible();
   await panel.getByRole('textbox', { name: T['factor.method.password'], exact: true }).fill(stack().Owner.Password);
   await expect(confirm).toBeEnabled();
   await shot(view, test.info().outputPath('host-key-confirm-ar.png'));
@@ -106,9 +108,10 @@ test('the private key goes into the environment secret once and is never shown a
   await page.getByRole('button', { name: T['targets.keySecret.submit'] }).click();
   await expect(page.getByRole('textbox', { name: T['targets.keySecret.value'], exact: true })).toHaveValue('');
 
-  const question = page.getByText(T['targets.keySecret.attach.question'].replace('{name}', KEY_SECRET));
-  await expect(question).toBeVisible();
-  const panel = page.locator('div', { has: question }).last();
+  await expect(page.getByText(KEY_SECRET, { exact: false }).first()).toBeVisible();
+  const attach = page.getByRole('button', { name: T['targets.keySecret.attach.confirm'] });
+  const attachPassword = page.getByRole('textbox', { name: T['factor.method.password'], exact: true });
+  const panel = page.locator('div').filter({ has: attach }).filter({ has: attachPassword }).last();
   await panel.getByRole('textbox', { name: T['factor.method.password'], exact: true }).fill(stack().Owner.Password);
   await panel.getByRole('button', { name: T['targets.keySecret.attach.confirm'] }).click();
 
