@@ -50,7 +50,8 @@ func (d deployWorld) shipped(t *testing.T) shipped {
 		j.report(t, ev(kindUploaded, host), sw, ev(kindVerified, host))
 	}
 	j.report(t, ev(kindVerified, uuid.Nil))
-	d.sql(t, `UPDATE "DeploymentReleases" SET "ArtifactDigest" = $1, "StartedAt" = now() - interval '2 days' WHERE "ReleaseId" = $2`, art.Digest[:], earlier)
+	d.sql(t, `UPDATE "DeploymentReleases" SET "ArtifactDigest" = $1, "StartedAt" = now() - interval '2 days',
+		"HealthInputs" = '{"health_check_url": "https://{host}/healthz"}' WHERE "ReleaseId" = $2`, art.Digest[:], earlier)
 	require.NoError(t, d.runner.Complete(j.grant, succeeded, 0, runnerv1.FailureReason_FAILURE_REASON_UNSPECIFIED))
 	rr := d.env.SeedConnectedRunner(d.org, d.ownerID, apptest.SeedRunnerSpec{
 		Capacity: 4, Features: []string{"checkout", "plugins", "artifacts", "deploy_targets"},
@@ -333,4 +334,45 @@ func TestARollbackWithoutAKeptArtifactStillStartsAndTheServersThatKeptTheRelease
 			assert.False(t, rel.ArtifactKept)
 		}
 	}
+}
+
+func (s shipped) rollbackInputs(t *testing.T) map[string]string {
+	t.Helper()
+	r := s.rollingBack(t, earlier)
+	return r.grant.Grant.GetSpec().GetSteps()[0].GetPlugin().GetInputs()
+}
+
+func TestARollbackUsesTheHealthCheckStoredOnTheChosenReleaseAndNotTheLatestDeploy(t *testing.T) {
+	s := newDeployWorld(t).shipped(t)
+	s.sql(t, `UPDATE "DeploymentReleases" SET "HealthInputs" = '{"health_check_url": "https://{host}/old-health"}' WHERE "ReleaseId" = $1`, earlier)
+	s.sql(t, `UPDATE "DeploymentReleases" SET "HealthInputs" = '{"health_check_url": "https://{host}/new-health"}' WHERE "ReleaseId" = $1`, s.current)
+	assert.Equal(t, "https://{host}/old-health", s.rollbackInputs(t)["health_check_url"])
+}
+
+func TestARollbackToAReleaseWithoutStoredHealthSettingsRunsWithoutACheck(t *testing.T) {
+	s := newDeployWorld(t).shipped(t)
+	s.sql(t, `UPDATE "DeploymentReleases" SET "HealthInputs" = '{}' WHERE "ReleaseId" = $1`, earlier)
+	assert.NotContains(t, s.rollbackInputs(t), "health_check_url")
+}
+
+func TestARollbackToAReleaseWithDamagedHealthSettingsIsRefusedAndStartsNoRun(t *testing.T) {
+	d := newDeployWorld(t)
+	s := d.shipped(t)
+	d.sql(t, `UPDATE "DeploymentReleases" SET "HealthInputs" = '{"health_check_url": 5}' WHERE "ReleaseId" = $1`, earlier)
+	res := d.askForRollback(s.owner, earlier, apptest.PasswordFactor(s.pass))
+	assert.Equal(t, http.StatusUnprocessableEntity, res.Status, string(res.Raw))
+	assert.Contains(t, string(res.Raw), "ROLLBACK_SETTINGS_INVALID")
+	var runs int
+	require.NoError(t, d.env.Pool.QueryRow(context.Background(), `SELECT count(*) FROM "PipelineRuns" WHERE "Trigger" = 'rollback'`).Scan(&runs))
+	assert.Zero(t, runs)
+}
+
+func TestARollbackReleaseNeedsTheRestoredReleaseOnTheRow(t *testing.T) {
+	d := newDeployWorld(t)
+	d.shipped(t)
+	_, err := d.env.Pool.Exec(context.Background(), `INSERT INTO "DeploymentReleases"
+		("OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "ReleaseId", "Kind")
+		SELECT r."OrganizationId", r."DeploymentId", r."RunJobId", r."JobId", gen_random_uuid(), r."TargetId", 9, '40-ffffffff-0', 'rollback'
+		FROM "DeploymentReleases" r WHERE r."ReleaseId" = $1`, earlier)
+	require.Error(t, err, "a rollback row without the release it restored is refused by the database")
 }

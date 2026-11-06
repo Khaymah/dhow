@@ -24,6 +24,7 @@ const (
 	ArtifactMaxBytesMin          = 1 << 20
 	ArtifactMaxBytesMax          = 64 << 30
 	ArtifactRetentionDefault     = 30
+	RollbackArtifactMaxKeep      = 90 * 24 * time.Hour
 	ArtifactRetentionMax         = 365
 	CacheMaxBytesDefault         = 5 << 30
 	CacheMaxBytesMin             = 16 << 20

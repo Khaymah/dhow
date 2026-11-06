@@ -111,7 +111,9 @@ func (s *Service) Prepare(ctx context.Context, tx *sqlc.Queries, r artifactindex
 }
 
 func (s *Service) PrepareDigest(ctx context.Context, tx *sqlc.Queries, r artifactindex.DigestRequest) (artifactindex.Input, bool, error) {
-	a, err := tx.FindRollbackArtifact(ctx, sqlc.FindRollbackArtifactParams{OrganizationID: r.OrganizationID, ProjectID: r.ProjectID, Digest: r.Digest})
+	a, err := tx.FindRollbackArtifact(ctx, sqlc.FindRollbackArtifactParams{
+		OrganizationID: r.OrganizationID, ProjectID: r.ProjectID, Digest: r.Digest, RollbackGraceSeconds: config.RollbackArtifactMaxKeep.Seconds(),
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return artifactindex.Input{}, false, nil
 	}

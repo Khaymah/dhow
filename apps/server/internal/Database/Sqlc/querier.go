@@ -112,7 +112,7 @@ type Querier interface {
 	EraseSecretVersionsBelow(ctx context.Context, arg EraseSecretVersionsBelowParams) (int64, error)
 	EraseSecretVersionsOf(ctx context.Context, arg EraseSecretVersionsOfParams) (int64, error)
 	EvictCacheEntries(ctx context.Context, ids []uuid.UUID) (int64, error)
-	ExpireArtifacts(ctx context.Context, batch int32) (int64, error)
+	ExpireArtifacts(ctx context.Context, arg ExpireArtifactsParams) (int64, error)
 	ExpirePreviousDeployKeys(ctx context.Context, now time.Time) (int64, error)
 	ExpireUserAuthChallenges(ctx context.Context, arg ExpireUserAuthChallengesParams) error
 	ExtendLease(ctx context.Context, arg ExtendLeaseParams) (time.Time, error)
@@ -267,7 +267,6 @@ type Querier interface {
 	JobExists(ctx context.Context, arg JobExistsParams) (bool, error)
 	KnownBlobs(ctx context.Context, digests [][]byte) ([][]byte, error)
 	LatestApproval(ctx context.Context, arg LatestApprovalParams) (DeploymentApproval, error)
-	LatestDeployHealthInputs(ctx context.Context, arg LatestDeployHealthInputsParams) ([]byte, error)
 	LatestEnvironmentRef(ctx context.Context, arg LatestEnvironmentRefParams) (string, error)
 	LatestTrustedSha(ctx context.Context, arg LatestTrustedShaParams) (string, error)
 	LinkedProjects(ctx context.Context, arg LinkedProjectsParams) ([]uuid.UUID, error)
@@ -419,7 +418,7 @@ type Querier interface {
 	NotifySettingsChanged(ctx context.Context, groupName string) error
 	OlderGroupRuns(ctx context.Context, arg OlderGroupRunsParams) ([]uuid.UUID, error)
 	OldestCacheEntries(ctx context.Context, arg OldestCacheEntriesParams) ([]OldestCacheEntriesRow, error)
-	OrganizationArtifactBytes(ctx context.Context, organizationID uuid.UUID) (int64, error)
+	OrganizationArtifactBytes(ctx context.Context, arg OrganizationArtifactBytesParams) (int64, error)
 	OrganizationProjectIDs(ctx context.Context, organizationID uuid.UUID) ([]uuid.UUID, error)
 	OrganizationsWithLogRetention(ctx context.Context) ([]OrganizationsWithLogRetentionRow, error)
 	OriginUsedElsewhere(ctx context.Context, arg OriginUsedElsewhereParams) (bool, error)

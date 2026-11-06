@@ -143,13 +143,6 @@ SELECT *
 FROM "DeploymentReleases"
 WHERE "TargetId" = @target_id AND "ReleaseId" = @release_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted";
 
--- name: LatestDeployHealthInputs :one
-SELECT "HealthInputs"
-FROM "DeploymentReleases"
-WHERE "TargetId" = @target_id AND "OrganizationId" = @organization_id AND "Kind" = 'deploy' AND "State" = 'succeeded' AND NOT "IsDeleted"
-ORDER BY "StartedAt" DESC, "Id" DESC
-LIMIT 1;
-
 -- name: ListTargetReleases :many
 SELECT *
 FROM "DeploymentReleases"

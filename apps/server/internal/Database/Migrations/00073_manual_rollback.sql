@@ -15,8 +15,12 @@ ALTER TABLE "DeploymentReleases" ADD CONSTRAINT "CK_DeploymentReleases_Restored"
 ALTER TABLE "DeploymentReleases" DROP CONSTRAINT IF EXISTS "CK_DeploymentReleases_HealthInputs";
 ALTER TABLE "DeploymentReleases" ADD CONSTRAINT "CK_DeploymentReleases_HealthInputs"
     CHECK (jsonb_typeof("HealthInputs") = 'object' AND octet_length("HealthInputs"::text) <= 2048) NOT VALID;
+ALTER TABLE "DeploymentReleases" DROP CONSTRAINT IF EXISTS "CK_DeploymentReleases_RollbackRestores";
+ALTER TABLE "DeploymentReleases" ADD CONSTRAINT "CK_DeploymentReleases_RollbackRestores"
+    CHECK ("Kind" <> 'rollback' OR "RestoredReleaseId" IS NOT NULL) NOT VALID;
 
 -- +goose Down
+ALTER TABLE "DeploymentReleases" DROP CONSTRAINT IF EXISTS "CK_DeploymentReleases_RollbackRestores";
 ALTER TABLE "DeploymentReleases" DROP CONSTRAINT IF EXISTS "CK_DeploymentReleases_HealthInputs";
 ALTER TABLE "DeploymentReleases" DROP CONSTRAINT IF EXISTS "CK_DeploymentReleases_Restored";
 ALTER TABLE "DeploymentReleases" DROP COLUMN IF EXISTS "HealthInputs";

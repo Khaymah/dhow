@@ -342,26 +342,6 @@ func (q *Queries) IsLeaseActive(ctx context.Context, leaseID uuid.UUID) (bool, e
 	return Active, err
 }
 
-const latestDeployHealthInputs = `-- name: LatestDeployHealthInputs :one
-SELECT "HealthInputs"
-FROM "DeploymentReleases"
-WHERE "TargetId" = $1 AND "OrganizationId" = $2 AND "Kind" = 'deploy' AND "State" = 'succeeded' AND NOT "IsDeleted"
-ORDER BY "StartedAt" DESC, "Id" DESC
-LIMIT 1
-`
-
-type LatestDeployHealthInputsParams struct {
-	TargetID       uuid.UUID
-	OrganizationID uuid.UUID
-}
-
-func (q *Queries) LatestDeployHealthInputs(ctx context.Context, arg LatestDeployHealthInputsParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, latestDeployHealthInputs, arg.TargetID, arg.OrganizationID)
-	var HealthInputs []byte
-	err := row.Scan(&HealthInputs)
-	return HealthInputs, err
-}
-
 const listDeploymentReleases = `-- name: ListDeploymentReleases :many
 SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId", "PreviousReleaseId", "ArtifactDigest", "BatchSize", "State", "FailedHostId", "RollbackReason", "Message", "StartedAt", "FinishedAt", "RestoredReleaseId", "HealthInputs"
 FROM "DeploymentReleases"

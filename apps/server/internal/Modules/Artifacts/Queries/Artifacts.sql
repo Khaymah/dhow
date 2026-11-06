@@ -72,9 +72,20 @@ WHERE "Digest" = ANY (@digests::bytea[]) AND NOT "IsDeleted";
 SELECT pg_advisory_xact_lock(hashtextextended('dhow-artifacts:' || @organization_id::text, 0));
 
 -- name: OrganizationArtifactBytes :one
-SELECT COALESCE(sum("SizeBytes"), 0)::bigint AS "Bytes"
-FROM "Artifacts"
-WHERE "OrganizationId" = @organization_id AND NOT "IsDeleted" AND "ExpiresAt" > now();
+SELECT COALESCE(sum(a."SizeBytes"), 0)::bigint AS "Bytes"
+FROM "Artifacts" a
+WHERE a."OrganizationId" = @organization_id AND NOT a."IsDeleted"
+  AND (a."ExpiresAt" > now() OR EXISTS (SELECT 1
+          FROM "DeploymentReleases" r
+          JOIN "DeployTargets" t ON t."Id" = r."TargetId" AND t."OrganizationId" = r."OrganizationId"
+          WHERE r."ArtifactDigest" = a."Digest" AND r."OrganizationId" = a."OrganizationId" AND t."ProjectId" = a."ProjectId"
+            AND NOT a."Untrusted" AND a."ExpiresAt" > now() - make_interval(secs => @rollback_grace_seconds::float8)
+            AND r."Kind" = 'deploy' AND r."State" = 'succeeded' AND NOT r."IsDeleted" AND NOT t."IsDeleted"
+            AND (SELECT count(*)
+                 FROM "DeploymentReleases" n
+                 WHERE n."TargetId" = r."TargetId" AND n."OrganizationId" = r."OrganizationId"
+                   AND n."Kind" = 'deploy' AND n."State" = 'succeeded' AND NOT n."IsDeleted"
+                   AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases"));
 
 -- name: ProjectUntrustedArtifactBytes :one
 SELECT COALESCE(sum("SizeBytes"), 0)::bigint AS "Bytes"
@@ -182,15 +193,16 @@ WHERE "Id" IN (SELECT a."Id"
                FROM "Artifacts" a
                WHERE a."ExpiresAt" <= now() AND NOT a."IsDeleted"
                  AND NOT EXISTS (SELECT 1
-                                 FROM "DeploymentReleases" r
-                                 JOIN "DeployTargets" t ON t."Id" = r."TargetId" AND t."OrganizationId" = r."OrganizationId"
-                                 WHERE r."ArtifactDigest" = a."Digest" AND r."OrganizationId" = a."OrganizationId"
-                                   AND r."Kind" = 'deploy' AND r."State" = 'succeeded' AND NOT r."IsDeleted" AND NOT t."IsDeleted"
-                                   AND (SELECT count(*)
-                                        FROM "DeploymentReleases" n
-                                        WHERE n."TargetId" = r."TargetId" AND n."OrganizationId" = r."OrganizationId"
-                                          AND n."Kind" = 'deploy' AND n."State" = 'succeeded' AND NOT n."IsDeleted"
-                                          AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases")
+                         FROM "DeploymentReleases" r
+                         JOIN "DeployTargets" t ON t."Id" = r."TargetId" AND t."OrganizationId" = r."OrganizationId"
+                         WHERE r."ArtifactDigest" = a."Digest" AND r."OrganizationId" = a."OrganizationId" AND t."ProjectId" = a."ProjectId"
+                           AND NOT a."Untrusted" AND a."ExpiresAt" > now() - make_interval(secs => @rollback_grace_seconds::float8)
+                           AND r."Kind" = 'deploy' AND r."State" = 'succeeded' AND NOT r."IsDeleted" AND NOT t."IsDeleted"
+                           AND (SELECT count(*)
+                                FROM "DeploymentReleases" n
+                                WHERE n."TargetId" = r."TargetId" AND n."OrganizationId" = r."OrganizationId"
+                                  AND n."Kind" = 'deploy' AND n."State" = 'succeeded' AND NOT n."IsDeleted"
+                                  AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases")
                LIMIT @batch
                FOR UPDATE SKIP LOCKED);
 
@@ -217,6 +229,6 @@ SELECT a."Name", a."Digest", a."SizeBytes"
 FROM "Artifacts" a
 JOIN "Blobs" b ON b."Digest" = a."Digest" AND NOT b."IsDeleted"
 WHERE a."OrganizationId" = @organization_id AND a."ProjectId" = @project_id AND a."Digest" = @digest
-  AND NOT a."Untrusted" AND NOT a."IsDeleted"
+  AND NOT a."Untrusted" AND NOT a."IsDeleted" AND a."ExpiresAt" > now() - make_interval(secs => @rollback_grace_seconds::float8)
 ORDER BY a."CreatedAt" DESC, a."Id" DESC
 LIMIT 1;

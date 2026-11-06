@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	deployments "github.com/Khaymah/dhow/apps/server/internal/Core/Deployments"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
@@ -68,7 +69,7 @@ func (s *Service) RequestTargetRollback(ctx context.Context, org, project uuid.U
 	if err != nil {
 		return models.CheckStarted{}, err
 	}
-	health, err := s.healthInputsOf(ctx, q, row.Id, org)
+	health, err := healthInputsOf(rel.HealthInputs)
 	if err != nil {
 		return models.CheckStarted{}, err
 	}
@@ -92,17 +93,10 @@ func (s *Service) RequestTargetRollback(ctx context.Context, org, project uuid.U
 	return models.CheckStarted{RunID: run.RunID, RunNumber: run.Number}, nil
 }
 
-func (s *Service) healthInputsOf(ctx context.Context, q *sqlc.Queries, target, org uuid.UUID) (map[string]string, error) {
-	raw, err := q.LatestDeployHealthInputs(ctx, sqlc.LatestDeployHealthInputsParams{TargetID: target, OrganizationID: org})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
+func healthInputsOf(raw []byte) (map[string]string, error) {
 	var all map[string]string
 	if err := json.Unmarshal(raw, &all); err != nil {
-		return nil, nil
+		return nil, apperrors.RollbackSettingsInvalid()
 	}
 	out := map[string]string{}
 	for _, k := range healthInputNames {
@@ -199,7 +193,9 @@ func (s *Service) ListTargetReleases(ctx context.Context, org, project uuid.UUID
 	for _, r := range rows {
 		kept := false
 		if len(r.ArtifactDigest) == 32 {
-			_, err := q.FindRollbackArtifact(ctx, sqlc.FindRollbackArtifactParams{OrganizationID: org, ProjectID: project, Digest: r.ArtifactDigest})
+			_, err := q.FindRollbackArtifact(ctx, sqlc.FindRollbackArtifactParams{
+				OrganizationID: org, ProjectID: project, Digest: r.ArtifactDigest, RollbackGraceSeconds: config.RollbackArtifactMaxKeep.Seconds(),
+			})
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				return models.TargetReleases{}, err
 			}
