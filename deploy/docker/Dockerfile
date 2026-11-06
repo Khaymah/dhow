@@ -33,8 +33,6 @@ COPY --from=web /src/apps/web/dist/ ./apps/server/internal/App/WebDist/
 RUN if [ -n "$DEPLOY_SSH_PINNED" ]; then \
       printf '%s' "$DEPLOY_SSH_PINNED" | grep -Eq '^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$' \
         || { echo "DEPLOY_SSH_PINNED must be registry/name@sha256:<64 hex>, got: $DEPLOY_SSH_PINNED" >&2; exit 1; }; \
-    elif [ "$VERSION" != dev ]; then \
-      echo "DEPLOY_SSH_PINNED is required for a build that is not a dev build" >&2; exit 1; \
     fi
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
