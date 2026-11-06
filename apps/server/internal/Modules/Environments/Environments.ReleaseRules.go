@@ -39,6 +39,9 @@ const (
 
 	modeDeploy   = "deploy"
 	modeRollback = "rollback"
+
+	releaseInput    = "release"
+	maxHealthInputs = 2048
 )
 
 var (

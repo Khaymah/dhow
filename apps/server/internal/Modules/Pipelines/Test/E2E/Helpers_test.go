@@ -57,6 +57,7 @@ type world struct {
 	env     *apptest.Env
 	owner   *apptest.Client
 	ownerID uuid.UUID
+	pass    string
 	org     uuid.UUID
 	project uuid.UUID
 	repo    uuid.UUID
@@ -89,7 +90,7 @@ func newWorldWith(t *testing.T, o apptest.Options) world {
 		runners = append(runners, env.SeedConnectedRunner(org, ownerID, apptest.SeedRunnerSpec{Capacity: 8, Features: checkoutFeatures()}))
 	}
 	return world{
-		env: env, owner: owner, ownerID: ownerID, org: org, project: project, repo: env.SeedRepository(org, project, ownerID),
+		env: env, owner: owner, ownerID: ownerID, pass: d.Password, org: org, project: project, repo: env.SeedRepository(org, project, ownerID),
 		defs: defs, images: images, runners: runners, next: &atomic.Int64{},
 	}
 }

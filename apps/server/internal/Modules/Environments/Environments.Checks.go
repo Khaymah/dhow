@@ -150,8 +150,12 @@ func (sc *reportScope) settleRepaired(ctx context.Context, release uuid.UUID) er
 }
 
 func (sc *reportScope) settleOlderUnknown(ctx context.Context) error {
+	onHost := sc.rel.ReleaseId
+	if sc.rel.RestoredReleaseId.Valid {
+		onHost = sc.rel.RestoredReleaseId.String
+	}
 	for hid := range sc.hosts {
-		if _, err := sc.writeTruth(ctx, hid, sc.rel.ReleaseId, sc.rel.ReleaseId); err != nil {
+		if _, err := sc.writeTruth(ctx, hid, onHost, onHost); err != nil {
 			return err
 		}
 	}

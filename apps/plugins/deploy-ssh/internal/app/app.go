@@ -100,6 +100,9 @@ func Run(ctx context.Context, s config.Settings, log *slog.Logger) int {
 	} else if out != nil {
 		defer func() { _ = out.Close() }()
 		reporter = deployrelease.NewStreamReporter(out)
+		if s.Deploy.Rollback {
+			reporter = deployrelease.NewRetagReporter(reporter, s.Deploy.ReleaseID, s.ReportID)
+		}
 	}
 	if s.Mode == jobspec.TargetModeCheck {
 		return runCheck(ctx, s, log, reporter, key, dial)

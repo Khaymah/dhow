@@ -110,12 +110,28 @@ SET "IsDeleted" = true, "UpdatedAt" = now()
 WHERE "Id" IN (SELECT a."Id"
                FROM "Artifacts" a
                WHERE a."ExpiresAt" <= now() AND NOT a."IsDeleted"
-               LIMIT $1
+                 AND NOT EXISTS (SELECT 1
+                         FROM "DeploymentReleases" r
+                         JOIN "DeployTargets" t ON t."Id" = r."TargetId" AND t."OrganizationId" = r."OrganizationId"
+                         WHERE r."ArtifactDigest" = a."Digest" AND r."OrganizationId" = a."OrganizationId" AND t."ProjectId" = a."ProjectId"
+                           AND NOT a."Untrusted" AND a."ExpiresAt" > now() - make_interval(secs => $1::float8)
+                           AND r."Kind" = 'deploy' AND r."State" = 'succeeded' AND NOT r."IsDeleted" AND NOT t."IsDeleted"
+                           AND (SELECT count(*)
+                                FROM "DeploymentReleases" n
+                                WHERE n."TargetId" = r."TargetId" AND n."OrganizationId" = r."OrganizationId"
+                                  AND n."Kind" = 'deploy' AND n."State" = 'succeeded' AND NOT n."IsDeleted"
+                                  AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases")
+               LIMIT $2
                FOR UPDATE SKIP LOCKED)
 `
 
-func (q *Queries) ExpireArtifacts(ctx context.Context, batch int32) (int64, error) {
-	result, err := q.db.Exec(ctx, expireArtifacts, batch)
+type ExpireArtifactsParams struct {
+	RollbackGraceSeconds float64
+	Batch                int32
+}
+
+func (q *Queries) ExpireArtifacts(ctx context.Context, arg ExpireArtifactsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, expireArtifacts, arg.RollbackGraceSeconds, arg.Batch)
 	if err != nil {
 		return 0, err
 	}
@@ -163,6 +179,41 @@ func (q *Queries) FindCacheEntry(ctx context.Context, arg FindCacheEntryParams) 
 		&i.LastUsedAt,
 		&i.HadSecrets,
 	)
+	return i, err
+}
+
+const findRollbackArtifact = `-- name: FindRollbackArtifact :one
+SELECT a."Name", a."Digest", a."SizeBytes"
+FROM "Artifacts" a
+JOIN "Blobs" b ON b."Digest" = a."Digest" AND NOT b."IsDeleted"
+WHERE a."OrganizationId" = $1 AND a."ProjectId" = $2 AND a."Digest" = $3
+  AND NOT a."Untrusted" AND NOT a."IsDeleted" AND a."ExpiresAt" > now() - make_interval(secs => $4::float8)
+ORDER BY a."CreatedAt" DESC, a."Id" DESC
+LIMIT 1
+`
+
+type FindRollbackArtifactParams struct {
+	OrganizationID       uuid.UUID
+	ProjectID            uuid.UUID
+	Digest               []byte
+	RollbackGraceSeconds float64
+}
+
+type FindRollbackArtifactRow struct {
+	Name      string
+	Digest    []byte
+	SizeBytes int64
+}
+
+func (q *Queries) FindRollbackArtifact(ctx context.Context, arg FindRollbackArtifactParams) (FindRollbackArtifactRow, error) {
+	row := q.db.QueryRow(ctx, findRollbackArtifact,
+		arg.OrganizationID,
+		arg.ProjectID,
+		arg.Digest,
+		arg.RollbackGraceSeconds,
+	)
+	var i FindRollbackArtifactRow
+	err := row.Scan(&i.Name, &i.Digest, &i.SizeBytes)
 	return i, err
 }
 
@@ -631,13 +682,29 @@ func (q *Queries) OldestCacheEntries(ctx context.Context, arg OldestCacheEntries
 }
 
 const organizationArtifactBytes = `-- name: OrganizationArtifactBytes :one
-SELECT COALESCE(sum("SizeBytes"), 0)::bigint AS "Bytes"
-FROM "Artifacts"
-WHERE "OrganizationId" = $1 AND NOT "IsDeleted" AND "ExpiresAt" > now()
+SELECT COALESCE(sum(a."SizeBytes"), 0)::bigint AS "Bytes"
+FROM "Artifacts" a
+WHERE a."OrganizationId" = $1 AND NOT a."IsDeleted"
+  AND (a."ExpiresAt" > now() OR EXISTS (SELECT 1
+          FROM "DeploymentReleases" r
+          JOIN "DeployTargets" t ON t."Id" = r."TargetId" AND t."OrganizationId" = r."OrganizationId"
+          WHERE r."ArtifactDigest" = a."Digest" AND r."OrganizationId" = a."OrganizationId" AND t."ProjectId" = a."ProjectId"
+            AND NOT a."Untrusted" AND a."ExpiresAt" > now() - make_interval(secs => $2::float8)
+            AND r."Kind" = 'deploy' AND r."State" = 'succeeded' AND NOT r."IsDeleted" AND NOT t."IsDeleted"
+            AND (SELECT count(*)
+                 FROM "DeploymentReleases" n
+                 WHERE n."TargetId" = r."TargetId" AND n."OrganizationId" = r."OrganizationId"
+                   AND n."Kind" = 'deploy' AND n."State" = 'succeeded' AND NOT n."IsDeleted"
+                   AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases"))
 `
 
-func (q *Queries) OrganizationArtifactBytes(ctx context.Context, organizationID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, organizationArtifactBytes, organizationID)
+type OrganizationArtifactBytesParams struct {
+	OrganizationID       uuid.UUID
+	RollbackGraceSeconds float64
+}
+
+func (q *Queries) OrganizationArtifactBytes(ctx context.Context, arg OrganizationArtifactBytesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, organizationArtifactBytes, arg.OrganizationID, arg.RollbackGraceSeconds)
 	var Bytes int64
 	err := row.Scan(&Bytes)
 	return Bytes, err

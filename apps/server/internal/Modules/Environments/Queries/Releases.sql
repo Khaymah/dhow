@@ -28,11 +28,12 @@ SELECT EXISTS (SELECT 1
 -- name: InsertRelease :one
 INSERT INTO "DeploymentReleases" (
     "OrganizationId", "DeploymentId", "RunJobId", "JobId", "LeaseId", "TargetId", "StepIndex", "Kind", "ReleaseId",
-    "PreviousReleaseId", "ArtifactDigest", "BatchSize", "StartedAt", "CreatedAt", "UpdatedAt"
+    "PreviousReleaseId", "ArtifactDigest", "BatchSize", "RestoredReleaseId", "HealthInputs", "StartedAt", "CreatedAt", "UpdatedAt"
 )
 VALUES (
     @organization_id, @deployment_id, @run_job_id, @job_id, @lease_id, @target_id, @step_index, @kind, @release_id,
-    sqlc.narg('previous_release_id')::text, sqlc.narg('artifact_digest')::bytea, @batch_size, @now, @now, @now
+    sqlc.narg('previous_release_id')::text, sqlc.narg('artifact_digest')::bytea, @batch_size, sqlc.narg('restored_release_id')::text,
+    @health_inputs, @now, @now, @now
 )
 RETURNING *;
 
@@ -136,3 +137,23 @@ FOR UPDATE OF r;
 UPDATE "DeploymentReleases"
 SET "State" = 'unknown', "UpdatedAt" = @now
 WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "State" = 'succeeded';
+
+-- name: GetRelease :one
+SELECT *
+FROM "DeploymentReleases"
+WHERE "TargetId" = @target_id AND "ReleaseId" = @release_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted";
+
+-- name: ListTargetReleases :many
+SELECT *
+FROM "DeploymentReleases"
+WHERE "TargetId" = @target_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"
+ORDER BY "StartedAt" DESC, "Id" DESC
+LIMIT @max_rows;
+
+-- name: ListTargetReleaseHosts :many
+SELECT h.*
+FROM "DeploymentReleaseHosts" h
+JOIN "DeploymentReleases" r ON r."Id" = h."ReleaseRowId" AND r."OrganizationId" = h."OrganizationId"
+WHERE r."TargetId" = @target_id AND h."OrganizationId" = @organization_id AND NOT h."IsDeleted" AND NOT r."IsDeleted"
+  AND h."ReleaseRowId" = ANY (@release_row_ids::uuid[])
+ORDER BY h."ReleaseRowId", h."Position";

@@ -57,6 +57,9 @@ func (s *Service) approve(ctx context.Context, q *sqlc.Queries, run sqlc.Pipelin
 }
 
 func (s *Service) gateOf(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, rj sqlc.RunJob, env deployments.Environment) (passage, error) {
+	if run.Trigger == triggerRollback {
+		env.HasReviewers, env.WaitMinutes = false, 0
+	}
 	if env.Paused {
 		return passage{gate: deployments.GatePaused, opens: rj.GateOpensAt}, nil
 	}

@@ -223,6 +223,8 @@ export const RunsEn: Record<keyof typeof RunsAr, string> = {
   'runs.reason.TARGET_KEY_NOT_REFERENCEABLE': 'A step names the secret that holds the key of a target. Only the deploy step receives that key.',
   'runs.reason.HEALTH_BUDGET_EXCEEDED': 'The health check would run longer than 10 minutes.',
   'runs.reason.ROLLING_BUDGET_EXCEEDED': 'The rolling deploy would run longer than 60 minutes.',
+  'runs.reason.ROLLBACK_RELEASE_UNAVAILABLE': 'The release you asked to roll back to can no longer be rolled back to. Pick a release that succeeded on the target before.',
+  'runs.reason.ROLLBACK_MODE_NOT_ALLOWED': 'The rollback mode cannot be asked for from the pipeline file. Use the rollback button on the page of the target.',
   'runs.reason.DEPLOY_FAILED': 'The deployment failed. Open the log of the step to see why.',
   'runs.reason.DEPLOY_ROLLED_BACK': 'The new release failed, so Dhow put every server back on its previous release.',
   'runs.reason.DEPLOY_HEALTH_FAILED': 'The health check failed on the first deployment to the target. There is no earlier release to go back to, so the new release stays on the server.',

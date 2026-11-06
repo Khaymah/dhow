@@ -35,6 +35,7 @@ type reportScope struct {
 	step   int32
 	digest []byte
 	mode   string
+	inputs map[string]string
 	hosts  map[uuid.UUID]*sqlc.DeploymentReleaseHost
 	rel    *sqlc.DeploymentRelease
 }
@@ -110,7 +111,8 @@ func (s *Service) reportScope(q *sqlc.Queries, row sqlc.LockReleaseLeaseRow, ste
 	if step < 0 || int(step) >= len(spec.GetSteps()) {
 		return nil, reject(connect.CodePermissionDenied, CodeNotTargetStep)
 	}
-	sc.mode = spec.GetSteps()[step].GetPlugin().GetInputs()[jobspec.TargetModeInput]
+	sc.inputs = spec.GetSteps()[step].GetPlugin().GetInputs()
+	sc.mode = sc.inputs[jobspec.TargetModeInput]
 	if name := spec.GetSteps()[step].GetPlugin().GetInputs()[jobspec.TargetArtifactInput]; name != "" {
 		for _, in := range spec.GetInputs() {
 			if raw, err := hex.DecodeString(in.GetDigest()); err == nil && in.GetName() == name && len(raw) == 32 {

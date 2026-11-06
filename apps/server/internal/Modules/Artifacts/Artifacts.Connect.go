@@ -128,7 +128,9 @@ func (s *Service) withinQuota(ctx context.Context, q *sqlc.Queries, l scope, nam
 }
 
 func (s *Service) quotaFits(ctx context.Context, q *sqlc.Queries, l scope, extra int64) error {
-	used, err := q.OrganizationArtifactBytes(ctx, l.row.OrganizationId)
+	used, err := q.OrganizationArtifactBytes(ctx, sqlc.OrganizationArtifactBytesParams{
+		OrganizationID: l.row.OrganizationId, RollbackGraceSeconds: config.RollbackArtifactMaxKeep.Seconds(),
+	})
 	if err != nil {
 		return err
 	}

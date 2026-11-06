@@ -95,6 +95,93 @@ func (e DeployTargetNotReady) Valid() bool {
 	}
 }
 
+// Defines values for DeployTargetReleaseKind.
+const (
+	Deploy   DeployTargetReleaseKind = "deploy"
+	Rollback DeployTargetReleaseKind = "rollback"
+)
+
+// Valid indicates whether the value is a known member of the DeployTargetReleaseKind enum.
+func (e DeployTargetReleaseKind) Valid() bool {
+	switch e {
+	case Deploy:
+		return true
+	case Rollback:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeployTargetReleaseState.
+const (
+	DeployTargetReleaseStateFailed         DeployTargetReleaseState = "failed"
+	DeployTargetReleaseStateRollbackFailed DeployTargetReleaseState = "rollback_failed"
+	DeployTargetReleaseStateRolledBack     DeployTargetReleaseState = "rolled_back"
+	DeployTargetReleaseStateRunning        DeployTargetReleaseState = "running"
+	DeployTargetReleaseStateSucceeded      DeployTargetReleaseState = "succeeded"
+	DeployTargetReleaseStateUnknown        DeployTargetReleaseState = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the DeployTargetReleaseState enum.
+func (e DeployTargetReleaseState) Valid() bool {
+	switch e {
+	case DeployTargetReleaseStateFailed:
+		return true
+	case DeployTargetReleaseStateRollbackFailed:
+		return true
+	case DeployTargetReleaseStateRolledBack:
+		return true
+	case DeployTargetReleaseStateRunning:
+		return true
+	case DeployTargetReleaseStateSucceeded:
+		return true
+	case DeployTargetReleaseStateUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeployTargetReleaseHostState.
+const (
+	DeployTargetReleaseHostStateFailed         DeployTargetReleaseHostState = "failed"
+	DeployTargetReleaseHostStatePending        DeployTargetReleaseHostState = "pending"
+	DeployTargetReleaseHostStateRollbackFailed DeployTargetReleaseHostState = "rollback_failed"
+	DeployTargetReleaseHostStateRolledBack     DeployTargetReleaseHostState = "rolled_back"
+	DeployTargetReleaseHostStateSkipped        DeployTargetReleaseHostState = "skipped"
+	DeployTargetReleaseHostStateSwitched       DeployTargetReleaseHostState = "switched"
+	DeployTargetReleaseHostStateUnknown        DeployTargetReleaseHostState = "unknown"
+	DeployTargetReleaseHostStateUploaded       DeployTargetReleaseHostState = "uploaded"
+	DeployTargetReleaseHostStateVerified       DeployTargetReleaseHostState = "verified"
+)
+
+// Valid indicates whether the value is a known member of the DeployTargetReleaseHostState enum.
+func (e DeployTargetReleaseHostState) Valid() bool {
+	switch e {
+	case DeployTargetReleaseHostStateFailed:
+		return true
+	case DeployTargetReleaseHostStatePending:
+		return true
+	case DeployTargetReleaseHostStateRollbackFailed:
+		return true
+	case DeployTargetReleaseHostStateRolledBack:
+		return true
+	case DeployTargetReleaseHostStateSkipped:
+		return true
+	case DeployTargetReleaseHostStateSwitched:
+		return true
+	case DeployTargetReleaseHostStateUnknown:
+		return true
+	case DeployTargetReleaseHostStateUploaded:
+		return true
+	case DeployTargetReleaseHostStateVerified:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeploymentApprovalState.
 const (
 	DeploymentApprovalStateApproved   DeploymentApprovalState = "approved"
@@ -436,6 +523,63 @@ type DeployTargetListResponse struct {
 // DeployTargetNotReady defines model for DeployTargetNotReady.
 type DeployTargetNotReady string
 
+// DeployTargetRelease defines model for DeployTargetRelease.
+type DeployTargetRelease struct {
+	ArtifactKept      bool                      `json:"ArtifactKept"`
+	FinishedAt        *time.Time                `json:"FinishedAt,omitempty"`
+	Hosts             []DeployTargetReleaseHost `json:"Hosts"`
+	Id                openapi_types.UUID        `json:"Id"`
+	Kind              DeployTargetReleaseKind   `json:"Kind"`
+	Message           *string                   `json:"Message,omitempty"`
+	PreviousReleaseId *string                   `json:"PreviousReleaseId,omitempty"`
+	ReleaseId         string                    `json:"ReleaseId"`
+
+	// RestoredReleaseId For a rollback, the earlier release it put back.
+	RestoredReleaseId *string                  `json:"RestoredReleaseId,omitempty"`
+	RollbackReason    *string                  `json:"RollbackReason,omitempty"`
+	RollbackTarget    bool                     `json:"RollbackTarget"`
+	StartedAt         time.Time                `json:"StartedAt"`
+	State             DeployTargetReleaseState `json:"State"`
+}
+
+// DeployTargetReleaseKind defines model for DeployTargetRelease.Kind.
+type DeployTargetReleaseKind string
+
+// DeployTargetReleaseState defines model for DeployTargetRelease.State.
+type DeployTargetReleaseState string
+
+// DeployTargetReleaseHost defines model for DeployTargetReleaseHost.
+type DeployTargetReleaseHost struct {
+	HostId         openapi_types.UUID           `json:"HostId"`
+	Message        *string                      `json:"Message,omitempty"`
+	Position       int                          `json:"Position"`
+	RollbackReason *string                      `json:"RollbackReason,omitempty"`
+	State          DeployTargetReleaseHostState `json:"State"`
+}
+
+// DeployTargetReleaseHostState defines model for DeployTargetReleaseHost.State.
+type DeployTargetReleaseHostState string
+
+// DeployTargetReleases defines model for DeployTargetReleases.
+type DeployTargetReleases struct {
+	CurrentReleaseId *string               `json:"CurrentReleaseId,omitempty"`
+	Partial          bool                  `json:"Partial"`
+	Releases         []DeployTargetRelease `json:"Releases"`
+}
+
+// DeployTargetReleasesResponse defines model for DeployTargetReleasesResponse.
+type DeployTargetReleasesResponse struct {
+	Data  *DeployTargetReleases `json:"Data,omitempty"`
+	Error *ErrorDetail          `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
 // DeployTargetResponse defines model for DeployTargetResponse.
 type DeployTargetResponse struct {
 	Data  *DeployTarget `json:"Data,omitempty"`
@@ -774,6 +918,13 @@ type ReorderDeployTargetHostsRequest struct {
 	Version       int64                `json:"Version"`
 }
 
+// RollbackDeployTargetRequest defines model for RollbackDeployTargetRequest.
+type RollbackDeployTargetRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+	ReleaseId     string        `json:"ReleaseId"`
+}
+
 // SetDeployTargetPendingHostKeyRequest defines model for SetDeployTargetPendingHostKeyRequest.
 type SetDeployTargetPendingHostKeyRequest struct {
 	HostKey string `json:"HostKey"`
@@ -916,6 +1067,9 @@ type RemoveDeployTargetHostJSONRequestBody = RemoveDeployTargetHostRequest
 // RemoveDeployTargetJSONRequestBody defines body for RemoveDeployTarget for application/json ContentType.
 type RemoveDeployTargetJSONRequestBody = CurrentFactorRequest
 
+// RollbackDeployTargetJSONRequestBody defines body for RollbackDeployTarget for application/json ContentType.
+type RollbackDeployTargetJSONRequestBody = RollbackDeployTargetRequest
+
 // ApproveDeploymentJSONRequestBody defines body for ApproveDeployment for application/json ContentType.
 type ApproveDeploymentJSONRequestBody = DecideDeploymentRequest
 
@@ -996,9 +1150,15 @@ type ServerInterface interface {
 	// RemoveDeployTargetHost Remove a host from a target
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/remove)
 	RemoveDeployTargetHost(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName, hostId TargetHostId)
+	// ListDeployTargetReleases List the releases of a deploy target
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/releases)
+	ListDeployTargetReleases(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
 	// RemoveDeployTarget Remove a deploy target
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/remove)
 	RemoveDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
+	// RollbackDeployTarget Roll a deploy target back to an earlier release
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/rollback)
+	RollbackDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName)
 	// ListRunApprovals List the approval requests of a run
 	// (GET /organizations/{id}/projects/{projectId}/runs/{runId}/approvals)
 	ListRunApprovals(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, runId RunId)
@@ -1155,9 +1315,21 @@ func (_ Unimplemented) RemoveDeployTargetHost(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListDeployTargetReleases List the releases of a deploy target
+// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/releases)
+func (_ Unimplemented) ListDeployTargetReleases(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // RemoveDeployTarget Remove a deploy target
 // (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/remove)
 func (_ Unimplemented) RemoveDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// RollbackDeployTarget Roll a deploy target back to an earlier release
+// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/rollback)
+func (_ Unimplemented) RollbackDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2426,6 +2598,59 @@ func (siw *ServerInterfaceWrapper) RemoveDeployTargetHost(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ListDeployTargetReleases operation middleware
+func (siw *ServerInterfaceWrapper) ListDeployTargetReleases(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeployTargetReleases(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RemoveDeployTarget operation middleware
 func (siw *ServerInterfaceWrapper) RemoveDeployTarget(w http.ResponseWriter, r *http.Request) {
 
@@ -2470,6 +2695,59 @@ func (siw *ServerInterfaceWrapper) RemoveDeployTarget(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RemoveDeployTarget(w, r, id, projectId, environmentName, targetName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RollbackDeployTarget operation middleware
+func (siw *ServerInterfaceWrapper) RollbackDeployTarget(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environmentName" -------------
+	var environmentName EnvironmentName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentName", chi.URLParam(r, "environmentName"), &environmentName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "targetName" -------------
+	var targetName TargetName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "targetName", chi.URLParam(r, "targetName"), &targetName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "targetName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RollbackDeployTarget(w, r, id, projectId, environmentName, targetName)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2842,6 +3120,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/check", wrapper.StartDeployTargetCheck)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/rollback", wrapper.RollbackDeployTarget)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/releases", wrapper.ListDeployTargetReleases)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts", wrapper.AddDeployTargetHost)
@@ -3859,6 +4143,48 @@ func (response RemoveDeployTargetHostdefaultJSONResponse) VisitRemoveDeployTarge
 	return err
 }
 
+type ListDeployTargetReleasesRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+}
+
+type ListDeployTargetReleasesResponseObject interface {
+	VisitListDeployTargetReleasesResponse(w http.ResponseWriter) error
+}
+
+type ListDeployTargetReleases200JSONResponse DeployTargetReleasesResponse
+
+func (response ListDeployTargetReleases200JSONResponse) VisitListDeployTargetReleasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeployTargetReleasesdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response ListDeployTargetReleasesdefaultJSONResponse) VisitListDeployTargetReleasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RemoveDeployTargetRequestObject struct {
 	Id              Id              `json:"id"`
 	ProjectId       ProjectId       `json:"projectId"`
@@ -3891,6 +4217,49 @@ type RemoveDeployTargetdefaultJSONResponse struct {
 }
 
 func (response RemoveDeployTargetdefaultJSONResponse) VisitRemoveDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RollbackDeployTargetRequestObject struct {
+	Id              Id              `json:"id"`
+	ProjectId       ProjectId       `json:"projectId"`
+	EnvironmentName EnvironmentName `json:"environmentName"`
+	TargetName      TargetName      `json:"targetName"`
+	Body            *RollbackDeployTargetJSONRequestBody
+}
+
+type RollbackDeployTargetResponseObject interface {
+	VisitRollbackDeployTargetResponse(w http.ResponseWriter) error
+}
+
+type RollbackDeployTarget202JSONResponse DeployTargetCheckStartedResponse
+
+func (response RollbackDeployTarget202JSONResponse) VisitRollbackDeployTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RollbackDeployTargetdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response RollbackDeployTargetdefaultJSONResponse) VisitRollbackDeployTargetResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -4143,9 +4512,15 @@ type StrictServerInterface interface {
 	// RemoveDeployTargetHost Remove a host from a target
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts/{hostId}/remove)
 	RemoveDeployTargetHost(ctx context.Context, request RemoveDeployTargetHostRequestObject) (RemoveDeployTargetHostResponseObject, error)
+	// ListDeployTargetReleases List the releases of a deploy target
+	// (GET /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/releases)
+	ListDeployTargetReleases(ctx context.Context, request ListDeployTargetReleasesRequestObject) (ListDeployTargetReleasesResponseObject, error)
 	// RemoveDeployTarget Remove a deploy target
 	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/remove)
 	RemoveDeployTarget(ctx context.Context, request RemoveDeployTargetRequestObject) (RemoveDeployTargetResponseObject, error)
+	// RollbackDeployTarget Roll a deploy target back to an earlier release
+	// (POST /organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/rollback)
+	RollbackDeployTarget(ctx context.Context, request RollbackDeployTargetRequestObject) (RollbackDeployTargetResponseObject, error)
 	// ListRunApprovals List the approval requests of a run
 	// (GET /organizations/{id}/projects/{projectId}/runs/{runId}/approvals)
 	ListRunApprovals(ctx context.Context, request ListRunApprovalsRequestObject) (ListRunApprovalsResponseObject, error)
@@ -4958,6 +5333,35 @@ func (sh *strictHandler) RemoveDeployTargetHost(w http.ResponseWriter, r *http.R
 	}
 }
 
+// ListDeployTargetReleases operation middleware
+func (sh *strictHandler) ListDeployTargetReleases(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request ListDeployTargetReleasesRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDeployTargetReleases(ctx, request.(ListDeployTargetReleasesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeployTargetReleases")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeployTargetReleasesResponseObject); ok {
+		if err := validResponse.VisitListDeployTargetReleasesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RemoveDeployTarget operation middleware
 func (sh *strictHandler) RemoveDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
 	var request RemoveDeployTargetRequestObject
@@ -4987,6 +5391,42 @@ func (sh *strictHandler) RemoveDeployTarget(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RemoveDeployTargetResponseObject); ok {
 		if err := validResponse.VisitRemoveDeployTargetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RollbackDeployTarget operation middleware
+func (sh *strictHandler) RollbackDeployTarget(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, environmentName EnvironmentName, targetName TargetName) {
+	var request RollbackDeployTargetRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.EnvironmentName = environmentName
+	request.TargetName = targetName
+
+	var body RollbackDeployTargetJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RollbackDeployTarget(ctx, request.(RollbackDeployTargetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RollbackDeployTarget")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RollbackDeployTargetResponseObject); ok {
+		if err := validResponse.VisitRollbackDeployTargetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

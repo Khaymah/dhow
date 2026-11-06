@@ -317,6 +317,67 @@ func (q *Queries) FindActiveCheckRun(ctx context.Context, arg FindActiveCheckRun
 	return i, err
 }
 
+const findActiveRollbackRun = `-- name: FindActiveRollbackRun :one
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "RepositoryId", "Provider", "Number", "Trigger", "Ref", "BaseRef", "Sha", "BaseSha", "IsFork", "PrNumber", "Actor", "Inputs", "DefinitionPath", "DefinitionSha", "DefinitionDigest", "DefinitionSource", "ImagePins", "Issues", "State", "FailureReason", "ConcurrencyGroup", "CancelInProgress", "DeliveryId", "TriggeredByUserId", "ApprovedByUserId", "ApprovedAt", "CancelRequestedAt", "CancelRequestedBy", "ClaimedUntil", "StartedAt", "FinishedAt", "Round"
+FROM "PipelineRuns"
+WHERE "ProjectId" = $1 AND "OrganizationId" = $2 AND "Trigger" = 'rollback' AND "DefinitionSource" = $3
+  AND "State" NOT IN ('succeeded', 'failed', 'canceled', 'skipped') AND NOT "IsDeleted"
+ORDER BY "CreatedAt" DESC, "Id" DESC
+LIMIT 1
+`
+
+type FindActiveRollbackRunParams struct {
+	ProjectID        uuid.UUID
+	OrganizationID   uuid.UUID
+	DefinitionSource pgtype.Text
+}
+
+func (q *Queries) FindActiveRollbackRun(ctx context.Context, arg FindActiveRollbackRunParams) (PipelineRun, error) {
+	row := q.db.QueryRow(ctx, findActiveRollbackRun, arg.ProjectID, arg.OrganizationID, arg.DefinitionSource)
+	var i PipelineRun
+	err := row.Scan(
+		&i.Id,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.OrganizationId,
+		&i.ProjectId,
+		&i.RepositoryId,
+		&i.Provider,
+		&i.Number,
+		&i.Trigger,
+		&i.Ref,
+		&i.BaseRef,
+		&i.Sha,
+		&i.BaseSha,
+		&i.IsFork,
+		&i.PrNumber,
+		&i.Actor,
+		&i.Inputs,
+		&i.DefinitionPath,
+		&i.DefinitionSha,
+		&i.DefinitionDigest,
+		&i.DefinitionSource,
+		&i.ImagePins,
+		&i.Issues,
+		&i.State,
+		&i.FailureReason,
+		&i.ConcurrencyGroup,
+		&i.CancelInProgress,
+		&i.DeliveryId,
+		&i.TriggeredByUserId,
+		&i.ApprovedByUserId,
+		&i.ApprovedAt,
+		&i.CancelRequestedAt,
+		&i.CancelRequestedBy,
+		&i.ClaimedUntil,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Round,
+	)
+	return i, err
+}
+
 const findCommitRun = `-- name: FindCommitRun :one
 SELECT "Id"
 FROM "PipelineRuns"

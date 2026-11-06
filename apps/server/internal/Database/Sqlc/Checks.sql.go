@@ -95,7 +95,7 @@ func (q *Queries) ListReleaseHostStates(ctx context.Context, arg ListReleaseHost
 }
 
 const lockUnknownReleaseHosts = `-- name: LockUnknownReleaseHosts :many
-SELECT h."Id", h."ReleaseRowId", h."ReleaseId", h."State", r."State" AS "GroupState", r."TargetId"
+SELECT h."Id", h."ReleaseRowId", COALESCE(r."RestoredReleaseId", h."ReleaseId")::text AS "ReleaseId", h."State", r."State" AS "GroupState", r."TargetId"
 FROM "DeploymentReleaseHosts" h
 JOIN "DeploymentReleases" r ON r."Id" = h."ReleaseRowId" AND r."OrganizationId" = h."OrganizationId"
 WHERE h."HostId" = $1 AND h."OrganizationId" = $2 AND r."TargetId" = $3

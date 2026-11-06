@@ -1772,6 +1772,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Roll a deploy target back to an earlier release
+         * @description Needs `deployment.rollback` (Maintainer or above) and a fresh `CurrentFactor`. `ReleaseId` must be a release that succeeded on this target before, was deployed (not a rollback) and is not a check. Answers 409 `ROLLBACK_RELEASE_NOT_ELIGIBLE` for any other release and 409 `ENVIRONMENT_PAUSED` when the environment is paused. Starts a run of one job (`Trigger` `rollback`) that runs the official deploy plugin in `rollback` mode on every host of the target, in the batches and the order of the target, back to that release. A host that still has the directory of the release only switches to it; a host that pruned it gets the release again from the artifact that Dhow kept for it, and the plugin checks the digest. The run goes through the same gate as any deployment, but it skips the reviewers and the wait timer of the environment. If it fails on a host the group is left `rollback_failed` and nothing is tried again by itself. The run is never run again by `rerun-failed`. The answer is 202 with the number of the run. Answers 422 `ROLLBACK_UNAVAILABLE` when this build of the server has no pinned image of the plugin, and 422 `ROLLBACK_NOT_SUPPORTED` for a target that is not an SSH target. The health check of the run is the one stored on the chosen release; if that is damaged the answer is 422 `ROLLBACK_SETTINGS_INVALID`.
+         */
+        post: operations["rollbackDeployTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the releases of a deploy target
+         * @description Needs `project.read`. The last 20 group releases of the target, newest first, each with the state of every host. `CurrentReleaseId` is the release the group was last deployed or rolled back to successfully. `Partial` is true when the hosts are on different releases: the last finished release is `rollback_failed` or `unknown`, or the last check found different releases on the hosts. A release can be rolled back to (`RollbackTarget`) when it was deployed and succeeded; `ArtifactKept` says whether the artifact of the release is still kept, for a host that pruned its directory.
+         */
+        get: operations["listDeployTargetReleases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/projects/{projectId}/environments/{environmentName}/targets/{targetName}/hosts": {
         parameters: {
             query?: never;
@@ -4686,6 +4726,48 @@ export interface components {
         };
         DeployTargetCheckStartedResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["DeployTargetCheckStarted"];
+        };
+        RollbackDeployTargetRequest: {
+            ReleaseId: string;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        DeployTargetReleaseHost: {
+            /** Format: uuid */
+            HostId: string;
+            Position: number;
+            /** @enum {string} */
+            State: "pending" | "uploaded" | "switched" | "verified" | "failed" | "rolled_back" | "rollback_failed" | "unknown" | "skipped";
+            RollbackReason?: string;
+            Message?: string;
+        };
+        DeployTargetRelease: {
+            /** Format: uuid */
+            Id: string;
+            ReleaseId: string;
+            /** @enum {string} */
+            Kind: "deploy" | "rollback";
+            /** @enum {string} */
+            State: "running" | "succeeded" | "failed" | "rolled_back" | "rollback_failed" | "unknown";
+            /** @description For a rollback, the earlier release it put back. */
+            RestoredReleaseId?: string;
+            PreviousReleaseId?: string;
+            RollbackReason?: string;
+            Message?: string;
+            /** Format: date-time */
+            StartedAt: string;
+            /** Format: date-time */
+            FinishedAt?: string;
+            RollbackTarget: boolean;
+            ArtifactKept: boolean;
+            Hosts: components["schemas"]["DeployTargetReleaseHost"][];
+        };
+        DeployTargetReleases: {
+            CurrentReleaseId?: string;
+            Partial: boolean;
+            Releases: components["schemas"]["DeployTargetRelease"][];
+        };
+        DeployTargetReleasesResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DeployTargetReleases"];
         };
         DeployTargetResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["DeployTarget"];
@@ -8024,6 +8106,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeployTargetCheckStartedResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    rollbackDeployTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RollbackDeployTargetRequest"];
+            };
+        };
+        responses: {
+            /** @description The rollback run was created. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetCheckStartedResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listDeployTargetReleases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                environmentName: components["parameters"]["EnvironmentName"];
+                targetName: components["parameters"]["TargetName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The releases. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployTargetReleasesResponse"];
                 };
             };
             default: components["responses"]["Error"];

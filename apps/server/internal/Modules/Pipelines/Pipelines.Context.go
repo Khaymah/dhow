@@ -30,11 +30,11 @@ func matchesAny(patterns []string, name string) bool {
 }
 
 func enabled(on *pipelinespec.Triggers, run sqlc.PipelineRun) bool {
-	if on == nil && run.Trigger != triggerCheck {
+	if on == nil && run.Trigger != triggerCheck && run.Trigger != triggerRollback {
 		return false
 	}
 	switch run.Trigger {
-	case triggerCheck:
+	case triggerCheck, triggerRollback:
 		return true
 	case triggers.EventPush:
 		return on.Push != nil && strings.HasPrefix(run.Ref, gitref.PrefixBranch) &&

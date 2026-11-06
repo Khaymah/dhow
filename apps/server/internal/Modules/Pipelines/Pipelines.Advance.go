@@ -250,6 +250,12 @@ func (s *Service) admitJob(ctx context.Context, q *sqlc.Queries, st *step, i int
 		approval = p.approval
 	}
 	rj := st.rows[i]
+	if reason, err := s.attachRollback(ctx, q, st, rj, spec); err != nil || reason != "" {
+		if err != nil {
+			return false, err
+		}
+		return true, s.endRunJob(ctx, q, st, i, models.JobFailed, reason)
+	}
 	if reason, err := s.attachTransfers(ctx, q, st, rj, plan, spec, c.eval); err != nil || reason != "" {
 		if err != nil {
 			return false, err

@@ -183,13 +183,20 @@ func (g *group) emitStarted() {
 		return
 	}
 	g.started = true
-	g.rep.Emit(Event{Event: EventStarted, ReleaseID: g.releaseID(), PreviousReleaseID: g.previous(), Mode: ModeDeploy})
+	mode := ModeDeploy
+	if g.f.Config.Rollback {
+		mode = ModeRollback
+	}
+	g.rep.Emit(Event{Event: EventStarted, ReleaseID: g.releaseID(), PreviousReleaseID: g.previous(), Mode: mode})
 }
 
 func (g *group) execute(ctx context.Context) *Failure {
-	totals, f := g.members[0].d.scanArchive()
-	if f != nil {
-		return g.stop(ctx, f, nil)
+	var totals scan
+	if g.f.Config.ArchivePath != "" {
+		var f *Failure
+		if totals, f = g.members[0].d.scanArchive(); f != nil {
+			return g.stop(ctx, f, nil)
+		}
 	}
 	if f := g.inspect(ctx); f != nil {
 		return g.stop(ctx, f, nil)
@@ -325,8 +332,12 @@ func (g *group) runBatch(ctx context.Context, batch []*member, n int) (*Failure,
 		}
 		return m.d.checkHealth(ctx)
 	})
-	if f != nil || !shared {
+	if f != nil {
 		return f, bad
+	}
+	if !shared {
+		confirm(batch)
+		return nil, nil
 	}
 	res, err := CheckHealth(ctx, g.f.Doer, batch[0].d.cfg.HostName, g.f.Config.Health, g.f.Clock)
 	var first *Failure
@@ -336,7 +347,16 @@ func (g *group) runBatch(ctx context.Context, batch []*member, n int) (*Failure,
 			first, culprit = f, m
 		}
 	}
+	if first == nil {
+		confirm(batch)
+	}
 	return first, culprit
+}
+
+func confirm(batch []*member) {
+	for _, m := range batch {
+		m.d.confirmed = true
+	}
 }
 
 func (g *group) commit(ctx context.Context) *Failure {

@@ -44,6 +44,8 @@ type run struct {
 	known      string
 	resumed    bool
 	hasFiles   bool
+	present    bool
+	confirmed  bool
 
 	timeoutKnown bool
 	hasTimeout   bool
@@ -88,7 +90,7 @@ func (d *run) cleanStage() {
 	}
 	_ = d.r.RemoveAll(d.incoming)
 	_ = d.r.Remove(d.manifest)
-	if !d.resumed {
+	if !d.resumed && !d.present {
 		_ = d.r.RemoveAll(d.releaseDir)
 	}
 }

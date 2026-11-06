@@ -11,6 +11,7 @@ import { ProjectsAr } from '@/I18n/Locales/Workspace/ProjectsAr';
 import { RunnersAr } from '@/I18n/Locales/Workspace/RunnersAr';
 import { RunsAr } from '@/I18n/Locales/Workspace/RunsAr';
 import { SecretsAr } from '@/I18n/Locales/Workspace/SecretsAr';
+import { TargetsAr } from '@/I18n/Locales/Workspace/TargetsAr';
 import { SettingsAr } from '@/I18n/Locales/Workspace/SettingsAr';
 
 export const WorkspaceAr = {
@@ -408,5 +409,6 @@ export const WorkspaceAr = {
   ...OidcSettingsAr,
   ...SecretsAr,
   ...EnvironmentsAr,
+  ...TargetsAr,
   ...ApprovalsAr,
 } as const;

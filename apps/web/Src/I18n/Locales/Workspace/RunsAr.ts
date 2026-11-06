@@ -221,6 +221,8 @@ export const RunsAr = {
   'runs.reason.TARGET_KEY_NOT_REFERENCEABLE': 'خطوة تذكر السر الذي يحمل مفتاح الهدف. خطوة النشر وحدها تستلم هذا المفتاح.',
   'runs.reason.HEALTH_BUDGET_EXCEEDED': 'فحص الصحة سيستغرق أكثر من 10 دقائق.',
   'runs.reason.ROLLING_BUDGET_EXCEEDED': 'النشر على دفعات سيستغرق أكثر من 60 دقيقة.',
+  'runs.reason.ROLLBACK_RELEASE_UNAVAILABLE': 'الإصدار الذي طُلب الرجوع إليه لم يعد صالحًا للرجوع. اختر إصدارًا نجح على الهدف من قبل.',
+  'runs.reason.ROLLBACK_MODE_NOT_ALLOWED': 'وضع الرجوع لا يُطلب من ملف خطوات النشر. استخدم زر الرجوع في صفحة الهدف.',
   'runs.reason.DEPLOY_FAILED': 'فشل النشر. افتح سجل الخطوة لتعرف السبب.',
   'runs.reason.DEPLOY_ROLLED_BACK': 'فشل الإصدار الجديد، فأرجع داو كل سيرفر إلى إصداره السابق.',
   'runs.reason.DEPLOY_HEALTH_FAILED': 'فشل فحص الصحة في أول نشر على الهدف. لا يوجد إصدار سابق للرجوع إليه، فبقي الإصدار الجديد على السيرفر.',

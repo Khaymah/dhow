@@ -23,7 +23,8 @@ const (
 	EventBatchPassed    = "batch_passed"
 	EventChecked        = "checked"
 
-	ModeDeploy = "deploy"
+	ModeDeploy   = "deploy"
+	ModeRollback = "rollback"
 
 	CauseHealth   = "health_check_failed"
 	CauseReload   = "reload_failed"
@@ -90,6 +91,22 @@ func (r *StreamReporter) Emit(e Event) {
 	}
 	r.events++
 	_, _ = r.w.Write(append(raw, '\n'))
+}
+
+type retagReporter struct {
+	inner    Reporter
+	from, to string
+}
+
+func NewRetagReporter(inner Reporter, from, to string) Reporter {
+	return &retagReporter{inner: inner, from: from, to: to}
+}
+
+func (r *retagReporter) Emit(e Event) {
+	if e.ReleaseID == r.from {
+		e.ReleaseID = r.to
+	}
+	r.inner.Emit(e)
 }
 
 type DiscardReporter struct{}

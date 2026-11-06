@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -107,6 +108,26 @@ func (s *Service) Prepare(ctx context.Context, tx *sqlc.Queries, r artifactindex
 		})
 	}
 	return out, nil
+}
+
+func (s *Service) PrepareDigest(ctx context.Context, tx *sqlc.Queries, r artifactindex.DigestRequest) (artifactindex.Input, bool, error) {
+	a, err := tx.FindRollbackArtifact(ctx, sqlc.FindRollbackArtifactParams{
+		OrganizationID: r.OrganizationID, ProjectID: r.ProjectID, Digest: r.Digest, RollbackGraceSeconds: config.RollbackArtifactMaxKeep.Seconds(),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return artifactindex.Input{}, false, nil
+	}
+	if err != nil {
+		return artifactindex.Input{}, false, err
+	}
+	d, ok := blob.DigestOf(a.Digest)
+	if !ok {
+		return artifactindex.Input{}, false, fmt.Errorf("artifact %s has a malformed digest", a.Name)
+	}
+	expires := s.now().Add(config.ArtifactInputGrantTTL)
+	return artifactindex.Input{
+		Name: a.Name, Digest: d.String(), SizeBytes: a.SizeBytes, DownloadToken: s.grants.issue(grantInput, r.RunJobID, d, expires),
+	}, true, nil
 }
 
 func (s *Service) SeedBlob(ctx context.Context, d blob.Digest, body io.Reader, size int64) error {

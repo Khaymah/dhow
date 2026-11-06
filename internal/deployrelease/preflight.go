@@ -41,7 +41,8 @@ func (d *run) preflight(ctx context.Context) *Failure {
 	if err != nil {
 		return fail(ExitFailed, CauseOther, "cannot read the free space of the server", err)
 	}
-	if need := uint64(max(d.totals.Bytes, 0)) * 2; free < need {
+	d.present = d.cfg.Rollback && d.releaseExists(d.cfg.ReleaseID)
+	if need := uint64(max(d.totals.Bytes, 0)) * 2; free < need && !d.present {
 		return fail(ExitFailed, CauseOther, "not enough disk space on the server", ErrNoSpace)
 	}
 	if f := d.inspectCurrent(); f != nil {
@@ -58,7 +59,13 @@ func (d *run) preflight(ctx context.Context) *Failure {
 	if f := d.lock(); f != nil {
 		return f
 	}
-	return d.choosePrevious()
+	if f := d.choosePrevious(); f != nil {
+		return f
+	}
+	if d.cfg.Rollback && !d.present && d.cfg.ArchivePath == "" {
+		return fail(ExitFailed, CauseOther, "the release is no longer on the server and its artifact is not kept", ErrReleaseGone)
+	}
+	return nil
 }
 
 func (d *run) inspectCurrent() *Failure {
@@ -108,7 +115,7 @@ func (d *run) choosePrevious() *Failure {
 		}
 		candidate = verified
 	}
-	if d.currentID == d.cfg.ReleaseID {
+	if d.currentID == d.cfg.ReleaseID && (!d.cfg.Rollback || d.present) {
 		d.resumed = true
 		candidate = ""
 		if verified != d.cfg.ReleaseID {

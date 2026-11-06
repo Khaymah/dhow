@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ const (
 	envArtifactSum  = "DHOW_INPUT_ARTIFACT_DIGEST"
 	envReport       = "DHOW_DEPLOY_REPORT"
 	envProxy        = "HTTPS_PROXY"
+	releaseInput    = "release"
 	envAllowPrivate = "DHOW_DEPLOY_ALLOW_PRIVATE_CIDRS"
 	maxArchiveBytes = 8 << 30
 	maxArchiveFiles = 200_000
@@ -32,6 +34,7 @@ var ErrInput = errors.New("an input of the deploy plugin is not valid")
 
 type Settings struct {
 	Mode         string
+	ReportID     string
 	Step         jobspec.TargetStep
 	Deploy       deployrelease.Config
 	BatchSize    int
@@ -57,7 +60,7 @@ func Parse(getenv func(string) string) (Settings, error) {
 	}
 	in := func(name string) string { return getenv(envInputPrefix + strings.ToUpper(name)) }
 	mode := orDefault(in(jobspec.TargetModeInput), jobspec.TargetModeDeploy)
-	if mode != jobspec.TargetModeDeploy && mode != jobspec.TargetModeCheck {
+	if !slices.Contains([]string{jobspec.TargetModeDeploy, jobspec.TargetModeCheck, jobspec.TargetModeRollback}, mode) {
 		return Settings{}, fmt.Errorf("%w: mode %q is not supported", ErrInput, mode)
 	}
 	allow, err := netguard.ParseCIDRs(getenv(envAllowPrivate))
@@ -77,14 +80,21 @@ func Parse(getenv func(string) string) (Settings, error) {
 		return Settings{}, err
 	}
 	cfg.ArchivePath, cfg.ArchiveDigest = getenv(envArtifactFile), getenv(envArtifactSum)
-	if cfg.ArchivePath == "" || !jobspec.ValidDigest(cfg.ArchiveDigest) {
+	reportID := cfg.ReleaseID
+	if mode == jobspec.TargetModeRollback {
+		cfg.Rollback, cfg.ReleaseID = true, in(releaseInput)
+		if !jobspec.ValidReleaseID(cfg.ReleaseID) || cfg.ReleaseID == reportID {
+			return Settings{}, fmt.Errorf("%w: the release to go back to", ErrInput)
+		}
+	}
+	if (cfg.ArchivePath == "" && !cfg.Rollback) || (cfg.ArchivePath != "" && !jobspec.ValidDigest(cfg.ArchiveDigest)) {
 		return Settings{}, fmt.Errorf("%w: the artifact", ErrInput)
 	}
 	batch, pause := max(step.Settings.BatchSize, 1), time.Duration(step.Settings.BatchPauseSeconds)*time.Second
 	if err := deployrelease.ValidateRollout(len(step.Hosts), batch, pause, cfg.Health); err != nil {
 		return Settings{}, fmt.Errorf("%w: %w", ErrInput, err)
 	}
-	s := Settings{Mode: mode, Step: step, Deploy: cfg, BatchSize: batch, BatchPause: pause, KeyFile: step.KeyFile, ReportPath: getenv(envReport), ProxyURL: getenv(envProxy), AllowPrivate: allow}
+	s := Settings{Mode: mode, ReportID: reportID, Step: step, Deploy: cfg, BatchSize: batch, BatchPause: pause, KeyFile: step.KeyFile, ReportPath: getenv(envReport), ProxyURL: getenv(envProxy), AllowPrivate: allow}
 	return s, cfg.Validate()
 }
 
