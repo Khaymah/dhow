@@ -2867,7 +2867,7 @@ export interface paths {
         put?: never;
         /**
          * Make an ingest token
-         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409 `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true`, otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`.
+         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409 `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true`, otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`, whose `Details` carry one `ProtectedReach` entry for each such environment, with its name as `Message`.
          */
         post: operations["createIngestToken"];
         delete?: never;
