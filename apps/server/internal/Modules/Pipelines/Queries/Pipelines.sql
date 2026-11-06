@@ -392,3 +392,12 @@ SELECT EXISTS (SELECT 1
                JOIN "Jobs" j ON j."Id" = rj."CurrentJobId" AND j."OrganizationId" = rj."OrganizationId"
                WHERE rj."RunId" = @run_id AND rj."OrganizationId" = @organization_id AND rj."Id" <> @run_job_id AND rj."State" = 'active'
                  AND j."Spec" @> jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('target_id', @target_id::text))))::boolean AS "Busy";
+
+-- name: InsertRunIngestedArtifact :exec
+INSERT INTO "RunIngestedArtifacts" ("OrganizationId", "RunId", "Name", "IngestedArtifactId")
+VALUES (@organization_id, @run_id, @name, @ingested_artifact_id);
+
+-- name: ListRunIngestedNames :many
+SELECT "Name"
+FROM "RunIngestedArtifacts"
+WHERE "RunId" = @run_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted";

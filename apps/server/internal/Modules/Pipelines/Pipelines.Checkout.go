@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	"github.com/Khaymah/dhow/internal/gitproof"
 	"github.com/Khaymah/dhow/internal/gitsource"
@@ -71,6 +72,9 @@ func (s *Service) checkoutFor(
 func definitionTarget(run sqlc.PipelineRun) (string, string) {
 	if run.IsFork {
 		return run.BaseRef.String, run.BaseSha.String
+	}
+	if run.Trigger == triggers.EventArtifact {
+		return run.BaseRef.String, run.DefinitionSha.String
 	}
 	return run.Ref, run.DefinitionSha.String
 }

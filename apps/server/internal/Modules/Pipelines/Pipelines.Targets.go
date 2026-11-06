@@ -190,6 +190,9 @@ func (s *Service) artifactAvailable(st *step, rj sqlc.RunJob, name string, requi
 	if name == "" {
 		return !required
 	}
+	if own, ok := st.c.byKey[rj.Key]; ok && slices.Contains(own.Ingested, name) {
+		return true
+	}
 	for _, key := range rj.Needs {
 		plan, ok := st.c.byKey[key]
 		if ok && slices.ContainsFunc(plan.Artifacts, func(a pipelinespec.ArtifactPlan) bool { return a.Name == name }) {

@@ -42,6 +42,7 @@ type RunJob struct {
 	Name        string
 	Matrix      []MatrixValue
 	Needs       []string
+	Ingested    []string
 	If          string
 	Environment string
 	MaxParallel int
@@ -127,6 +128,7 @@ func (a *analysis) runJob(ja *jobAnalysis, index int, combo combination, keys ma
 	for _, n := range ja.needs {
 		rj.Needs = append(rj.Needs, keys[n]...)
 	}
+	rj.Ingested = append([]string(nil), ja.job.Ingested...)
 	spec := a.jobSpec(ja, rj)
 	for _, art := range ja.artifacts {
 		rj.Artifacts = append(rj.Artifacts, ArtifactPlan{
@@ -320,6 +322,7 @@ type digestInput struct {
 	Key, JobID, Name, If, Environment string
 	Matrix                            []MatrixValue
 	Needs                             []string
+	Ingested                          []string `json:",omitempty"`
 	MaxParallel                       int
 	Spec                              []byte
 	Expressions                       map[string]string
@@ -335,7 +338,7 @@ func runJobDigest(rj *RunJob) (string, error) {
 	}
 	raw, err := json.Marshal(digestInput{
 		Key: rj.Key, JobID: rj.JobID, Name: rj.Name, If: rj.If, Environment: rj.Environment,
-		Matrix: rj.Matrix, Needs: rj.Needs, MaxParallel: rj.MaxParallel, Spec: spec,
+		Matrix: rj.Matrix, Needs: rj.Needs, Ingested: rj.Ingested, MaxParallel: rj.MaxParallel, Spec: spec,
 		Expressions: rj.Expressions, Steps: rj.Steps, Artifacts: rj.Artifacts, Cache: rj.Cache,
 	})
 	if err != nil {

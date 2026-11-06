@@ -21,6 +21,7 @@ import (
 	audit "github.com/Khaymah/dhow/apps/server/internal/Modules/Audit"
 	environments "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments"
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
+	ingest "github.com/Khaymah/dhow/apps/server/internal/Modules/Ingest"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
 	overview "github.com/Khaymah/dhow/apps/server/internal/Modules/Overview"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
@@ -50,6 +51,7 @@ type Options struct {
 	Sources   *sources.Service
 	Pipelines *pipelines.Service
 	Artifacts *artifacts.Service
+	Ingest    *ingest.Service
 	Overview  *overview.Service
 	Tokens    *tokens.Service
 	Prefs     *preferences.Service
@@ -78,6 +80,7 @@ func Policies() []policy.Rule {
 	rules = append(rules, sources.Policies()...)
 	rules = append(rules, pipelines.Policies()...)
 	rules = append(rules, artifacts.Policies()...)
+	rules = append(rules, ingest.Policies()...)
 	rules = append(rules, overview.Policies()...)
 	rules = append(rules, tokens.Policies()...)
 	rules = append(rules, preferences.Policies()...)
@@ -138,6 +141,7 @@ func NewRouter(o Options) http.Handler {
 		root.Mount(config.RunnerAPIPrefix, RunnerPlane(o))
 	}
 	mountWebhooks(root, o)
+	mountIngest(root, o)
 	root.Mount("/", public)
 	return root
 }
@@ -187,6 +191,9 @@ func publicRouter(o Options) chi.Router {
 			if o.Sources != nil {
 				sources.Routes(timed, sources.Deps{Service: o.Sources, Guard: guard, Log: o.Log})
 			}
+			if o.Ingest != nil {
+				ingest.Routes(timed, ingest.Deps{Service: o.Ingest, Guard: guard, Log: o.Log})
+			}
 			if o.Pipelines != nil {
 				pipelines.Routes(timed, pipelines.Deps{Service: o.Pipelines, Guard: guard, Log: o.Log})
 			}
@@ -226,7 +233,7 @@ func publicRouter(o Options) chi.Router {
 }
 
 func isAPIPath(p string) bool {
-	for _, prefix := range []string{"/api", config.RunnerAPIPrefix, config.WebhookPrefix} {
+	for _, prefix := range []string{"/api", config.RunnerAPIPrefix, config.WebhookPrefix, ingestRoot} {
 		if p == prefix || strings.HasPrefix(p, prefix+"/") {
 			return true
 		}

@@ -95,6 +95,9 @@ const (
 	CodeGroupRequired          = "CONCURRENCY_GROUP_REQUIRED"
 	CodeSpecTooLarge           = "JOB_SPEC_TOO_LARGE"
 	CodeSpecInvalid            = "JOB_SPEC_INVALID"
+	CodeArtifactTriggerInvalid = "ARTIFACT_TRIGGER_INVALID"
+	CodeIngestedNotDeclared    = "INGESTED_NOT_DECLARED"
+	CodeIngestedInvalid        = "INGESTED_INVALID"
 )
 
 func message(code string) string {
@@ -145,7 +148,7 @@ func parseMessage(code string) string {
 	case CodeTypeMismatch:
 		return "this value has the wrong type"
 	case CodeTriggerNotSupported:
-		return "this trigger is not supported yet (schedule comes after the first release, artifact with M6)"
+		return "this trigger is not supported yet (schedule comes after the first release)"
 	}
 	return ""
 }
@@ -216,6 +219,12 @@ func jobMessage(code string) string {
 		return "the job is too large once expanded"
 	case CodeSpecInvalid:
 		return "the expanded job is not a valid job spec"
+	case CodeArtifactTriggerInvalid:
+		return "on.artifact needs names: 1 to 16 artifact names of letters, digits, ., _ and -, each used once"
+	case CodeIngestedNotDeclared:
+		return "ingested: names an artifact that on.artifact.names does not list (or the pipeline has no on.artifact)"
+	case CodeIngestedInvalid:
+		return "ingested: is up to 16 artifact names of letters, digits, ., _ and -, each used once and not produced by a job of this pipeline"
 	}
 	return ""
 }

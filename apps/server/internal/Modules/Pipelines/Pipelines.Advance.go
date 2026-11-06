@@ -144,6 +144,13 @@ func (s *Service) environmentFor(ctx context.Context, q *sqlc.Queries, run sqlc.
 }
 
 func (s *Service) launch(ctx context.Context, q *sqlc.Queries, st *step, i int, plan *pipelinespec.RunJob) (bool, error) {
+	missing, err := s.ingestedMissing(ctx, q, st.run, plan)
+	if err != nil {
+		return false, err
+	}
+	if missing {
+		return true, s.endRunJob(ctx, q, st, i, models.JobSkipped, models.ReasonIngestedMissing)
+	}
 	var env *deployments.Environment
 	vars := st.vars
 	if plan.Environment != "" {
@@ -352,7 +359,7 @@ func planFeatures(plan *pipelinespec.RunJob) []string {
 	if slices.ContainsFunc(plan.Steps, func(sp pipelinespec.StepPlan) bool { return sp.Plugin != nil }) {
 		out = append(out, jobqueue.FeaturePlugins)
 	}
-	if len(plan.Artifacts) > 0 {
+	if len(plan.Artifacts) > 0 || len(plan.Ingested) > 0 {
 		out = append(out, jobqueue.FeatureArtifacts)
 	}
 	if plan.Cache != nil {

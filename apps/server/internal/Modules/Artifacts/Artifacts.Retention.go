@@ -17,6 +17,7 @@ import (
 type SweepReport struct {
 	Ran      bool
 	Expired  int64
+	Pinned   int64
 	Removed  int
 	Orphans  int
 	TempGone int
@@ -48,6 +49,11 @@ func (s *Service) Sweep(ctx context.Context) (SweepReport, error) {
 		if n < config.BlobSweepBatch {
 			break
 		}
+	}
+	pinned, expired, err := s.sweepIngested(ctx)
+	report.Pinned, report.Expired = pinned, report.Expired+expired
+	if err != nil {
+		return report, err
 	}
 	removed, orphans, ran, err := s.sweepBlobs(ctx)
 	report.Removed, report.Orphans, report.Ran = removed, orphans, ran

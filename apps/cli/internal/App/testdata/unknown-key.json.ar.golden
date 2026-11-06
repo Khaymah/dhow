@@ -12,7 +12,7 @@
       "Path": "on.schedule",
       "Line": 4,
       "Column": 3,
-      "Message": "هذا الحدث غير مدعوم بعد (schedule بعد أول إصدار، وartifact مع M6)"
+      "Message": "هذا الحدث غير مدعوم بعد (schedule بعد أول إصدار)"
     },
     {
       "Code": "UNKNOWN_KEY",

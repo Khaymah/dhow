@@ -127,7 +127,9 @@ func TestSchemaListsOnlySupportedTriggers(t *testing.T) {
 	root := loadSchema(t)
 	triggers := root.resolve(t, jsonSchema{"$ref": "#/$defs/triggers"})
 	props := child(t, triggers, "properties", "on")
-	for _, deferred := range []string{"schedule", "artifact"} {
+	assert.Contains(t, props, "artifact")
+	assert.False(t, deferredTrigger("artifact"))
+	for _, deferred := range []string{"schedule"} {
 		assert.NotContains(t, props, deferred)
 		assert.True(t, deferredTrigger(deferred))
 	}

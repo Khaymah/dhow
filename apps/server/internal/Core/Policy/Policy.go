@@ -67,6 +67,7 @@ const (
 	SecretRead         Action = "secret.read"
 	SecretManage       Action = "secret.manage"
 	OrgSecretManage    Action = "org.secret.manage"
+	IngestManage       Action = "ingest.manage"
 
 	InstanceSettingsManage Action = "instance.settings.manage"
 )
@@ -77,6 +78,7 @@ func Actions() []Action {
 		RunnerRead, RunnerManage, TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, InstanceSettingsManage,
 		ProjectRead, ProjectManage, RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
 		EnvironmentManage, EnvironmentPause, EnvironmentBypass, DeploymentApprove, DeploymentRollback, DeploymentCheck, SecretRead, SecretManage, OrgSecretManage,
+		IngestManage,
 	}
 }
 
@@ -107,19 +109,19 @@ func Grants(role Role) []Action {
 			OrgRead, OrgUpdate, OrgLeave, OrgTransfer, OrgSecurity, MemberRead, MemberManage, AuditRead, SessionManageSelf, RunnerRead,
 			RunnerManage, TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, ProjectRead, ProjectManage,
 			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead, EnvironmentManage, EnvironmentPause, EnvironmentBypass, DeploymentApprove, DeploymentRollback, DeploymentCheck,
-			SecretRead, SecretManage, OrgSecretManage,
+			SecretRead, SecretManage, OrgSecretManage, IngestManage,
 		}
 	case RoleAdmin:
 		return []Action{
 			OrgRead, OrgUpdate, OrgLeave, MemberRead, MemberManage, AuditRead, SessionManageSelf, RunnerRead, RunnerManage,
 			TokenCreate, TokenManage, JobRead, JobCreate, JobCancel, LogRead, ProjectRead, ProjectManage,
 			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead, EnvironmentManage, EnvironmentPause, EnvironmentBypass, DeploymentApprove, DeploymentRollback, DeploymentCheck,
-			SecretRead, SecretManage, OrgSecretManage,
+			SecretRead, SecretManage, OrgSecretManage, IngestManage,
 		}
 	case RoleMaintainer:
 		return []Action{
 			OrgRead, OrgLeave, MemberRead, SessionManageSelf, RunnerRead, JobRead, JobCancel, LogRead, TokenCreate, ProjectRead, ProjectManage,
-			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead, EnvironmentPause, DeploymentApprove, DeploymentRollback, DeploymentCheck, SecretRead, SecretManage,
+			RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead, EnvironmentPause, DeploymentApprove, DeploymentRollback, DeploymentCheck, SecretRead, SecretManage, IngestManage,
 		}
 	case RoleDeveloper:
 		return []Action{

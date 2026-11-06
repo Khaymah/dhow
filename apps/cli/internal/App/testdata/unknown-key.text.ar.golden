@@ -1,3 +1,3 @@
-testdata/unknown-key.dhow.yml:4:3: خطأ TRIGGER_NOT_SUPPORTED_YET في on.schedule: هذا الحدث غير مدعوم بعد (schedule بعد أول إصدار، وartifact مع M6)
+testdata/unknown-key.dhow.yml:4:3: خطأ TRIGGER_NOT_SUPPORTED_YET في on.schedule: هذا الحدث غير مدعوم بعد (schedule بعد أول إصدار)
 testdata/unknown-key.dhow.yml:8:5: خطأ UNKNOWN_KEY في jobs.build.stepz: هذا المفتاح ليس من مفاتيح ملف خطوات النشر
 testdata/unknown-key.dhow.yml: الأخطاء 2، والتحذيرات 0. يرفض السيرفر خطوات النشر هذه.

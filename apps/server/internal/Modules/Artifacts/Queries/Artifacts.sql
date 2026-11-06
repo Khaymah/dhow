@@ -72,7 +72,9 @@ WHERE "Digest" = ANY (@digests::bytea[]) AND NOT "IsDeleted";
 SELECT pg_advisory_xact_lock(hashtextextended('dhow-artifacts:' || @organization_id::text, 0));
 
 -- name: OrganizationArtifactBytes :one
-SELECT COALESCE(sum(a."SizeBytes"), 0)::bigint AS "Bytes"
+SELECT COALESCE(sum(u."SizeBytes"), 0)::bigint AS "Bytes"
+FROM (SELECT DISTINCT ON (x."Digest") x."SizeBytes"
+      FROM (SELECT a."Digest", a."SizeBytes"
 FROM "Artifacts" a
 WHERE a."OrganizationId" = @organization_id AND NOT a."IsDeleted"
   AND (a."ExpiresAt" > now() OR EXISTS (SELECT 1
@@ -85,7 +87,12 @@ WHERE a."OrganizationId" = @organization_id AND NOT a."IsDeleted"
                  FROM "DeploymentReleases" n
                  WHERE n."TargetId" = r."TargetId" AND n."OrganizationId" = r."OrganizationId"
                    AND n."Kind" = 'deploy' AND n."State" = 'succeeded' AND NOT n."IsDeleted"
-                   AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases"));
+                   AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases"))
+            UNION ALL
+            SELECT i."Digest", i."SizeBytes"
+            FROM "IngestedArtifacts" i
+            WHERE i."OrganizationId" = @organization_id AND NOT i."IsDeleted") x
+      ORDER BY x."Digest") u;
 
 -- name: ProjectUntrustedArtifactBytes :one
 SELECT COALESCE(sum("SizeBytes"), 0)::bigint AS "Bytes"
@@ -214,6 +221,7 @@ WHERE "Id" IN (SELECT b."Id"
                WHERE NOT b."IsDeleted" AND b."LastUsedAt" < @before
                  AND NOT EXISTS (SELECT 1 FROM "Artifacts" a WHERE a."Digest" = b."Digest" AND NOT a."IsDeleted")
                  AND NOT EXISTS (SELECT 1 FROM "CacheEntries" c WHERE c."Digest" = b."Digest" AND NOT c."IsDeleted")
+                 AND NOT EXISTS (SELECT 1 FROM "IngestedArtifacts" i WHERE i."Digest" = b."Digest" AND NOT i."IsDeleted")
                ORDER BY b."LastUsedAt"
                LIMIT @batch
                FOR UPDATE SKIP LOCKED)

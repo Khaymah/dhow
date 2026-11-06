@@ -12,6 +12,7 @@ import (
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	commitstatus "github.com/Khaymah/dhow/apps/server/internal/Core/CommitStatus"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
+	triggers "github.com/Khaymah/dhow/apps/server/internal/Core/Triggers"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines/Models"
 	"github.com/Khaymah/dhow/internal/pipelinespec"
@@ -143,8 +144,12 @@ func (s *Service) prepare(ctx context.Context, run sqlc.PipelineRun, project sql
 }
 
 func (s *Service) fetch(ctx context.Context, run sqlc.PipelineRun, p *prepared) (bool, error) {
+	ref := run.Ref
+	if run.Trigger == triggers.EventArtifact {
+		ref, _ = definitionTarget(run)
+	}
 	req := DefinitionRequest{
-		OrganizationID: run.OrganizationId, ProjectID: run.ProjectId, Provider: run.Provider.String, Ref: run.Ref,
+		OrganizationID: run.OrganizationId, ProjectID: run.ProjectId, Provider: run.Provider.String, Ref: ref,
 		Sha: run.DefinitionSha.String, Path: run.DefinitionPath,
 	}
 	if run.RepositoryId != nil {

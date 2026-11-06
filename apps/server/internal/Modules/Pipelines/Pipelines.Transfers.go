@@ -19,20 +19,24 @@ func (s *Service) attachTransfers(
 	ctx context.Context, q *sqlc.Queries, st *step, rj sqlc.RunJob, plan *pipelinespec.RunJob, spec *runnerv1.JobSpec,
 	evalCtx pipelinespec.Context,
 ) (string, error) {
-	if len(rj.Needs) == 0 && len(plan.Artifacts) == 0 && plan.Cache == nil {
+	if len(rj.Needs) == 0 && len(plan.Ingested) == 0 && len(plan.Artifacts) == 0 && plan.Cache == nil {
 		return "", nil
 	}
 	if s.artifacts == nil {
-		if len(plan.Artifacts) == 0 && plan.Cache == nil {
+		if len(plan.Ingested) == 0 && len(plan.Artifacts) == 0 && plan.Cache == nil {
 			return "", nil
 		}
 		return models.ReasonArtifactsUnavailable, nil
 	}
 	prepared, err := s.artifacts.Prepare(ctx, q, artifactindex.Request{
-		OrganizationID: st.run.OrganizationId, RunID: st.run.Id, RunJobID: rj.Id, Needs: rj.Needs, FeedsDeploy: feedsDeploy(plan, spec),
+		OrganizationID: st.run.OrganizationId, RunID: st.run.Id, RunJobID: rj.Id, Needs: rj.Needs,
+		Ingested: plan.Ingested, FeedsDeploy: feedsDeploy(plan, spec),
 	})
 	if err != nil {
 		return "", err
+	}
+	if prepared.Refused == artifactindex.ReasonIngestedGone {
+		return models.ReasonIngestedGone, nil
 	}
 	if prepared.Refused != "" {
 		return models.ReasonArtifactUntrusted, nil

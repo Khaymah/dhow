@@ -17,6 +17,7 @@ sql:
       - internal/Modules/Sources/Queries
       - internal/Modules/Pipelines/Queries
       - internal/Modules/Artifacts/Queries
+      - internal/Modules/Ingest/Queries
       - internal/Modules/Alerts/Queries
       - internal/Modules/Overview/Queries
       - internal/Core/RateLimit/Queries

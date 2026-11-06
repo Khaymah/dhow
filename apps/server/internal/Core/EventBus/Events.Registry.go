@@ -137,8 +137,14 @@ const (
 	RegistryCredentialCreated = "registry_credential.created" //nolint:gosec // An audit action name, not a credential.
 	RegistryCredentialUpdated = "registry_credential.updated" //nolint:gosec // An audit action name, not a credential.
 	RegistryCredentialRemoved = "registry_credential.removed" //nolint:gosec // An audit action name, not a credential.
+
+	IngestTokenCreated = "ingest_token.created" //nolint:gosec // An audit action name, not a credential.
+	IngestTokenRevoked = "ingest_token.revoked" //nolint:gosec // An audit action name, not a credential.
+	ArtifactIngested   = "artifact.ingested"
+	IngestRejected     = "ingest.rejected"
 )
 
+//nolint:funlen // A flat list of event names.
 func AuditedEvents() []string {
 	return []string{
 		SystemInstanceSetupCompleted,
@@ -236,6 +242,10 @@ func AuditedEvents() []string {
 		RegistryCredentialCreated,
 		RegistryCredentialUpdated,
 		RegistryCredentialRemoved,
+		IngestTokenCreated,
+		IngestTokenRevoked,
+		ArtifactIngested,
+		IngestRejected,
 		JobSecretsDelivered,
 	}
 }

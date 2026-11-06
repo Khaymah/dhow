@@ -84,7 +84,7 @@ func decodeSpec(raw []byte) (*runnerv1.JobSpec, error) {
 
 func (s *Service) Prepare(ctx context.Context, tx *sqlc.Queries, r artifactindex.Request) (artifactindex.Prepared, error) {
 	out := artifactindex.Prepared{ArtifactMaxBytes: s.cfg.MaxBytes, CacheMaxBytes: s.cfg.CacheMaxBytes}
-	if len(r.Needs) == 0 {
+	if len(r.Needs) == 0 && len(r.Ingested) == 0 {
 		return out, nil
 	}
 	rows, err := tx.ListRunJobArtifacts(ctx, sqlc.ListRunJobArtifactsParams{
@@ -107,26 +107,36 @@ func (s *Service) Prepare(ctx context.Context, tx *sqlc.Queries, r artifactindex
 			DownloadToken: s.grants.issue(grantInput, r.RunJobID, d, expires),
 		})
 	}
-	return out, nil
+	return s.addIngested(ctx, tx, r, expires, out)
 }
+
+func (s *Service) Store() blob.Store { return s.store }
 
 func (s *Service) PrepareDigest(ctx context.Context, tx *sqlc.Queries, r artifactindex.DigestRequest) (artifactindex.Input, bool, error) {
 	a, err := tx.FindRollbackArtifact(ctx, sqlc.FindRollbackArtifactParams{
 		OrganizationID: r.OrganizationID, ProjectID: r.ProjectID, Digest: r.Digest, RollbackGraceSeconds: config.RollbackArtifactMaxKeep.Seconds(),
 	})
+	name, digest, size := a.Name, a.Digest, a.SizeBytes
 	if errors.Is(err, pgx.ErrNoRows) {
-		return artifactindex.Input{}, false, nil
+		ing, ierr := tx.FindRollbackIngested(ctx, sqlc.FindRollbackIngestedParams{OrganizationID: r.OrganizationID, ProjectID: r.ProjectID, Digest: r.Digest})
+		if errors.Is(ierr, pgx.ErrNoRows) {
+			return artifactindex.Input{}, false, nil
+		}
+		if ierr != nil {
+			return artifactindex.Input{}, false, ierr
+		}
+		name, digest, size, err = ing.Name, ing.Digest, ing.SizeBytes, nil
 	}
 	if err != nil {
 		return artifactindex.Input{}, false, err
 	}
-	d, ok := blob.DigestOf(a.Digest)
+	d, ok := blob.DigestOf(digest)
 	if !ok {
-		return artifactindex.Input{}, false, fmt.Errorf("artifact %s has a malformed digest", a.Name)
+		return artifactindex.Input{}, false, fmt.Errorf("artifact %s has a malformed digest", name)
 	}
 	expires := s.now().Add(config.ArtifactInputGrantTTL)
 	return artifactindex.Input{
-		Name: a.Name, Digest: d.String(), SizeBytes: a.SizeBytes, DownloadToken: s.grants.issue(grantInput, r.RunJobID, d, expires),
+		Name: name, Digest: d.String(), SizeBytes: size, DownloadToken: s.grants.issue(grantInput, r.RunJobID, d, expires),
 	}, true, nil
 }
 

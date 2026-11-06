@@ -89,17 +89,31 @@
       "additionalProperties": false,
       "properties": {}
     },
+    "artifactName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "artifactTrigger": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "Runs when an external CI uploads one of these artifacts with an ingest token. The pipeline is read from the default branch.",
+      "properties": {
+        "names": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "$ref": "#/$defs/artifactName" } },
+        "refs": { "$ref": "#/$defs/patterns" }
+      }
+    },
     "triggers": {
       "type": "object",
       "minProperties": 1,
       "additionalProperties": false,
-      "description": "schedule (after the first release) and artifact (M6) are refused with TRIGGER_NOT_SUPPORTED_YET.",
+      "description": "schedule (after the first release) is refused with TRIGGER_NOT_SUPPORTED_YET.",
       "properties": {
         "push": { "$ref": "#/$defs/branchFilter" },
         "tag": { "$ref": "#/$defs/tagFilter" },
         "pull_request": { "$ref": "#/$defs/branchFilter" },
         "manual": { "$ref": "#/$defs/manual" },
-        "api": { "$ref": "#/$defs/api" }
+        "api": { "$ref": "#/$defs/api" },
+        "artifact": { "$ref": "#/$defs/artifactTrigger" }
       }
     },
     "runner": {
@@ -263,6 +277,13 @@
           "maxItems": 64,
           "uniqueItems": true,
           "items": { "type": "string" }
+        },
+        "ingested": {
+          "description": "Artifacts uploaded by an external CI (listed in on.artifact.names). Each is downloaded and unpacked into /workspace before the first step.",
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/artifactName" }
         },
         "if": { "$ref": "#/$defs/condition" },
         "image": { "type": "string", "minLength": 1, "maxLength": 512 },

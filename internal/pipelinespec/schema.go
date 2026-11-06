@@ -18,7 +18,7 @@ var (
 )
 
 func deferredTrigger(key string) bool {
-	return key == "schedule" || key == "artifact"
+	return key == "schedule"
 }
 
 type schemaWalk struct {

@@ -15,6 +15,7 @@ const (
 	EnvArtifactRetentionDays   = "DHOW_ARTIFACT_RETENTION_DAYS"
 	EnvCacheMaxBytesPerProject = "DHOW_CACHE_MAX_BYTES_PER_PROJECT"
 	EnvArtifactMaxBytesPerOrg  = "DHOW_ARTIFACT_MAX_BYTES_PER_ORG"
+	EnvIngestMaxBytes          = "DHOW_INGEST_MAX_BYTES"
 )
 
 const (
@@ -61,18 +62,19 @@ const (
 )
 
 type Artifacts struct {
-	BlobDir       string
-	BlobDirIsDev  bool
-	MaxBytes      int64
-	RetentionDays int
-	CacheMaxBytes int64
-	OrgMaxBytes   int64
+	BlobDir        string
+	BlobDirIsDev   bool
+	MaxBytes       int64
+	RetentionDays  int
+	CacheMaxBytes  int64
+	OrgMaxBytes    int64
+	IngestMaxBytes int64
 }
 
 func DefaultArtifacts() Artifacts {
 	return Artifacts{
 		BlobDir: BlobDirDefault, MaxBytes: ArtifactMaxBytesDefault, RetentionDays: ArtifactRetentionDefault,
-		CacheMaxBytes: CacheMaxBytesDefault, OrgMaxBytes: ArtifactOrgMaxBytesDefault,
+		CacheMaxBytes: CacheMaxBytesDefault, OrgMaxBytes: ArtifactOrgMaxBytesDefault, IngestMaxBytes: ArtifactMaxBytesDefault,
 	}
 }
 
@@ -122,5 +124,9 @@ func loadArtifacts(getenv func(string) string, dev bool) (Artifacts, []error) {
 		errs = append(errs, errors.New(EnvArtifactRetentionDays+": "+err.Error()))
 	}
 	out.RetentionDays = days
+	if out.IngestMaxBytes, err = boundedBytes(EnvIngestMaxBytes, getenv(EnvIngestMaxBytes), out.MaxBytes,
+		ArtifactMaxBytesMin, ArtifactMaxBytesMax); err != nil {
+		errs = append(errs, err)
+	}
 	return out, errs
 }

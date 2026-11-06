@@ -96,6 +96,7 @@ func organizationPath(env *apptest.Env, fx fixture, rule policy.Rule) string {
 	}
 	path = secretsPath(env, path, uuid.MustParse(fx.orgA), project)
 	path = targetsPath(env, path, project)
+	path = ingestPath(env, path, project, uuid.MustParse(fx.byRole[policy.RoleOwner]))
 	if strings.Contains(path, "{invitationId}") {
 		path = strings.ReplaceAll(path, "{invitationId}", seedInvitation(env, fx.orgA, fx.byRole[policy.RoleOwner], string(policy.RoleViewer)))
 	}
@@ -143,6 +144,6 @@ func organizationBody(env *apptest.Env, fx fixture, rule policy.Rule) any {
 	case "POST /invitations/accept":
 		return map[string]string{"Token": "not-a-token", "Name": "Route Table", "Password": "a long enough password"}
 	default:
-		return targetsBody(env, rule)
+		return ingestBody(env, rule)
 	}
 }

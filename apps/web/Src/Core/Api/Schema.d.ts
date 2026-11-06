@@ -2852,6 +2852,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/ingest-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the ingest tokens of a project
+         * @description Needs `ingest.manage` on the project (Maintainer and above) and a session: an API token never reads or makes ingest tokens. A token shows its name, its first characters (`Prefix`), the ref patterns it allows and its state. The value is never shown again after it was made.
+         */
+        get: operations["listIngestTokens"];
+        put?: never;
+        /**
+         * Make an ingest token
+         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409 `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true`, otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`.
+         */
+        post: operations["createIngestToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke an ingest token
+         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The next upload with the token is 401 `INGEST_TOKEN_REVOKED`. Files it already uploaded stay.
+         */
+        post: operations["revokeIngestToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/ingested-artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the artifacts an outside CI uploaded
+         * @description Needs `artifact.read` on the project. Each file shows the ref and commit its uploader declared, what the CI said about itself (`Provenance`, declared and not verified), and the run it started, if any.
+         */
+        get: operations["listIngestedArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/projects/{projectId}/manual-inputs": {
         parameters: {
             query?: never;
@@ -5109,6 +5173,101 @@ export interface components {
             /** Format: date-time */
             ExpiresAt: string;
         };
+        /** @enum {string} */
+        IngestRefKind: "branch" | "tag";
+        IngestRefPattern: {
+            Kind: components["schemas"]["IngestRefKind"];
+            /** @description A branch or tag name pattern. `*` stays inside one `/` part, `**` crosses parts, `?` is one character. */
+            Pattern: string;
+        };
+        /** @enum {string} */
+        IngestTokenStatus: "active" | "expired" | "revoked";
+        IngestToken: {
+            /** Format: uuid */
+            Id: string;
+            /** Format: uuid */
+            ProjectId: string;
+            Name: string;
+            /** @description The first characters of the token, to tell tokens apart. Not enough to use it. */
+            Prefix: string;
+            RefPatterns: components["schemas"]["IngestRefPattern"][];
+            Status: components["schemas"]["IngestTokenStatus"];
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            ExpiresAt: string;
+            /** Format: date-time */
+            LastUsedAt?: string;
+            /** Format: date-time */
+            RevokedAt?: string;
+            /** Format: uuid */
+            CreatedByUserId?: string;
+            /** @description The environments of the project whose allowed refs could match one of the token's patterns. The check is conservative: a wide pattern such as `**` reaches every environment that allows any branch. */
+            Reaches?: string[];
+        };
+        CreateIngestTokenRequest: {
+            Name: string;
+            RefPatterns: components["schemas"]["IngestRefPattern"][];
+            /** @default 90 */
+            ExpiresInDays: number;
+            /**
+             * @description Must be `true` when the token reaches an environment that has deploy targets or reviewers. Otherwise the answer is 422 `INGEST_TOKEN_REACH_UNCONFIRMED`.
+             * @default false
+             */
+            AcknowledgeProtectedReach: boolean;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        CreatedIngestToken: {
+            Token: components["schemas"]["IngestToken"];
+            /** @description The token (`dhow_ing_...`). Shown in this answer only. */
+            Value: string;
+        };
+        CreatedIngestTokenResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["CreatedIngestToken"];
+        };
+        IngestTokenResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["IngestToken"];
+        };
+        IngestTokenListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["IngestToken"][];
+        };
+        IngestedArtifact: {
+            /** Format: uuid */
+            Id: string;
+            Name: string;
+            /** @description The SHA-256 of the archive, in hex. Dhow computed it itself. */
+            Digest: string;
+            /** Format: int64 */
+            SizeBytes: number;
+            /** @description The full ref the uploader declared, such as `refs/heads/main`. */
+            Ref: string;
+            RefKind: components["schemas"]["IngestRefKind"];
+            /** @description The commit the uploader declared. It is a hint, and Dhow did not check it against the repository. */
+            Sha: string;
+            /** @description What the CI said about itself. Declared by the uploader, not verified by Dhow. */
+            Provenance: {
+                [key: string]: string;
+            };
+            ProvenanceVerified: boolean;
+            TokenName: string;
+            /** Format: uuid */
+            RunId?: string;
+            /** Format: int64 */
+            RunNumber?: number;
+            RunState?: string;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            ExpiresAt: string;
+            /**
+             * Format: date-time
+             * @description Set while a release that succeeded on a deploy target still uses this file, so a rollback needs no rebuild.
+             */
+            PinnedUntil?: string;
+        };
+        IngestedArtifactListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["IngestedArtifact"][];
+        };
         ArtifactListResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["Artifact"][];
         };
@@ -5370,6 +5529,7 @@ export interface components {
         ProjectId: string;
         RunId: string;
         ArtifactId: string;
+        IngestTokenId: string;
         SecretName: string;
         VariableName: string;
         RegistryCredentialId: string;
@@ -9695,6 +9855,117 @@ export interface operations {
                 };
                 content: {
                     "application/gzip": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listIngestTokens: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of ingest tokens, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestTokenListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createIngestToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIngestTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description The token and its value, shown once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedIngestTokenResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    revokeIngestToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                ingestTokenId: components["parameters"]["IngestTokenId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CurrentFactorRequest"];
+            };
+        };
+        responses: {
+            /** @description The revoked token. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestTokenResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listIngestedArtifacts: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of uploaded artifacts, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestedArtifactListResponse"];
                 };
             };
             default: components["responses"]["Error"];

@@ -262,6 +262,7 @@ func runnerKeys(t *testing.T, path string) []leaksweep.Needle {
 func patterns() []leaksweep.Pattern {
 	return []leaksweep.Pattern{
 		{Name: "API token", Re: regexp.MustCompile(config.APITokenPrefix + tokenChars + `{20,}`)},
+		{Name: "ingest token", Re: regexp.MustCompile(config.IngestTokenPrefix + tokenChars + `{20,}`)},
 		{Name: "runner access token", Re: regexp.MustCompile(config.RunnerAccessTokenPrefix + tokenChars + `{20,}`)},
 		{Name: "runner registration token", Re: regexp.MustCompile(config.RunnerRegistrationTokenPrefix + tokenChars + `{20,}`)},
 		{

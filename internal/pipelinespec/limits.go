@@ -24,6 +24,7 @@ const (
 	MaxMatrixValue     = 128
 	MaxMatrixNameRunes = 512
 	MaxNeeds           = 64
+	MaxIngested        = 16
 
 	MaxPatterns      = 50
 	MaxPatternLength = pathglob.MaxLength
