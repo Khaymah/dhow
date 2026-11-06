@@ -121,7 +121,11 @@ if ! sweep_test "$work" '(TestAPrivateKeyOfATargetIsCaughtWhenPlanted|TestAPendi
   tail -n 30 "$work/canary-targets.out" >&2
   exit 1
 fi
-printf '    caught: the private key of a deploy target and a pending host key planted by the test\n'
+if grep -q -- '--- SKIP' "$work/canary-targets.out"; then
+  grep -o -- '--- SKIP: Test[A-Za-z]*' "$work/canary-targets.out" | sed 's/^--- SKIP: /    skipped, nothing of that kind in this demo: /'
+else
+  printf '    caught: the private key of a deploy target and a pending host key planted by the test\n'
+fi
 caught shape "found the runner access token in clear in $canary/shape/runner.log"
 say "Sweeping"
 sweep_test "$dirs" | tee "$work/sweep.out"
