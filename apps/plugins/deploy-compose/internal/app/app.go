@@ -23,10 +23,10 @@ func Run(ctx context.Context, s config.Settings, log *slog.Logger) *deployreleas
 
 func Code(f *deployrelease.Failure) string {
 	var v *policy.Violation
-	if errors.As(f, &v) {
-		return v.Code
-	}
 	if f.Exit == stack.ExitPolicy {
+		if errors.As(f, &v) {
+			return v.Code
+		}
 		return "COMPOSE_INVALID"
 	}
 	return deployplugin.Code(f.Exit)

@@ -73,18 +73,15 @@ func (d *deployment) render(image, check, mount, extra string) string {
       retries: 2
       start_period: 1s
     volumes:
-      - state:/state
+      - %s/shared/state:/state
 %s%s
-volumes:
-  state:
-    external: true
-    name: %s
-`, image, d.port, check, mount, extra, stateVol)
+`, image, d.port, check, d.path, mount, extra)
 }
 
 type spec struct {
 	release  string
 	compose  string
+	extra    map[string]string
 	batch    int
 	unsafe   bool
 	images   string
@@ -157,7 +154,11 @@ func (d *deployment) env(s spec, key, archivePath, sum, report string) []string 
 
 func (d *deployment) deploy(scenario string, s spec) result {
 	d.t.Helper()
-	archivePath, sum := pack(d.t, map[string]string{"compose.yaml": s.compose})
+	files := map[string]string{"compose.yaml": s.compose}
+	for name, body := range s.extra {
+		files[name] = body
+	}
+	archivePath, sum := pack(d.t, files)
 	work := d.t.TempDir()
 	key := filepath.Join(work, jobspec.TargetKeyFile(0))
 	require.NoError(d.t, os.WriteFile(key, d.hosts[0].clientKey, 0o400))

@@ -28,7 +28,6 @@ const (
 	envReport = "DHOW_E2E_REPORTS"
 	sshPort   = 22
 	appBase   = "docker.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec"
-	stateVol  = "e2e-state"
 	hostCount = 2
 )
 
@@ -122,7 +121,6 @@ func startHosts(t *testing.T, image string) []*composeHost {
 	for _, h := range out {
 		h.waitReady(t)
 		h.hostPublic = docker(t, "exec", h.name, "cat", "/etc/ssh/ssh_host_ed25519_key.pub")
-		docker(t, "exec", h.name, "docker", "volume", "create", stateVol)
 	}
 	return out
 }
@@ -198,19 +196,20 @@ func (h *composeHost) runningImages(project string) []string {
 
 func (h *composeHost) prepare(t *testing.T, path, project string) {
 	t.Helper()
-	docker(t, "exec", "-u", "deploy", h.name, "mkdir", "-p", path)
+	docker(t, "exec", "-u", "deploy", h.name, "mkdir", "-p", path+"/shared/state")
 	t.Cleanup(func() {
 		_, _ = dockerRun(nil, "exec", h.name, "docker", "compose", "--project-name="+project, "down", "--volumes", "--remove-orphans", "--timeout", "1")
 	})
 }
 
-func (h *composeHost) setBad(t *testing.T, ref, version string) {
+func (h *composeHost) setBad(t *testing.T, path, version string) {
 	t.Helper()
+	flag := path + "/shared/state/bad"
 	if version == "" {
-		h.exec(t, "docker", "run", "--rm", "-v", stateVol+":/state", ref, "rm", "-f", "/state/bad")
+		h.exec(t, "rm", "-f", flag)
 		return
 	}
-	out, err := dockerRun(bytes.NewReader([]byte(version)), "exec", "-i", h.name, "docker", "run", "--rm", "-i", "-v", stateVol+":/state", ref, "tee", "/state/bad")
+	out, err := dockerRun(bytes.NewReader([]byte(version)), "exec", "-i", "-u", "deploy", h.name, "tee", flag)
 	require.NoError(t, err, out)
 }
 

@@ -25,7 +25,8 @@
 
 - `compose.yaml` هو ملف المشروع كما جاء من الـ commit. اسمه في الهدف (`ComposeFile`) ويمكن أن يكون في مجلد فرعي.
 - `compose.dhow.yaml` تكتبه الإضافة. فيه صورة كل خدمة بالـ digest، فهو سجل الصور التي نُشرت في هذا الإصدار، ومنه يعرف الرجوع صور الإصدار السابق.
-- `shared/.env` اختياري. إذا وُجد، تمرّره الإضافة إلى Compose بـ `--env-file`. داو لا يكتب أسرار التطبيق على السيرفر: ضع الملف بنفسك.
+- `shared/.env` اختياري. إذا وُجد، تمرّره الإضافة إلى Compose بـ `--env-file`، وهو المصدر الوحيد لمتغيرات `${...}` في الملف. داو لا يكتب أسرار التطبيق على السيرفر: ضع الملف بنفسك.
+- `.dhow/compose-<الإصدار>.json` تكتبه الإضافة. فيه بصمة `compose.yaml` وبصمة `compose.dhow.yaml` وقت الفحص، وتقارنهما الإضافة قبل كل تشغيل.
 - `current` و`.dhow` كما في [النشر على سيرفر بـ SSH](deploy-ssh.md#كيف-تظهر-الملفات-على-السيرفر).
 
 مجلد الإصدار هو مجلد المشروع. المسارات النسبية في الملف، مثل `./conf`، تُحسب منه.
@@ -108,12 +109,34 @@ with:
 | `COMPOSE_UNSAFE_INCLUDE` | `include` في أعلى الملف |
 | `COMPOSE_UNSAFE_EXTENDS` | `extends` في خدمة |
 | `COMPOSE_UNSAFE_PROVIDER` | `provider` في خدمة |
+| `COMPOSE_UNSAFE_UNKNOWN_KEY` | مفتاح ليس في قائمة المفاتيح المعروفة، في خدمة أو في أعلى الملف أو في `deploy`. المفاتيح الجديدة في Compose تُرفض حتى تُضاف إلى القائمة |
+| `COMPOSE_UNSAFE_VOLUMES_FROM` | `volumes_from` |
+| `COMPOSE_UNSAFE_NAMESPACE_SHARED` | `pid` أو `network_mode` أو `ipc` بالصيغة `container:` أو `service:`، و`ipc: shareable` |
+| `COMPOSE_UNSAFE_EXTERNAL` | شبكة أو volume في أعلى الملف يكون `external` أو له `name` |
+| `COMPOSE_UNSAFE_VOLUME_DRIVER` | `driver` لـ volume غير `local` |
+| `COMPOSE_UNSAFE_SECRET_SOURCE` | `secrets` أو `configs` مصدرها غير `file`، مثل `environment` |
+| `COMPOSE_UNSAFE_BIND_RELEASE` | ربط مجلد الإصدار نفسه (`.`)، أو `releases`، أو مجلد إصدار كامل |
+| `COMPOSE_UNSAFE_BIND_COMPOSE` | ربط ملف Compose أو `compose.dhow.yaml` أو مجلدًا يحتويهما |
+| `COMPOSE_UNSAFE_BIND_SHARED` | ربط `shared` نفسه أو `shared/.env` |
+| `COMPOSE_UNSAFE_CGROUP_PARENT` و`_RUNTIME` و`_SYSCTLS` و`_GROUP_ADD` و`_EXTRA_HOSTS` و`_EXTERNAL_LINKS` و`_MODELS` | المفاتيح `cgroup_parent` و`runtime` و`sysctls` و`group_add` و`extra_hosts` و`external_links` و`models` |
+| `COMPOSE_FILE_CHANGED` | ملف Compose أو `compose.dhow.yaml` على السيرفر لا يطابق ما فُحص، أو لا يوجد سجل بصماتهما |
+| `COMPOSE_ENV_FORBIDDEN` | متغير يبدأ بـ `COMPOSE_` في `shared/.env` |
 | `COMPOSE_INVALID` | ملف ليس YAML صحيحًا، أو فيه أكثر من مستند، أو مفتاح مكرر، أو بلا خدمات، أو أكبر من 256 KiB، أو غير موجود في الأرشيف |
 
-- الربط المسموح: volume مسمّى، أو `tmpfs`، أو مسار نسبي داخل مجلد الإصدار، أو مسار مطلق تحت مجلد النشر مثل `/srv/shop/shared/uploads`.
+- الربط المسموح: volume مسمّى، أو `tmpfs`، أو مجلد فرعي داخل مجلد الإصدار مثل `./conf`، أو مجلد فرعي باسم تحت `shared` مثل `/srv/shop/shared/uploads`. لا يُسمح بربط مجلد الإصدار نفسه ولا ملفات Compose ولا `shared` نفسه ولا `shared/.env`، حتى لا تستطيع حاوية أن تعدّل الملفات التي فُحصت.
 - المرجعيات `&` و`<<` في YAML تُفكّ قبل الفحص، فلا تخفي خيارًا.
-- المدير يستطيع فتح قواعد `COMPOSE_UNSAFE_*` لهدف معيّن بالخيار `AllowUnsafeCompose`. هذا الخيار لا يفتح تثبيت الصور ولا منع `build`، ولا `COMPOSE_INVALID`.
+- المفاتيح المسموحة قائمة محددة: `image` و`command` و`entrypoint` و`environment` و`env_file` و`ports` و`expose` و`volumes` و`networks` و`depends_on` و`healthcheck` و`restart` و`labels` و`logging` و`deploy` (`resources` و`restart_policy` فقط) و`user` و`working_dir` و`read_only` و`tmpfs` و`stop_signal` و`stop_grace_period` و`init` و`hostname` و`domainname` و`mem_limit` و`cpus` و`ulimits` و`shm_size` و`secrets` و`configs` و`profiles` وما يبدأ بـ `x-`. أي مفتاح آخر يفشل بـ `COMPOSE_UNSAFE_UNKNOWN_KEY`.
+- المدير يستطيع فتح قواعد `COMPOSE_UNSAFE_*` لهدف معيّن بالخيار `AllowUnsafeCompose`، وهي المفاتيح التي تتطلب صلاحيات أوسع مثل `privileged` و`cap_add` و`devices` و`sysctls`. هذا الخيار لا يفتح تثبيت الصور ولا منع `build` ولا `COMPOSE_INVALID`، ولا القواعد التي تجلب ملفات أخرى أو تشارك مساحات الأسماء أو تستخدم موارد خارجية: `include` و`extends` و`provider` و`volumes_from` و`container:` و`service:` وما يتعلق بـ `external` وبمصادر `secrets`.
 - الرفض يوقف الـ job بالخروج 30 قبل أي اتصال أو كتابة على السيرفر، ويكتب الرمز واسم الخدمة في السجل. في التقرير يظهر النشر فاشلًا برسالة ثابتة.
+
+## المتغيرات في ملف Compose
+
+متغيرات `${...}` في الملف تأتي من `shared/.env` فقط. تشغّل الإضافة Compose بأمر `env -i` وبمتغيرين فقط: `PATH` ثابت، و`DOCKER_CONFIG` يشير إلى `.docker` في مجلد حساب النشر ليجد Docker تسجيل الدخول إلى الـ registry. فلا يصل إلى الملف شيء من بيئة السيرفر، مثل `${HOME}`.
+
+- إذا لم يوجد `shared/.env` تمرّر الإضافة `/dev/null`، فلا يُحمَّل ملف `.env` الموجود داخل الأرشيف أبدًا.
+- المتغير غير المعرّف يصبح فارغًا، ويحذّر Compose.
+- ملف `shared/.env` فيه متغير يبدأ بـ `COMPOSE_` يوقف النشر بـ `COMPOSE_ENV_FORBIDDEN`، لأن هذه المتغيرات تغيّر ما يقرؤه Compose.
+- المتغيرات غير مقبولة في اسم الصورة ولا في مسارات الربط ولا في الخيارات الحساسة مثل `privileged`.
 
 ## مدخلات الإضافة
 
@@ -143,7 +166,7 @@ with:
 1. تفحص الإضافة الأرشيف وبصمته وملف Compose، قبل أن تتصل بأي سيرفر.
 2. تتصل بالمفتاح المثبّت فقط، وتفحص المسار والمساحة و`current`، وتأخذ قفلًا على الهدف.
 3. ترفع الملفات إلى `releases/<الإصدار>` وتتحقق من بصماتها على السيرفر.
-4. تقرأ `compose.yaml` من السيرفر وتفحصه مرة ثانية، ثم تكتب `compose.dhow.yaml`.
+4. تقرأ `compose.yaml` من السيرفر وتفحصه مرة ثانية، ثم تكتب `compose.dhow.yaml` وسجل البصمات.
 5. تنفّذ `docker compose pull --quiet` للمشروع. إذا فشل السحب، لأن صورة غير موجودة في الـ registry مثلًا، يُحذف الإصدار ولا تتغيّر الخدمات التي تعمل ولا `current`، ويفشل النشر بـ `DEPLOY_FAILED`.
 6. تبدّل `current` إلى الإصدار الجديد.
 7. تنفّذ `docker compose up --detach --wait --no-build --wait-timeout=<ثواني>`. الأمر يعيد إنشاء الخدمات التي تغيّرت صورتها أو إعدادها فقط، وينتظر أن تصبح كل خدمة سليمة.
@@ -158,6 +181,7 @@ with:
 
 بعد التبديل يسبب الرجوع أحد أمرين: فشل `docker compose up --wait` (خدمة لم تصبح سليمة في المهلة)، أو فشل فحص الصحة الخارجي. وإلغاء الـ job بعد التبديل يرجع كذلك.
 
+- قبل كل تشغيل، ومنه الرجوع واستئناف نشر انقطع، تقرأ الإضافة ملفي الإصدار من السيرفر من جديد وتقارن بصمتيهما بالسجل وتفحصهما بكل القواعد. إذا تغيّر أحد الملفين بعد فحصه لا تشغّل الإضافة شيئًا، ويفشل الرجوع بـ `DEPLOY_ROLLBACK_FAILED` والرمز `COMPOSE_FILE_CHANGED` في السجل.
 - الرجوع يبدّل `current` إلى آخر إصدار فحصته داو ونجح، ثم ينفّذ `docker compose up --wait` بملفات ذلك الإصدار. الصور في `compose.dhow.yaml` مثبّتة بالـ digest، فإذا حُذفت من السيرفر سحبها Compose من جديد.
 - الخدمات التي لم تتغيّر لا يعاد إنشاؤها. الخدمات التي بدأت بالصور الجديدة تعود إلى صور الإصدار السابق.
 - أول نشر على هدف لا إصدار سابق له لا يستطيع الرجوع. تبقى الحاويات والإصدار كما هما، ويفشل الـ job. أصلح الخدمة وانشر من جديد.
