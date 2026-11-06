@@ -175,7 +175,7 @@ export const HostItem = (props: IHostItemProps) => {
           </Badge>
         )}
         {canManage ? (
-          <span className="flex flex-none flex-wrap items-center gap-1">
+          <span className="flex max-w-full min-w-0 flex-wrap items-center gap-1">
             {ACTIONS.map((action) => (
               <Button
                 key={action.Open}

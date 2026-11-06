@@ -181,7 +181,19 @@ test('the history renders a rolled-back release (served by a stub of the release
     await expect(row.getByText(`${ADDRESS}:22`)).toBeVisible();
     await expect(row.getByRole('button', { name: T['targets.rollback.action'] })).toHaveCount(0);
     await expect(page.getByRole('listitem').filter({ hasText: '1-aaaaaaaa-1' }).getByText(T['targets.release.auto'])).toHaveCount(0);
+    const width = viewport.width;
+    const actions = page.getByRole('list', { name: T['targets.hosts.title'] }).getByRole('button');
+    for (const action of await actions.all()) {
+      const box = await action.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+      expect((box?.x ?? width) + (box?.width ?? width)).toBeLessThanOrEqual(width);
+    }
+    const reason = row.locator('small').filter({ hasText: T['targets.release.reason'].split('{')[0] ?? '' }).first();
+    expect((await reason.boundingBox())?.width ?? 0).toBeGreaterThan(100);
     await shot(view, test.info().outputPath(`history-${lang}.png`));
+    await page.goto(`${environmentPath()}/new-target`);
+    await expect(page.getByRole('button', { name: T['targets.form.create'] })).toBeVisible();
     await close(view);
   }
 });
