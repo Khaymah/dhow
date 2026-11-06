@@ -15,6 +15,8 @@ while IFS= read -r file; do
   [[ -n $file ]] || continue
   case $file in
     docs/* | Plan/* | .claude/* | *.md) ;;
+    internal/deployrelease/* | internal/deployplugin/*) deploy=true ;;
+    internal/ingestpush/*) ingest=true ;;
     apps/web/* | packages/openapi/* | deploy/e2e/*) e2e=true ;;
     apps/server/* | internal/* | packages/proto/* | deploy/dev/* | deploy/dhow-git/* | deploy/m4-demo/* | go.mod | go.sum | \
       apps/runner/* | .github/workflows/demo.yml | deploy/ci/demo-areas.sh)
