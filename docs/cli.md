@@ -134,6 +134,6 @@ dhow lint --format json --lang en .dhow.yml
 
 | الأمر | المعنى |
 |---|---|
-| `dhow artifact push` | يعبّئ مجلدًا أو يأخذ `.tar.gz` ويرفعه إلى سيرفر داو بتوكن استقبال. انظر [رفع الملفات الناتجة](guides/ingest-action.md). |
+| `dhow artifact push` | يعبّئ مجلدًا أو يأخذ `.tar.gz` ويرفعه إلى سيرفر داو بتوكن استقبال. تدخل الملفات المخفية في الأرشيف، ويُرفض مجلد فيه `.git` في جذره. انظر [رفع الملفات الناتجة](guides/ingest-action.md). |
 | `dhow version` | يطبع الإصدار، والـ commit، وإصدار Go. |
 | `dhow help` | يعرض الأوامر وأكواد الخروج. |

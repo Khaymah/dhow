@@ -134,6 +134,6 @@ Control characters (C0 and C1) and invisible direction characters in a file name
 
 | Command | Meaning |
 |---|---|
-| `dhow artifact push` | Packs a folder or takes a `.tar.gz` and uploads it to a Dhow server with an ingest token. See [uploading artifacts](guides/ingest-action.md). |
+| `dhow artifact push` | Packs a folder or takes a `.tar.gz` and uploads it to a Dhow server with an ingest token. Hidden files go into the archive, and a folder with `.git` at its root is refused. See [uploading artifacts](guides/ingest-action.md). |
 | `dhow version` | Prints the version, the commit and the Go version. |
 | `dhow help` | Shows the commands and the exit codes. |

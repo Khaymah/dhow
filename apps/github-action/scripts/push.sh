@@ -11,9 +11,16 @@ bin=${DHOW_BIN:?DHOW_BIN is not set}
 [[ -x $bin && -f $bin ]] || fail "the dhow binary is missing"
 command -v jq >/dev/null 2>&1 || fail "jq is needed to read the result, and it is not installed on this runner"
 
-if [[ ${GITHUB_EVENT_NAME:-} == pull_request_target ]]; then
-  fail "refusing to upload on pull_request_target: that event runs with secrets next to code from the pull request. Upload from a push to a branch or a tag instead."
-fi
+case ${GITHUB_EVENT_NAME:-} in
+  pull_request_target)
+    fail "refusing to upload on pull_request_target: that event runs with secrets next to code from the pull request. Upload from a push to a branch or a tag instead."
+    ;;
+  workflow_run | issue_comment)
+    if [[ ${DHOW_ACTION_ALLOW_PRIVILEGED:-false} != true ]]; then
+      fail "refusing to upload on ${GITHUB_EVENT_NAME}: that event can run with secrets after input from a stranger. Upload from a push to a branch or a tag, or set allow-privileged-trigger: true if you checked what this workflow builds."
+    fi
+    ;;
+esac
 
 clip() {
   printf '%s' "$1" | LC_ALL=C tr -d '\000-\037\177' | LC_ALL=C head -c 200 | iconv -c -f UTF-8 -t UTF-8 || true
@@ -62,6 +69,8 @@ field() {
   jq -r --arg key "$1" 'if has($key) and .[$key] != null then .[$key] | tostring else empty end' <<<"$result"
 }
 
+tick=$'\x60'
+url_pattern="^https?://[^[:cntrl:][:space:]${tick}<>|]+\$"
 digest=$(field Digest)
 size=$(field SizeBytes)
 created=$(field Created)
@@ -76,7 +85,7 @@ run_url=$(field RunUrl)
 [[ $triggered == true || $triggered == false ]] || fail "the result has no valid triggered flag"
 [[ -z $run_id || $run_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || fail "the result has an invalid run id"
 [[ -z $run_number || $run_number =~ ^[0-9]+$ ]] || fail "the result has an invalid run number"
-[[ -z $run_url || $run_url =~ ^https?://[^[:cntrl:][:space:]]+$ ]] || fail "the result has an invalid run URL"
+[[ -z $run_url || $run_url =~ $url_pattern ]] || fail "the result has an invalid run URL"
 
 if [[ -n ${GITHUB_OUTPUT:-} ]]; then
   {
@@ -90,6 +99,6 @@ if [[ -n ${GITHUB_OUTPUT:-} ]]; then
   } >>"$GITHUB_OUTPUT"
 fi
 if [[ -n ${GITHUB_STEP_SUMMARY:-} ]]; then
-  printf 'Dhow stored sha256:%s (%s bytes). Created: %s. Run: %s\n' "$digest" "$size" "$created" "${run_url:-none}" >>"$GITHUB_STEP_SUMMARY"
+  printf 'Dhow stored %ssha256:%s%s (%s bytes). Created: %s. Run: %s%s%s\n' "$tick" "$digest" "$tick" "$size" "$created" "$tick" "${run_url:-none}" "$tick" >>"$GITHUB_STEP_SUMMARY"
 fi
 printf 'sha256:%s stored (%s bytes), created=%s, triggered=%s\n' "$digest" "$size" "$created" "$triggered"

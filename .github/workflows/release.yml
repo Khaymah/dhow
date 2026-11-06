@@ -612,6 +612,19 @@ jobs:
         if: steps.gate.outputs.mirror == 'true'
         working-directory: dist
         run: sha256sum --check --strict SHA256SUMS
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        if: steps.gate.outputs.mirror == 'true'
+      - name: Verify the signature of SHA256SUMS before any checksum is pinned
+        if: steps.gate.outputs.mirror == 'true'
+        working-directory: dist
+        env:
+          IDENTITY: ^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/tags/v
+        run: |
+          cosign verify-blob \
+            --bundle SHA256SUMS.sigstore.json \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "$IDENTITY" \
+            SHA256SUMS
       - name: Build the tree of the mirror with the checksums of this release pinned
         if: steps.gate.outputs.mirror == 'true'
         run: |
@@ -673,7 +686,11 @@ jobs:
           git -C "$repo" add --all
           git -C "$repo" commit --quiet --signoff --message "chore(release): mirror the action for $TAG"
           git -C "$repo" tag -- "$TAG"
-          git -C "$repo" push origin HEAD:refs/heads/main "refs/tags/$TAG"
+          if [[ "$VERSION" == *-* ]]; then
+            git -C "$repo" push origin "refs/tags/$TAG"
+          else
+            git -C "$repo" push origin HEAD:refs/heads/main "refs/tags/$TAG"
+          fi
       - name: Remove the deploy key from the runner
         if: always()
         run: rm -f -- "$RUNNER_TEMP/mirror-deploy-key"

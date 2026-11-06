@@ -25,7 +25,7 @@ import (
 
 const (
 	pushSha   = "2222222222222222222222222222222222222222"
-	pushToken = "dhow_ing_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde" //nolint:gosec // A made-up token for tests. allow-secret
+	pushToken = ingestpush.TokenPrefix + "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde"
 )
 
 type pushServer struct {

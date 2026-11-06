@@ -36,6 +36,9 @@ inputs:
   ca-file:
     description: A PEM file of extra certificate authorities, for a Dhow server behind your own CA.
     default: ""
+  allow-privileged-trigger:
+    description: The action refuses workflow_run and issue_comment events, which can run with secrets after input from a stranger. Set true only if you checked what the workflow builds. pull_request_target is always refused.
+    default: "false"
   release-base-url:
     description: Where to download the pinned dhow release from. Leave empty. The checksum pinned in the action is checked either way.
     default: ""
@@ -87,6 +90,7 @@ runs:
         DHOW_ACTION_TRIGGER: ${{ inputs.trigger }}
         DHOW_ACTION_RETRIES: ${{ inputs.retries }}
         DHOW_ACTION_CA_FILE: ${{ inputs.ca-file }}
+        DHOW_ACTION_ALLOW_PRIVILEGED: ${{ inputs.allow-privileged-trigger }}
         DHOW_PROV_REPOSITORY: ${{ github.repository }}
         DHOW_PROV_RUN_ID: ${{ github.run_id }}
         DHOW_PROV_RUN_ATTEMPT: ${{ github.run_attempt }}

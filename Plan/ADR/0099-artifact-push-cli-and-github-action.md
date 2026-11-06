@@ -55,6 +55,19 @@
 ### 7. اختبار `ingest-e2e`
 - job في `demo.yml` (شرط `!github.event.pull_request.draft` في `changes`، ونطاقه من `deploy/ci/demo-areas.sh`): يبني الـ CLI كإصدار `0.0.0-e2e` ويثبّت SHA-256 أرشيفه في `dhow.pin` ويقدّمه من `127.0.0.1`، ويشغّل السيرفر وForgejo بمكوّنات عرض M4، ويصنع مشروعًا فيه `on.artifact` وتوكنًا لـ `main`، ويشغّل `uses: ./apps/github-action`، ثم يتحقق أن `digest` في المخرجات هو المسجّل وأن التشغيل اتعمل، وأن التكرار `created=false` بالتشغيل نفسه، وأن `dhow.pin` بـ SHA غلط يفشل قبل أي رفع.
 
+### 8. تشديدات بعد المراجعة
+- **حارس الاستيراد** صار يفحص كل حزمة غير stdlib في الملف التنفيذي (ومنها الطرف الثالث وحزم مستودعنا)، على linux وdarwin وwindows. ممنوع في الاستيراد المباشر: `net` و`net/http*` و`crypto/tls` و`crypto/x509` و`syscall` و`unsafe` و`os/exec` و`golang.org/x/sys/*`، إلا في `internal/ingestpush`. والمستثنى بالاسم فقط، وكل استثناء له سبب:
+  - `unsafe` في حزم protobuf (`google.golang.org/protobuf/internal/{impl,protolazy,strs}` و`reflect/protoreflect` و`types/...`) وفي كود الـ protobuf المتولّد (`packages/proto/gen/go/dhow/runner/v1`) و`cel.dev/expr` و`genproto/googleapis/api/expr/v1alpha1`: المكتبة تستخدمه داخليًا للوصول إلى الحقول، ولا يفتح شبكة ولا عملية.
+  - `syscall` في `github.com/antlr4-go/antlr/v4` (للمقارنة بالخطأ `ENOENT` عند فتح ملف) وفي `internal/safefile` (فتح الملفات دون اتباع الروابط، وهو سبب وجودها).
+  - لا استثناء لـ `net` ولا `os/exec` ولا `x/sys`. أي استثناء جديد يحتاج تعديل الاختبار وهذا الـ ADR.
+- ولا يستورد `internal/ingestpush` إلا ملفات `apps/cli/internal/App/Push*.go`، ويفحص اختبار ذلك.
+- **المجلد:** يُرفض مجلد فيه `.git` في جذره (`PACK_HAS_GIT_DIR`، كود 1) إلا مع `--include-git`، والـ Action لا تمرره أبدًا. الملفات المخفية تدخل، وهذا موثّق مع تحذير `persist-credentials`. ويطبع الأمر عدد الإدخالات والحجمين.
+- **الحدود محليًا:** فحص `archive.Walk` المحلي بحد السيرفر (`--max-bytes`، الافتراضي 1 GiB، وثمانية أمثاله بعد الفك)، فيفشل `ARTIFACT_TOO_LARGE` قبل أي اتصال.
+- **http:** يتحقق `DialContext` أن الاسم يشير إلى عناوين loopback فقط (`netip.Addr.IsLoopback`)، ويُختبر بمحلّل أسماء وهمي.
+- **الإشارات:** `SIGINT` و`SIGTERM` يلغيان السياق فيُحذف الأرشيف المؤقت. ومسار يشبه التوكن (`dhow_ing_`) يُرفض دون طباعته.
+- **الـ Action:** ترفض `workflow_run` و`issue_comment` افتراضيًا ويُفتحان بمدخل `allow-privileged-trigger: true`، و`pull_request_target` مرفوض دائمًا. وملخص الخطوة يكتب البصمة والعنوان بين علامتي code، وعنوان التشغيل المقبول لا يحوي `` ` `` ولا `<` ولا `>` ولا `|`. والتوثيق يوجب استخدام المخرجات عبر `env:`.
+- **المرآة:** تتحقق من توقيع cosign لـ `SHA256SUMS` بنفس هوية `verify-install` قبل كتابة `dhow.pin`، ووسم الإصدار التجريبي (`-rc` وغيره) يُدفع وحده دون تغيير `main`.
+
 ## العواقب
 - الملف التنفيذي `dhow` يكبر (حزم net وTLS)، وتصير حدود التحكم في الشبكة اختبارات وhook بدل غياب الحزم. من يضيف استيراد شبكة خارج `internal/ingestpush` يفشل له الاختبار.
 - أي تغيير في بروتوكول الاستقبال (ADR-0098) يمر على اختبار E2E يستخدم العميل الحقيقي (`Modules/Ingest/Test/E2E/Push_test.go` و`Action_test.go`)، فلا ينحرف العميل عن السيرفر.

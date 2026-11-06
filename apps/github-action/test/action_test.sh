@@ -25,6 +25,7 @@ expect() {
   if "$@"; then ok "$name"; else bad "$name"; fi
 }
 
+tick=$'\x60'
 contains() { grep -qF -- "$2" "$1"; }
 lacks() { ! grep -qF -- "$2" "$1"; }
 missing() { [[ ! -e $1 ]]; }
@@ -206,7 +207,7 @@ push() {
     STUB_EXIT="${STUB_EXIT:-0}" \
     DHOW_BIN="$root/stub-dhow" DHOW_INGEST_TOKEN="${TOKEN-$token}" DHOW_ACTION_SERVER=https://dhow.example.com \
     DHOW_ACTION_PATH=dist/web DHOW_ACTION_NAME=web DHOW_ACTION_REF=main DHOW_ACTION_REF_KIND=branch \
-    DHOW_ACTION_SHA=1111111111111111111111111111111111111111 DHOW_ACTION_TRIGGER="${TRIGGER-true}" DHOW_ACTION_RETRIES=3 \
+    DHOW_ACTION_SHA=1111111111111111111111111111111111111111 DHOW_ACTION_TRIGGER="${TRIGGER-true}" DHOW_ACTION_RETRIES=3 DHOW_ACTION_ALLOW_PRIVILEGED="${ALLOW-}" \
     DHOW_PROV_REPOSITORY=Khaymah/dhow DHOW_PROV_RUN_ID=42 DHOW_PROV_RUN_ATTEMPT=1 DHOW_PROV_WORKFLOW="${WORKFLOW-CI}" \
     DHOW_PROV_ACTOR=sara DHOW_PROV_EVENT="${EVENT-push}" DHOW_PROV_RUN_URL=https://github.com/Khaymah/dhow/actions/runs/42 \
     GITHUB_EVENT_NAME="${EVENT-push}" GITHUB_OUTPUT="$root/push.out" GITHUB_STEP_SUMMARY="$root/summary" \
@@ -251,6 +252,28 @@ expect "pull_request_target is refused" test "$code" -ne 0
 expect "and the CLI never ran" missing "$STUB_MARKER"
 expect "with a reason" contains "$root/push.log" "pull_request_target"
 
+for event in workflow_run issue_comment; do
+  EVENT=$event
+  code=0
+  push || code=$?
+  expect "$event is refused by default" test "$code" -ne 0
+  expect "and the CLI never ran for $event" missing "$STUB_MARKER"
+  ALLOW=true
+  code=0
+  push || code=$?
+  unset ALLOW
+  unset EVENT
+  expect "$event is allowed with the explicit opt-in" test "$code" -eq 0
+done
+code=0
+EVENT=pull_request_target ALLOW=true push || code=$?
+expect "pull_request_target stays refused even with the opt-in" test "$code" -ne 0
+
+code=0
+push || code=$?
+expect "the summary shows the run URL as code" contains "$root/summary" 'Run: '"$tick"'https://dhow.example.com/runs/7'"$tick"
+expect "the CLI never gets the option that packs the history" lacks "$STUB_ARGV" "--include-g"
+
 TOKEN=
 code=0
 push || code=$?
@@ -288,7 +311,9 @@ for broken in \
   '{"Digest":"'"$digest"'","SizeBytes":1,"Created":"yes","Triggered":true}' \
   '{"Digest":"'"$digest"'","SizeBytes":1,"Created":true,"Triggered":true,"RunId":"nope"}' \
   '{"Digest":"'"$digest"'","SizeBytes":1,"Created":true,"Triggered":true,"RunUrl":"https://a.example/\nINJECT=1"}' \
-  '{"Digest":"'"$digest"'","SizeBytes":1,"Created":true,"Triggered":true,"RunUrl":"javascript:alert(1)"}'; do
+  '{"Digest":"'"$digest"'","SizeBytes":1,"Created":true,"Triggered":true,"RunUrl":"javascript:alert(1)"}' \
+  '{"Digest":"'"$digest"'","SizeBytes":1,"Created":true,"Triggered":true,"RunUrl":"https://a.example/'"$tick"'x'"$tick"'"}' \
+  '{"Digest":"'"$digest"'","SizeBytes":1,"Created":true,"Triggered":true,"RunUrl":"https://a.example/<img src=x>"}'; do
   printf '%s\n' "$broken" >"$reply"
   code=0
   push || code=$?

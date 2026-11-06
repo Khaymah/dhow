@@ -16,6 +16,13 @@ dhow artifact push \
 
 The command packs the folder into a `tar.gz` archive with Dhow's own safe rules, or takes a `.tar.gz` file you already built. It then computes the SHA-256, checks the archive with the same rules the server uses, and uploads it to `PUT /ingest/v1/artifacts/{sha256}` with the required headers. Packing gives the same archive, byte for byte, whenever the folder is the same.
 
+### What goes into the archive
+
+- **Everything** in the folder goes in, hidden files included (the ones that start with a dot, such as `.env`) and safe links. Make `path` the build output folder, such as `dist`, and not the root of the repository, so that files you did not mean to upload are not sent.
+- If the folder has a `.git` entry at its root, the command refuses with the code `PACK_HAS_GIT_DIR` (exit code 1), because the upload would carry the whole history of the repository and maybe credentials stored in it. Use `--include-git` only if you mean it.
+- Warning: the `actions/checkout` step stores the GitHub token inside `.git/config` unless you write `persist-credentials: false`. Always write it, and never upload the root of the repository.
+- After a success the command prints the number of entries, their size unpacked, and the size that was sent.
+
 ### Options
 
 | Option | Meaning |
@@ -27,6 +34,8 @@ The command packs the folder into a `tar.gz` archive with Dhow's own safe rules,
 | `--sha COMMIT` | The commit that was built, in full lowercase hex. Required. |
 | `--provenance K=V` | A text fact about the CI. Repeat the option for each fact. Up to 16 facts, and 256 characters for a value. |
 | `--no-trigger` | Stores the file and does not start a run. |
+| `--include-git` | Packs a folder that has a `.git` entry at its root. Refused without it. The Action never uses it. |
+| `--max-bytes N` | The archive size limit of the server (`DHOW_INGEST_MAX_BYTES`). The default is 1 GiB. The command refuses locally an archive over it, or one that unpacks to more than eight times it. |
 | `--token-stdin` | Reads the token from standard input instead of the variable. |
 | `--ca-file FILE` | A PEM file of extra certificate authorities. The variable `DHOW_CA_FILE` works too. |
 | `--retries N` | Retries after a temporary failure, from 0 to 10. The default is 3. |
@@ -75,7 +84,7 @@ Size: 100 bytes
 | Code | Meaning |
 |---|---|
 | `0` | The file is stored (`201`), or it was already stored (`200`). |
-| `1` | The server refused the file or its details: `DIGEST_MISMATCH`, `ARCHIVE_UNSAFE`, `ARTIFACT_TOO_LARGE`, `ARTIFACT_QUOTA_EXCEEDED`, `INGEST_TOKEN_QUOTA`, `LENGTH_REQUIRED`, `VALIDATION_FAILED`, `PROJECT_ARCHIVED`, or any unknown `4xx`. |
+| `1` | The server refused the file or its details: `DIGEST_MISMATCH`, `ARCHIVE_UNSAFE`, `ARTIFACT_TOO_LARGE`, `PACK_HAS_GIT_DIR`, `ARTIFACT_QUOTA_EXCEEDED`, `INGEST_TOKEN_QUOTA`, `LENGTH_REQUIRED`, `VALIDATION_FAILED`, `PROJECT_ARCHIVED`, or any unknown `4xx`. |
 | `2` | The command or its input is wrong, the folder cannot be read, or the command does not trust the server certificate. Nothing was sent. |
 | `3` | The server does not accept the token: `INGEST_TOKEN_INVALID`, `INGEST_TOKEN_REVOKED`, `INGEST_TOKEN_EXPIRED`, or it does not allow it for this ref: `REF_NOT_ALLOWED_FOR_TOKEN`. |
 | `4` | A temporary failure was still there after the retries: `NETWORK`, `TIMEOUT`, `UPLOAD_TOO_SLOW`, `RATE_LIMITED`, `SERVICE_UNAVAILABLE`, or any `5xx`. |
@@ -88,6 +97,8 @@ Messages go to `stderr` in your language, with the code in brackets, such as `(R
 - The command honours `HTTPS_PROXY` and `NO_PROXY` from its environment.
 - The command uses the certificate authorities your system trusts. If your server is behind your company's own authority, pass its PEM file with `--ca-file` or `DHOW_CA_FILE`. It is added to the system authorities and does not replace them.
 - There is no option to turn off certificate checking.
+- With `http://localhost` the command checks at connection time that the name resolves to loopback addresses only, and refuses otherwise. So the token cannot go in clear text to another machine.
+- `SIGINT` and `SIGTERM` stop the upload and delete the temporary archive.
 - `dhow lint` never uses the network, and that does not change. See the [command line tool](../cli.md).
 
 ## The GitHub Action
@@ -116,8 +127,12 @@ jobs:
           token: ${{ secrets.DHOW_INGEST_TOKEN }}
           path: dist/web
           name: web
-      - run: echo "Dhow stored sha256:${{ steps.dhow.outputs.digest }}"
+      - env:
+          DIGEST: ${{ steps.dhow.outputs.digest }}
+        run: echo "Dhow stored sha256:$DIGEST"
 ```
+
+Always use the outputs of the Action through `env:`, and never write `${{ steps.dhow.outputs.… }}` inside `run:`. The expression is replaced in the text of the script before it runs, so an unexpected value becomes commands. A variable reaches the shell as a value only.
 
 Pin the Action to a full commit SHA instead of the tag if you want the highest safety. A tag points to one release and never moves, but the commit is the clearest thing to review.
 
@@ -135,6 +150,7 @@ Pin the Action to a full commit SHA instead of the tag if you want the highest s
 | `trigger` | `false` stores the file without a run. The default is `true`. |
 | `retries` | Retries after a temporary failure. The default is `3`. |
 | `ca-file` | A PEM file of extra certificate authorities. |
+| `allow-privileged-trigger` | The Action refuses the `workflow_run` and `issue_comment` events by default. Set it to `true` only if you checked what this workflow builds. `pull_request_target` is always refused. The default is `false`. |
 | `release-base-url` | Leave it empty. Where to download `dhow` from in tests. The pinned SHA-256 check still runs with it. |
 
 The Action adds these text fields from the GitHub context to `Dhow-Ingest-Provenance`: `Provider` (its value is `github-actions`), `Repository`, `RunId`, `RunAttempt`, `Workflow`, `Actor`, `Event` and `RunUrl`. Hidden characters are removed from them, and each is cut at 200 bytes. Remember that Dhow shows them as declared by the CI and not verified.
@@ -167,14 +183,15 @@ The Action checks every output before it writes it: the digest is 64 hex charact
 - Run the Action from a `push` event on a branch or tag, or from `workflow_dispatch` or `release`. These events run your own repository's code.
 - **Do not use `pull_request_target`.** That event gives repository secrets to a workflow that may run code from a pull request written by a stranger. The Action refuses to run under it and fails with a clear message.
 - Repository secrets do not reach pull requests from forks on the `pull_request` event. So `token` is empty and the Action fails, which is what you want.
-- Do not upload from `workflow_run` unless you are sure the first workflow built a trusted branch and not a pull request.
+- The Action also refuses `workflow_run` and `issue_comment` by default, because they can run with secrets after input from a stranger. Add `allow-privileged-trigger: true` only after you are sure the workflow builds a trusted branch and not a pull request or a comment.
+- In the step summary the digest and the address are written as code (between backticks). Do not put the outputs of the Action into `run:` as a direct expression, as in the example above.
 - Give the token the narrowest patterns you can (`main` or `release/*`) and a short life, and replace it from time to time. Keeping it in an environment secret protected by a branch rule protects it further.
 - The token reaches the command in an environment variable of the upload step alone. It never appears in the command line, and neither the command nor the script prints it.
 - Set `permissions: contents: read`. The Action needs nothing more.
 
 ### Publishing the Action (for maintainers)
 
-The release workflow copies `apps/github-action` to the `Khaymah/dhow-action` repository on every release tag, after the binaries are published. It writes `dhow.pin` with the SHA-256 of that release, installs the pinned release the way a user's workflow would, and then pushes a commit and a tag of the same name. A tag is never moved, and if the tag exists the job fails.
+The release workflow copies `apps/github-action` to the `Khaymah/dhow-action` repository on every release tag, after the binaries are published. It first verifies the cosign signature of `SHA256SUMS` against the identity of the release workflow, then writes `dhow.pin` with the SHA-256 of that release, installs the pinned release the way a user's workflow would, and then pushes a commit and a tag of the same name. A tag is never moved, and if the tag exists the job fails. A prerelease (such as `-rc.1`) pushes its tag only and does not change `main` in the mirror.
 
 One-time setup:
 
