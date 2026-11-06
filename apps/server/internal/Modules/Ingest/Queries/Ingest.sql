@@ -95,9 +95,27 @@ SELECT count(*)::bigint AS "Total"
 FROM "IngestedArtifacts"
 WHERE "OrganizationId" = @organization_id AND "ProjectId" = @project_id AND NOT "IsDeleted";
 
--- name: IngestOrganizationBytes :one
-SELECT (COALESCE((SELECT sum(a."SizeBytes") FROM "Artifacts" a WHERE a."OrganizationId" = @organization_id AND NOT a."IsDeleted" AND a."ExpiresAt" > now()), 0)
-      + COALESCE((SELECT sum(i."SizeBytes") FROM "IngestedArtifacts" i WHERE i."OrganizationId" = @organization_id AND NOT i."IsDeleted"), 0))::bigint AS "Bytes";
+-- name: IngestTokenBytes :one
+SELECT COALESCE(sum(u."SizeBytes"), 0)::bigint AS "Bytes"
+FROM (SELECT DISTINCT ON ("Digest") "SizeBytes"
+      FROM "IngestedArtifacts"
+      WHERE "TokenId" = @token_id AND NOT "IsDeleted"
+      ORDER BY "Digest") u;
+
+-- name: RecheckIngestToken :one
+SELECT t."Id", t."RevokedAt", t."ExpiresAt", p."State" AS "ProjectState"
+FROM "IngestTokens" t
+JOIN "Projects" p ON p."Id" = t."ProjectId" AND p."OrganizationId" = t."OrganizationId" AND NOT p."IsDeleted"
+WHERE t."Id" = @id AND NOT t."IsDeleted"
+FOR SHARE OF t;
+
+-- name: ListEnvironmentReach :many
+SELECT e."Name", e."AllowedRefs",
+       EXISTS (SELECT 1 FROM "DeployTargets" d WHERE d."EnvironmentId" = e."Id" AND NOT d."IsDeleted")::boolean AS "HasTargets",
+       EXISTS (SELECT 1 FROM "EnvironmentReviewers" r WHERE r."EnvironmentId" = e."Id" AND NOT r."IsDeleted")::boolean AS "HasReviewers"
+FROM "Environments" e
+WHERE e."OrganizationId" = @organization_id AND e."ProjectId" = @project_id AND NOT e."IsDeleted"
+ORDER BY e."Name";
 
 -- name: IngestTargetProject :one
 SELECT p."Id", p."State"

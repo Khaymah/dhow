@@ -29,7 +29,10 @@ const (
 	targetArtifact    = "ingested_artifact"
 )
 
-var ErrNoStore = errors.New("the ingest service needs a blob store")
+var (
+	ErrNoStore   = errors.New("the ingest service needs a blob store")
+	ErrNoLimiter = errors.New("the ingest service needs a rate limiter")
+)
 
 type DB interface {
 	sqlc.DBTX
@@ -65,11 +68,15 @@ type Service struct {
 	log       *slog.Logger
 	now       func() time.Time
 	slots     chan struct{}
+	inflight  *inflight
 }
 
 func NewService(o Options) (*Service, error) {
 	if o.Store == nil {
 		return nil, ErrNoStore
+	}
+	if o.Limiter == nil {
+		return nil, ErrNoLimiter
 	}
 	now := o.Now
 	if now == nil {
@@ -90,7 +97,7 @@ func NewService(o Options) (*Service, error) {
 	}
 	return &Service{
 		db: o.DB, store: o.Store, triggers: o.Triggers, bus: o.Bus, factors: o.Factors, limiter: o.Limiter, cfg: cfg,
-		publicURL: strings.TrimSuffix(o.PublicURL, "/"), log: o.Log, now: now, slots: make(chan struct{}, config.IngestConcurrent),
+		publicURL: strings.TrimSuffix(o.PublicURL, "/"), log: o.Log, now: now, slots: make(chan struct{}, config.IngestConcurrent), inflight: newInflight(),
 	}, nil
 }
 
@@ -105,9 +112,6 @@ func principalOf(ctx context.Context) (auth.Principal, error) {
 }
 
 func (s *Service) take(ctx context.Context, limit ratelimit.Limit, subject string) error {
-	if s.limiter == nil {
-		return nil
-	}
 	d, err := s.limiter.Take(ctx, limit, subject)
 	if err != nil {
 		return err

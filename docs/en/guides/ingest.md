@@ -18,6 +18,9 @@ If you build in another CI, for example GitHub Actions, you can hand the finishe
 - Only a session can make or revoke a token, with a fresh second factor. An API token cannot.
 - The token allows nothing but the upload and the status of an upload. It reads no project data.
 - A ref pattern has a kind (`branch` or `tag`) and a name pattern: `main`, `release/*` (one part), `release/**` (all parts) or `v*`.
+- **Protected reach:** when you make a token, Dhow shows `Reaches`: the environments whose allowed refs could match the token's patterns. The check is conservative, so a pattern such as `**` reaches every environment that allows a branch. If the token reaches an environment that has deploy targets or reviewers, the request needs `AcknowledgeProtectedReach: true`, or the answer is `422 INGEST_TOKEN_REACH_UNCONFIRMED`. Narrow the patterns when you can.
+- **The ref and the commit are claims.** The uploader says which ref and commit it built, and Dhow checks only that the ref fits the token's patterns. `ProvenanceVerified` stays `false` until a later release verifies the CI identity (GitHub OIDC). So a stolen token can start a run, with the environment's rules, as any ref its patterns allow. That is why patterns, the acknowledgement above, and approvals on protected environments matter.
+- A token uploads at most 10 GiB in total. Revoking it does not free the quota of the organization: the files stay until they expire. There is no purge call yet.
 - Revoke a token at once from the same page. The next upload with it is `401 INGEST_TOKEN_REVOKED`.
 - Keep the token in your CI secret store. Never write it in a file of the repository, never print it, and never give it to a job that runs code from pull requests (for example `pull_request_target` in GitHub).
 
@@ -61,7 +64,10 @@ The answer is `201` for a new file and `200` when the same file (same project, d
 | `ARTIFACT_TOO_LARGE` | 413 | Larger than `DHOW_INGEST_MAX_BYTES` |
 | `ARTIFACT_QUOTA_EXCEEDED` | 413 | The artifact quota of the organization is full |
 | `LENGTH_REQUIRED` | 411 | No `Content-Length` |
+| `UPLOAD_TOO_SLOW` | 408 | The upload took longer than its deadline (at least 2 minutes, and 256 KiB per second of its size, at most 30 minutes) or fell below 256 KiB per second |
+| `INGEST_TOKEN_QUOTA` | 413 | This token already uploaded 10 GiB. Revoke it and make a new one |
 | `RATE_LIMITED` | 429 | More than 30 uploads in an hour for this token |
+| `SERVICE_UNAVAILABLE` | 503 | This token already has an upload running, the organization has two, or the server has four. Try again after `Retry-After` |
 
 ## Start a run
 
@@ -93,4 +99,6 @@ An ingested file that a deploy used stays while that release is among the last `
 
 ## Reverse proxy and size
 
-Uploads go to `/ingest/`. Put the larger body limit on that path in your reverse proxy ([reverse proxy](../install/reverse-proxy.md)) and set `DHOW_INGEST_MAX_BYTES` ([configuration](../install/configuration.md)).
+**Set `DHOW_TRUSTED_PROXIES` first.** The limits per address use the client address Dhow reads from the proxy. Without the right trusted proxies every upload looks like it comes from the proxy, and one noisy client uses the limit of all ([trusted proxies](../install/reverse-proxy.md#trusted-proxies)).
+
+Dhow cuts an upload that is slower than 256 KiB per second after 15 seconds, or that takes longer than its deadline. Uploads go to `/ingest/`. Put the larger body limit on that path in your reverse proxy ([reverse proxy](../install/reverse-proxy.md)) and set `DHOW_INGEST_MAX_BYTES` ([configuration](../install/configuration.md)).

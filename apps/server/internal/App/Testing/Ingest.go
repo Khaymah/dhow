@@ -86,6 +86,7 @@ type IngestUpload struct {
 	Provenance string
 	Headers    map[string]string
 	Chunked    bool
+	AfterBody  func()
 }
 
 func (u IngestUpload) headers() map[string]string {
@@ -119,7 +120,7 @@ func (e *Env) IngestPut(u IngestUpload) Response {
 		digest = DigestHex(u.Body)
 	}
 	return e.WebhookFrom(WebhookRequest{
-		Method: "PUT", Path: "/ingest/v1/artifacts/" + digest, Headers: u.headers(), Body: u.Body, Chunked: u.Chunked,
+		Method: "PUT", Path: "/ingest/v1/artifacts/" + digest, Headers: u.headers(), Body: u.Body, Chunked: u.Chunked, AfterBody: u.AfterBody,
 	})
 }
 

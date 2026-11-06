@@ -69,11 +69,16 @@ type WebhookRequest struct {
 	Body       []byte
 	RemoteAddr string
 	Chunked    bool
+	AfterBody  func()
 }
 
 func (e *Env) WebhookFrom(req WebhookRequest) Response {
 	e.T.Helper()
 	r := httptest.NewRequestWithContext(context.Background(), req.Method, req.Path, bytes.NewReader(req.Body))
+	if req.AfterBody != nil {
+		r.Body = &afterBody{r: bytes.NewReader(req.Body), after: req.AfterBody}
+		r.ContentLength = int64(len(req.Body))
+	}
 	r.RemoteAddr = "198.51.100.20:4444"
 	if req.RemoteAddr != "" {
 		r.RemoteAddr = req.RemoteAddr
@@ -100,3 +105,20 @@ func (e *Env) CountRows(query string, args ...any) int {
 	require.NoError(e.T, e.Pool.QueryRow(context.Background(), query, args...).Scan(&n))
 	return n
 }
+
+type afterBody struct {
+	r     *bytes.Reader
+	after func()
+	done  bool
+}
+
+func (a *afterBody) Read(p []byte) (int, error) {
+	n, err := a.r.Read(p)
+	if a.r.Len() == 0 && !a.done {
+		a.done = true
+		a.after()
+	}
+	return n, err
+}
+
+func (a *afterBody) Close() error { return nil }

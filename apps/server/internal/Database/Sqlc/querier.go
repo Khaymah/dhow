@@ -213,8 +213,8 @@ type Querier interface {
 	GroupBlocked(ctx context.Context, arg GroupBlockedParams) (bool, error)
 	HasIdentityForProvider(ctx context.Context, arg HasIdentityForProviderParams) (bool, error)
 	HoldEnvironment(ctx context.Context, arg HoldEnvironmentParams) error
-	IngestOrganizationBytes(ctx context.Context, organizationID uuid.UUID) (int64, error)
 	IngestTargetProject(ctx context.Context, arg IngestTargetProjectParams) (IngestTargetProjectRow, error)
+	IngestTokenBytes(ctx context.Context, tokenID uuid.UUID) (int64, error)
 	IngestTokenNameTaken(ctx context.Context, arg IngestTokenNameTakenParams) (bool, error)
 	IngestedArtifactRun(ctx context.Context, arg IngestedArtifactRunParams) (IngestedArtifactRunRow, error)
 	InsertApiToken(ctx context.Context, arg InsertApiTokenParams) (InsertApiTokenRow, error)
@@ -299,6 +299,7 @@ type Querier interface {
 	ListDeployments(ctx context.Context, arg ListDeploymentsParams) ([]Deployment, error)
 	ListDoneBackfills(ctx context.Context, names []string) ([]string, error)
 	ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobsParams) ([]ListDriftedRunJobsRow, error)
+	ListEnvironmentReach(ctx context.Context, arg ListEnvironmentReachParams) ([]ListEnvironmentReachRow, error)
 	ListEnvironmentReviewers(ctx context.Context, arg ListEnvironmentReviewersParams) ([]ListEnvironmentReviewersRow, error)
 	ListEnvironments(ctx context.Context, arg ListEnvironmentsParams) ([]Environment, error)
 	ListGatedRuns(ctx context.Context, arg ListGatedRunsParams) ([]uuid.UUID, error)
@@ -466,6 +467,7 @@ type Querier interface {
 	PurgeRunnerThrottles(ctx context.Context, arg PurgeRunnerThrottlesParams) (int64, error)
 	PurgeSetupTokens(ctx context.Context, arg PurgeSetupTokensParams) (int64, error)
 	QueueRun(ctx context.Context, id uuid.UUID) error
+	RecheckIngestToken(ctx context.Context, id uuid.UUID) (RecheckIngestTokenRow, error)
 	RecordPasskeyUse(ctx context.Context, arg RecordPasskeyUseParams) (int64, error)
 	RefundRunnerThrottle(ctx context.Context, arg RefundRunnerThrottleParams) error
 	RefundThrottle(ctx context.Context, arg RefundThrottleParams) error

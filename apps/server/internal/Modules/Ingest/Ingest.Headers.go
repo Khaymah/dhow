@@ -58,7 +58,7 @@ func single(h http.Header, name string) (string, bool) {
 		return "", true
 	case 1:
 		v := values[0]
-		return v, len(v) <= maxHeaderBytes && utf8.ValidString(v) && strings.IndexFunc(v, unicode.IsControl) < 0
+		return v, len(v) <= maxHeaderBytes && utf8.ValidString(v) && noInvisible(v)
 	default:
 		return "", false
 	}
@@ -154,5 +154,9 @@ func parseProvenance(raw string) (map[string]string, error) {
 }
 
 func plainText(s string, most int) bool {
-	return len(s) <= most && utf8.ValidString(s) && strings.IndexFunc(s, unicode.IsControl) < 0
+	return len(s) <= most && utf8.ValidString(s) && noInvisible(s)
+}
+
+func noInvisible(s string) bool {
+	return strings.IndexFunc(s, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }) < 0
 }

@@ -82,6 +82,9 @@ func (e IngestTokenStatus) Valid() bool {
 
 // CreateIngestTokenRequest defines model for CreateIngestTokenRequest.
 type CreateIngestTokenRequest struct {
+	// AcknowledgeProtectedReach Must be `true` when the token reaches an environment that has deploy targets or reviewers. Otherwise the answer is 422 `INGEST_TOKEN_REACH_UNCONFIRMED`.
+	AcknowledgeProtectedReach *bool `json:"AcknowledgeProtectedReach,omitempty"`
+
 	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
 	CurrentFactor CurrentFactor      `json:"CurrentFactor"`
 	ExpiresInDays *int               `json:"ExpiresInDays,omitempty"`
@@ -196,8 +199,11 @@ type IngestToken struct {
 	Name            string              `json:"Name"`
 
 	// Prefix The first characters of the token, to tell tokens apart. Not enough to use it.
-	Prefix      string             `json:"Prefix"`
-	ProjectId   openapi_types.UUID `json:"ProjectId"`
+	Prefix    string             `json:"Prefix"`
+	ProjectId openapi_types.UUID `json:"ProjectId"`
+
+	// Reaches The environments of the project whose allowed refs could match one of the token's patterns. The check is conservative: a wide pattern such as `**` reaches every environment that allows any branch.
+	Reaches     *[]string          `json:"Reaches,omitempty"`
 	RefPatterns []IngestRefPattern `json:"RefPatterns"`
 	RevokedAt   *time.Time         `json:"RevokedAt,omitempty"`
 	Status      IngestTokenStatus  `json:"Status"`

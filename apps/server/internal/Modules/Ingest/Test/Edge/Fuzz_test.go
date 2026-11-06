@@ -48,21 +48,24 @@ func TestGoodHeadersGiveAFullRefAndAShortName(t *testing.T) {
 
 func TestBadHeadersNameTheFieldAndNeverBecomeAnotherRef(t *testing.T) {
 	tests := map[string]http.Header{
-		"no name":                   headers("", "main", "branch", sha, "", ""),
-		"a name that is a path":     headers("../web", "main", "branch", sha, "", ""),
-		"a tag ref for a branch":    headers("web", "refs/tags/v1", "branch", sha, "", ""),
-		"a pull request ref":        headers("web", "refs/pull/4/head", "branch", sha, "", ""),
-		"an unknown kind":           headers("web", "main", "pull", sha, "", ""),
-		"no ref":                    headers("web", "", "branch", sha, "", ""),
-		"a ref with a dot dot":      headers("web", "a/../b", "branch", sha, "", ""),
-		"a short sha":               headers("web", "main", "branch", "abc123", "", ""),
-		"the zero sha":              headers("web", "main", "branch", strings.Repeat("0", 40), "", ""),
-		"an upper case sha":         headers("web", "main", "branch", strings.Repeat("A", 40), "", ""),
-		"a trigger that is a word":  headers("web", "main", "branch", sha, "yes", ""),
-		"provenance that is a list": headers("web", "main", "branch", sha, "", `["a"]`),
-		"provenance with a number":  headers("web", "main", "branch", sha, "", `{"RunId":7}`),
-		"provenance with a bad key": headers("web", "main", "branch", sha, "", `{"bad key":"x"}`),
-		"too much provenance":       headers("web", "main", "branch", sha, "", `{"A":"`+strings.Repeat("x", 300)+`"}`),
+		"no name":                         headers("", "main", "branch", sha, "", ""),
+		"a name that is a path":           headers("../web", "main", "branch", sha, "", ""),
+		"a tag ref for a branch":          headers("web", "refs/tags/v1", "branch", sha, "", ""),
+		"a pull request ref":              headers("web", "refs/pull/4/head", "branch", sha, "", ""),
+		"an unknown kind":                 headers("web", "main", "pull", sha, "", ""),
+		"no ref":                          headers("web", "", "branch", sha, "", ""),
+		"a ref with a dot dot":            headers("web", "a/../b", "branch", sha, "", ""),
+		"a short sha":                     headers("web", "main", "branch", "abc123", "", ""),
+		"the zero sha":                    headers("web", "main", "branch", strings.Repeat("0", 40), "", ""),
+		"an upper case sha":               headers("web", "main", "branch", strings.Repeat("A", 40), "", ""),
+		"a trigger that is a word":        headers("web", "main", "branch", sha, "yes", ""),
+		"provenance that is a list":       headers("web", "main", "branch", sha, "", `["a"]`),
+		"provenance with a number":        headers("web", "main", "branch", sha, "", `{"RunId":7}`),
+		"a name with a zero width space":  headers("we\u200bb", "main", "branch", sha, "", ""),
+		"a ref with a right to left mark": headers("web", "ma\u202ein", "branch", sha, "", ""),
+		"provenance with a hidden mark":   headers("web", "main", "branch", sha, "", `{"Actor":"sa\u200bra"}`),
+		"provenance with a bad key":       headers("web", "main", "branch", sha, "", `{"bad key":"x"}`),
+		"too much provenance":             headers("web", "main", "branch", sha, "", `{"A":"`+strings.Repeat("x", 300)+`"}`),
 	}
 	for name, h := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -81,6 +84,8 @@ func FuzzIngestHeaders(f *testing.F) {
 	f.Add("web", "refs/tags/v1", "tag", sha, "false", "")
 	f.Add("../web", "refs/heads/../x", "branch", "zz", "maybe", `{"a":1}`)
 	f.Add("web\r\nX-Evil: 1", "main\x00", "branch", sha, "", `{"A":"\u0000"}`)
+	f.Add("web", "main", "branch", sha, "true", `{"Actor":"sa\u200bra"}`)
+	f.Add("we\u200bb", "ma\u202ein", "branch", sha, "", "")
 	f.Fuzz(func(t *testing.T, name, ref, kind, commit, trigger, provenance string) {
 		m, err := ingest.ParseHeaders(headers(name, ref, kind, commit, trigger, provenance))
 		if err != nil {
@@ -103,7 +108,7 @@ func FuzzIngestHeaders(f *testing.F) {
 			t.Fatalf("accepted %d provenance fields", len(m.Provenance))
 		}
 		for k, v := range m.Provenance {
-			if len(v) > config.IngestProvenanceValue || strings.IndexFunc(k+v, unicode.IsControl) >= 0 {
+			if len(v) > config.IngestProvenanceValue || strings.IndexFunc(k+v, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }) >= 0 {
 				t.Fatalf("accepted the provenance %q=%q", k, v)
 			}
 		}

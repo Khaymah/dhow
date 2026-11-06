@@ -35,6 +35,7 @@ type Token struct {
 	LastUsedAt      *time.Time
 	RevokedAt       *time.Time
 	CreatedByUserID uuid.UUID
+	Reaches         []string
 }
 
 type TokenPage struct {
@@ -46,6 +47,8 @@ type CreateTokenInput struct {
 	Name          string
 	RefPatterns   []RefPattern
 	ExpiresInDays int
+
+	AcknowledgeProtectedReach bool
 }
 
 type CreatedToken struct {

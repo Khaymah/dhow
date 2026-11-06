@@ -27,6 +27,14 @@ const (
 	IngestRejectAuditEvery    = time.Minute
 	IngestLastUsedEvery       = time.Minute
 	IngestIdleTimeout         = time.Minute
+	IngestMinRate             = 256 << 10
+	IngestRateGrace           = 15 * time.Second
+	IngestDeadlineFloor       = 2 * time.Minute
+	IngestDeadlineCap         = 30 * time.Minute
+	IngestResponseGrace       = 30 * time.Second
+	IngestPerTokenInflight    = 1
+	IngestPerOrgInflight      = 2
+	IngestTokenMaxBytes       = 10 << 30
 	IngestListMax             = 100
 	IngestPinMax              = 90 * 24 * time.Hour
 	IngestHeaderName          = "Dhow-Ingest-Name"

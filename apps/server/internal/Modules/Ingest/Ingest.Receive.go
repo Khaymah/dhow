@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	blob "github.com/Khaymah/dhow/apps/server/internal/Core/Blob"
@@ -58,7 +59,10 @@ func (s *Service) receive(
 ) (models.Received, error) {
 	check := startArchiveCheck(s.archiveLimits())
 	rc := http.NewResponseController(w)
-	body := idleReader{r: http.MaxBytesReader(w, r.Body, s.cfg.IngestMaxBytes), rc: rc, idle: config.IngestIdleTimeout}
+	body := newIdleReader(http.MaxBytesReader(w, r.Body, s.cfg.IngestMaxBytes), rc, r.ContentLength, s.now)
+	if err := extendDeadline(rc.SetWriteDeadline, body.deadline.Add(config.IngestResponseGrace)); err != nil {
+		return models.Received{}, err
+	}
 	pending, stageErr := s.store.Stage(ctx, blob.Put{
 		Digest: d, Size: r.ContentLength, MaxBytes: s.cfg.IngestMaxBytes, Body: check.tee(body),
 	})
@@ -66,15 +70,27 @@ func (s *Service) receive(
 	if stageErr == nil {
 		defer pending.Abort()
 	}
-	switch {
-	case unsafeArchive(archiveErr):
-		return models.Received{}, apperrors.ArchiveUnsafe()
-	case stageErr != nil:
-		return models.Received{}, stageFailure(stageErr)
-	case archiveErr != nil:
-		return models.Received{}, archiveErr
+	if err := ClassifyUpload(stageErr, archiveErr); err != nil {
+		return models.Received{}, err
 	}
 	return s.record(ctx, pending, tok, m, d, r.ContentLength)
+}
+
+func ClassifyUpload(stageErr, archiveErr error) error {
+	var known *apperrors.AppError
+	if stageErr != nil {
+		if mapped := stageFailure(stageErr); errors.As(mapped, &known) {
+			return mapped
+		}
+	}
+	switch {
+	case unsafeArchive(archiveErr):
+		return apperrors.ArchiveUnsafe()
+	case stageErr != nil:
+		return stageErr
+	default:
+		return archiveErr
+	}
 }
 
 func stageFailure(err error) error {
@@ -86,6 +102,8 @@ func stageFailure(err error) error {
 		return apperrors.DigestMismatch()
 	case errors.Is(err, blob.ErrNoSpace):
 		return apperrors.StorageFull()
+	case tooSlow(err):
+		return apperrors.UploadTooSlow()
 	default:
 		return err
 	}
@@ -109,7 +127,13 @@ func (s *Service) record(
 			out = known
 			return err
 		}
+		if err := s.recheckToken(commitCtx, q, tok); err != nil {
+			return err
+		}
 		if err := s.checkQuota(commitCtx, q, org, size); err != nil {
+			return err
+		}
+		if err := s.checkTokenQuota(commitCtx, q, tok.row.Id, size); err != nil {
 			return err
 		}
 		if err := q.LockBlobsShared(commitCtx, config.BlobSweepLockKey); err != nil {
@@ -187,4 +211,23 @@ func (s *Service) auditStored(ctx context.Context, q *sqlc.Queries, tok tokenAut
 	return s.audit(ctx, auditEntry{
 		name: eventbus.ArtifactIngested, org: row.OrganizationId, target: targetArtifact, targetID: row.Id, data: data, tx: q,
 	})
+}
+
+func (s *Service) recheckToken(ctx context.Context, q *sqlc.Queries, tok tokenAuth) error {
+	row, err := q.RecheckIngestToken(ctx, tok.row.Id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperrors.IngestTokenRevoked()
+	}
+	if err != nil {
+		return err
+	}
+	switch {
+	case row.RevokedAt != nil:
+		return apperrors.IngestTokenRevoked()
+	case !s.now().Before(row.ExpiresAt):
+		return apperrors.IngestTokenExpired()
+	case row.ProjectState != projectActive:
+		return apperrors.ProjectArchived()
+	}
+	return nil
 }

@@ -2867,7 +2867,7 @@ export interface paths {
         put?: never;
         /**
          * Make an ingest token
-         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409 `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`.
+         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409 `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true`, otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`.
          */
         post: operations["createIngestToken"];
         delete?: never;
@@ -5202,12 +5202,19 @@ export interface components {
             RevokedAt?: string;
             /** Format: uuid */
             CreatedByUserId?: string;
+            /** @description The environments of the project whose allowed refs could match one of the token's patterns. The check is conservative: a wide pattern such as `**` reaches every environment that allows any branch. */
+            Reaches?: string[];
         };
         CreateIngestTokenRequest: {
             Name: string;
             RefPatterns: components["schemas"]["IngestRefPattern"][];
             /** @default 90 */
             ExpiresInDays: number;
+            /**
+             * @description Must be `true` when the token reaches an environment that has deploy targets or reviewers. Otherwise the answer is 422 `INGEST_TOKEN_REACH_UNCONFIRMED`.
+             * @default false
+             */
+            AcknowledgeProtectedReach: boolean;
             CurrentFactor: components["schemas"]["CurrentFactor"];
         };
         CreatedIngestToken: {

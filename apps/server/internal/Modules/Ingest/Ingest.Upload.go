@@ -66,11 +66,11 @@ func (s *Service) authenticate(ctx context.Context, header string) (tokenAuth, e
 	now := s.now()
 	switch {
 	case row.RevokedAt != nil:
-		return tokenAuth{}, apperrors.IngestTokenRevoked()
+		return tokenAuth{row: row}, apperrors.IngestTokenRevoked()
 	case !now.Before(row.ExpiresAt):
-		return tokenAuth{}, apperrors.IngestTokenExpired()
+		return tokenAuth{row: row}, apperrors.IngestTokenExpired()
 	case row.ProjectState != projectActive:
-		return tokenAuth{}, apperrors.ProjectArchived()
+		return tokenAuth{row: row}, apperrors.ProjectArchived()
 	}
 	patterns, err := patternsOf(row.RefPatterns)
 	if err != nil {
@@ -108,6 +108,7 @@ func (s *Service) Put(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, tok, err)
 		return
 	}
+	_ = extendDeadline(http.NewResponseController(w).SetWriteDeadline, s.now().Add(config.IngestResponseGrace))
 	status, message := http.StatusCreated, messageStored
 	if !res.Created {
 		status, message = http.StatusOK, messageDuplicate
@@ -123,6 +124,9 @@ func (s *Service) put(w http.ResponseWriter, r *http.Request, got **tokenAuth) (
 	}
 	tok, err := s.authenticate(ctx, r.Header.Get("Authorization"))
 	if err != nil {
+		if tok.row.Id != uuid.Nil {
+			*got = &tok
+		}
 		return models.Received{}, err
 	}
 	*got = &tok
@@ -153,6 +157,14 @@ func (s *Service) put(w http.ResponseWriter, r *http.Request, got **tokenAuth) (
 	if err := s.checkQuota(ctx, s.queries(), tok.row.OrganizationId, r.ContentLength); err != nil {
 		return models.Received{}, err
 	}
+	if err := s.checkTokenQuota(ctx, s.queries(), tok.row.Id, r.ContentLength); err != nil {
+		return models.Received{}, err
+	}
+	release, err := s.inflight.acquire(tok.row.Id, tok.row.OrganizationId)
+	if err != nil {
+		return models.Received{}, err
+	}
+	defer release()
 	select {
 	case s.slots <- struct{}{}:
 		defer func() { <-s.slots }()
@@ -163,12 +175,25 @@ func (s *Service) put(w http.ResponseWriter, r *http.Request, got **tokenAuth) (
 }
 
 func (s *Service) checkQuota(ctx context.Context, q *sqlc.Queries, org uuid.UUID, extra int64) error {
-	used, err := q.IngestOrganizationBytes(ctx, org)
+	used, err := q.OrganizationArtifactBytes(ctx, sqlc.OrganizationArtifactBytesParams{
+		OrganizationID: org, RollbackGraceSeconds: config.RollbackArtifactMaxKeep.Seconds(),
+	})
 	if err != nil {
 		return err
 	}
 	if used+extra > s.cfg.OrgMaxBytes {
 		return apperrors.ArtifactQuotaExceeded()
+	}
+	return nil
+}
+
+func (s *Service) checkTokenQuota(ctx context.Context, q *sqlc.Queries, token uuid.UUID, extra int64) error {
+	used, err := q.IngestTokenBytes(ctx, token)
+	if err != nil {
+		return err
+	}
+	if used+extra > config.IngestTokenMaxBytes {
+		return apperrors.IngestTokenQuota()
 	}
 	return nil
 }
@@ -248,6 +273,9 @@ func (s *Service) status(r *http.Request, got **tokenAuth) ([]receivedJSON, erro
 	}
 	tok, err := s.authenticate(ctx, r.Header.Get("Authorization"))
 	if err != nil {
+		if tok.row.Id != uuid.Nil {
+			*got = &tok
+		}
 		return nil, err
 	}
 	*got = &tok

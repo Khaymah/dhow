@@ -354,4 +354,7 @@ var arMessages = map[string]string{ //nolint:gosec // This is a message catalog,
 	"ingest.artifact.stored":                       "حفظنا الملف.",
 	"ingest.artifact.duplicate":                    "هذا الملف محفوظ من قبل. لم نغيّر شيئًا.",
 	"ingest.artifact.status":                       "حمّلنا حالة الملف.",
+	"errors.ingestTooSlow":                         "وصل الملف ببطء شديد أو تأخر عن المدة المسموحة، فقطعنا الرفع. لم نحفظ الملف.",
+	"errors.ingestTokenQuota":                      "وصل هذا التوكن إلى أقصى حجم يسمح له برفعه. ألغِه وأنشئ توكنًا جديدًا.",
+	"errors.ingestReachUnconfirmed":                "يصل هذا التوكن إلى بيئة فيها أهداف نشر أو مراجعون. أكّد ذلك صراحة أو ضيّق أنماط الفروع.",
 }

@@ -683,7 +683,9 @@ func (q *Queries) OldestCacheEntries(ctx context.Context, arg OldestCacheEntries
 }
 
 const organizationArtifactBytes = `-- name: OrganizationArtifactBytes :one
-SELECT COALESCE(sum(a."SizeBytes"), 0)::bigint AS "Bytes"
+SELECT COALESCE(sum(u."SizeBytes"), 0)::bigint AS "Bytes"
+FROM (SELECT DISTINCT ON (x."Digest") x."SizeBytes"
+      FROM (SELECT a."Digest", a."SizeBytes"
 FROM "Artifacts" a
 WHERE a."OrganizationId" = $1 AND NOT a."IsDeleted"
   AND (a."ExpiresAt" > now() OR EXISTS (SELECT 1
@@ -697,6 +699,11 @@ WHERE a."OrganizationId" = $1 AND NOT a."IsDeleted"
                  WHERE n."TargetId" = r."TargetId" AND n."OrganizationId" = r."OrganizationId"
                    AND n."Kind" = 'deploy' AND n."State" = 'succeeded' AND NOT n."IsDeleted"
                    AND (n."StartedAt", n."Id") > (r."StartedAt", r."Id")) < t."KeepReleases"))
+            UNION ALL
+            SELECT i."Digest", i."SizeBytes"
+            FROM "IngestedArtifacts" i
+            WHERE i."OrganizationId" = $1 AND NOT i."IsDeleted") x
+      ORDER BY x."Digest") u
 `
 
 type OrganizationArtifactBytesParams struct {

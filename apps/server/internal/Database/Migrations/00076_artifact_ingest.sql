@@ -68,6 +68,9 @@ CREATE TABLE "RunIngestedArtifacts" (
     FOREIGN KEY ("RunId", "OrganizationId") REFERENCES "PipelineRuns" ("Id", "OrganizationId")
 );
 
+ALTER TABLE "RunIngestedArtifacts" ADD CONSTRAINT "FK_RunIngestedArtifacts_Artifact"
+    FOREIGN KEY ("IngestedArtifactId", "OrganizationId") REFERENCES "IngestedArtifacts" ("Id", "OrganizationId") NOT VALID;
+
 CREATE UNIQUE INDEX "UX_RunIngestedArtifacts_Run_Name" ON "RunIngestedArtifacts" ("RunId", "Name") WHERE NOT "IsDeleted";
 CREATE INDEX "IX_RunIngestedArtifacts_Artifact" ON "RunIngestedArtifacts" ("IngestedArtifactId") WHERE NOT "IsDeleted";
 
@@ -77,4 +80,4 @@ DROP TABLE "IngestedArtifacts";
 DROP TABLE "IngestTokens";
 ALTER TABLE "PipelineRuns" DROP CONSTRAINT IF EXISTS "CK_PipelineRuns_Trigger";
 ALTER TABLE "PipelineRuns" ADD CONSTRAINT "CK_PipelineRuns_Trigger"
-    CHECK ("Trigger" IN ('push', 'tag', 'pull_request', 'manual', 'api', 'check', 'rollback'));
+    CHECK ("Trigger" IN ('push', 'tag', 'pull_request', 'manual', 'api', 'check', 'rollback')) NOT VALID;

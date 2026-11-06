@@ -201,18 +201,6 @@ func (q *Queries) GetIngestToken(ctx context.Context, arg GetIngestTokenParams) 
 	return i, err
 }
 
-const ingestOrganizationBytes = `-- name: IngestOrganizationBytes :one
-SELECT (COALESCE((SELECT sum(a."SizeBytes") FROM "Artifacts" a WHERE a."OrganizationId" = $1 AND NOT a."IsDeleted" AND a."ExpiresAt" > now()), 0)
-      + COALESCE((SELECT sum(i."SizeBytes") FROM "IngestedArtifacts" i WHERE i."OrganizationId" = $1 AND NOT i."IsDeleted"), 0))::bigint AS "Bytes"
-`
-
-func (q *Queries) IngestOrganizationBytes(ctx context.Context, organizationID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, ingestOrganizationBytes, organizationID)
-	var Bytes int64
-	err := row.Scan(&Bytes)
-	return Bytes, err
-}
-
 const ingestTargetProject = `-- name: IngestTargetProject :one
 SELECT p."Id", p."State"
 FROM "Projects" p
@@ -234,6 +222,21 @@ func (q *Queries) IngestTargetProject(ctx context.Context, arg IngestTargetProje
 	var i IngestTargetProjectRow
 	err := row.Scan(&i.Id, &i.State)
 	return i, err
+}
+
+const ingestTokenBytes = `-- name: IngestTokenBytes :one
+SELECT COALESCE(sum(u."SizeBytes"), 0)::bigint AS "Bytes"
+FROM (SELECT DISTINCT ON ("Digest") "SizeBytes"
+      FROM "IngestedArtifacts"
+      WHERE "TokenId" = $1 AND NOT "IsDeleted"
+      ORDER BY "Digest") u
+`
+
+func (q *Queries) IngestTokenBytes(ctx context.Context, tokenID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, ingestTokenBytes, tokenID)
+	var Bytes int64
+	err := row.Scan(&Bytes)
+	return Bytes, err
 }
 
 const ingestTokenNameTaken = `-- name: IngestTokenNameTaken :one
@@ -388,6 +391,52 @@ func (q *Queries) InsertIngestedArtifact(ctx context.Context, arg InsertIngested
 		&i.PinnedUntil,
 	)
 	return i, err
+}
+
+const listEnvironmentReach = `-- name: ListEnvironmentReach :many
+SELECT e."Name", e."AllowedRefs",
+       EXISTS (SELECT 1 FROM "DeployTargets" d WHERE d."EnvironmentId" = e."Id" AND NOT d."IsDeleted")::boolean AS "HasTargets",
+       EXISTS (SELECT 1 FROM "EnvironmentReviewers" r WHERE r."EnvironmentId" = e."Id" AND NOT r."IsDeleted")::boolean AS "HasReviewers"
+FROM "Environments" e
+WHERE e."OrganizationId" = $1 AND e."ProjectId" = $2 AND NOT e."IsDeleted"
+ORDER BY e."Name"
+`
+
+type ListEnvironmentReachParams struct {
+	OrganizationID uuid.UUID
+	ProjectID      uuid.UUID
+}
+
+type ListEnvironmentReachRow struct {
+	Name         string
+	AllowedRefs  []byte
+	HasTargets   bool
+	HasReviewers bool
+}
+
+func (q *Queries) ListEnvironmentReach(ctx context.Context, arg ListEnvironmentReachParams) ([]ListEnvironmentReachRow, error) {
+	rows, err := q.db.Query(ctx, listEnvironmentReach, arg.OrganizationID, arg.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEnvironmentReachRow{}
+	for rows.Next() {
+		var i ListEnvironmentReachRow
+		if err := rows.Scan(
+			&i.Name,
+			&i.AllowedRefs,
+			&i.HasTargets,
+			&i.HasReviewers,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listIngestTokens = `-- name: ListIngestTokens :many
@@ -646,6 +695,33 @@ SELECT pg_advisory_xact_lock(hashtextextended('dhow-ingest-tokens:' || $1::text,
 func (q *Queries) LockIngestTokens(ctx context.Context, projectID string) error {
 	_, err := q.db.Exec(ctx, lockIngestTokens, projectID)
 	return err
+}
+
+const recheckIngestToken = `-- name: RecheckIngestToken :one
+SELECT t."Id", t."RevokedAt", t."ExpiresAt", p."State" AS "ProjectState"
+FROM "IngestTokens" t
+JOIN "Projects" p ON p."Id" = t."ProjectId" AND p."OrganizationId" = t."OrganizationId" AND NOT p."IsDeleted"
+WHERE t."Id" = $1 AND NOT t."IsDeleted"
+FOR SHARE OF t
+`
+
+type RecheckIngestTokenRow struct {
+	Id           uuid.UUID
+	RevokedAt    *time.Time
+	ExpiresAt    time.Time
+	ProjectState string
+}
+
+func (q *Queries) RecheckIngestToken(ctx context.Context, id uuid.UUID) (RecheckIngestTokenRow, error) {
+	row := q.db.QueryRow(ctx, recheckIngestToken, id)
+	var i RecheckIngestTokenRow
+	err := row.Scan(
+		&i.Id,
+		&i.RevokedAt,
+		&i.ExpiresAt,
+		&i.ProjectState,
+	)
+	return i, err
 }
 
 const revokeIngestToken = `-- name: RevokeIngestToken :one

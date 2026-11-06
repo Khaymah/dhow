@@ -18,6 +18,9 @@ const (
 	CodeArtifactQuota      = "ARTIFACT_QUOTA_EXCEEDED"
 	CodeLengthRequired     = "LENGTH_REQUIRED"
 	CodeStorageFull        = "STORAGE_FULL"
+	CodeUploadTooSlow      = "UPLOAD_TOO_SLOW"
+	CodeIngestTokenQuota   = "INGEST_TOKEN_QUOTA"             //nolint:gosec // A public error code, not a credential.
+	CodeReachUnconfirmed   = "INGEST_TOKEN_REACH_UNCONFIRMED" //nolint:gosec // A public error code, not a credential.
 
 	KeyIngestTokenInvalid = "errors.ingestTokenInvalid"
 	KeyIngestTokenRevoked = "errors.ingestTokenRevoked"
@@ -32,6 +35,9 @@ const (
 	KeyLengthRequired     = "errors.ingestLengthRequired"
 	KeyStorageFull        = "errors.ingestStorageFull"
 	KeyIngestBusy         = "errors.ingestBusy"
+	KeyUploadTooSlow      = "errors.ingestTooSlow"
+	KeyIngestTokenQuota   = "errors.ingestTokenQuota"
+	KeyReachUnconfirmed   = "errors.ingestReachUnconfirmed"
 )
 
 func IngestTokenInvalid() *AppError {
@@ -85,5 +91,19 @@ func StorageFull() *AppError {
 func IngestBusy(retryAfter time.Duration) *AppError {
 	e := New(http.StatusServiceUnavailable, CodeServiceUnavailable, KeyIngestBusy)
 	e.RetryAfter = retryAfter
+	return e
+}
+
+func UploadTooSlow() *AppError {
+	return New(http.StatusRequestTimeout, CodeUploadTooSlow, KeyUploadTooSlow)
+}
+
+func IngestTokenQuota() *AppError {
+	return New(http.StatusRequestEntityTooLarge, CodeIngestTokenQuota, KeyIngestTokenQuota)
+}
+
+func IngestReachUnconfirmed(details ...IErrorDetail) *AppError {
+	e := New(http.StatusUnprocessableEntity, CodeReachUnconfirmed, KeyReachUnconfirmed)
+	e.Details = details
 	return e
 }

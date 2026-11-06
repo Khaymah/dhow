@@ -34,6 +34,7 @@ const (
 	auditValueMax    = 256
 	fieldRefPatterns = "RefPatterns"
 	fieldExpires     = "ExpiresInDays"
+	fieldAcknowledge = "AcknowledgeProtectedReach"
 )
 
 func invalid(field string) apperrors.IErrorDetail {
@@ -183,6 +184,7 @@ func (s *Service) CreateToken(
 	}
 	now := s.now()
 	var row sqlc.IngestToken
+	var reaches []string
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		if err := q.LockIngestTokens(ctx, project.String()); err != nil {
 			return err
@@ -193,7 +195,15 @@ func (s *Service) CreateToken(
 		if err := s.checkRoom(ctx, q, org, project, in.Name, now); err != nil {
 			return err
 		}
-		var err error
+		envs, err := s.environmentsOf(ctx, q, org, project)
+		if err != nil {
+			return err
+		}
+		var protected bool
+		reaches, protected = reachOf(patterns, envs)
+		if protected && !in.AcknowledgeProtectedReach {
+			return apperrors.IngestReachUnconfirmed(invalid(fieldAcknowledge))
+		}
 		row, err = q.InsertIngestToken(ctx, sqlc.InsertIngestTokenParams{
 			OrganizationID: org, ProjectID: project, Name: in.Name, TokenHash: hash, Prefix: prefix, RefPatterns: raw,
 			ExpiresAt: now.Add(time.Duration(days) * day), CreatedByUserID: p.UserID,
@@ -216,6 +226,7 @@ func (s *Service) CreateToken(
 		return models.CreatedToken{}, err
 	}
 	token, err := s.tokenOf(row)
+	token.Reaches = reaches
 	return models.CreatedToken{Token: token, Value: value}, err
 }
 
@@ -254,12 +265,17 @@ func (s *Service) ListTokens(ctx context.Context, org, project uuid.UUID, page, 
 	if err != nil {
 		return models.TokenPage{}, err
 	}
+	envs, err := s.environmentsOf(ctx, q, org, project)
+	if err != nil {
+		return models.TokenPage{}, err
+	}
 	out := models.TokenPage{Items: make([]models.Token, 0, len(rows)), Total: total}
 	for _, row := range rows {
 		t, err := s.tokenOf(row)
 		if err != nil {
 			return models.TokenPage{}, err
 		}
+		t.Reaches, _ = reachOf(t.RefPatterns, envs)
 		out.Items = append(out.Items, t)
 	}
 	return out, nil

@@ -354,4 +354,7 @@ var enMessages = map[string]string{ //nolint:gosec // This is a message catalog,
 	"ingest.artifact.stored":                       "The file was stored.",
 	"ingest.artifact.duplicate":                    "This file is already stored. Nothing changed.",
 	"ingest.artifact.status":                       "File status loaded.",
+	"errors.ingestTooSlow":                         "The file arrived too slowly or took longer than allowed, so the upload was cut. The file was not stored.",
+	"errors.ingestTokenQuota":                      "This token reached the most data it may upload. Revoke it and make a new token.",
+	"errors.ingestReachUnconfirmed":                "This token reaches an environment that has deploy targets or reviewers. Confirm it explicitly, or narrow the ref patterns.",
 }

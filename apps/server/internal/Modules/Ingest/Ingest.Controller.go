@@ -27,6 +27,13 @@ func NewController(service *Service) *Controller { return &Controller{service: s
 
 func ptrOf[T any](v T) *T { return &v }
 
+func nonNil(in []string) []string {
+	if in == nil {
+		return []string{}
+	}
+	return in
+}
+
 func factorOf(f gen.CurrentFactor) auth.Factor {
 	out := auth.Factor{Method: string(f.Method)}
 	if f.Password != nil {
@@ -52,6 +59,7 @@ func tokenView(t models.Token) gen.IngestToken {
 	return gen.IngestToken{
 		Id: t.ID, ProjectId: t.ProjectID, Name: t.Name, Prefix: t.Prefix, RefPatterns: patterns, Status: gen.IngestTokenStatus(t.Status),
 		CreatedAt: t.CreatedAt, ExpiresAt: t.ExpiresAt, LastUsedAt: t.LastUsedAt, RevokedAt: t.RevokedAt, CreatedByUserId: ptrOf(t.CreatedByUserID),
+		Reaches: ptrOf(nonNil(t.Reaches)),
 	}
 }
 
@@ -94,6 +102,9 @@ func (c *Controller) CreateIngestToken(ctx context.Context, req gen.CreateIngest
 	in := models.CreateTokenInput{Name: b.Name, RefPatterns: patterns}
 	if b.ExpiresInDays != nil {
 		in.ExpiresInDays = *b.ExpiresInDays
+	}
+	if b.AcknowledgeProtectedReach != nil {
+		in.AcknowledgeProtectedReach = *b.AcknowledgeProtectedReach
 	}
 	created, err := c.service.CreateToken(ctx, req.Id, req.ProjectId, in, factorOf(b.CurrentFactor))
 	if err != nil {
