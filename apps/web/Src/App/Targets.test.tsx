@@ -32,11 +32,11 @@ const PASSWORD = 'correct horse battery staple';
 const PAGE_URL = `/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}`;
 const API = `/organizations/${ORG_ID}/projects/${PROJECT_ID}/environments/${ENVIRONMENT_NAME}/targets/web`;
 
-const mount = (role = 'owner', state: ITargetsState = newTargetsState(), paused = false) => {
+const mount = (role = 'owner', state: ITargetsState = newTargetsState(), paused = false, organizationRole = role) => {
   const environments = newEnvironmentsState();
   environments.environments = [paused ? environmentFixture({ Paused: true, PausedReason: 'Freeze' }) : environmentFixture()];
   const backend = startBackend({
-    role,
+    role: organizationRole,
     routes: [targetsRoute(state), environmentsRoute(environments), projectsRoute({ project: () => ok(projectFixture({ CallerRole: role })) })],
   });
   const router = createAppRouter(createMemoryHistory({ initialEntries: [PAGE_URL] }));
@@ -150,6 +150,20 @@ describe('checking a target', () => {
     expect(within(region).queryByRole('button', { name: Ar['targets.check.button'] })).not.toBeInTheDocument();
     await within(region).findAllByText(arText('targets.release.state.succeeded'));
     expect(within(region).queryByRole('button', { name: Ar['targets.rollback.action'] })).not.toBeInTheDocument();
+    expect(within(region).getByText(Ar['targets.forbidden'])).toBeInTheDocument();
+  });
+
+  it('follows the role on the project, not the role in the organization', async () => {
+    mount('maintainer', newTargetsState(), false, 'developer');
+    const region = await targetsRegion();
+    expect(await within(region).findByRole('button', { name: Ar['targets.check.button'] })).toBeInTheDocument();
+  });
+
+  it('hides the actions from a viewer of the project even when the organization role is owner', async () => {
+    mount('viewer', newTargetsState(), false, 'owner');
+    const region = await targetsRegion();
+    await within(region).findByRole('heading', { name: 'web' });
+    expect(within(region).queryByRole('button', { name: Ar['targets.check.button'] })).not.toBeInTheDocument();
     expect(within(region).getByText(Ar['targets.forbidden'])).toBeInTheDocument();
   });
 
