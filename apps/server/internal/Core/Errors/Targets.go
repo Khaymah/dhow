@@ -69,3 +69,12 @@ const (
 func TargetCheckUnavailable() *AppError {
 	return New(http.StatusUnprocessableEntity, CodeTargetCheckUnavailable, KeyTargetCheckUnavailable)
 }
+
+const (
+	CodeCheckRunNotRerunnable = "CHECK_RUN_NOT_RERUNNABLE"
+	KeyCheckRunNotRerunnable  = "errors.checkRunNotRerunnable"
+)
+
+func CheckRunNotRerunnable() *AppError {
+	return New(http.StatusConflict, CodeCheckRunNotRerunnable, KeyCheckRunNotRerunnable)
+}

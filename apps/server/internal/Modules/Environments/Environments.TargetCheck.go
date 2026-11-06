@@ -44,11 +44,13 @@ func (s *Service) RequestTargetCheck(ctx context.Context, org, project uuid.UUID
 		return models.CheckStarted{}, err
 	}
 	actor := p.UserID
-	err = s.bus.Publish(ctx, eventbus.Event{Name: eventbus.DeploymentTargetCheckRequested, Payload: eventbus.Audited{
+	if err := s.bus.Publish(ctx, eventbus.Event{Name: eventbus.DeploymentTargetCheckRequested, Payload: eventbus.Audited{
 		OrganizationIDs: []uuid.UUID{org}, ActorUserID: &actor, TargetType: targetCheck, TargetID: row.Id.String(),
 		Data: map[string]string{"RunId": run.RunID.String(), "ProjectId": project.String(), "Environment": env.Name, "Name": row.Name},
-	}})
-	return models.CheckStarted{RunID: run.RunID, RunNumber: run.Number}, err
+	}}); err != nil && s.log != nil {
+		s.log.ErrorContext(ctx, "the audit entry of a check of a target could not be written", "run_id", run.RunID.String(), "error", err.Error())
+	}
+	return models.CheckStarted{RunID: run.RunID, RunNumber: run.Number}, nil
 }
 
 func (s *Service) LatestTargetCheck(ctx context.Context, org, project uuid.UUID, envName, name string) (models.TargetCheckResult, error) {

@@ -15,6 +15,8 @@ const (
 	PipelineTriggerPerUser        = 60
 	PipelineTriggerPerProject     = 240
 	PipelineTriggerWindow         = 10 * time.Minute
+	PipelineCheckPerUser          = 10
+	PipelineCheckPerProject       = 30
 	PipelineWebhookRunsPerProject = 600
 	PipelineWebhookRunsWindow     = time.Hour
 )

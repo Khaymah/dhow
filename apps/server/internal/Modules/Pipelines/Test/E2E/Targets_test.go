@@ -56,9 +56,11 @@ type deployWorld struct {
 	target apptest.SeededTarget
 }
 
-func newDeployWorld(t *testing.T) deployWorld {
+func newDeployWorld(t *testing.T) deployWorld { return newDeployWorldWith(t, sshPlugin) }
+
+func newDeployWorldWith(t *testing.T, bakedImage string) deployWorld {
 	t.Helper()
-	w := newWorldWith(t, apptest.Options{DeploySSHImage: sshPlugin})
+	w := newWorldWith(t, apptest.Options{DeploySSHImage: bakedImage})
 	envID := w.env.SeedEnvironment(w.project, "production")
 	w.env.SeedSecret(apptest.SecretRef(w.org, &w.project, "production"), keySecretName, targetKeyValue)
 	w.env.SeedVariable(apptest.SecretRef(w.org, &w.project, "production"), "TARGET", "web")

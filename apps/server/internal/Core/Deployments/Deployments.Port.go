@@ -159,8 +159,9 @@ type SyntheticRequest struct {
 }
 
 type SyntheticRun struct {
-	RunID  uuid.UUID
-	Number int64
+	RunID    uuid.UUID
+	Number   int64
+	Existing bool
 }
 
 type Synthetic interface {

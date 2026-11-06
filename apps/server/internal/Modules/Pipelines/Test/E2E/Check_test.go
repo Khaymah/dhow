@@ -235,7 +235,7 @@ func TestACheckWritesWhatIsReallyDeployedOverAnUnknownRelease(t *testing.T) {
 		release, h := checkJob{deployWorld: d}.unknownRelease(t)
 		c := d.checking(t)
 		c.report(t,
-			checked(h[0], "diverged", "11-aaaaaaaa-0", "11-aaaaaaaa-0", 5<<30),
+			checked(h[0], "ok", "11-aaaaaaaa-0", "11-aaaaaaaa-0", 5<<30),
 			checked(h[1], "ok", "11-aaaaaaaa-0", "11-aaaaaaaa-0", 5<<30),
 		)
 		assert.Equal(t, "rolled_back", groupStateOf(t, d, release))

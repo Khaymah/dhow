@@ -3,6 +3,7 @@ package pipelines
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -66,24 +67,36 @@ func (s *Service) StartSynthetic(ctx context.Context, req deployments.SyntheticR
 	if req.Kind != deployments.SyntheticCheck {
 		return deployments.SyntheticRun{}, errors.New("this kind of synthetic run is not supported")
 	}
-	if s.deployImage == "" || !strings.Contains(s.deployImage, digestMarker) {
+	if s.deployImage == "" {
 		return deployments.SyntheticRun{}, apperrors.TargetCheckUnavailable()
 	}
-	if err := s.chargeTrigger(ctx, req.ProjectID, p.UserID); err != nil {
+	if err := s.requireActiveProject(ctx, req); err != nil {
 		return deployments.SyntheticRun{}, err
 	}
 	source := syntheticSource(s.deployImage, req.EnvironmentName, req.TargetName)
 	digest := sha256.Sum256(source)
 	var run sqlc.PipelineRun
+	existing := false
 	err = s.inTx(ctx, func(q *sqlc.Queries) error {
-		project, err := q.GetRunProject(ctx, sqlc.GetRunProjectParams{ProjectID: req.ProjectID, OrganizationID: req.OrganizationID})
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			return apperrors.NotFound()
-		case err != nil:
+		if err := q.LockCheckRequests(ctx, req.ProjectID.String()+"/"+hex.EncodeToString(digest[:])); err != nil {
 			return err
-		case project.State != projectActive:
-			return apperrors.ProjectArchived()
+		}
+		found, err := q.FindActiveCheckRun(ctx, sqlc.FindActiveCheckRunParams{
+			ProjectID: req.ProjectID, OrganizationID: req.OrganizationID, DefinitionSource: text(string(source)),
+		})
+		if err == nil {
+			run, existing = found, true
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if err := s.chargeCheck(ctx, req.ProjectID, p.UserID); err != nil {
+			return err
+		}
+		project, err := q.GetRunProject(ctx, sqlc.GetRunProjectParams{ProjectID: req.ProjectID, OrganizationID: req.OrganizationID})
+		if err != nil {
+			return err
 		}
 		ref, err := s.syntheticRef(ctx, q, req, project)
 		if err != nil {
@@ -102,6 +115,21 @@ func (s *Service) StartSynthetic(ctx context.Context, req deployments.SyntheticR
 	if err != nil {
 		return deployments.SyntheticRun{}, err
 	}
-	s.auditByUser(ctx, eventbus.RunCreated, run, p)
-	return deployments.SyntheticRun{RunID: run.Id, Number: run.Number}, nil
+	if !existing {
+		s.auditByUser(ctx, eventbus.RunCreated, run, p)
+	}
+	return deployments.SyntheticRun{RunID: run.Id, Number: run.Number, Existing: existing}, nil
+}
+
+func (s *Service) requireActiveProject(ctx context.Context, req deployments.SyntheticRequest) error {
+	project, err := s.queries().GetRunProject(ctx, sqlc.GetRunProjectParams{ProjectID: req.ProjectID, OrganizationID: req.OrganizationID})
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return apperrors.NotFound()
+	case err != nil:
+		return err
+	case project.State != projectActive:
+		return apperrors.ProjectArchived()
+	}
+	return nil
 }

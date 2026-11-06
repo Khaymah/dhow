@@ -363,7 +363,19 @@ RETURNING *;
 SELECT d."Ref"
 FROM "Deployments" d
 WHERE d."EnvironmentId" = @environment_id AND d."OrganizationId" = @organization_id AND NOT d."IsDeleted"
+  AND NOT EXISTS (SELECT 1 FROM "PipelineRuns" r WHERE r."Id" = d."RunId" AND r."Trigger" = 'check')
 ORDER BY d."CreatedAt" DESC, d."Id" DESC
+LIMIT 1;
+
+-- name: LockCheckRequests :exec
+SELECT pg_advisory_xact_lock(hashtextextended(@key::text, 0));
+
+-- name: FindActiveCheckRun :one
+SELECT *
+FROM "PipelineRuns"
+WHERE "ProjectId" = @project_id AND "OrganizationId" = @organization_id AND "Trigger" = 'check' AND "DefinitionSource" = @definition_source
+  AND "State" NOT IN ('succeeded', 'failed', 'canceled', 'skipped') AND NOT "IsDeleted"
+ORDER BY "CreatedAt" DESC, "Id" DESC
 LIMIT 1;
 
 -- name: TargetBusyInRun :one

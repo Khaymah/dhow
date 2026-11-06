@@ -214,6 +214,9 @@ func (s *Service) Rerun(ctx context.Context, org, project, id uuid.UUID) (models
 		if err != nil {
 			return err
 		}
+		if run.Trigger == triggerCheck {
+			return apperrors.CheckRunNotRerunnable()
+		}
 		if (run.State != models.RunFailed && run.State != models.RunCanceled) || !run.DefinitionSource.Valid ||
 			!slices.ContainsFunc(rows, rerunnable) {
 			return apperrors.RunNotRerunnable()

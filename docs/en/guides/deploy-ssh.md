@@ -142,18 +142,18 @@ Dhow does not undo changes outside the files, such as a database migration. Desi
 
 ## Cancel and interruption
 
-If you cancel the job during the deploy step after the switch happened, the plugin goes back to the last trusted release, and then the job is recorded as `canceled`. Dhow gives the deploy step a cancel grace longer than the other steps, about 4 minutes. It is computed from the rollback budget (3 minutes) plus closing the connections and releasing the locks, so Dhow does not cut the plugin in the middle of the rollback. The other steps keep the normal cancel grace.
+If you cancel the job during the deploy step after the switch happened, the plugin goes back to the last trusted release, and then the job is recorded as `canceled`. Dhow gives the deploy step a cancel grace longer than the other steps, about 4 minutes. It is computed from the rollback budget (3 minutes) plus closing the connections and releasing the locks, so Dhow does not cut the plugin in the middle of the rollback. The other steps keep the normal cancel grace. The same long grace applies when the job times out (not only when it is canceled), because going back is right in both cases. So a job may run about 4 minutes past its timeout before it ends as `timed_out`.
 
 If the runner itself dies (`SIGKILL`) after the switch, nobody can go back. Dhow marks the release and its servers that did not finish as `unknown`, and never assumes they succeeded. On the server, `.dhow/state.json` stays in the state `switching` and `.dhow/verified` stays on the previous release. One of two things fixes this:
 
-- **Check the target:** it reads the state of each server. If `current` matches `.dhow/verified`, Dhow writes the real state: `verified` if the server is on the interrupted release, and `rolled_back` if it is on another one. If the two differ the state is not clear, so the server stays `unknown` and you see `diverged` in the result of the check.
+- **Check the target:** it reads the state of each server. If the server is ready (`ok`) and `current` matches `.dhow/verified`, Dhow writes the real state: `verified` if the server is on the interrupted release, and `rolled_back` if it is on another one. If the two differ the state is not clear, so the server stays `unknown` and you see `diverged` in the result of the check.
 - **A new successful deploy:** if it fails it goes back to `.dhow/verified`. If it succeeds, Dhow closes every old release that stayed `unknown` on its servers.
 
 The remote lock that a dead runner left ends after 30 minutes, and then the next deploy takes it with a warning.
 
 ## Checking a target
 
-A check reads the state of the servers and changes nothing on them. Start it with a `POST` on the path of the target followed by `/check` (the action `deployment.check`, for the owner, the admin and the maintainer), and read its result with a `GET` on the same path. The request goes through the gate of the environment like any deploy: its rules, its lock and its approvals, and it runs the official plugin image that is pinned in the server. A check needs no artifact.
+A check reads the state of the servers and changes nothing on them. Start it with a `POST` on the path of the target followed by `/check` (the action `deployment.check`, for the owner, the admin and the maintainer), and read its result with a `GET` on the same path. The request goes through the gate of the environment like any deploy: its rules, its lock and its approvals, and it runs the official plugin image that is pinned in the server. A check needs no artifact. If you ask for a check of a target that already has a check that has not ended, the request returns `202` with the number of the run that exists and does not start another. Checks have a limit of their own, 10 for each user and 30 for each project in every 10 minutes, apart from the limit of normal runs. A check run is not run again (it returns `CHECK_RUN_NOT_RERUNNABLE`): ask for a new check. A check does not appear in the list of deploys of the environment.
 
 The plugin connects to each server with the pinned key and reads `current`, `.dhow/verified`, the state in `.dhow/state.json`, the free disk space and the lock. Then it writes one reason for each server:
 

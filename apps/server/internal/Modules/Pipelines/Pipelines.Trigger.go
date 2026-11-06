@@ -29,6 +29,8 @@ const (
 	maxActorBytes       = 255
 	limitTriggerUser    = "run-trigger-user"
 	limitTriggerProject = "run-trigger-project"
+	limitCheckUser      = "check-trigger-user"
+	limitCheckProject   = "check-trigger-project"
 )
 
 var (
@@ -185,16 +187,23 @@ func chargeWebhook(ctx context.Context, q *sqlc.Queries, project uuid.UUID) erro
 }
 
 func (s *Service) chargeTrigger(ctx context.Context, project, user uuid.UUID) error {
+	return s.charge(ctx, ratelimit.Limit{Name: limitTriggerUser, Max: config.PipelineTriggerPerUser, Window: config.PipelineTriggerWindow}, user.String(),
+		ratelimit.Limit{Name: limitTriggerProject, Max: config.PipelineTriggerPerProject, Window: config.PipelineTriggerWindow}, project.String())
+}
+
+func (s *Service) chargeCheck(ctx context.Context, project, user uuid.UUID) error {
+	return s.charge(ctx, ratelimit.Limit{Name: limitCheckUser, Max: config.PipelineCheckPerUser, Window: config.PipelineTriggerWindow}, user.String(),
+		ratelimit.Limit{Name: limitCheckProject, Max: config.PipelineCheckPerProject, Window: config.PipelineTriggerWindow}, project.String())
+}
+
+func (s *Service) charge(ctx context.Context, userLimit ratelimit.Limit, user string, projectLimit ratelimit.Limit, project string) error {
 	if s.limiter == nil {
 		return nil
 	}
 	for _, c := range []struct {
 		limit   ratelimit.Limit
 		subject string
-	}{
-		{ratelimit.Limit{Name: limitTriggerUser, Max: config.PipelineTriggerPerUser, Window: config.PipelineTriggerWindow}, user.String()},
-		{ratelimit.Limit{Name: limitTriggerProject, Max: config.PipelineTriggerPerProject, Window: config.PipelineTriggerWindow}, project.String()},
-	} {
+	}{{userLimit, user}, {projectLimit, project}} {
 		d, err := s.limiter.Take(ctx, c.limit, c.subject)
 		if err != nil {
 			return err
