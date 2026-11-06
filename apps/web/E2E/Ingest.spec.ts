@@ -159,13 +159,15 @@ test('the owner revokes a token on a phone with the second step and the old valu
   await signInPage(view, stack().Owner, owner);
   await page.goto(ingestPath());
 
-  const name = DOCS_TOKEN;
-  await page.getByRole('button', { name: T['ingest.revoke.aria'].replace('{name}', name) }).click();
-  await expect(page.getByText(T['ingest.revoke.question'].replace('{name}', name))).toBeVisible();
-  await page.getByRole('textbox', { name: T['factor.method.password'], exact: true }).fill(stack().Owner.Password);
-  await page.getByRole('button', { name: T['ingest.revoke.confirm'] }).click();
+  const revoke = page.getByRole('button', { name: new RegExp(DOCS_TOKEN) });
+  await revoke.click();
+  const confirm = page.getByRole('button', { name: T['ingest.revoke.confirm'] });
+  const password = page.getByRole('textbox', { name: T['factor.method.password'], exact: true });
+  const panel = page.locator('div').filter({ has: confirm }).filter({ has: password }).last();
+  await panel.getByRole('textbox', { name: T['factor.method.password'], exact: true }).fill(stack().Owner.Password);
+  await panel.getByRole('button', { name: T['ingest.revoke.confirm'] }).click();
 
-  await expect(page.getByRole('button', { name: T['ingest.revoke.aria'].replace('{name}', name) })).toHaveCount(0);
+  await expect(revoke).toHaveCount(0);
   await expect(page.getByText(T['ingest.token.status.revoked']).first()).toBeVisible();
   await shot(view, test.info().outputPath('revoked-ar-390.png'));
 

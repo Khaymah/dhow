@@ -13,6 +13,7 @@ import { RunnersEn } from '@/I18n/Locales/Workspace/RunnersEn';
 import { RunsEn } from '@/I18n/Locales/Workspace/RunsEn';
 import { SecretsEn } from '@/I18n/Locales/Workspace/SecretsEn';
 import { TargetsEn } from '@/I18n/Locales/Workspace/TargetsEn';
+import { TargetsManageEn } from '@/I18n/Locales/Workspace/TargetsManageEn';
 import { SettingsEn } from '@/I18n/Locales/Workspace/SettingsEn';
 import type { TWorkspaceMessages } from '@/I18n/Messages';
 
@@ -413,5 +414,6 @@ export const WorkspaceEn: TWorkspaceMessages = {
   ...EnvironmentsEn,
   ...TargetsEn,
   ...IngestEn,
+  ...TargetsManageEn,
   ...ApprovalsEn,
 };

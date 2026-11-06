@@ -37,7 +37,7 @@ export const ReceivedFileRow = ({ file, runHref, onOpenRun }: IReceivedFileRowPr
       : t('ingest.file.pinned', { when: time.full(file.PinnedUntil) });
 
   return (
-    <li className="grid min-w-0 gap-2 border-t border-line px-card py-3 first:border-t-0">
+    <li className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 border-t border-line px-card py-3 first:border-t-0">
       <div className="flex min-w-0 flex-wrap items-center gap-3">
         <Icon name="file" size={18} className="flex-none text-secondary" />
         <span className="grid min-w-0 flex-1 gap-0.5">

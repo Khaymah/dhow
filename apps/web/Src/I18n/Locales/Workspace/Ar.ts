@@ -13,6 +13,7 @@ import { RunnersAr } from '@/I18n/Locales/Workspace/RunnersAr';
 import { RunsAr } from '@/I18n/Locales/Workspace/RunsAr';
 import { SecretsAr } from '@/I18n/Locales/Workspace/SecretsAr';
 import { TargetsAr } from '@/I18n/Locales/Workspace/TargetsAr';
+import { TargetsManageAr } from '@/I18n/Locales/Workspace/TargetsManageAr';
 import { SettingsAr } from '@/I18n/Locales/Workspace/SettingsAr';
 
 export const WorkspaceAr = {
@@ -412,5 +413,6 @@ export const WorkspaceAr = {
   ...EnvironmentsAr,
   ...TargetsAr,
   ...IngestAr,
+  ...TargetsManageAr,
   ...ApprovalsAr,
 } as const;

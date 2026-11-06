@@ -91,7 +91,21 @@ const EnvironmentSections = ({ view, environment, onReload, onRemoved }: ISectio
           projectId={projectId}
           environmentName={environment.Name}
           canAct={canActOnTargets(role) && project.State === 'active'}
+          canManage={manager}
           paused={environment.Paused}
+          hrefFor={(targetName) => `/projects/${projectId}/environments/${environment.Name}/targets/${targetName}`}
+          onOpenTarget={(targetName) => {
+            void navigate({
+              to: '/projects/$projectId/environments/$environmentName/targets/$targetName',
+              params: { projectId, environmentName: environment.Name, targetName },
+            });
+          }}
+          onNew={() => {
+            void navigate({
+              to: '/projects/$projectId/environments/$environmentName/new-target',
+              params: { projectId, environmentName: environment.Name },
+            });
+          }}
         />
       </PageGroup>
       <PageGroup title={t('environments.group.deployments')} lead={t('environments.group.deployments.lead')} icon="queue">

@@ -34,31 +34,35 @@ export const IngestPatternsField = ({ patterns, disabled, onChange }: IIngestPat
       </small>
       {patterns.map((item, index) => (
         <div key={`${String(index)}-${item.Kind}`} className="flex min-w-0 items-center gap-2">
-          <Select
-            compact
-            aria-label={t('ingest.patterns.kind')}
-            className="w-32 flex-none"
-            value={item.Kind}
-            options={KINDS.map((kind) => ({ value: kind, label: t(`ingest.kind.${kind}`) }))}
-            onChange={(event) => {
-              replace(index, { ...item, Kind: event.target.value === 'tag' ? 'tag' : 'branch' });
-            }}
-          />
-          <Input
-            compact
-            dir="ltr"
-            className="font-mono"
-            aria-label={t('ingest.patterns.pattern')}
-            maxLength={PATTERN_MAX}
-            autoComplete="off"
-            spellCheck={false}
-            value={item.Pattern}
-            onChange={(event) => {
-              replace(index, { ...item, Pattern: event.target.value });
-            }}
-          />
+          <div className="w-28 flex-none">
+            <Select
+              compact
+              aria-label={t('ingest.patterns.kind')}
+              value={item.Kind}
+              options={KINDS.map((kind) => ({ value: kind, label: t(`ingest.kind.${kind}`) }))}
+              onChange={(event) => {
+                replace(index, { ...item, Kind: event.target.value === 'tag' ? 'tag' : 'branch' });
+              }}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <Input
+              compact
+              dir="ltr"
+              className="font-mono"
+              aria-label={t('ingest.patterns.pattern')}
+              maxLength={PATTERN_MAX}
+              autoComplete="off"
+              spellCheck={false}
+              value={item.Pattern}
+              onChange={(event) => {
+                replace(index, { ...item, Pattern: event.target.value });
+              }}
+            />
+          </div>
           <IconButton
             size="sm"
+            className="flex-none"
             icon="trash"
             label={t('ingest.patterns.remove')}
             disabled={patterns.length <= 1}

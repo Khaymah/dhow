@@ -1,4 +1,5 @@
 import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
+import { Button } from '@/Core/Ui/Button';
 import { Card } from '@/Core/Ui/Card';
 import { CardStates, cardStateOf } from '@/Core/Ui/CardStates';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
@@ -11,10 +12,14 @@ export interface ITargetsCardProps {
   projectId: string;
   environmentName: string;
   canAct: boolean;
+  canManage: boolean;
   paused: boolean;
+  hrefFor: (targetName: string) => string;
+  onOpenTarget: (targetName: string) => void;
+  onNew: () => void;
 }
 
-export const TargetsCard = ({ organizationId, projectId, environmentName, canAct, paused }: ITargetsCardProps) => {
+export const TargetsCard = ({ organizationId, projectId, environmentName, canAct, canManage, paused, hrefFor, onOpenTarget, onNew }: ITargetsCardProps) => {
   const t = useT();
   const errorText = useApiErrorText();
   const query = useTargets(organizationId, projectId, environmentName);
@@ -24,6 +29,11 @@ export const TargetsCard = ({ organizationId, projectId, environmentName, canAct
   return (
     <div className="grid gap-3">
       {canAct ? null : <InlineAlert accent="building" title={t('targets.forbidden')} />}
+      {canManage ? (
+        <Button size="sm" variant="primary" iconStart="plus" className="justify-self-start" onClick={onNew}>
+          {t('targets.add')}
+        </Button>
+      ) : null}
       {state === 'ready' ? (
         targets.map((target) => (
           <TargetPanel
@@ -34,6 +44,10 @@ export const TargetsCard = ({ organizationId, projectId, environmentName, canAct
             target={target}
             canAct={canAct}
             paused={paused}
+            manageHref={hrefFor(target.Name)}
+            onManage={() => {
+              onOpenTarget(target.Name);
+            }}
           />
         ))
       ) : (
