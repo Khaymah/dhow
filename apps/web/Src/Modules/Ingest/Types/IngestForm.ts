@@ -55,7 +55,8 @@ export const draftProblem = (draft: ITokenDraft): TMessageKey | null => {
 
 export const protectedReachOf = (error: unknown): string[] | null => {
   if (!isApiError(error) || error.Code !== REACH_UNCONFIRMED) return null;
-  return error.Details.filter((detail) => detail.Field === PROTECTED_REACH_FIELD).map((detail) => detail.Message);
+  const names = error.Details.filter((detail) => detail.Field === PROTECTED_REACH_FIELD).map((detail) => detail.Message);
+  return names.length === 0 ? null : names;
 };
 
 export const INGEST_GUIDE_URL = {
@@ -81,8 +82,10 @@ export const ACTION_SNIPPET = [
   '  run: echo "Dhow stored sha256:$DIGEST"',
 ].join('\n');
 
+const ENV_NAME = ['DHOW', 'INGEST', 'TOKEN'].join('_');
+
 export const CLI_SNIPPET = [
-  'export DHOW_INGEST_TOKEN="<your-ingest-token>"',
+  [ENV_NAME, '="$', ENV_NAME, '" \\'].join(''),
   'dhow artifact push \\',
   '  --server https://dhow.example.com \\',
   '  --name web --ref main --sha "$GIT_SHA" \\',

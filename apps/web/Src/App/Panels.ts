@@ -1,5 +1,6 @@
 import { canApproveDeployments, canCreateProjects, canManageMembers, canManageRunners, canManageTokens, type TRole } from '@/Core/Auth/AuthTypes';
 import { isCustomThemeId } from '@/Core/Theme/ThemeIds';
+import { canManageIngest } from '@/Modules/Ingest/Types/IngestAccess';
 import { canBypassDeployments } from '@/Modules/Approvals/Types/ApprovalAccess';
 import type { TDecision } from '@/Modules/Approvals/Types/Gate';
 
@@ -135,16 +136,16 @@ const SLIDE_GATES: Partial<Record<TStaticSlideId, (role: TRole | undefined) => b
   'variable-new': (role) => role !== undefined,
   'registry-new': (role) => role !== undefined,
   'environment-new': (role) => role !== undefined,
-  'ingest-token-new': (role) => role !== undefined,
+  'ingest-token-new': canManageIngest,
 };
 
 const isStaticSlide = (id: TSlideId): id is TStaticSlideId => STATIC_SLIDES.some((slide) => slide === id);
 
-export const slideAllowed = (id: TSlideId, role: TRole | undefined): boolean => {
+export const slideAllowed = (id: TSlideId, role: TRole | undefined, projectRole?: TRole): boolean => {
   const decision = decisionTargetOf(id);
   if (decision !== null) return decision.Decision === 'bypass' ? canBypassDeployments(role) : canApproveDeployments(role);
   const gate = isStaticSlide(id) ? SLIDE_GATES[id] : undefined;
-  return gate === undefined || gate(role);
+  return gate === undefined || gate(id === 'ingest-token-new' ? (projectRole ?? role) : role);
 };
 
 const legacyStack = (raw: unknown): string | undefined => {

@@ -51,6 +51,7 @@ export const SendBuildPanel = () => {
         <Snippet id="action" title={t('ingest.send.action')} value={ACTION_SNIPPET} />
         <p className="m-0 text-body-sm text-secondary">{t('ingest.send.env')}</p>
         <Snippet id="cli" title={t('ingest.send.cli')} value={CLI_SNIPPET} />
+        <p className="m-0 text-body-sm text-secondary">{t('ingest.send.cliToken')}</p>
         <p className="m-0 text-body-sm text-secondary">{t('ingest.send.secret')}</p>
         <div className="flex flex-wrap gap-x-4 gap-y-1">
           <a href={INGEST_GUIDE_URL[Locale]} target="_blank" rel="noreferrer noopener" className="text-body-sm text-primary underline">

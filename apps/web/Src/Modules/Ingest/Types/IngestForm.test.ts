@@ -91,8 +91,9 @@ describe('the protected reach of an error', () => {
     ).toEqual(['production', 'staging']);
   });
 
-  it('answers an empty list when the server named none, and null for any other error', () => {
-    expect(protectedReachOf(failure('INGEST_TOKEN_REACH_UNCONFIRMED', []))).toEqual([]);
+  it('answers null when the server named none, and for any other error', () => {
+    expect(protectedReachOf(failure('INGEST_TOKEN_REACH_UNCONFIRMED', []))).toBeNull();
+    expect(protectedReachOf(failure('INGEST_TOKEN_REACH_UNCONFIRMED', [{ Field: 'AcknowledgeProtectedReach', Message: 'x' }]))).toBeNull();
     expect(protectedReachOf(failure('VALIDATION_FAILED', [{ Field: 'ProtectedReach', Message: 'production' }]))).toBeNull();
     expect(protectedReachOf(new Error('x'))).toBeNull();
     expect(protectedReachOf(null)).toBeNull();
@@ -107,7 +108,8 @@ describe('the snippets', () => {
     expect(ACTION_SNIPPET).toContain('${{ secrets.DHOW_INGEST_TOKEN }}');
     expect(ACTION_SNIPPET).toMatch(/- env:\n {4}DIGEST: \$\{\{ steps\.dhow\.outputs\.digest \}\}\n {2}run: echo "Dhow stored sha256:\$DIGEST"/);
     expect(ACTION_SNIPPET).not.toMatch(/run:.*\$\{\{/);
-    expect(CLI_SNIPPET).toContain('<your-ingest-token>');
+    expect(CLI_SNIPPET.split('\n')[0]).toMatch(/^(\w+)="\$\1" \\$/);
+    expect(CLI_SNIPPET).not.toMatch(/export .*TOKEN/);
     expect(CLI_SNIPPET).not.toContain('--token ');
   });
 });

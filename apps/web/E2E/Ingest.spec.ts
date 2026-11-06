@@ -115,7 +115,7 @@ test('a file uploaded with the token shows in the list, declared and not verifie
   await close(view);
 });
 
-test('a wide pattern lists the protected environment and needs an explicit yes, and the value goes with the page', async ({ browser }) => {
+test('a wide pattern lists the protected environment and needs an explicit yes, and the value goes the moment the slide closes', async ({ browser }) => {
   const view = await open(browser, 'en', DESKTOP);
   const { Page: page, T } = view;
   await signInPage(view, stack().Owner, owner);
@@ -143,7 +143,8 @@ test('a wide pattern lists the protected environment and needs an explicit yes, 
   expect(value).not.toBe(docsValue);
   await expect(dialog.getByRole('list', { name: T['ingest.reach.label'] }).getByText(PROTECTED)).toBeVisible();
 
-  await page.goBack();
+  await page.keyboard.press('Escape');
+  await expectNowhere(view, value);
   await expect(dialog).toBeHidden();
   await expectNowhere(view, value);
   await expect(page.getByText(WIDE_TOKEN, { exact: true })).toBeVisible();

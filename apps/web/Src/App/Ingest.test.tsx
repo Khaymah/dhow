@@ -130,7 +130,7 @@ describe('the page around them', () => {
     const panel = await within(main).findByRole('region', { name: Ar['ingest.send.group'] });
     const text = panel.textContent;
     expect(text).toContain('secrets.DHOW_INGEST_TOKEN');
-    expect(text).toContain('<your-ingest-token>');
+    expect(text).toMatch(/(DHOW_INGEST_TOKEN)="\$\1"/);
     expect(text).toContain('env:');
     expect(text).not.toContain('dhow_ing_');
     const links = within(panel).getAllByRole('link');

@@ -3,6 +3,7 @@ export const IngestEn = {
   'ingest.lead': 'Another build system, such as GitHub Actions, sends the build output to Dhow, and Dhow starts a run from it. Here are the tokens that allow it and the files that arrived.',
   'ingest.readOnly': 'You can read the files that arrived. Whoever manages the project makes and revokes the tokens.',
   'ingest.forbidden': 'You cannot read the received files of this project.',
+  'ingest.forbidden.manage': 'Only those who manage the project make ingest tokens.',
 
   'ingest.tokens.group': 'Ingest tokens',
   'ingest.tokens.title': 'Ingest tokens',
@@ -104,6 +105,7 @@ export const IngestEn = {
   'ingest.send.action': 'The ready-made GitHub Action',
   'ingest.send.cli': 'Command line',
   'ingest.send.env': 'Pass the outputs of the Action to the step through an environment variable always, and never write them inside the command of the step directly.',
+  'ingest.send.cliToken': 'Map the secret of your build system to the environment variable the command reads the token from. The command does not take the token on its command line.',
   'ingest.send.secret': 'The token comes from the secret of your system and never appears on the command line.',
   'ingest.send.copy': 'Copy the {title} example',
   'ingest.send.copied': 'Copied the example',

@@ -21,6 +21,8 @@ export interface IIngestState {
   writes: IIngestWrite[];
   failCreate: Response | null;
   failTokens: Response | null;
+  holdTokens: Promise<void> | null;
+  emptyReach: boolean;
 }
 
 export const ingestTokenFixture = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -64,6 +66,8 @@ export const newIngestState = (): IIngestState => ({
   writes: [],
   failCreate: null,
   failTokens: null,
+  holdTokens: null,
+  emptyReach: false,
 });
 
 const PATH = /^\/api\/v1\/organizations\/[^/]+\/projects\/[^/]+\/(ingest-tokens(?:\/([^/]+)\/revoke)?|ingested-artifacts)$/;
@@ -88,7 +92,7 @@ const unconfirmed = (names: readonly string[]): Response =>
       Success: false,
       Error: {
         Code: 'INGEST_TOKEN_REACH_UNCONFIRMED',
-        Message: 'x',
+        Message: 'تحتاج إلى تأكيد',
         Details: [{ Field: 'AcknowledgeProtectedReach', Message: 'x' }, ...names.map((name) => ({ Field: 'ProtectedReach', Message: name }))],
       },
     },
@@ -102,6 +106,7 @@ export const ingestRoute =
     if (!match) return undefined;
     const [, kind, revokeId] = match;
     if (request.method === 'GET' && kind === 'ingest-tokens' && state.failTokens) return state.failTokens.clone();
+    if (request.method === 'GET' && kind === 'ingest-tokens' && state.holdTokens) return state.holdTokens.then(() => pageOf(state.tokens, url));
     if (request.method === 'GET') return pageOf(kind === 'ingested-artifacts' ? state.files : state.tokens, url);
     return bodyOf(request).then((body) => {
       state.writes.push({ Method: request.method, Path: url.pathname.replace(/^\/api\/v1/, ''), Body: body });
@@ -110,6 +115,7 @@ export const ingestRoute =
         return envelope({ Success: true, Data: state.tokens.find((token) => token.Id === revokeId) }, 200);
       }
       if (state.failCreate) return state.failCreate.clone();
+      if (state.emptyReach && body?.AcknowledgeProtectedReach !== true) return unconfirmed([]);
       if (state.protectedReach.length > 0 && body?.AcknowledgeProtectedReach !== true) return unconfirmed(state.protectedReach);
       const token = ingestTokenFixture({
         Id: '0198a000-0000-7000-8000-0000000009a9',
