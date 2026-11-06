@@ -1,0 +1,58 @@
+# ADR-0096: إضافة النشر بـ Docker Compose وسياسة الملف الآمنة (M6.5)
+
+- **الحالة:** مقبول. [خطة M6](../M6-Deploy-Targets.md) §M6.5 (قرار 5: Compose بـ `docker compose` على السيرفر عبر SSH exec، وقرار 14: سياسة Compose الآمنة والصور بالـ digest).
+- **التاريخ:** 2026-11-06
+- **بيكمّل:** [ADR-0094](0094-rolling-deploy-and-group-rollback.md) (المنسّق `Fleet` والرجوع الجماعي)، و[ADR-0093](0093-release-engine-and-ssh-deploy-plugin.md) (المحرك وإضافة SSH)، و[ADR-0091](0091-deploy-target-delivery-to-the-runner.md) (البند 11: التزامات الإضافة، وإعدادات `ComposeProject` و`ComposeFile` و`AllowUnsafeCompose` في الهدف)، و[ADR-0092](0092-deploy-target-runner-side-and-release-reports.md) (التقارير)، و[ADR-0011](0011-deploy-targets.md).
+
+## السياق
+- بعد M6.3ب عندنا محرك بيرفع إصدار ويبدّل `current` ويفحص الصحة ويرجع، على سيرفر أو مجموعة بدفعات. المطلوب إضافة تانية للنشر بـ Compose على نفس المحرك من غير تكرار التدرّج ولا الأقفال ولا التقارير.
+- مستخدم Docker على السيرفر يساوي root عليه. ملف Compose جاي من commit، فمايتنفّذش بحدود أوسع من المقصود، والصور لازم تبقى معروفة بالظبط وقت النشر (ADR-0010: النشر بيسحب مش بيبني).
+- M6.4أ بيشتغل في نفس الوقت على أسباب الفشل والإلغاء وفحص الهدف في الإضافة الأولى وفي الـ runner والخادم. فالتغييرات المشتركة هنا صغيرة وإضافية، ومفيش لمس لإضافة SSH ولا للـ proto ولا لتحويل أسباب الفشل في الـ runner.
+
+## القرار
+1. **المكان:** `apps/plugins/deploy-compose` (الـ binary والـ Dockerfile والاختبارات)، وتحته `internal/policy` (سياسة الملف) و`internal/stack` (الأوامر على السيرفر) و`internal/config` و`internal/app`. الكود المشترك مع إضافة SSH اتحط في `internal/deployplugin` (قراية مدخلات الخطوة والفحص الصحي، وتشغيل `Fleet` بالاتصال والتقرير)، وإضافة SSH نفسها ماتلمستش عشان ما يحصلش تعارض مع M6.4أ؛ توحيدها على الحزمة دي متابعة لاحقة.
+2. **المحرك:** واجهة اختيارية `Activator` على `Config` (`internal/deployrelease/activator.go`) بتلات نقاط: `Inspect` (واجهة منفصلة) قبل أي اتصال بنفس مكان فحص الأرشيف، فرفضه بيتقرّر ويتبلّغ زي رفض الأرشيف؛ و`Prepare` بعد رفع الإصدار ووضعه في `releases/<id>` وبعد أمر ما قبل التبديل؛ و`Activate` بعد التبديل، وتاني مرة وقت الرجوع بملفات الإصدار السابق. الخطأ بيتحول لـ `Failure` بسبب `hook_failed` للتحضير و`reload_failed` للتشغيل (الأسباب نفسها المقفولة في التقرير، من غير أسباب جديدة)، وأي `*Failure` راجع من الإضافة بيعدّي كما هو. التعديل في المحرك ثلاث نقاط نداء وملف جديد، والتدرّج والأقفال والتقارير والرجوع الجماعي ماتغيّرتش.
+3. **التخطيط:** نفس تخطيط SSH (`releases/<id>` و`current` و`.dhow`). الإصدار فيه `compose.yaml` (الاسم من `ComposeFile`) وملف `compose.dhow.yaml` بتولّده الإضافة. مجلد الإصدار هو `--project-directory`، فالمسارات النسبية تتحسب منه. لو موجود `shared/.env` على السيرفر بيتمرر بـ `--env-file`؛ داو مابيكتبش أسرار التطبيق.
+4. **الأوامر** (الاستثناء نفسه لقاعدة الـ shell في ADR-0093 البند 9): سطر `exec` واحد من argv بيعدّي على `Command()`، وكل وسيط مقتبس. `docker compose` مفيهوش `--` قبل قيمة الملف، فالبند 11 في ADR-0091 («بعد `--` أو بصيغة `-f=`») اتطبّق بالصيغة المدمجة: `--project-name=<p>` و`--project-directory=<dir>` و`--file=<path>` و`--env-file=<path>`، كل واحد وسيط واحد، فمايتقراش أبدًا كخيار. الأوامر:
+   - `pull --quiet` في `Prepare`، مهلتها `pull_timeout` (10 دقايق افتراضيًا).
+   - `up --detach --wait --no-build --wait-timeout=<ثواني>` في `Activate`، ومهلة الـ exec أطول بـ 30 ثانية. `wait_timeout` من 5 ثواني لـ 10 دقايق (120 ثانية افتراضيًا)، وده بيدخل في ميزانية الرجوع (3 دقايق) لأن الرجوع بيعمل نفس الأمر.
+   - مفيش `--remove-orphans` ولا حذف صور ولا `down`: الإضافة مابتمسحش حاجة على السيرفر.
+5. **السحب قبل التبديل:** `pull` جزء من مرحلة الرفع، فبيجري على كل السيرفرات (4 في وقت واحد) قبل أول تبديل. صورة ناقصة أو registry مش واصل بيوقف النشر وهو لسه مالمسش خدمة شغّالة: الإصدار بيتمسح و`current` زي ما هو والمجموعة `failed`. بعد كده `up --wait` بياخد الصور من الكاش المحلي.
+6. **الرجوع:** نفس خوارزمية المحرك (تبديل `current` للـ `verified` ثم `Activate` بملفاته). `compose.dhow.yaml` بتاع الإصدار السابق فيه الـ digests، فلو الصورة اتمسحت من السيرفر `up` بيسحبها. الخدمات اللي ماتغيّرتش ماتتعملش لها إعادة إنشاء. لو الإصدار الجديد فشل `--wait`، حاوياته الفاشلة بتفضل لحد ما الرجوع يستبدلها. أول نشر من غير سابق بيسيب الحاويات و`current` ويفشل (نفس `on_first_failure` بتاع SSH).
+7. **الصور بالـ digest:** بعد دمج المدخل `images` (`خدمة=صورة@sha256:...`، أقصى 100) على الملف، كل خدمة لازم صورتها `^[A-Za-z0-9][A-Za-z0-9._:/-]{0,254}@sha256:[0-9a-f]{64}$`، وإلا `COMPOSE_IMAGE_NOT_PINNED` (ومتغيّر في الاسم مرفوض). `build:` مرفوض بـ `COMPOSE_BUILD_NOT_ALLOWED`، وخدمة في `images` مش في الملف `COMPOSE_IMAGE_UNKNOWN_SERVICE`. التثبيت ومنع `build` مايتفتحوش بـ `AllowUnsafeCompose`. `compose.dhow.yaml` بيتولّد من الصور بعد الدمج بـ `yaml.Marshal`، فالقيم مابتتدمجش في نص.
+8. **سياسة الملف:** `internal/policy` بقراية `go.yaml.in/yaml/v3` (موجودة في الـ repo، من غير اعتمادية جديدة): مستند واحد بس، ومفتاح مكرر مرفوض، وأقصى 256 KiB، والمراجع و`<<` بتتفك قبل الفحص. القواعد `COMPOSE_UNSAFE_<RULE>`: `PRIVILEGED` (وفي `post_start` و`pre_stop`) و`PID_HOST` و`IPC_HOST` و`UTS_HOST` و`CGROUP_HOST` و`USERNS_HOST` و`NETWORK_HOST` و`CAP_ADD` و`DEVICES` (و`device_cgroup_rules` و`gpus` وحجز الأجهزة) و`SECURITY_OPT` (غير `no-new-privileges`) و`DOCKER_SOCKET` (أي مسار فيه `docker.sock` و`use_api_socket`) و`BIND_ROOT` و`BIND_OUTSIDE` و`BIND_SYMLINK` و`INTERPOLATION` و`INCLUDE` و`EXTENDS` و`PROVIDER`. تفاصيل الربط:
+   - المسموح volume مسمّى و`tmpfs`، ومسار نسبي جوه مجلد الإصدار، ومطلق تحت `DeployPath` (مش `DeployPath` نفسه ولا `.dhow`). نفس القاعدة بتتطبق على `env_file` و`file:` في `configs` و`secrets` و`driver_opts.device` في الـ volumes.
+   - أي `$` في مسار ربط أو في قيمة خيار حساس (`privileged` و`pid`...) مرفوض (`INTERPOLATION` أو القاعدة نفسها)، لأن القيمة بتتحدد وقت التشغيل من `.env` ومش بنقدر نفحصها.
+   - مسار نسبي بيعدّي على رابط رمزي جاي من الأرشيف مرفوض (`BIND_SYMLINK`)، لأن الرابط ممكن يشاور على أي حاجة جوه الإصدار بتتبدّل بعد الفحص.
+   - الفحص مرتين: على الأرشيف قبل أي اتصال (`Inspect`، بنفس بصمة الأرشيف، فالرفض `failed` في التقرير ومفيش اتصال ولا كتابة)، وعلى `compose.yaml` كما وصل السيرفر بعد `sha256sum -c` (`Prepare`) وهو ملف عادي مش رابط، وده اللي بيتولّد منه الـ override. فالملف اللي اتفحص هو اللي بيشتغل حتى لو الأرشيف اتبدّل بين الفحص والرفع.
+   - `AllowUnsafeCompose` (على الهدف، من الأدمن) بيفتح قواعد `UNSAFE` بس.
+   - `FuzzComposePolicy` بيتأكد من عدم الـ panic، ومن إن كل رفض `Violation` بكود `COMPOSE_`، وإن كل قبول كل صوره مثبّتة والـ override اللي بيتولّد منه بيعدّي نفس الفحص. في `make fuzz-list` وفي الليلي.
+9. **كودات الخروج:** كودات SSH نفسها، وكود جديد `30` لرفض الملف، والكود الاسمي المطبوع على stderr هو كود القاعدة (`COMPOSE_UNSAFE_PRIVILEGED`...) مش `30`. تحويل الخروج لأسباب `DEPLOY_*` في الـ runner والخادم من شغل M6.4أ، ولما يوصل manifest الإضافة بيحتاج `ExitReasons` للكود `30`. رسالة التقرير ثابتة («the compose file is not safe to deploy»)، ومفيهاش اسم قاعدة ولا خدمة، لأن الخادم بيحوّل أي 20 حرف متتالية من `[A-Za-z0-9+/=_-]` لـ `***`.
+10. **الصورة:** `apps/plugins/deploy-compose/Dockerfile` بنفس الـ builder والصورة النهائية (distroless nonroot, 65532) و label manifest فيه `target` و`artifact` و`images` و`wait_timeout` و`pull_timeout` والفحص الصحي، و`Mutating: true`. job `deploy-compose-image` في `release.yml` زي `deploy-ssh-image` (متعدد المعماريات، وفحص الخروج 2 من غير هدف، وcosign وprovenance) و`publish-binaries` بيستناه. اختبار في الـ runner (`DeployCompose_test.go`) بيقرا الـ label ويمرره على `plugin.Parse`.
+11. **صورة السيرفر للاختبار:** `deploy/e2e-targets/compose-host`: `docker:28-dind` و`registry:3` بالـ digest، و`openssh-server` بنسخة مثبّتة، وحساب `deploy` في مجموعة `docker`، و`registry` على `127.0.0.1:5000` جوه الحاوية نفسها، و`dockerd` على socket يونكس بس (من غير TCP). بتشتغل `--privileged`. الحاويات هنا مالهاش إنترنت، فالصور بتدخل عن طريق دايمون الـ host: `docker build` ثم `docker save | docker exec -i … docker load` ثم `push` على `localhost:5000` ثم مسحها من الدايمون الداخلي، فالـ `pull` بيشتغل فعلًا من الـ registry، والـ digest لازم يطلع واحد على السيرفرين.
+12. **الاختبارات:**
+    - وحدات `policy` (جدول لكل قاعدة، ومعاها YAML anchors والتكرار) و`config` و`stack` على سيرفر وهمي من نظام ملفات محلي بيجري عليه `Fleet` كامل: ترتيب `pull` ثم `up`، و`pull` فاشل، و`up` فاشل ورجوع، وأول نشر، وسيرفرين التاني بيفشل في الدفعة التانية، وفحص التاني على الملف اللي على السيرفر، و`app` للكود الاسمي، وحدات المحرك للـ `Activator` بـ stub.
+    - `make deploy-e2e`: جزء compose في `deploy/e2e-targets/run.sh` (يتخطى بـ `DHOW_E2E_SKIP_COMPOSE=1`) بسيناريوهات `apps/plugins/deploy-compose/e2e`: نشر بـ digest ثم تحديث ثم تحديث بـ healthcheck فاشل (رجوع للصور السابقة والحاويات القديمة شغّالة والخروج 10)، وصورة ناقصة (`pull` يفشل والخدمات ماتتغيّرتش)، وtag بس وprivileged وbind على `/` و`docker.sock` وhost network وbuild (خروج 30 ومفيش إصدار على السيرفر)، و`AllowUnsafeCompose`، ومدخل `images`، وأول نشر فاشل، وhost key غلط، وسيرفرين التاني بيفشل في الدفعة التانية (الأول بيرجع والمجموعة `rolled_back`)، وصورة ناقصة على مجموعة (من غير تبديل). التقارير بتتحفظ باسم `compose-*` و`rolling-compose-*` فاختبار إعادة التقارير على الخادم (`TestTheReportsOfTheRealPluginRun`) بياخدها بنفس البوابة.
+    - في الـ CI: خطوة بناء صورة الإضافة وفحصها في job `deploy-e2e` (زي SSH) و`make deploy-e2e` بنفسه، ومهلة الـ job 45 دقيقة. الـ job بيتشغّل لما `apps/plugins` أو `deploy/e2e-targets` يتغيّروا (موجود في `deploy/ci/demo-areas.sh`).
+13. **الاعتمادية:** مفيش اعتمادية جديدة في الـ Go. الصور الجديدة في الاختبار بس: `docker:28-dind` و`registry:3` و`busybox:1.37.0` بالـ digest.
+
+## البدائل اللي اترفضت
+- **`DOCKER_HOST=ssh://` أو Docker API من الإضافة:** كان يحتاج `ssh` وdocker CLI في صورة الإضافة، أو تعريض الـ API. القرار 5: الأوامر على السيرفر بـ SSH exec.
+- **تشغيل Compose عن طريق `ReloadCommand`:** hook بيمشي في `sh -c` بنص من الأدمن، فكنا هنركّب فيه المسارات واسم المشروع كنص. الأوامر هنا argv مقتبس.
+- **`docker compose config` على السيرفر للفحص:** بيلمس السيرفر قبل القرار، وبيحلّ المتغيّرات من `.env` اللي ممكن يتغيّر. الفحص المحلي الصارم أحسن.
+- **قبول tag وحلّه لـ digest وقت النشر:** النشر مايبقاش قابل للتكرار، والـ registry ممكن يتبدّل بين الفحص والسحب.
+- **نسخة من محرك SSH للـ Compose:** تكرار للتدرّج والأقفال والتقارير والرجوع. `Activator` أصغر وبيخلّي أي إصلاح في المحرك يوصل الإضافتين.
+
+## النتايج
+- إضافة SSH ماتغيّرتش. لما M6.4أ ينزل `ExitReasons` للـ manifest، manifest إضافة Compose يحتاج نفس الحقل للكودات 10 لـ 17 و30. `internal/deployplugin` ممكن تحل محل نسخة SSH في متابعة.
+- الربط تحت `DeployPath` مسموح، فحاوية تقدر تقرا وتكتب في `shared/` وفي مجلدات الإصدارات الأخرى. ده مقصود (الـ volumes عادةً هناك)، ومحميّ `.dhow` فقط.
+- الاسم والـ `ComposeProject` من الهدف: مشروعين على نفس السيرفر لازم يبقوا باسمين مختلفين، والإضافة مابتتحقق من تعارض المنافذ.
+- `docs/guides/deploy-compose.md` بالنسختين، وتوصية rootless Docker على الهدف.
+
+## المراجعة الأمنية
+- مفيش Critical ولا High.
+- **(LOW، مقبول)** حساب النشر في مجموعة `docker` يساوي root على السيرفر. التخفيف: السياسة بترفض الخيارات اللي توسّع ده، والوثائق بتوصي بـ rootless والمفتاح بـ `from` وللهدف ده بس. الأدمن اللي بيفتح `AllowUnsafeCompose` بيقبل ده صراحةً.
+- **(LOW، مقبول)** صورة بـ digest صحيح ممكن تكون ضارة (الـ digest بيثبّت المحتوى مش بيحكم عليه). فحص الصور (مسح الثغرات) برّه نطاق M6، والمشغّل بيتحكم في الـ registry وبوابة البيئة.
+- **(LOW، مقبول)** `--env-file` من `shared/.env` بتغيّر قيم `${VAR}` غير الحساسة بدون فحص. القيم في الخيارات الحساسة وأسماء الصور وأي مسار ربط مرفوضة لو فيها `$`.
+- **(LOW، مقبول)** حاويات الإصدار الفاشل بتفضل شغّالة لحد ما الرجوع يستبدلها، وفي أول نشر بتفضل لحد ما الأدمن يصلّح.
+- **(LOW، مقبول)** الاختبار على dind في حاوية `--privileged` على جهاز التطوير بيحتاج Docker، ومسار Podman الحقيقي للإضافة (جوه الـ sandbox) بيتجرّب في CI زي إضافة SSH.
