@@ -151,7 +151,7 @@ Jobs that already run finish, and a job that has not reached the gate yet waits 
 
 ## Deploy targets
 
-A target is where a deploy arrives: one server or a group of up to 10 servers, with the user, the deploy path and the access key. A target belongs to the environment, so no commit can pick another server. A job writes only the name of the target, and the address comes from the server. A job that deploys points to the target with `with.target` in a [deploy plugin](../pipeline-spec.md#plugins-that-deploy-to-a-target), and the server checks the target and its keys before it queues the job, and again before it opens the access key at start. Running the deploy on one server is described in [Deploy to a server over SSH](deploy-ssh.md), and the rolling deploy across more than one server comes in a later release.
+A target is where a deploy arrives: one server or a group of up to 10 servers, with the user, the deploy path and the access key. A target belongs to the environment, so no commit can pick another server. A job writes only the name of the target, and the address comes from the server. A job that deploys points to the target with `with.target` in a [deploy plugin](../pipeline-spec.md#plugins-that-deploy-to-a-target), and the server checks the target and its keys before it queues the job, and again before it opens the access key at start. Running the deploy on one server, or on a group of servers in batches, is described in [Deploy to a server over SSH](deploy-ssh.md).
 
 Everyone who reads the project reads the targets. Only an Admin and an owner create, change and remove them, with the second step (`CurrentFactor`).
 

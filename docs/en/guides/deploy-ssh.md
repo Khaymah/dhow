@@ -4,7 +4,7 @@
 
 The official `dhow-deploy-ssh` plugin uploads the new release to its own folder on the server, switches the `current` link to it in one step, and then checks that the application works. If the check fails, or the reload command or one of the commands fails, the plugin goes back to the release that succeeded before it. The server needs nothing but `sshd` and an ordinary file system.
 
-This version of the plugin deploys to one server. A target with more than one server fails with a clear reason, and the rolling deploy across a group comes in a later release.
+A target can be one server or a group of up to 10 servers. On a group the plugin deploys in batches, and if one server fails, every server that was switched in this deploy goes back. The details are in [Deploy to a group of servers](#deploy-to-a-group-of-servers).
 
 ## How the files look on the server
 
@@ -56,9 +56,9 @@ The server needs `sshd` with the `sftp` file transfer, the `sha256sum` command, 
 
 The target, the key and pinning the host key are described in [Deploy targets](environments.md#deploy-targets). In short, you need this here:
 
-1. Create the target in the environment with the deploy path, the deploy account and one server.
-2. Generate the access key and put its public part in `authorized_keys`.
-3. Fetch the host key of the server, compare its fingerprint and confirm it. The plugin connects only with the pinned key: it never accepts a new key by itself, and any difference fails with `HOST_KEY_MISMATCH` before any file is written.
+1. Create the target in the environment with the deploy path, the deploy account and one or more servers (up to 10).
+2. Generate the access key and put its public part in `authorized_keys` on every server. The key is one for the target.
+3. Fetch the host key of each server, compare its fingerprint and confirm it. The plugin connects only with the pinned key: it never accepts a new key by itself, and any difference fails with `HOST_KEY_MISMATCH` before any file is written.
 
 ## The step in the pipeline file
 
@@ -100,6 +100,8 @@ deploy:
 
 ## What happens in a deploy
 
+These steps are for one server. On a group they repeat on every server in the order described in [Deploy to a group of servers](#deploy-to-a-group-of-servers).
+
 1. The plugin checks the archive and its digest before it connects to any server.
 2. It connects with the pinned key only, checks the deploy path, the space and `current`, and takes a lock on the target. A lock that another deploy took and whose time has not ended refuses this deploy with `TARGET_LOCKED`. An expired lock is taken with a warning.
 3. It uploads the files to `releases/.incoming-<release>` and computes the digest of each file, and then the server verifies the digests with `sha256sum -c`.
@@ -138,15 +140,57 @@ After the switch a rollback has one of three causes: the health check failed, `R
 
 Dhow does not undo changes outside the files, such as a database migration. Design the releases so that the previous one works with the new database.
 
+## Deploy to a group of servers
+
+If the target has more than one server, the plugin deploys one release (one number and one digest) to all of them, from one step on one runner. Each server has its own record in Dhow with its state and the result of its check.
+
+The batches are set in `Settings.Rolling` in the settings of the target, and the order of the servers in the target is the order of the batches.
+
+| Field | Meaning |
+|---|---|
+| `BatchSize` | The number of servers that switch together in a batch. From 1 to the number of servers, and the default is 1 |
+| `BatchPauseSeconds` | The wait between two batches in seconds. From 0 to 600, and the default is 0 |
+
+The stages in order:
+
+1. **A check on all servers first**, one after the other: the connection with the pinned key, the deploy path, the space and `current`, and taking the lock of the server. Any server that fails stops the deploy before any change, and the locks that were taken are released.
+2. **Upload the release to all servers**, check its digests and run the pre-switch command, up to 4 servers at a time. Nothing that is running changes in this stage.
+3. **Switch batch by batch.** In each batch every server switches, reloads and then checks its health, and the servers of the batch work together. If `health_check_url` has the value `{host}`, each server is checked on its own address. If it does not, the address is checked once for the batch and does not tell one server from another (like the address of a load balancer). After a batch passes, the plugin waits `BatchPauseSeconds` and then starts the next one.
+4. **Success:** after the last batch passes, the plugin records the release in `.dhow/verified` on all servers, deletes the older releases, and releases the locks.
+
+The total of the health budgets of the batches and the waits between them is at most 60 minutes, or the job fails before it starts with `ROLLING_BUDGET_EXCEEDED`.
+
+### When it fails
+
+The first failure on any server stops the deploy at once. The failure can be in the upload, the switch, the reload, one of the commands, the health check, or a cancel of the job.
+
+- No new batches start. The servers that have not switched yet do not change, their upload files are deleted, and they appear in the log as `skipped`.
+- Every server that switched in this deploy goes back to the last release that Dhow checked on it. The rollback starts from the newest batch to the oldest, and the servers of one batch go back together.
+- The rollback does not stop if it fails on a server. The plugin goes on with the rest of the servers. The budget of the whole rollback is 3 minutes, and a cancel of the job does not cut it.
+- There is no third automatic try.
+
+| State of the group | Meaning | Code |
+|---|---|---|
+| `failed` | It failed before any server switched, and nothing changed | By reason, such as `HOST_KEY_MISMATCH`, `TARGET_HOST_UNREACHABLE` or `DEPLOY_FAILED` |
+| `rolled_back` | Every server that switched went back | `DEPLOY_ROLLED_BACK` |
+| `rollback_failed` | At least one server stayed on the new release or it is not known which release it is on | `DEPLOY_ROLLBACK_FAILED` |
+| `unknown` | The runner went down during the deploy | Dhow sets it after the job ends |
+
+The state of each server in the record of the release is one of: `pending`, `uploaded`, `switched`, `verified`, `failed`, `rolled_back`, `rollback_failed`, `unknown` and `skipped`.
+
+- **A server with no earlier release.** If all the servers that switched have no earlier release (the first deploy to the target), they stay as they are and the group fails as `failed` with `DEPLOY_HEALTH_FAILED`, as with one server. If some have an earlier release and some do not (a server that was added to the target recently), the one with none stays on the new release and is recorded as `rollback_failed`, and so is the group.
+- **If the rollback fails on a server**, the group is on different releases. Dhow records the reason for each server and writes an audit record with high severity at once. Fix it with a new successful deploy to the target. The new deploy starts by reading the release of each server and writes a warning, and it fixes what is left.
+- **A lock for each server.** It is taken in the order of the servers and stays for the whole deploy, and the plugin releases it on every path. Another deploy that holds the lock of one server stops this deploy with `TARGET_LOCKED` before any change.
+
 ## Result codes
 
 The plugin writes the code in the log of the step and exits with the matching number.
 
 | Code | Number | Meaning |
 |---|---|---|
-| `DEPLOY_ROLLED_BACK` | 10 | It failed after the switch and the previous release came back |
+| `DEPLOY_ROLLED_BACK` | 10 | It failed after the switch and the previous release came back, and on a group every server that switched went back |
 | `DEPLOY_HEALTH_FAILED` | 11 | The check failed and there is no earlier release, so `current` stayed as it is |
-| `DEPLOY_ROLLBACK_FAILED` | 12 | The rollback itself failed |
+| `DEPLOY_ROLLBACK_FAILED` | 12 | The rollback itself failed, and on a group on at least one server |
 | `HOST_KEY_MISMATCH` | 13 | The key of the server is not the pinned one, and nothing was written |
 | `ARTIFACT_UNSAFE` | 14 | The archive has an unsafe entry or its digest does not match, and nothing was written |
 | `TARGET_LOCKED` | 15 | Another deploy holds the lock of the target |
@@ -164,10 +208,13 @@ Dhow keeps, for each release, the target, the release id, the previous release, 
 - **The check fails with `status`:** the address answers outside the accepted range. Open it from another machine and make sure the web server reads from `current` and the file exists in the release.
 - **The check fails with `refused`:** the service has not started yet. Raise `health_check_start_delay` or `health_check_retries`.
 - **The check fails with `certificate`:** the certificate of the address is not valid or does not match the name. The check never skips the certificate.
+- **A server of the group does not connect (`TARGET_HOST_UNREACHABLE`):** the deploy fails before any server switches and nothing changes. Fix the connection or start the server and deploy again.
+- **The group is on different releases after `DEPLOY_ROLLBACK_FAILED`:** open the record of the release to see the server that did not go back and the reason, fix the reason, and then deploy a new release. The new deploy brings the group to one release.
 
 ## Limits of this version
 
-- One server in the target.
+- The first deploy to a group goes back to nothing if it fails in the middle: the servers that switched stay on the new release.
+- A second job on the same target in one run does not wait for the first to end. The lock of the servers stops it with `TARGET_LOCKED`.
 - No manual rollback and no "check the target" button yet. The only rollback is the automatic one during a deploy.
 - Dhow does not write application secrets on the server. Put the `.env` file in `shared/` yourself.
 - The commands written by the Admin run in the login shell of the deploy account on the server. This is the only exception to the rule "no text goes through a shell", and it is written in the architecture decision.
