@@ -110,6 +110,7 @@
 |---|---|---|---|
 | M6.7: `dhow artifact push` وGitHub Action ونسخها لـ `Khaymah/dhow-action` (ADR-0099) | `feat/artifact-push-m67` | #117 | الـ CI والـ merge |
 | M6.8أ: واجهة الأهداف وسجل النشر وتأكيد بصمة السيرفر | `feat/targets-ui-m68a` | — | الشغل، وبعده M6.8ب |
+| M6.9ب: `deploy/m6-demo/run.sh` (sshd حقيقي، تثبيت البصمة، نشر ناجح، فشل فحص الصحة ورجوع تلقائي، رجوع يدوي، `dhow artifact push`، تغيّر مفتاح السيرفر، Compose، فحص التسريب) واختبار قتل الـ runner بعد التبديل | `feat/m6-demo-m69b` | #121 | تشغيل الـ demo في الـ CI (مااتشغّلش محليًا: cgroup v1)، ومراجعة أمنية |
 | `make proxy-check` مابيشتغلش في الـ CI، وبناء الصورة بيفشل جوه بيئة الجلسة، فإعدادات nginx وCaddy لـ `/ingest/` اتجرّبت بإيد بس | — | — | تشغيله على جهاز فيه Docker بيبني الصورة، أو إضافته للـ CI |
 | `runner.revoked` (إلغاء اللوحة وإلغاء الـ runner لنفسه) بيتنشر على الـ event bus بعد الـ commit، فلو الـ process وقع بينهم الـ audit بيضيع. الـ bus مافيهوش outbox | — | — | outbox للأحداث اللي بتتسجّل، أو نشرها جوه نفس الـ transaction |
 

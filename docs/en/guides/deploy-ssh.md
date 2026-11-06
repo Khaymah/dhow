@@ -276,3 +276,7 @@ Dhow keeps, for each release, the target, the release id, the previous release, 
 - A manual rollback puts back files and reloads only. It does not undo changes outside the files, such as database migrations. And a manual rollback that failed is not rolled back by itself.
 - Dhow does not write application secrets on the server. Put the `.env` file in `shared/` yourself.
 - The commands written by the Admin run in the login shell of the deploy account on the server. This is the only exception to the rule "no text goes through a shell", and it is written in the architecture decision.
+
+## Try it on a clean machine
+
+`deploy/m6-demo/run.sh` runs the whole path in Docker on a machine that has Docker with Compose v2 and cgroup v2, and nothing else: a real `sshd` and a Docker host as targets, the host keys pinned after a fingerprint check, a deploy that succeeds, a deploy that fails its health check and goes back by itself, a rollback by hand, an artifact pushed with `dhow artifact push` that starts a deploy, a server whose host key changed (`HOST_KEY_MISMATCH`, with nothing written), a Docker Compose project that deploys and goes back, and at the end the leak sweep with the private key of the target and the value of the ingest token added. The same demo runs in the `Demo` workflow when any file it depends on changes.

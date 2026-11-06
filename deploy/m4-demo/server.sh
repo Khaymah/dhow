@@ -15,6 +15,6 @@ export DHOW_BLOB_DIR=$blobs
 
 install -d -m 0700 "$blobs"
 go build -trimpath \
-  -ldflags "-X github.com/Khaymah/dhow/internal/buildinfo.checkoutImage=${DHOW_DEMO_CHECKOUT_IMAGE:-}" \
+  -ldflags "-X github.com/Khaymah/dhow/internal/buildinfo.checkoutImage=${DHOW_DEMO_CHECKOUT_IMAGE:-} -X github.com/Khaymah/dhow/internal/buildinfo.deploySSHImage=${DHOW_DEMO_DEPLOY_SSH_IMAGE:-}" \
   -o "$bin" ./apps/server/cmd/dhow-server
 exec "$bin"

@@ -1,0 +1,46 @@
+x-keys: &keys
+  type: bind
+  read_only: true
+
+services:
+  server:
+    environment:
+      DHOW_DEMO_DEPLOY_SSH_IMAGE: ${DHOW_DEMO_DEPLOY_SSH_IMAGE:-}
+
+  runner:
+    environment:
+      DHOW_DEV_RUNNER_EGRESS_ALLOW_PRIVATE_CIDRS: ${DHOW_DEMO_FORGEJO_IP}/32,${DHOW_M6_SSHD_IP}/32,${DHOW_M6_COMPOSE_HOST_IP}/32
+    volumes:
+      - type: bind
+        source: ${DHOW_DEMO_WORK}/certs/ca.crt
+        target: /etc/containers/certs.d/ghcr.io/ca.crt
+        read_only: true
+
+  registry:
+    networks:
+      default:
+        aliases: [ghcr.io]
+
+  sshd:
+    build: ../e2e-targets/sshd
+    image: dhow-e2e-sshd:m6-demo
+    volumes:
+      - <<: *keys
+        source: ${DHOW_DEMO_WORK}/keys-ssh
+        target: /keys
+    networks:
+      default:
+        ipv4_address: ${DHOW_M6_SSHD_IP}
+
+  compose-host:
+    build: ../e2e-targets/compose-host
+    image: dhow-e2e-compose-host:m6-demo
+    privileged: true
+    volumes:
+      - <<: *keys
+        source: ${DHOW_DEMO_WORK}/keys-compose
+        target: /keys
+      - /var/lib/docker
+    networks:
+      default:
+        ipv4_address: ${DHOW_M6_COMPOSE_HOST_IP}

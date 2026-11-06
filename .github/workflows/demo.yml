@@ -16,6 +16,7 @@ on:
       - deploy/m3-demo/**
       - deploy/m4-demo/**
       - deploy/m5-demo/**
+      - deploy/m6-demo/**
       - deploy/e2e/**
       - deploy/e2e-targets/**
       - deploy/ingest-e2e/**
@@ -46,6 +47,7 @@ jobs:
       e2e: ${{ steps.scope.outputs.e2e }}
       deploy: ${{ steps.scope.outputs.deploy }}
       ingest: ${{ steps.scope.outputs.ingest }}
+      m6: ${{ steps.scope.outputs.m6 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,6 +81,23 @@ jobs:
         env:
           DEMO: ${{ matrix.demo }}
         run: bash "deploy/$DEMO/run.sh"
+
+  m6-demo:
+    needs: changes
+    if: needs.changes.outputs.m6 == 'true'
+    name: m6-demo on a clean Ubuntu 26.04 with Docker
+    runs-on: ubuntu-26.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: No secret of the demo helpers reaches the argv of a process
+        run: bash deploy/m4-demo/secrets-argv-test.sh
+      - name: Let rootless Podman in the runner container make user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Run the demo
+        run: bash deploy/m6-demo/run.sh
 
   deploy-e2e:
     needs: changes
