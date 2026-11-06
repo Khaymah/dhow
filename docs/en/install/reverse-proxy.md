@@ -101,6 +101,14 @@ server {
         proxy_read_timeout 90s;
         proxy_send_timeout 90s;
     }
+
+    location /ingest/ {
+        proxy_pass http://127.0.0.1:8080;
+        client_max_body_size 1g;
+        proxy_request_buffering off;
+        proxy_read_timeout 10m;
+        proxy_send_timeout 10m;
+    }
 }
 ```
 
@@ -127,6 +135,7 @@ What the configuration does:
 - nginx forwards `Origin`, cookies and every other request header unchanged by default. Do not add `proxy_set_header Origin` or `proxy_hide_header` for request headers.
 - `$proxy_add_x_forwarded_for` appends the client address to any `X-Forwarded-For` the client sent. Dhow reads the list from the right, so a forged entry on the left changes nothing. `X-Forwarded-Proto` carries `https`.
 - `client_max_body_size 2m` stops oversized bodies before they reach Dhow.
+- The `/ingest/` location takes artifact uploads from an outside CI. It allows 1 GB, sends the body on while it arrives (`proxy_request_buffering off`) and gives the upload 10 minutes. Keep `client_max_body_size` there at or above `DHOW_INGEST_MAX_BYTES`, and Dhow gives the exact `413`.
 - The regular-expression location matches only the log stream. It turns off `proxy_buffering` and raises the read and send timeouts to one hour, so every event reaches the browser at once and a quiet build step does not cut the stream. Every other response keeps nginx's buffering.
 - The `/runner-api/` location gives runner long polls (up to 25 seconds) and log uploads 90 seconds. The `map` and the `Upgrade` and `Connection` headers let WebSocket upgrades through as well.
 - `proxy_hide_header` and `add_header ... always` replace Dhow's `Strict-Transport-Security` with one copy that is also sent on nginx's own responses.
@@ -144,21 +153,36 @@ Caddy gets and renews the certificate on its own.
 dhow.example.com {
 	header >Strict-Transport-Security "max-age=63072000; includeSubDomains"
 
-	request_body {
-		max_size 2MB
-	}
+	@ingest path /ingest/*
+	handle @ingest {
+		request_body {
+			max_size 1GB
+		}
 
-	@logstream path_regexp ^/api/v1/organizations/[^/]+/jobs/[^/]+/logs/stream$
-	reverse_proxy @logstream 127.0.0.1:8080 {
-		flush_interval -1
-		transport http {
-			read_timeout 1h
+		reverse_proxy 127.0.0.1:8080 {
+			transport http {
+				read_timeout 10m
+			}
 		}
 	}
 
-	reverse_proxy 127.0.0.1:8080 {
-		transport http {
-			read_timeout 90s
+	handle {
+		request_body {
+			max_size 2MB
+		}
+
+		@logstream path_regexp ^/api/v1/organizations/[^/]+/jobs/[^/]+/logs/stream$
+		reverse_proxy @logstream 127.0.0.1:8080 {
+			flush_interval -1
+			transport http {
+				read_timeout 1h
+			}
+		}
+
+		reverse_proxy 127.0.0.1:8080 {
+			transport http {
+				read_timeout 90s
+			}
 		}
 	}
 }
@@ -171,6 +195,7 @@ What the configuration does:
 
 - `reverse_proxy` forwards `Host`, `Origin` and cookies unchanged and sets `X-Forwarded-For` and `X-Forwarded-Proto` itself. It replaces any `X-Forwarded-For` that a client sends, unless you list that client in Caddy's own `trusted_proxies` option.
 - `request_body` stops bodies over 2 MB.
+- The `/ingest/` path has its own `handle` with a 1 GB `request_body` and a 10 minute `read_timeout`, for artifact uploads from an outside CI. Keep that size at or above `DHOW_INGEST_MAX_BYTES`.
 - The `@logstream` matcher sends the log stream through its own `reverse_proxy` with `flush_interval -1`, which writes every event to the browser at once, and `read_timeout 1h`, which keeps a quiet stream open.
 - Every other request goes through the second `reverse_proxy`, whose `read_timeout 90s` covers runner long polls of up to 25 seconds on `/runner-api/`.
 - `header >Strict-Transport-Security` sets HSTS after the response comes back from Dhow, so it replaces Dhow's copy instead of adding a second one.
@@ -335,7 +360,7 @@ Caddy and Traefik replace the `X-Forwarded-For` they receive from untrusted send
 - `POST /api/v1/setup` from a foreign `Origin` is `CSRF_FAILED`, and the real setup with the right `Origin` succeeds.
 - The `Host`, `Origin`, `X-Forwarded-For` and `X-Forwarded-Proto` headers as they reach Dhow's socket, captured with `tcpdump` next to Dhow.
 - The client address in Dhow's access log and in the audit event of a sign-in, with a forged `X-Forwarded-For` in the request.
-- The `__Host-dhow_session` cookie attributes, the cookie reaching Dhow, and a 3 MiB body refused with `413`.
+- The `__Host-dhow_session` cookie attributes, the cookie reaching Dhow, a 3 MiB body refused with `413`, and a 3 MiB upload on `/ingest/` that reaches Dhow.
 - The runner plane answering through the proxy on `/runner-api/`, and the log stream path reaching Dhow with the session cookie.
 
 A Go test in `deploy/proxy-check` fails if a configuration on this page differs from the file the script runs. The check does not run certbot, Let's Encrypt or Cloudflare, and it runs without IPv6.

@@ -309,6 +309,11 @@ check_scenario() {
   status=$(request big POST /api/v1/sessions --header 'Content-Type: application/json' \
     --header "Origin: $public_url" --data-binary "@$out/big.body.in")
   expect "a 3 MiB body is refused with 413" test "$status" = 413
+  printf 'Artifact upload path through %s\n' "$name"
+  status=$(request ingest PUT "/ingest/v1/artifacts/$(printf 'a%.0s' {1..64})" --header 'Content-Type: application/gzip' \
+    --header 'Authorization: Bearer dhow_ing_proxy-check-token-that-is-not-real' --data-binary "@$out/big.body.in")
+  expect "a 3 MiB upload on /ingest/ passes the proxy and Dhow answers 401 (got $status)" test "$status" = 401
+  expect "the upload answer comes from Dhow" grep -q '"Code":"INGEST_TOKEN_INVALID"' "$out/ingest.body"
 }
 
 run_nginx() {

@@ -101,6 +101,14 @@ server {
         proxy_read_timeout 90s;
         proxy_send_timeout 90s;
     }
+
+    location /ingest/ {
+        proxy_pass http://127.0.0.1:8080;
+        client_max_body_size 1g;
+        proxy_request_buffering off;
+        proxy_read_timeout 10m;
+        proxy_send_timeout 10m;
+    }
 }
 ```
 
@@ -127,6 +135,7 @@ server {
 - يمرّر nginx الترويسة `Origin` والكوكيز وكل ترويسات الطلب الأخرى بلا تغيير افتراضيًا. لا تضف `proxy_set_header Origin` ولا `proxy_hide_header` لترويسات الطلب.
 - `$proxy_add_x_forwarded_for` يضيف عنوان العميل إلى آخر أي `X-Forwarded-For` أرسله العميل. يقرأ داو القائمة من اليمين، فالقيمة المزوّرة في أولها لا تغيّر شيئًا. و`X-Forwarded-Proto` يحمل `https`.
 - `client_max_body_size 2m` يوقف الطلبات الكبيرة قبل أن تصل إلى داو.
+- الـ location الخاص بـ `/ingest/` يستقبل رفع الملفات الناتجة من CI خارجي. يسمح بـ 1 GB، ويمرّر الجسم أثناء وصوله (`proxy_request_buffering off`)، ويعطي الرفع 10 دقائق. أبقِ `client_max_body_size` هناك مساويًا لـ `DHOW_INGEST_MAX_BYTES` أو أكبر منه، ويرد داو بالخطأ `413` الدقيق.
 - الـ location الذي يستخدم تعبيرًا نمطيًا (regular expression) يطابق بث السجل فقط. يوقف `proxy_buffering` ويرفع مهلتي القراءة والإرسال إلى ساعة. هكذا يصل كل حدث إلى المتصفح فورًا، ولا تقطع خطوة بناء هادئة البث. كل الردود الأخرى تبقى مع التخزين المؤقت في nginx.
 - الـ location الخاص بـ `/runner-api/` يعطي طلبات أجهزة التشغيل الطويلة (حتى 25 ثانية) ورفع السجلات 90 ثانية. والـ `map` مع ترويستي `Upgrade` و`Connection` يسمحان بترقيات WebSocket أيضًا.
 - `proxy_hide_header` و`add_header ... always` يستبدلان `Strict-Transport-Security` من داو بنسخة واحدة تُرسل أيضًا في ردود nginx نفسه.
@@ -144,21 +153,36 @@ server {
 dhow.example.com {
 	header >Strict-Transport-Security "max-age=63072000; includeSubDomains"
 
-	request_body {
-		max_size 2MB
-	}
+	@ingest path /ingest/*
+	handle @ingest {
+		request_body {
+			max_size 1GB
+		}
 
-	@logstream path_regexp ^/api/v1/organizations/[^/]+/jobs/[^/]+/logs/stream$
-	reverse_proxy @logstream 127.0.0.1:8080 {
-		flush_interval -1
-		transport http {
-			read_timeout 1h
+		reverse_proxy 127.0.0.1:8080 {
+			transport http {
+				read_timeout 10m
+			}
 		}
 	}
 
-	reverse_proxy 127.0.0.1:8080 {
-		transport http {
-			read_timeout 90s
+	handle {
+		request_body {
+			max_size 2MB
+		}
+
+		@logstream path_regexp ^/api/v1/organizations/[^/]+/jobs/[^/]+/logs/stream$
+		reverse_proxy @logstream 127.0.0.1:8080 {
+			flush_interval -1
+			transport http {
+				read_timeout 1h
+			}
+		}
+
+		reverse_proxy 127.0.0.1:8080 {
+			transport http {
+				read_timeout 90s
+			}
 		}
 	}
 }
@@ -171,6 +195,7 @@ dhow.example.com {
 
 - `reverse_proxy` يمرّر `Host` و`Origin` والكوكيز بلا تغيير، ويضبط `X-Forwarded-For` و`X-Forwarded-Proto` بنفسه. ويستبدل أي `X-Forwarded-For` يرسله العميل، إلا إذا ذكرت هذا العميل في خيار `trusted_proxies` الخاص بـ Caddy.
 - `request_body` يوقف الطلبات الأكبر من 2 MB.
+- مسار `/ingest/` له `handle` خاص بـ `request_body` حجمه 1 GB و`read_timeout` عشر دقائق، لرفع الملفات الناتجة من CI خارجي. أبقِ هذا الحجم مساويًا لـ `DHOW_INGEST_MAX_BYTES` أو أكبر منه.
 - المطابِق `@logstream` يرسل بث السجل عبر `reverse_proxy` خاص به، مع `flush_interval -1` الذي يكتب كل حدث إلى المتصفح فورًا، و`read_timeout 1h` الذي يُبقي البث الهادئ مفتوحًا.
 - كل طلب آخر يمر عبر `reverse_proxy` الثاني، ومهلته `read_timeout 90s` تكفي طلبات أجهزة التشغيل الطويلة حتى 25 ثانية على `/runner-api/`.
 - `header >Strict-Transport-Security` يضبط HSTS بعد أن يعود الرد من داو، فيستبدل نسخة داو بدل أن يضيف نسخة ثانية.
@@ -335,7 +360,7 @@ printf 'DHOW_TRUSTED_PROXIES=127.0.0.1,%s,%s\n' \
 - `POST /api/v1/setup` من `Origin` غريب يرد بـ `CSRF_FAILED`، والإعداد الحقيقي مع `Origin` الصحيح ينجح.
 - ترويسات `Host` و`Origin` و`X-Forwarded-For` و`X-Forwarded-Proto` كما تصل إلى socket داو، ونلتقطها بـ `tcpdump` بجوار داو.
 - عنوان العميل في سجل الوصول في داو، وفي حدث الدخول في سجل الأحداث، مع `X-Forwarded-For` مزوّر في الطلب.
-- خصائص الكوكي `__Host-dhow_session`، ووصول الكوكي إلى داو، ورفض طلب حجمه 3 MiB بـ `413`.
+- خصائص الكوكي `__Host-dhow_session`، ووصول الكوكي إلى داو، ورفض طلب حجمه 3 MiB بـ `413`، ووصول رفع حجمه 3 MiB على `/ingest/` إلى داو.
 - رد مسار أجهزة التشغيل عبر الوكيل على `/runner-api/`، ووصول مسار بث السجل إلى داو مع كوكي الجلسة.
 
 يفشل اختبار Go في `deploy/proxy-check` إذا اختلف إعداد في هذه الصفحة عن الملف الذي يشغّله السكربت. الفحص لا يشغّل certbot ولا Let's Encrypt ولا Cloudflare، ويعمل بدون IPv6.

@@ -119,13 +119,14 @@ jobs:
 |---|---|---|
 | `version` | int | Must be `1` |
 | `name` | string | Optional, at most 100 characters |
-| `on` | map | `push` and `pull_request` (`branches`, `paths`), `tag` (`patterns`), `manual` (typed `inputs`: `string`, `boolean` or `choice` with `options`, at most 20) and `api`. At least one trigger. `schedule` and `artifact` are refused for now (§8) |
+| `on` | map | `push` and `pull_request` (`branches`, `paths`), `tag` (`patterns`), `manual` (typed `inputs`: `string`, `boolean` or `choice` with `options`, at most 20) `api`, and `artifact` (`names`, 1 to 16 artifact names, and optional `refs` patterns: a run starts when an outside CI uploads one of them with an ingest token, see the ingest guide). At least one trigger. `schedule` is refused for now (§8) |
 | `on.*` filters | list | Glob patterns with `*` (inside one path segment), `**` (a whole segment, any depth) and `?` only, at most 50 per list |
 | `defaults.runner` | map | `labels` (at most 32) and `isolation` (`container` only in the first release, §8) |
 | `defaults.timeout` | duration | The job timeout when a job does not set one (otherwise 1h) |
 | `concurrency` | map | `group` (text or CEL `string`), `cancel_in_progress` |
 | `jobs.<id>` | map | The id is a lowercase letter followed by up to 62 of `a-z`, `0-9`, `_` and `-`. At most 64 jobs |
 | `jobs.<id>.needs` | list | DAG edges; unknown jobs and cycles are rejected at validation time. A need on a matrix job waits for every copy |
+| `jobs.<id>.ingested` | list | Up to 16 names from `on.artifact.names`. Each artifact the outside CI uploaded is downloaded and unpacked into `/workspace` before the first step, like `needs`. A name that `on.artifact.names` does not list, or `ingested:` without `on.artifact`, is `INGESTED_NOT_DECLARED`. A run that did not get one of the names skips the job |
 | `jobs.<id>.if` | CEL bool | Evaluated before the job is queued; `false` marks it `skipped` |
 | `jobs.<id>.strategy.matrix` | map | Cartesian product with `include` and `exclude` (§6); `strategy.max_parallel` from 1 to 256 |
 | `jobs.<id>.image` | string | Required when the job has a `run:` step. Should be digest-pinned: a tag-only image is a warning, and the server pins the tag to a digest when the run starts (§12.5). A name without a registry host is completed the way Docker does it: `node:22-bookworm@sha256:…` runs as `docker.io/library/node:22-bookworm@sha256:…`. The runner never searches other registries. |
@@ -230,6 +231,7 @@ An artifact keeps files of one job for the jobs that need it, and for people to 
 - **Cache scope:** a scope belongs to the linked repository, so linking the project to another repository starts with an empty cache. A push or a manual run of a branch writes into the scope of that branch, a tag into its tag, and a pull request from the same repository into the scope of that pull request. A lookup tries the run's own scope, then the default branch. A pull request from a fork never writes, and reads nothing unless the project allows the default branch (section 12.4). A pull request can never write into the scope of `main`. A manual or API run whose commit is not the latest one pushed to its branch only reads the cache, so only the head of a branch writes it.
 - **Saving:** the cache is saved only when the job succeeded and the key was not found at the start. An existing key is never replaced. When a project's entries pass `DHOW_CACHE_MAX_BYTES_PER_PROJECT`, the least recently used entries of other scopes go first; the default branch's entries are never removed to make room for another branch, a tag or a pull request, and an entry that still does not fit is not kept. A cache that cannot be read or saved is a warning in the job log, not a failure.
 - **One upload each:** a job uploads each declared artifact and its cache once. The artifacts of an organization share `DHOW_ARTIFACT_MAX_BYTES_PER_ORG` (`ARTIFACT_QUOTA_EXCEEDED` past it). The artifacts of fork runs of one project together get at most a tenth of it, so forks, also under the `automatic` fork policy, cannot fill the quota of the project's own runs.
+- **`ingested`:** an artifact uploaded by an outside CI is kept like any other for `DHOW_ARTIFACT_RETENTION_DAYS`. The run reads the pipeline file from the head of the default branch, not from the commit the uploader declared, and the job gets the same digest that was uploaded. The `Sha` and the provenance (CI name, run link, actor) are declared by the uploader and are not verified.
 - **Forks:** the artifacts of a run from a fork's pull request are marked `Untrusted` and can never feed a deploy.
 - **Secrets:** before an upload, the runner looks in every file for the values of the job's secrets in all their forms (the value itself, base64 and others). An artifact that holds a secret value fails the job with `ARTIFACT_CONTAINS_SECRET`, and the log names the file only. A cache that holds one is not saved, with a warning in the log. The check reads files as they are, so a compressed or encrypted file inside the archive is not covered. A cache written by a job that got a secret never reaches a fork.
 
@@ -298,7 +300,7 @@ jobs:
 
 ## 8. Not supported yet
 
-- **The `schedule` trigger** comes after the first release, and **the `artifact` trigger** (a build from external CI) comes with M6. Both are refused with `TRIGGER_NOT_SUPPORTED_YET`, not ignored.
+- **The `schedule` trigger** comes after the first release. It is refused with `TRIGGER_NOT_SUPPORTED_YET`, not ignored.
 - **`isolation: gvisor`** is refused with `ISOLATION_NOT_SUPPORTED_YET` until gVisor returns after the first release.
 - **`id_token:`** (an OIDC token for cloud services) arrives after the first release and is refused with `ID_TOKEN_NOT_SUPPORTED_YET`.
 - **`services:`** (containers that live for the whole job) and the visual editor come after the first release.
