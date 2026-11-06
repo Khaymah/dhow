@@ -102,6 +102,8 @@ func IngestTokenQuota() *AppError {
 	return New(http.StatusRequestEntityTooLarge, CodeIngestTokenQuota, KeyIngestTokenQuota)
 }
 
+const DetailProtectedReach = "ProtectedReach"
+
 func IngestReachUnconfirmed(details ...IErrorDetail) *AppError {
 	e := New(http.StatusUnprocessableEntity, CodeReachUnconfirmed, KeyReachUnconfirmed)
 	e.Details = details

@@ -68,6 +68,10 @@ const EnvironmentNewBody = lazyComponent(() =>
   import('@/Modules/Environments/Components/EnvironmentNewBody').then((module) => module.EnvironmentNewBody),
 );
 
+const IngestTokenNewBody = lazyComponent(() =>
+  import('@/Modules/Ingest/Components/IngestTokenNewBody').then((module) => module.IngestTokenNewBody),
+);
+
 const DecisionBody = lazyComponent(() =>
   import('@/Modules/Approvals/Components/DecisionBody').then((module) => module.DecisionBody),
 );
@@ -105,6 +109,7 @@ const PARTS: Record<TSlidePart, readonly IPreloadable[]> = {
   'variable-new': [VariableFormBody],
   'registry-new': [RegistryFormBody],
   'environment-new': [EnvironmentNewBody],
+  'ingest-token-new': [IngestTokenNewBody],
   'deployment-decision': [DecisionBody],
 };
 
@@ -171,4 +176,5 @@ export const LazySecretFormBody = withSkeleton(SecretFormBody);
 export const LazyVariableFormBody = withSkeleton(VariableFormBody);
 export const LazyRegistryFormBody = withSkeleton(RegistryFormBody);
 export const LazyEnvironmentNewBody = withSkeleton(EnvironmentNewBody);
+export const LazyIngestTokenNewBody = withSkeleton(IngestTokenNewBody);
 export const LazyDecisionBody = withSkeleton(DecisionBody);

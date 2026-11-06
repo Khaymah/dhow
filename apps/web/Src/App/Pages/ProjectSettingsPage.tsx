@@ -1,4 +1,4 @@
-import { useParams } from '@tanstack/react-router';
+import { useNavigate, useParams } from '@tanstack/react-router';
 
 import { NotFoundPage } from '@/App/Layout/NotFoundPage';
 import { Page } from '@/App/Layout/Page';
@@ -8,7 +8,11 @@ import { isUuid } from '@/App/Pages/Params';
 import { ProjectNav } from '@/App/Pages/ProjectNav';
 import { RegistryGroup } from '@/App/Pages/SecretsGroups';
 import { canManageProjectSecrets, canReadSecrets } from '@/Core/Auth/AuthTypes';
+import { Card } from '@/Core/Ui/Card';
+import { LinkRow } from '@/Core/Ui/LinkRow';
+import { Rows } from '@/Core/Ui/Row';
 import { useT } from '@/I18n/useT';
+import { canReadIngested } from '@/Modules/Ingest/Types/IngestAccess';
 import { ProjectDangerZone } from '@/Modules/Projects/Components/ProjectDangerZone';
 import { ProjectGate } from '@/Modules/Projects/Components/ProjectGate';
 import { ProjectSettingsCard } from '@/Modules/Projects/Components/ProjectSettingsCard';
@@ -19,6 +23,7 @@ import { canOnProject, canRunForksWithoutApproval } from '@/Modules/Projects/Typ
 export const ProjectSettingsPage = () => {
   const t = useT();
   const { open } = useSlide();
+  const navigate = useNavigate();
   const { projectId } = useParams({ strict: false });
   if (!isUuid(projectId)) return <NotFoundPage />;
 
@@ -43,6 +48,23 @@ export const ProjectSettingsPage = () => {
               />
               {manager && active && project.RepositoryLinked ? <RepositoryActions organizationId={organizationId} projectId={projectId} /> : null}
             </PageGroup>
+            {canReadIngested(role) ? (
+              <PageGroup title={t('ingest.settings.title')} lead={t('ingest.settings.lead')} icon="download">
+                <Card>
+                  <Rows label={t('ingest.settings.title')}>
+                    <LinkRow
+                      icon="key"
+                      title={t('ingest.settings.link')}
+                      sub={t('ingest.settings.sub')}
+                      href={`/projects/${projectId}/ingest`}
+                      onOpen={() => {
+                        void navigate({ to: '/projects/$projectId/ingest', params: { projectId } });
+                      }}
+                    />
+                  </Rows>
+                </Card>
+              </PageGroup>
+            ) : null}
             {canReadSecrets(role) ? (
               <RegistryGroup scope={{ OrganizationId: organizationId, ProjectId: projectId }} writable={canManageProjectSecrets(role) && active} />
             ) : null}

@@ -41,6 +41,14 @@ func invalid(field string) apperrors.IErrorDetail {
 	return apperrors.IErrorDetail{Field: field, Message: messageInvalid}
 }
 
+func reachDetails(protected []string) []apperrors.IErrorDetail {
+	details := []apperrors.IErrorDetail{invalid(fieldAcknowledge)}
+	for _, name := range protected {
+		details = append(details, apperrors.IErrorDetail{Field: apperrors.DetailProtectedReach, Message: name})
+	}
+	return details
+}
+
 func newTokenValue() (value string, hash []byte, prefix string, err error) {
 	raw := make([]byte, config.IngestTokenRandomBytes)
 	if _, err := rand.Read(raw); err != nil {
@@ -199,10 +207,10 @@ func (s *Service) CreateToken(
 		if err != nil {
 			return err
 		}
-		var protected bool
+		var protected []string
 		reaches, protected = reachOf(patterns, envs)
-		if protected && !in.AcknowledgeProtectedReach {
-			return apperrors.IngestReachUnconfirmed(invalid(fieldAcknowledge))
+		if len(protected) > 0 && !in.AcknowledgeProtectedReach {
+			return apperrors.IngestReachUnconfirmed(reachDetails(protected)...)
 		}
 		row, err = q.InsertIngestToken(ctx, sqlc.InsertIngestTokenParams{
 			OrganizationID: org, ProjectID: project, Name: in.Name, TokenHash: hash, Prefix: prefix, RefPatterns: raw,

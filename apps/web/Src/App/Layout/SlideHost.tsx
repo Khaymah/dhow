@@ -46,8 +46,10 @@ export const SlideHost = () => {
   const projectSlide = slide !== null && isProjectSlide(slide) && isUuid(projectId);
   const project = useProject(projectSlide && membership !== undefined ? membership.OrganizationId : '', projectSlide ? projectId : '');
   const projectPending = projectSlide && project.data === undefined && !project.isError;
+  const projectRole = project.data?.CallerRole;
+  const projectActive = project.isError ? false : project.data === undefined ? undefined : project.data.State === 'active';
   const scope = slideScopeOf(isUuid(projectId), isEnvironmentName(environmentName));
-  const refused = slide !== null && (badEnvironment || (!projectPending && !slideAllowed(slide, role, project.data?.CallerRole, scope)));
+  const refused = slide !== null && (badEnvironment || (!projectPending && !slideAllowed(slide, role, projectRole, scope)));
   const editing = slide !== null && isThemeEditSlide(slide);
 
   const rejectLink = useEffectEvent(() => {
@@ -91,6 +93,8 @@ export const SlideHost = () => {
               void navigate({ to: '/' });
             },
             projectId: isUuid(projectId) ? projectId : undefined,
+            projectRole,
+            projectActive,
             openProject: (id) => {
               void navigate({ to: '/projects/$projectId', params: { projectId: id } });
             },
