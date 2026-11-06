@@ -69,9 +69,10 @@ test('the owner makes a token that reaches nothing protected and sees its value 
   await page.goto(`/projects/${stack().ProjectId}/settings`);
   await page.getByRole('link', { name: new RegExp(T['ingest.settings.link']) }).click();
   await expect(page).toHaveURL(new RegExp(`${ingestPath()}$`));
-  await expect(page.getByRole('list', { name: T['ingest.tokens.title'] })).toBeVisible();
+  const create = page.getByRole('button', { name: T['ingest.tokens.new'] });
+  await expect(create).toBeVisible();
 
-  await page.getByRole('button', { name: T['ingest.tokens.new'] }).click();
+  await create.click();
   const dialog = page.getByRole('dialog', { name: T['ingest.new.title'] });
   await fillToken(dialog, view, DOCS_TOKEN, 'e2e/*');
   await typePassword(dialog, view);
