@@ -258,7 +258,7 @@ func decide(job sqlc.Job, attempt sqlc.JobAttempt) (string, string) {
 	case job.CancelRequestedAt != nil:
 		return models.JobCanceled, models.ReasonCanceled
 	case attempt.MutationStartedAt != nil && final == models.JobLost:
-		return models.JobLost, models.ReasonLostAfterMutation
+		return models.JobLost, lostAfterMutation(job.Spec)
 	case attempt.MutationStartedAt != nil:
 		return models.JobFailed, attempt.FailureReason
 	case job.AttemptCount < 1+job.MaxInfraRetries:
@@ -266,6 +266,13 @@ func decide(job sqlc.Job, attempt sqlc.JobAttempt) (string, string) {
 	default:
 		return final, models.ReasonRetriesExhausted
 	}
+}
+
+func lostAfterMutation(raw []byte) string {
+	if spec, err := decodeSpec(raw); err == nil && len(spec.GetTargets()) > 0 {
+		return models.ReasonDeployInterrupted
+	}
+	return models.ReasonLostAfterMutation
 }
 
 func requireTargetForReason(raw []byte, reason runnerv1.FailureReason) error {

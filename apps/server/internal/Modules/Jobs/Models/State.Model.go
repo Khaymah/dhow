@@ -41,6 +41,7 @@ const (
 	ReasonCanceled          = "CANCELED"
 	ReasonQueueTimeout      = "QUEUE_TIMEOUT"
 	ReasonLostAfterMutation = "LOST_AFTER_MUTATION"
+	ReasonDeployInterrupted = "DEPLOY_INTERRUPTED"
 	ReasonRetriesExhausted  = "RETRIES_EXHAUSTED"
 	ReasonLeaseLost         = "LEASE_LOST"
 	ReasonRunnerRevoked     = "RUNNER_REVOKED"

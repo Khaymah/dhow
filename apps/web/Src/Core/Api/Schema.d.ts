@@ -4386,7 +4386,7 @@ export interface components {
             OrganizationId: string;
             Name: string;
             State: components["schemas"]["JobState"];
-            /** @description Why the job ended the way it did, for example `QUEUE_TIMEOUT` or `LOST_AFTER_MUTATION`. */
+            /** @description Why the job ended the way it did, for example `QUEUE_TIMEOUT`, `LOST_AFTER_MUTATION` or `DEPLOY_INTERRUPTED`. */
             FailureReason?: string;
             QueuedReason?: components["schemas"]["JobQueuedReason"];
             Labels: string[];

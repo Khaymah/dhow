@@ -47,6 +47,7 @@ export const JobsEn: Record<keyof typeof JobsAr, string> = {
   'jobs.step.state.interrupted': 'Interrupted',
   'jobs.reason.CANCELED': 'A member stopped it.',
   'jobs.reason.QUEUE_TIMEOUT': 'It waited a full day and no runner took it.',
+  'jobs.reason.DEPLOY_INTERRUPTED': 'The runner was lost after the deploy switched a server, so the release is unknown and the deploy was not retried. Check the target, then deploy again.',
   'jobs.reason.LOST_AFTER_MUTATION': 'The runner was lost after a step that changes a target began, so it was not retried automatically.',
   'jobs.reason.RETRIES_EXHAUSTED': 'The runner was lost more than once and no retries are left.',
   'jobs.reason.LEASE_LOST': 'The runner stopped answering.',

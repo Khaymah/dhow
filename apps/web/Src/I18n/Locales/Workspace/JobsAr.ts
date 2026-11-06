@@ -46,6 +46,7 @@ export const JobsAr = {
   'jobs.step.state.interrupted': 'توقفت',
   'jobs.reason.CANCELED': 'أوقفه أحد الأعضاء.',
   'jobs.reason.QUEUE_TIMEOUT': 'انتظر يومًا كاملًا ولم يأخذه أي جهاز تشغيل.',
+  'jobs.reason.DEPLOY_INTERRUPTED': 'انقطع جهاز التشغيل بعد أن بدّل النشر سيرفرًا، فالإصدار غير معروف ولم يُعَد النشر تلقائيًا. افحص الهدف ثم انشر من جديد.',
   'jobs.reason.LOST_AFTER_MUTATION': 'انقطع جهاز التشغيل بعد أن بدأت خطوة تغيّر في الهدف، لذلك لم نُعِده تلقائيًا.',
   'jobs.reason.RETRIES_EXHAUSTED': 'انقطع جهاز التشغيل أكثر من مرة، وانتهت المحاولات المسموحة.',
   'jobs.reason.LEASE_LOST': 'توقف جهاز التشغيل عن الرد.',

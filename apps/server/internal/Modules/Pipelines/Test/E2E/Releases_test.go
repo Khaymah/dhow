@@ -299,6 +299,12 @@ func TestAKilledRunnerLeavesTheRunningReleaseUnknown(t *testing.T) {
 	assert.Equal(t, map[uuid.UUID]string{h[0]: "unknown", h[1]: "unknown", h[2]: "pending"}, j.hostStates(t))
 	assert.Equal(t, 1, j.env.AuditCount("deployment.release_unknown"))
 	assert.Zero(t, j.runningReleases(t), "no release of the target is left running")
+	for _, job := range j.view(t, j.run).Jobs {
+		if job.Key == "deploy" {
+			require.NotNil(t, job.FailureReason)
+			assert.Equal(t, "DEPLOY_INTERRUPTED", *job.FailureReason, "a deploy cut off after its mutating step began is not a plain lost job")
+		}
+	}
 	j.refuse(t, connect.CodeFailedPrecondition, "LEASE_LOST", 1, ev(kindVerified, h[0]))
 }
 

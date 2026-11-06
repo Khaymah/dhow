@@ -248,7 +248,7 @@ type Job struct {
 	CreatedByUserId *openapi_types.UUID `json:"CreatedByUserId,omitempty"`
 	Deadline        *time.Time          `json:"Deadline,omitempty"`
 
-	// FailureReason Why the job ended the way it did, for example `QUEUE_TIMEOUT` or `LOST_AFTER_MUTATION`.
+	// FailureReason Why the job ended the way it did, for example `QUEUE_TIMEOUT`, `LOST_AFTER_MUTATION` or `DEPLOY_INTERRUPTED`.
 	FailureReason   *string            `json:"FailureReason,omitempty"`
 	FinishedAt      *time.Time         `json:"FinishedAt,omitempty"`
 	Id              openapi_types.UUID `json:"Id"`
