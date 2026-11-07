@@ -14,7 +14,7 @@ CREATE TABLE "NotificationChannels" (
     "DisabledReason"      TEXT CHECK ("DisabledReason" IN ('creator-removed', 'failures')),
     "ConsecutiveFailures" integer NOT NULL DEFAULT 0 CHECK ("ConsecutiveFailures" >= 0),
     "Host"                TEXT NOT NULL DEFAULT '' CHECK (char_length("Host") <= 255),
-    "ConfigSealed"        bytea CHECK (octet_length("ConfigSealed") BETWEEN 1 AND 8192),
+    "ConfigSealed"        bytea CHECK (octet_length("ConfigSealed") BETWEEN 1 AND 8192 AND get_byte("ConfigSealed", 0) = 3),
     "Version"             bigint NOT NULL DEFAULT 1 CHECK ("Version" >= 1),
     "CreatedByUserId"     uuid NOT NULL REFERENCES "Users" ("Id"),
     FOREIGN KEY ("ProjectId", "OrganizationId") REFERENCES "Projects" ("Id", "OrganizationId"),

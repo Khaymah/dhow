@@ -30,7 +30,7 @@ func ownerOf(org uuid.UUID, project *uuid.UUID) keys.Owner {
 	return keys.OrganizationOwner(org)
 }
 
-func sealContext(channel uuid.UUID) []byte {
+func ChannelSealContext(channel uuid.UUID) []byte {
 	return []byte(config.NotifyConfigSealLabel + channel.String())
 }
 
@@ -42,7 +42,7 @@ func ValueLocations() []keys.Location {
 				return q.ScanNotificationConfigs(ctx, sqlc.ScanNotificationConfigsParams{After: after, Batch: limit})
 			},
 			Read: func(r sqlc.ScanNotificationConfigsRow) (uuid.UUID, keys.Owner, []byte, []byte) {
-				return r.Id, ownerOf(r.OrganizationId, r.ProjectId), sealContext(r.Id), r.Sealed
+				return r.Id, ownerOf(r.OrganizationId, r.ProjectId), ChannelSealContext(r.Id), r.Sealed
 			},
 			ReplaceRow: func(ctx context.Context, q *sqlc.Queries, id uuid.UUID, old, sealed []byte) (int64, error) {
 				return q.ReplaceNotificationConfigs(ctx, sqlc.ReplaceNotificationConfigsParams{Sealed: sealed, ID: id, Old: old})

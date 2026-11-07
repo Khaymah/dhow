@@ -75,7 +75,7 @@ func seed(t *testing.T) world {
 	require.NoError(t, pool.QueryRow(ctx,
 		`INSERT INTO "Users" ("Email", "Name", "PasswordHash") VALUES ('a@example.com', 'A', 'x') RETURNING "Id"`).Scan(&w.user))
 	require.NoError(t, pool.QueryRow(ctx, `INSERT INTO "NotificationChannels" ("OrganizationId", "Kind", "Name", "ConfigSealed", "CreatedByUserId")
-		VALUES ($1, 'webhook', 'hook', '\x01', $2) RETURNING "Id"`, w.org, w.user).Scan(&w.channel))
+		VALUES ($1, 'webhook', 'hook', '\x03', $2) RETURNING "Id"`, w.org, w.user).Scan(&w.channel))
 	return w
 }
 
@@ -322,7 +322,7 @@ func TestTheWorkerKeepsToTheChannelAndGlobalConcurrencyLimits(t *testing.T) {
 	w := seed(t)
 	other := uuid.Nil
 	require.NoError(t, w.pool.QueryRow(t.Context(), `INSERT INTO "NotificationChannels" ("OrganizationId", "Kind", "Name", "ConfigSealed", "CreatedByUserId")
-		VALUES ($1, 'webhook', 'second', '\x01', $2) RETURNING "Id"`, w.org, w.user).Scan(&other))
+		VALUES ($1, 'webhook', 'second', '\x03', $2) RETURNING "Id"`, w.org, w.user).Scan(&other))
 	for range 6 {
 		w.enqueue(t)
 	}

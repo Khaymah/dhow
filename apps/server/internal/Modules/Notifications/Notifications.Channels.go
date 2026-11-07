@@ -138,7 +138,7 @@ func (s *Service) sealConfig(ctx context.Context, q *sqlc.Queries, scope models.
 	if err != nil {
 		return nil, fmt.Errorf("encode the settings of a notification channel: %w", err)
 	}
-	return s.column.SealIn(ctx, q, ownerOf(scope.OrganizationID, scope.ProjectID), sealContext(id), raw)
+	return s.column.SealIn(ctx, q, ownerOf(scope.OrganizationID, scope.ProjectID), ChannelSealContext(id), raw)
 }
 
 func (s *Service) openConfig(ctx context.Context, row sqlc.NotificationChannel) (channelConfig, error) {
@@ -146,7 +146,7 @@ func (s *Service) openConfig(ctx context.Context, row sqlc.NotificationChannel) 
 	if len(row.ConfigSealed) == 0 {
 		return cfg, apperrors.ChannelSecretInvalid()
 	}
-	raw, err := s.column.Open(ctx, ownerOf(row.OrganizationId, row.ProjectId), sealContext(row.Id), row.ConfigSealed)
+	raw, err := s.column.Open(ctx, ownerOf(row.OrganizationId, row.ProjectId), ChannelSealContext(row.Id), row.ConfigSealed)
 	if err != nil {
 		return cfg, fmt.Errorf("open the settings of a notification channel: %w", err)
 	}

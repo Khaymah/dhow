@@ -33,7 +33,7 @@ func TestKeysRekeyMovesEveryStoredValueToNewDataKeys(t *testing.T) {
 
 	require.NoError(t, cli.run("rekey", "--grace", "5s"))
 	out := cli.out.String()
-	assert.Contains(t, out, "4 owners have a new data key, 7 values were sealed again and 4 old data keys were destroyed")
+	assert.Contains(t, out, "4 owners have a new data key, 8 values were sealed again and 4 old data keys were destroyed")
 	for _, m := range keyMaterial(apptest.TestKeyring(t)) {
 		assert.NotContains(t, out, m)
 	}
