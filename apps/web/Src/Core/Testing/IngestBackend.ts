@@ -37,6 +37,8 @@ export const ingestTokenFixture = (over: Record<string, unknown> = {}): Record<s
   LastUsedAt: '2026-11-05T08:00:00Z',
   CreatedByUserId: '0198a000-0000-7000-8000-0000000000b1',
   Reaches: ['staging'],
+  CreatorAllowed: true,
+  UnacknowledgedReach: [],
   ...over,
 });
 
@@ -70,7 +72,7 @@ export const newIngestState = (): IIngestState => ({
   emptyReach: false,
 });
 
-const PATH = /^\/api\/v1\/organizations\/[^/]+\/projects\/[^/]+\/(ingest-tokens(?:\/([^/]+)\/revoke)?|ingested-artifacts)$/;
+const PATH = /^\/api\/v1\/organizations\/[^/]+\/projects\/[^/]+\/(ingest-tokens(?:\/([^/]+)\/(revoke|acknowledge-reach))?|ingested-artifacts)$/;
 
 const pageOf = (items: readonly unknown[], url: URL): Response => {
   const page = Number(url.searchParams.get('Page') ?? '1');
@@ -104,14 +106,15 @@ export const ingestRoute =
   (request, url) => {
     const match = PATH.exec(url.pathname);
     if (!match) return undefined;
-    const [, kind, revokeId] = match;
+    const [, kind, revokeId, action] = match;
     if (request.method === 'GET' && kind === 'ingest-tokens' && state.failTokens) return state.failTokens.clone();
     if (request.method === 'GET' && kind === 'ingest-tokens' && state.holdTokens) return state.holdTokens.then(() => pageOf(state.tokens, url));
     if (request.method === 'GET') return pageOf(kind === 'ingested-artifacts' ? state.files : state.tokens, url);
     return bodyOf(request).then((body) => {
       state.writes.push({ Method: request.method, Path: url.pathname.replace(/^\/api\/v1/, ''), Body: body });
       if (revokeId !== undefined) {
-        state.tokens = state.tokens.map((token) => (token.Id === revokeId ? { ...token, Status: 'revoked' } : token));
+        const change = action === 'revoke' ? { Status: 'revoked' } : { UnacknowledgedReach: [] };
+        state.tokens = state.tokens.map((token) => (token.Id === revokeId ? { ...token, ...change } : token));
         return envelope({ Success: true, Data: state.tokens.find((token) => token.Id === revokeId) }, 200);
       }
       if (state.failCreate) return state.failCreate.clone();

@@ -31,6 +31,8 @@ type IngestSeed struct {
 	Patterns  string
 	ExpiresIn time.Duration
 	Revoked   bool
+
+	Acknowledged []string
 }
 
 func (e *Env) SeedIngestToken(project, creator uuid.UUID, seed IngestSeed) IngestToken {
@@ -58,9 +60,11 @@ func (e *Env) SeedIngestToken(project, creator uuid.UUID, seed IngestSeed) Inges
 	}
 	now := e.Clock.Now()
 	require.NoError(e.T, e.Pool.QueryRow(context.Background(),
-		`INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId")
-		 VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8) RETURNING "Id"`,
-		org, project, seed.Name, sum[:], IngestTokenPrefix+body[:8], seed.Patterns, now.Add(seed.ExpiresIn), creator).Scan(&id))
+		`INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId",
+		 "AcknowledgedEnvironments")
+		 VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9::text[]) RETURNING "Id"`,
+		org, project, seed.Name, sum[:], IngestTokenPrefix+body[:8], seed.Patterns, now.Add(seed.ExpiresIn), creator,
+		append([]string{}, seed.Acknowledged...)).Scan(&id))
 	if seed.Revoked {
 		_, err := e.Pool.Exec(context.Background(), `UPDATE "IngestTokens" SET "RevokedAt" = now(), "RevokedByUserId" = $2 WHERE "Id" = $1`, id, creator)
 		require.NoError(e.T, err)
@@ -87,6 +91,7 @@ type IngestUpload struct {
 	Headers    map[string]string
 	Chunked    bool
 	AfterBody  func()
+	RemoteAddr string
 }
 
 func (u IngestUpload) headers() map[string]string {
@@ -121,6 +126,7 @@ func (e *Env) IngestPut(u IngestUpload) Response {
 	}
 	return e.WebhookFrom(WebhookRequest{
 		Method: "PUT", Path: "/ingest/v1/artifacts/" + digest, Headers: u.headers(), Body: u.Body, Chunked: u.Chunked, AfterBody: u.AfterBody,
+		RemoteAddr: u.RemoteAddr,
 	})
 }
 

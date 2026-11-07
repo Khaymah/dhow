@@ -14,6 +14,7 @@ export const TargetsEn = {
   'targets.current.none': 'Nothing was deployed to this target yet.',
   'targets.partial': 'The group is on different releases',
   'targets.partial.hint': 'Not every server is on the same release. Check the target, then deploy or roll back to one release.',
+  'targets.hooks.hidden': 'The target runs commands on the server, but only project admins can read their text.',
   'targets.forbidden': 'Maintainers, admins and owners check a target and roll it back.',
   'targets.paused': 'Deploys are paused in this environment, so you cannot roll back now. Resume deploys first.',
 

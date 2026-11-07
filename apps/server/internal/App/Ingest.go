@@ -23,10 +23,15 @@ func ingestFor(in Infra, runs runServices, bus *eventbus.Bus, limiter ratelimit.
 	if in.Triggers != nil {
 		sink = in.Triggers
 	}
-	return ingest.NewService(ingest.Options{
+	service, err := ingest.NewService(ingest.Options{
 		DB: in.Pool, Store: runs.artifacts.Store(), Triggers: sink, Bus: bus, Factors: factors, Limiter: limiter,
 		Config: in.Config.Artifacts, PublicURL: in.Config.PublicURL.String(), Log: in.Log, Now: in.Now,
 	})
+	if err != nil {
+		return nil, err
+	}
+	ingest.Subscribe(bus, service)
+	return service, nil
 }
 
 func ingestStack(o Options) []func(http.Handler) http.Handler {

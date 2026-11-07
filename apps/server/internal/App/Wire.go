@@ -159,7 +159,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	runs, err := runsFor(in, values, bus, limiter, jobsService, secrets, environmentsFor(in, sessionService, bus, limiter))
+	runs, err := runsWithEnvironments(in, values, bus, limiter, jobsService, secrets, sessionService)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,18 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	return wired, nil
 }
 
-func environmentsFor(in Infra, factors auth.FactorConfirmer, bus *eventbus.Bus, limiter ratelimit.Limiter) *environments.Service {
+func runsWithEnvironments(
+	in Infra, values *keys.Values, bus *eventbus.Bus, limiter ratelimit.Limiter, jobsService *jobs.Service, secrets *checkoutSecrets,
+	factors auth.FactorConfirmer,
+) (runServices, error) {
+	envService, err := environmentsFor(in, factors, bus, limiter)
+	if err != nil {
+		return runServices{}, err
+	}
+	return runsFor(in, values, bus, limiter, jobsService, secrets, envService)
+}
+
+func environmentsFor(in Infra, factors auth.FactorConfirmer, bus *eventbus.Bus, limiter ratelimit.Limiter) (*environments.Service, error) {
 	return environments.NewService(environments.Options{
 		DB: in.Pool, Factors: factors, Bus: bus, Log: in.Log, Now: in.Now, Limiter: limiter,
 		Dialer: netguard.Dialer{Lookup: in.GitLookup, Dial: in.GitDial},

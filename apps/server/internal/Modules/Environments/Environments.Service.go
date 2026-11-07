@@ -66,12 +66,17 @@ type Service struct {
 	synthetic deployments.Synthetic
 }
 
-func NewService(o Options) *Service {
+var ErrNoLimiter = errors.New("the environments service needs a rate limiter")
+
+func NewService(o Options) (*Service, error) {
+	if o.Limiter == nil {
+		return nil, ErrNoLimiter
+	}
 	now := o.Now
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{db: o.DB, factors: o.Factors, bus: o.Bus, log: o.Log, now: now, dialer: o.Dialer, limiter: o.Limiter}
+	return &Service{db: o.DB, factors: o.Factors, bus: o.Bus, log: o.Log, now: now, dialer: o.Dialer, limiter: o.Limiter}, nil
 }
 
 func (s *Service) UseSecretWriter(w secretstore.EnvironmentWriter) { s.secrets = w }

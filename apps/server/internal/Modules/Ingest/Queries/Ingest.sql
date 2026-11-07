@@ -1,6 +1,8 @@
 -- name: InsertIngestToken :one
-INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId")
-VALUES (@organization_id, @project_id, @name, @token_hash, @prefix, @ref_patterns, @expires_at, @created_by_user_id)
+INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId",
+                            "AcknowledgedEnvironments")
+VALUES (@organization_id, @project_id, @name, @token_hash, @prefix, @ref_patterns, @expires_at, @created_by_user_id,
+        @acknowledged_environments::text[])
 RETURNING *;
 
 -- name: ListIngestTokens :many
@@ -128,3 +130,34 @@ FROM "IngestedArtifacts"
 WHERE "ProjectId" = @project_id AND "OrganizationId" = @organization_id AND "Digest" = @digest AND NOT "IsDeleted"
 ORDER BY "CreatedAt" DESC, "Id" DESC
 LIMIT @max_rows;
+
+-- name: ListIngestCreatorAccess :many
+SELECT u."Id" AS "UserId", m."Role",
+       ARRAY(SELECT r."Role" FROM "OrganizationTeamRoles" r
+             WHERE r."UserId" = u."Id" AND r."OrganizationId" = m."OrganizationId")::text[] AS "TeamRoles",
+       ARRAY(SELECT rb."Role"
+             FROM "RoleBindings" rb
+             WHERE rb."OrganizationId" = m."OrganizationId" AND rb."Scope" = 'project' AND rb."ProjectId" = @project_id::uuid
+               AND NOT rb."IsDeleted"
+               AND (rb."UserId" = u."Id"
+                    OR EXISTS (SELECT 1
+                               FROM "TeamMembers" tm
+                               JOIN "Teams" t ON t."Id" = tm."TeamId" AND t."OrganizationId" = tm."OrganizationId" AND NOT t."IsDeleted"
+                               WHERE tm."TeamId" = rb."TeamId" AND tm."OrganizationId" = rb."OrganizationId"
+                                 AND tm."UserId" = u."Id" AND NOT tm."IsDeleted")))::text[] AS "Bindings"
+FROM "Users" u
+JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = @organization_id AND NOT m."IsDeleted"
+WHERE u."Id" = ANY (@user_ids::uuid[]) AND NOT u."IsDeleted" AND NOT u."Disabled";
+
+-- name: RevokeIngestTokensOfCreator :many
+UPDATE "IngestTokens"
+SET "RevokedAt" = @now::timestamptz, "RevokedByUserId" = @actor_id::uuid, "UpdatedAt" = @now::timestamptz
+WHERE "OrganizationId" = @organization_id AND "CreatedByUserId" = @user_id AND NOT "IsDeleted" AND "RevokedAt" IS NULL
+RETURNING "Id", "ProjectId", "Name";
+
+-- name: AcknowledgeIngestTokenReach :one
+UPDATE "IngestTokens"
+SET "AcknowledgedEnvironments" = @environments::text[], "UpdatedAt" = @now
+WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "ProjectId" = @project_id AND NOT "IsDeleted" AND "RevokedAt" IS NULL
+  AND "ExpiresAt" > @now
+RETURNING *;

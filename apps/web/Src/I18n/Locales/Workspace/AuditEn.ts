@@ -117,6 +117,7 @@ export const AuditEn: Record<keyof typeof AuditAr, string> = {
   'audit.action.registry_credential.removed': 'Registry credential removed',
   'audit.action.ingest_token.created': 'Ingest token created',
   'audit.action.ingest_token.revoked': 'Ingest token revoked',
+  'audit.action.ingest_token.reach_acknowledged': 'Ingest token reach confirmed',
   'audit.action.artifact.ingested': 'Artifact received from an external CI',
   'audit.action.ingest.rejected': 'Artifact upload refused',
   'audit.action.job.secrets_delivered': 'Secrets sent to a runner',

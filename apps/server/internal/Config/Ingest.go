@@ -18,7 +18,7 @@ const (
 	IngestProvenanceFields    = 16
 	IngestProvenanceValue     = 256
 	IngestExpandFactor        = 8
-	IngestConcurrent          = 4
+	IngestConcurrent          = 8
 	IngestBusyRetry           = 30 * time.Second
 	IngestPerTokenMax         = 30
 	IngestPerTokenWindow      = time.Hour
@@ -33,7 +33,9 @@ const (
 	IngestDeadlineCap         = 30 * time.Minute
 	IngestResponseGrace       = 30 * time.Second
 	IngestPerTokenInflight    = 1
-	IngestPerOrgInflight      = 2
+	IngestOrgShareDivisor     = 4
+	IngestPerOrgInflight      = IngestConcurrent / IngestOrgShareDivisor
+	IngestPerNetworkInflight  = 2
 	IngestTokenMaxBytes       = 10 << 30
 	IngestListMax             = 100
 	IngestPinMax              = 90 * 24 * time.Hour

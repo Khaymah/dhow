@@ -8,6 +8,7 @@ import { Pager } from '@/Core/Ui/Pager';
 import { Skeleton } from '@/Core/Ui/Skeleton';
 import { useT } from '@/I18n/useT';
 import { INGEST_PAGE_SIZE } from '@/Modules/Ingest/Api/IngestApi';
+import { IngestTokenAcknowledge } from '@/Modules/Ingest/Components/IngestTokenAcknowledge';
 import { IngestTokenRevoke } from '@/Modules/Ingest/Components/IngestTokenRevoke';
 import { IngestTokenRow } from '@/Modules/Ingest/Components/IngestTokenRow';
 import { useCreatorName } from '@/Modules/Ingest/Hooks/useCreatorName';
@@ -25,6 +26,7 @@ export const IngestTokensCard = ({ organizationId, projectId, writable, onNew }:
   const errorText = useApiErrorText();
   const [Page, setPage] = useState(1);
   const [Revoking, setRevoking] = useState<string | null>(null);
+  const [Acknowledging, setAcknowledging] = useState<string | null>(null);
   const tokens = useIngestTokens(organizationId, projectId, Page);
   const creator = useCreatorName(organizationId, true);
 
@@ -65,7 +67,25 @@ export const IngestTokensCard = ({ organizationId, projectId, writable, onNew }:
                   }
                 : undefined
             }
+            onAskAcknowledge={
+              writable
+                ? () => {
+                    setAcknowledging(token.Id);
+                  }
+                : undefined
+            }
           />,
+          Acknowledging === token.Id ? (
+            <IngestTokenAcknowledge
+              key={`${token.Id}-ack`}
+              organizationId={organizationId}
+              projectId={projectId}
+              token={token}
+              onClose={() => {
+                setAcknowledging(null);
+              }}
+            />
+          ) : null,
           Revoking === token.Id ? (
             <IngestTokenRevoke
               key={`${token.Id}-revoke`}

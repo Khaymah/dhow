@@ -4594,6 +4594,38 @@ paths:
                 $ref: "#/components/schemas/IngestTokenResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/acknowledge-reach:
+    post:
+      operationId: acknowledgeIngestTokenReach
+      tags: [ingest]
+      summary: Confirm the protected environments an ingest token reaches
+      description: >-
+        Needs `ingest.manage` on the project and a fresh `CurrentFactor`. Use it after an environment became protected
+        (it got a deploy target or a reviewer, or its allowed refs changed) and the list shows the environment in
+        `UnacknowledgedReach`. It records every protected environment the token reaches now. A revoked or expired token is
+        409 `CONFLICT`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/IngestTokenId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
+      responses:
+        "200":
+          description: The token with its reach confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestTokenResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/projects/{projectId}/ingested-artifacts:
     get:
       operationId: listIngestedArtifacts
@@ -8371,13 +8403,31 @@ components:
         ReloadCommand:
           type: string
           maxLength: 1024
-          description: A single line that runs on the host after the switch. Written by an admin only.
+          description: >-
+            A single line that runs on the host after the switch. Written by an admin only. An answer shows the text only
+            to a session that holds `environment.manage` on the project; for everyone else, including every API token, the
+            field is missing and the matching `...Set` flag tells whether a command exists. A hook must never contain a
+            secret: use a deploy secret instead.
         PreSwitchCommand:
           type: string
           maxLength: 1024
+          description: Same rules as `ReloadCommand`.
         PostSwitchCommand:
           type: string
           maxLength: 1024
+          description: Same rules as `ReloadCommand`.
+        ReloadCommandSet:
+          type: boolean
+          readOnly: true
+          description: Answers only. `true` when a reload command exists, whether or not its text is shown.
+        PreSwitchCommandSet:
+          type: boolean
+          readOnly: true
+          description: Answers only. `true` when a pre-switch command exists.
+        PostSwitchCommandSet:
+          type: boolean
+          readOnly: true
+          description: Answers only. `true` when a post-switch command exists.
         Shared:
           type: array
           maxItems: 20
@@ -9433,6 +9483,18 @@ components:
           description: >-
             The environments of the project whose allowed refs could match one of the token's patterns. The check is
             conservative: a wide pattern such as `**` reaches every environment that allows any branch.
+        CreatorAllowed:
+          type: boolean
+          description: >-
+            `false` when the person who made the token is no longer a member of the organization, or no longer holds a role
+            that allows `ingest.manage` on the project. An upload with such a token is 403 `INGEST_CREATOR_NOT_ALLOWED`.
+        UnacknowledgedReach:
+          type: array
+          items:
+            type: string
+          description: >-
+            The protected environments (with deploy targets or reviewers) the token reaches now but nobody confirmed. An
+            upload with such a token is 403 `INGEST_REACH_NOT_ACKNOWLEDGED` until `acknowledgeIngestTokenReach` confirms them.
     CreateIngestTokenRequest:
       type: object
       additionalProperties: false

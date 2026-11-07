@@ -32,7 +32,7 @@ func ingestBody(env *apptest.Env, rule policy.Rule) any {
 		return map[string]any{
 			"Name": "rt-" + randomSuffix(env.T), "RefPatterns": []map[string]string{{"Kind": "branch", "Pattern": "main"}}, "CurrentFactor": wrong,
 		}
-	case rule.Method == http.MethodPost && strings.HasSuffix(rule.Path, "/revoke"):
+	case rule.Method == http.MethodPost && (strings.HasSuffix(rule.Path, "/revoke") || strings.HasSuffix(rule.Path, "/acknowledge-reach")):
 		return map[string]any{"CurrentFactor": wrong}
 	default:
 		return targetsBody(env, rule)

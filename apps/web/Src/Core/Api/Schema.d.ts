@@ -2896,6 +2896,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/acknowledge-reach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm the protected environments an ingest token reaches
+         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. Use it after an environment became protected (it got a deploy target or a reviewer, or its allowed refs changed) and the list shows the environment in `UnacknowledgedReach`. It records every protected environment the token reaches now. A revoked or expired token is 409 `CONFLICT`.
+         */
+        post: operations["acknowledgeIngestTokenReach"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/projects/{projectId}/ingested-artifacts": {
         parameters: {
             query?: never;
@@ -4686,10 +4706,18 @@ export interface components {
             BatchPauseSeconds?: number;
         };
         DeployTargetSshSettings: {
-            /** @description A single line that runs on the host after the switch. Written by an admin only. */
+            /** @description A single line that runs on the host after the switch. Written by an admin only. An answer shows the text only to a session that holds `environment.manage` on the project; for everyone else, including every API token, the field is missing and the matching `...Set` flag tells whether a command exists. A hook must never contain a secret: use a deploy secret instead. */
             ReloadCommand?: string;
+            /** @description Same rules as `ReloadCommand`. */
             PreSwitchCommand?: string;
+            /** @description Same rules as `ReloadCommand`. */
             PostSwitchCommand?: string;
+            /** @description Answers only. `true` when a reload command exists, whether or not its text is shown. */
+            readonly ReloadCommandSet?: boolean;
+            /** @description Answers only. `true` when a pre-switch command exists. */
+            readonly PreSwitchCommandSet?: boolean;
+            /** @description Answers only. `true` when a post-switch command exists. */
+            readonly PostSwitchCommandSet?: boolean;
             /** @description Names of files and folders kept in `shared/` and linked into each release. */
             Shared?: string[];
         };
@@ -5204,6 +5232,10 @@ export interface components {
             CreatedByUserId?: string;
             /** @description The environments of the project whose allowed refs could match one of the token's patterns. The check is conservative: a wide pattern such as `**` reaches every environment that allows any branch. */
             Reaches?: string[];
+            /** @description `false` when the person who made the token is no longer a member of the organization, or no longer holds a role that allows `ingest.manage` on the project. An upload with such a token is 403 `INGEST_CREATOR_NOT_ALLOWED`. */
+            CreatorAllowed?: boolean;
+            /** @description The protected environments (with deploy targets or reviewers) the token reaches now but nobody confirmed. An upload with such a token is 403 `INGEST_REACH_NOT_ACKNOWLEDGED` until `acknowledgeIngestTokenReach` confirms them. */
+            UnacknowledgedReach?: string[];
         };
         CreateIngestTokenRequest: {
             Name: string;
@@ -9939,6 +9971,35 @@ export interface operations {
         };
         responses: {
             /** @description The revoked token. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestTokenResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    acknowledgeIngestTokenReach: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                ingestTokenId: components["parameters"]["IngestTokenId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CurrentFactorRequest"];
+            };
+        };
+        responses: {
+            /** @description The token with its reach confirmed. */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -115,6 +115,7 @@ export const AuditAr = {
   'audit.action.registry_credential.removed': 'حذف حساب سجل صور',
   'audit.action.ingest_token.created': 'إنشاء توكن استقبال',
   'audit.action.ingest_token.revoked': 'إلغاء توكن استقبال',
+  'audit.action.ingest_token.reach_acknowledged': 'تأكيد البيئات المحمية لتوكن استقبال',
   'audit.action.artifact.ingested': 'استقبال ملف ناتج من نظام خارجي',
   'audit.action.ingest.rejected': 'رفض رفع ملف ناتج',
   'audit.action.job.secrets_delivered': 'إرسال الأسرار إلى جهاز التشغيل',

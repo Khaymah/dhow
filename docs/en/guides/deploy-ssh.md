@@ -117,7 +117,7 @@ Pruning never touches `current` or the previous release, and it orders the relea
 
 ## Commands
 
-`ReloadCommand`, the pre-switch command and the post-switch command are lines that the Admin writes in the target, and a commit cannot change them. Each command runs on the server inside the folder of the new release, with these variables:
+`ReloadCommand`, the pre-switch command and the post-switch command are lines that the Admin writes in the target, and a commit cannot change them. **Never put a secret in a command** (a password, a token or a key): the command text appears in the audit log and in deploy reports, and everyone who holds the admin permission on the project reads it. Use a deploy secret instead. In API answers and on the page, the text of the commands is shown only to whoever holds `environment.manage`. Everyone else, including every API token, sees that a command exists without its text, in the fields `ReloadCommandSet`, `PreSwitchCommandSet` and `PostSwitchCommandSet`. Each command runs on the server inside the folder of the new release, with these variables:
 
 | Variable | Value |
 |---|---|

@@ -30,6 +30,7 @@ func Policies() []policy.Rule {
 		policy.Project(http.MethodGet, tokensPath, policy.IngestManage, "id", "projectId"),
 		policy.Project(http.MethodPost, tokensPath, policy.IngestManage, "id", "projectId"),
 		policy.Project(http.MethodPost, tokensPath+"/{ingestTokenId}/revoke", policy.IngestManage, "id", "projectId"),
+		policy.Project(http.MethodPost, tokensPath+"/{ingestTokenId}/acknowledge-reach", policy.IngestManage, "id", "projectId"),
 		policy.Project(http.MethodGet, artifactsPath, policy.ArtifactRead, "id", "projectId"),
 	}
 }

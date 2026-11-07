@@ -16,9 +16,11 @@ If you build in another CI, for example GitHub Actions, you can hand the finishe
 
 - It looks like `dhow_ing_` and 43 more characters. It is shown **once**, when you make it. Dhow keeps only a hash, so a lost token is replaced, not read again.
 - Only a session can make or revoke a token, with a fresh second factor. An API token cannot.
+- **The owner of the token:** The token works as long as the person who made it is a member of the organization and holds a role that manages ingest in the project (Maintainer and above, counting their role in the project too). If they are removed from the organization or leave it, their tokens are revoked at once. If they are only demoted, Dhow refuses the upload with `403 INGEST_CREATOR_NOT_ALLOWED`, and the token works again if the role comes back. The list shows `CreatorAllowed`, and the page points out a token whose creator is no longer allowed.
 - The token allows nothing but the upload and the status of an upload. It reads no project data.
 - A ref pattern has a kind (`branch` or `tag`) and a name pattern: `main`, `release/*` (one part), `release/**` (all parts) or `v*`.
 - **Protected reach:** when you make a token, Dhow shows `Reaches`: the environments whose allowed refs could match the token's patterns. The check is conservative, so a pattern such as `**` reaches every environment that allows a branch. If the token reaches an environment that has deploy targets or reviewers, the request needs `AcknowledgeProtectedReach: true`, or the answer is `422 INGEST_TOKEN_REACH_UNCONFIRMED`, whose `Details` carry one `ProtectedReach` entry for each protected environment the token reaches, with its name in `Message`. The page shows these environments and asks for an explicit confirmation before it sends the request again. Narrow the patterns when you can.
+- **An environment that became protected after the token was made:** Dhow keeps the protected environments that were confirmed for the token. If an environment becomes protected later (it got a target or a reviewer, or its allowed refs changed) and the token reaches it, Dhow refuses every upload with the token with `403 INGEST_REACH_NOT_ACKNOWLEDGED` and starts no run. The list shows these environments in `UnacknowledgedReach`, and an admin confirms them with a second step from the same page (`POST .../ingest-tokens/{ingestTokenId}/acknowledge-reach`). Tokens made before this change start with no confirmation, so they need one confirmation if they reach a protected environment.
 - **The ref and the commit are claims.** The uploader says which ref and commit it built, and Dhow checks only that the ref fits the token's patterns. `ProvenanceVerified` stays `false` until a later release verifies the CI identity (GitHub OIDC). So a stolen token can start a run, with the environment's rules, as any ref its patterns allow. That is why patterns, the acknowledgement above, and approvals on protected environments matter.
 - A token uploads at most 10 GiB in total. Revoking it does not free the quota of the organization: the files stay until they expire. There is no purge call yet.
 - Revoke a token at once from the same page. The next upload with it is `401 INGEST_TOKEN_REVOKED`.
@@ -60,6 +62,8 @@ The answer is `201` for a new file and `200` when the same file (same project, d
 | `INGEST_TOKEN_INVALID` | 401 | No token, or a token Dhow does not know |
 | `INGEST_TOKEN_REVOKED` | 401 | The token was revoked |
 | `INGEST_TOKEN_EXPIRED` | 401 | The token expired |
+| `INGEST_CREATOR_NOT_ALLOWED` | 403 | The owner of the token is no longer a member with a role that manages ingest in the project |
+| `INGEST_REACH_NOT_ACKNOWLEDGED` | 403 | The token now reaches a protected environment that nobody confirmed. Confirm it from the token list |
 | `REF_NOT_ALLOWED_FOR_TOKEN` | 403 | The ref matches none of the token's patterns |
 | `DIGEST_MISMATCH` | 422 | The bytes do not match the digest in the address |
 | `ARCHIVE_UNSAFE` | 422 | Not a `tar.gz`, or it holds a path with `..`, an absolute path, a link that leaves the folder, or a device |
@@ -69,7 +73,7 @@ The answer is `201` for a new file and `200` when the same file (same project, d
 | `UPLOAD_TOO_SLOW` | 408 | The upload took longer than its deadline (at least 2 minutes, and 256 KiB per second of its size, at most 30 minutes) or fell below 256 KiB per second |
 | `INGEST_TOKEN_QUOTA` | 413 | This token already uploaded 10 GiB. Revoke it and make a new one |
 | `RATE_LIMITED` | 429 | More than 30 uploads in an hour for this token |
-| `SERVICE_UNAVAILABLE` | 503 | This token already has an upload running, the organization has two, or the server has four. Try again after `Retry-After` |
+| `SERVICE_UNAVAILABLE` | 503 | This token already has an upload running, the organization has two, the network address has two, or the server has eight. Try again after `Retry-After` |
 
 ## Start a run
 

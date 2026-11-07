@@ -192,7 +192,7 @@ func (s *Service) CreateToken(
 	}
 	now := s.now()
 	var row sqlc.IngestToken
-	var reaches []string
+	var reaches, protected []string
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		if err := q.LockIngestTokens(ctx, project.String()); err != nil {
 			return err
@@ -207,14 +207,13 @@ func (s *Service) CreateToken(
 		if err != nil {
 			return err
 		}
-		var protected []string
 		reaches, protected = reachOf(patterns, envs)
 		if len(protected) > 0 && !in.AcknowledgeProtectedReach {
 			return apperrors.IngestReachUnconfirmed(reachDetails(protected)...)
 		}
 		row, err = q.InsertIngestToken(ctx, sqlc.InsertIngestTokenParams{
 			OrganizationID: org, ProjectID: project, Name: in.Name, TokenHash: hash, Prefix: prefix, RefPatterns: raw,
-			ExpiresAt: now.Add(time.Duration(days) * day), CreatedByUserID: p.UserID,
+			ExpiresAt: now.Add(time.Duration(days) * day), CreatedByUserID: p.UserID, AcknowledgedEnvironments: protected,
 		})
 		if isUnique(err) {
 			return apperrors.IngestTokenNameTaken()
@@ -235,6 +234,8 @@ func (s *Service) CreateToken(
 	}
 	token, err := s.tokenOf(row)
 	token.Reaches = reaches
+	token.CreatorAllowed = true
+	token.UnacknowledgedReach = []string{}
 	return models.CreatedToken{Token: token, Value: value}, err
 }
 
@@ -273,20 +274,11 @@ func (s *Service) ListTokens(ctx context.Context, org, project uuid.UUID, page, 
 	if err != nil {
 		return models.TokenPage{}, err
 	}
-	envs, err := s.environmentsOf(ctx, q, org, project)
+	items, err := s.viewsOf(ctx, q, org, project, rows)
 	if err != nil {
 		return models.TokenPage{}, err
 	}
-	out := models.TokenPage{Items: make([]models.Token, 0, len(rows)), Total: total}
-	for _, row := range rows {
-		t, err := s.tokenOf(row)
-		if err != nil {
-			return models.TokenPage{}, err
-		}
-		t.Reaches, _ = reachOf(t.RefPatterns, envs)
-		out.Items = append(out.Items, t)
-	}
-	return out, nil
+	return models.TokenPage{Items: items, Total: total}, nil
 }
 
 func (s *Service) RevokeToken(ctx context.Context, org, project, id uuid.UUID, factor auth.Factor) (models.Token, error) {
@@ -329,5 +321,9 @@ func (s *Service) RevokeToken(ctx context.Context, org, project, id uuid.UUID, f
 	if err != nil {
 		return models.Token{}, err
 	}
-	return s.tokenOf(row)
+	views, err := s.viewsOf(ctx, s.queries(), org, project, []sqlc.IngestToken{row})
+	if err != nil {
+		return models.Token{}, err
+	}
+	return views[0], nil
 }

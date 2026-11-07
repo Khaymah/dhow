@@ -13,6 +13,7 @@ import (
 
 type Querier interface {
 	AbandonCommitStatuses(ctx context.Context, arg AbandonCommitStatusesParams) (int64, error)
+	AcknowledgeIngestTokenReach(ctx context.Context, arg AcknowledgeIngestTokenReachParams) (IngestToken, error)
 	ActivateRunJob(ctx context.Context, arg ActivateRunJobParams) (int64, error)
 	AddKeyRekeyProgress(ctx context.Context, arg AddKeyRekeyProgressParams) error
 	AdoptRelease(ctx context.Context, arg AdoptReleaseParams) error
@@ -303,6 +304,7 @@ type Querier interface {
 	ListEnvironmentReviewers(ctx context.Context, arg ListEnvironmentReviewersParams) ([]ListEnvironmentReviewersRow, error)
 	ListEnvironments(ctx context.Context, arg ListEnvironmentsParams) ([]Environment, error)
 	ListGatedRuns(ctx context.Context, arg ListGatedRunsParams) ([]uuid.UUID, error)
+	ListIngestCreatorAccess(ctx context.Context, arg ListIngestCreatorAccessParams) ([]ListIngestCreatorAccessRow, error)
 	ListIngestTokens(ctx context.Context, arg ListIngestTokensParams) ([]IngestToken, error)
 	ListIngestedArtifacts(ctx context.Context, arg ListIngestedArtifactsParams) ([]ListIngestedArtifactsRow, error)
 	ListIngestedByDigest(ctx context.Context, arg ListIngestedByDigestParams) ([]IngestedArtifact, error)
@@ -544,6 +546,7 @@ type Querier interface {
 	RevokeAllUserSessions(ctx context.Context, arg RevokeAllUserSessionsParams) (int64, error)
 	RevokeApiToken(ctx context.Context, arg RevokeApiTokenParams) (RevokeApiTokenRow, error)
 	RevokeIngestToken(ctx context.Context, arg RevokeIngestTokenParams) (IngestToken, error)
+	RevokeIngestTokensOfCreator(ctx context.Context, arg RevokeIngestTokensOfCreatorParams) ([]RevokeIngestTokensOfCreatorRow, error)
 	RevokeInvitation(ctx context.Context, arg RevokeInvitationParams) (int64, error)
 	RevokeOtherUserSessions(ctx context.Context, arg RevokeOtherUserSessionsParams) (int64, error)
 	RevokeRegistrationToken(ctx context.Context, arg RevokeRegistrationTokenParams) (RunnerRegistrationToken, error)

@@ -85,29 +85,63 @@ func TestOneTokenUploadsOnceAndOneOrganizationTwiceAtATime(t *testing.T) {
 	orgA, orgB := uuid.New(), uuid.New()
 	tokenA1, tokenA2, tokenA3, tokenB := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 
-	releaseA1, err := f.acquire(tokenA1, orgA)
+	releaseA1, err := f.acquire(tokenA1, orgA, "198.51.100.1")
 	require.NoError(t, err)
-	_, err = f.acquire(tokenA1, orgA)
+	_, err = f.acquire(tokenA1, orgA, "198.51.100.2")
 	var busy *apperrors.AppError
 	require.ErrorAs(t, err, &busy, "a second upload of the same token waits")
 	assert.Equal(t, http.StatusServiceUnavailable, busy.Status)
 
-	releaseA2, err := f.acquire(tokenA2, orgA)
+	releaseA2, err := f.acquire(tokenA2, orgA, "198.51.100.3")
 	require.NoError(t, err)
-	_, err = f.acquire(tokenA3, orgA)
+	_, err = f.acquire(tokenA3, orgA, "198.51.100.4")
 	require.Error(t, err, "a third upload of the same organization waits")
 
-	releaseB, err := f.acquire(tokenB, orgB)
+	releaseB, err := f.acquire(tokenB, orgB, "198.51.100.5")
 	require.NoError(t, err, "another organization still uploads")
 
 	releaseA1()
-	again, err := f.acquire(tokenA3, orgA)
+	again, err := f.acquire(tokenA3, orgA, "198.51.100.4")
 	require.NoError(t, err, "a finished upload frees its place")
 	again()
 	releaseA2()
 	releaseB()
 	assert.Empty(t, f.byToken)
 	assert.Empty(t, f.byOrg)
+	assert.Empty(t, f.byNet)
+}
+
+func TestOneNetworkNeverHoldsMoreThanItsShareAcrossOrganizations(t *testing.T) {
+	f := newInflight()
+	const network = "203.0.113.9"
+	releases := make([]func(), 0, config.IngestPerNetworkInflight)
+	for range config.IngestPerNetworkInflight {
+		release, err := f.acquire(uuid.New(), uuid.New(), network)
+		require.NoError(t, err)
+		releases = append(releases, release)
+	}
+	_, err := f.acquire(uuid.New(), uuid.New(), network)
+	var busy *apperrors.AppError
+	require.ErrorAs(t, err, &busy, "a third upload from one address waits, whichever organization it is for")
+	assert.Equal(t, http.StatusServiceUnavailable, busy.Status)
+
+	other, err := f.acquire(uuid.New(), uuid.New(), "203.0.113.10")
+	require.NoError(t, err, "another address still uploads")
+	other()
+	releases[0]()
+	again, err := f.acquire(uuid.New(), uuid.New(), network)
+	require.NoError(t, err, "a finished upload frees its place")
+	again()
+	for _, release := range releases[1:] {
+		release()
+	}
+	assert.Empty(t, f.byNet)
+}
+
+func TestNoSingleOrganizationOrPairOfThemCanTakeEveryGlobalSlot(t *testing.T) {
+	assert.LessOrEqual(t, config.IngestPerOrgInflight*config.IngestOrgShareDivisor, config.IngestConcurrent)
+	assert.Less(t, 2*config.IngestPerOrgInflight, config.IngestConcurrent, "two organizations always leave a slot for a third")
+	assert.Less(t, config.IngestPerNetworkInflight, config.IngestConcurrent)
 }
 
 func TestTheLimitIsCheckedBeforeTheArchiveReason(t *testing.T) {

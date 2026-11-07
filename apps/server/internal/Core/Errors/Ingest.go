@@ -21,6 +21,8 @@ const (
 	CodeUploadTooSlow      = "UPLOAD_TOO_SLOW"
 	CodeIngestTokenQuota   = "INGEST_TOKEN_QUOTA"             //nolint:gosec // A public error code, not a credential.
 	CodeReachUnconfirmed   = "INGEST_TOKEN_REACH_UNCONFIRMED" //nolint:gosec // A public error code, not a credential.
+	CodeCreatorNotAllowed  = "INGEST_CREATOR_NOT_ALLOWED"
+	CodeReachNotAcked      = "INGEST_REACH_NOT_ACKNOWLEDGED"
 
 	KeyIngestTokenInvalid = "errors.ingestTokenInvalid"
 	KeyIngestTokenRevoked = "errors.ingestTokenRevoked"
@@ -38,6 +40,8 @@ const (
 	KeyUploadTooSlow      = "errors.ingestTooSlow"
 	KeyIngestTokenQuota   = "errors.ingestTokenQuota"
 	KeyReachUnconfirmed   = "errors.ingestReachUnconfirmed"
+	KeyCreatorNotAllowed  = "errors.ingestCreatorNotAllowed"
+	KeyReachNotAcked      = "errors.ingestReachNotAcknowledged"
 )
 
 func IngestTokenInvalid() *AppError {
@@ -106,6 +110,16 @@ const DetailProtectedReach = "ProtectedReach"
 
 func IngestReachUnconfirmed(details ...IErrorDetail) *AppError {
 	e := New(http.StatusUnprocessableEntity, CodeReachUnconfirmed, KeyReachUnconfirmed)
+	e.Details = details
+	return e
+}
+
+func IngestCreatorNotAllowed() *AppError {
+	return New(http.StatusForbidden, CodeCreatorNotAllowed, KeyCreatorNotAllowed)
+}
+
+func IngestReachNotAcknowledged(details ...IErrorDetail) *AppError {
+	e := New(http.StatusForbidden, CodeReachNotAcked, KeyReachNotAcked)
 	e.Details = details
 	return e
 }

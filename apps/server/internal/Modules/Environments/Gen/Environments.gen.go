@@ -612,11 +612,23 @@ type DeployTargetSettings struct {
 
 // DeployTargetSshSettings defines model for DeployTargetSshSettings.
 type DeployTargetSshSettings struct {
+	// PostSwitchCommand Same rules as `ReloadCommand`.
 	PostSwitchCommand *string `json:"PostSwitchCommand,omitempty"`
-	PreSwitchCommand  *string `json:"PreSwitchCommand,omitempty"`
 
-	// ReloadCommand A single line that runs on the host after the switch. Written by an admin only.
+	// PostSwitchCommandSet Answers only. `true` when a post-switch command exists.
+	PostSwitchCommandSet *bool `json:"PostSwitchCommandSet,omitempty"`
+
+	// PreSwitchCommand Same rules as `ReloadCommand`.
+	PreSwitchCommand *string `json:"PreSwitchCommand,omitempty"`
+
+	// PreSwitchCommandSet Answers only. `true` when a pre-switch command exists.
+	PreSwitchCommandSet *bool `json:"PreSwitchCommandSet,omitempty"`
+
+	// ReloadCommand A single line that runs on the host after the switch. Written by an admin only. An answer shows the text only to a session that holds `environment.manage` on the project; for everyone else, including every API token, the field is missing and the matching `...Set` flag tells whether a command exists. A hook must never contain a secret: use a deploy secret instead.
 	ReloadCommand *string `json:"ReloadCommand,omitempty"`
+
+	// ReloadCommandSet Answers only. `true` when a reload command exists, whether or not its text is shown.
+	ReloadCommandSet *bool `json:"ReloadCommandSet,omitempty"`
 
 	// Shared Names of files and folders kept in `shared/` and linked into each release.
 	Shared *[]string `json:"Shared,omitempty"`

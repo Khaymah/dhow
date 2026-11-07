@@ -41,6 +41,8 @@ type settingsView struct {
 	AllowRoot *bool
 	Ssh       *struct {
 		ReloadCommand, PreSwitchCommand, PostSwitchCommand string
+		ReloadCommandSet, PreSwitchCommandSet              bool
+		PostSwitchCommandSet                               bool
 		Shared                                             []string
 	}
 	Compose *struct {

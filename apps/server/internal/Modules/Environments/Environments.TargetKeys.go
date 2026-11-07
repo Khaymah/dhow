@@ -136,7 +136,7 @@ func fingerprintOfPublic(authorized string) string { return sshhostkey.Fingerpri
 
 func (s *Service) chargeDial(ctx context.Context, org, user uuid.UUID) error {
 	if s.limiter == nil {
-		return nil
+		return ErrNoLimiter
 	}
 	for _, c := range []struct {
 		limit   ratelimit.Limit

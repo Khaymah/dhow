@@ -2,6 +2,8 @@ package deployrelease
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -15,6 +17,9 @@ const (
 	lockName     = "lock"
 	ownerName    = "owner"
 	maxSmallFile = 4 << 10
+
+	staleInfix       = ".stale-"
+	staleSuffixBytes = 8
 )
 
 type lockOwner struct {
@@ -149,12 +154,43 @@ func (d *run) lock() *Failure {
 		if !d.lockExpired(dir) {
 			return fail(ExitTargetLocked, CauseOther, "another deployment holds the lock of the target", ErrTargetLocked)
 		}
-		d.e.Log.Warn("the lock of the target had expired, so this deployment takes it")
-		if err := d.r.RemoveAll(dir); err != nil {
-			return fail(ExitFailed, CauseOther, "cannot clear the expired lock", err)
+		if f := d.takeOver(dir); f != nil {
+			return f
 		}
 	}
 	return fail(ExitTargetLocked, CauseOther, "another deployment holds the lock of the target", ErrTargetLocked)
+}
+
+func staleName(dir string) (string, error) {
+	raw := make([]byte, staleSuffixBytes)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return dir + staleInfix + hex.EncodeToString(raw), nil
+}
+
+func (d *run) takeOver(dir string) *Failure {
+	stale, err := staleName(dir)
+	if err != nil {
+		return fail(ExitFailed, CauseOther, "cannot name the expired lock", err)
+	}
+	if err := d.r.Rename(dir, stale); err != nil {
+		if isNotExist(err) {
+			return nil
+		}
+		return fail(ExitFailed, CauseOther, "cannot move the expired lock aside", err)
+	}
+	if !d.lockExpired(stale) {
+		if err := d.r.Rename(stale, dir); err != nil {
+			d.e.Log.Warn("a lock that another deployment had just taken could not be put back", "error", err.Error())
+		}
+		return fail(ExitTargetLocked, CauseOther, "another deployment holds the lock of the target", ErrTargetLocked)
+	}
+	d.e.Log.Warn("the lock of the target had expired, so this deployment takes it")
+	if err := d.r.RemoveAll(stale); err != nil {
+		d.e.Log.Warn("an expired lock could not be removed", "error", err.Error())
+	}
+	return nil
 }
 
 func (d *run) writeOwner(dir string) *Failure {

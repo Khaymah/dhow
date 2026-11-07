@@ -109,6 +109,7 @@
 | M6.9ب | `deploy/m6-demo/run.sh` عدّى في الـ CI على Ubuntu 26.04 (sshd وCompose حقيقيين، رجوع تلقائي ويدوي، `dhow artifact push`، مفتاح سيرفر اتغيّر، فحص التسريب)، وسيناريو chaos لقتل الـ runner بعد التبديل، وسبب `DEPLOY_INTERRUPTED` (ADR-0101) | #121 |
 | M6.9د | سدّ ثغرات المراجعة: حد الرفع المتزامن العام، و413 قبل قراءة الجسم، وحدود خرج السيرفر البعيد، ومفتاح الهدف خارج الـ argv، وأحداث `deployment.release_*` بالـ digest والمنفّذ، و`make proxy-check` في الـ CI (job `proxy`) | #124 |
 | M6.9ج | مراجعة تهديدات M6 (§14 في `docs/security-model.md`) بكل صف ومعاه مسار اختباره، والمخاطر المقبولة، وM6 خلص في `docs/roadmap.md`. اللي فاضل: تشغيل الـ demo على جهاز نظيف بـ Debian 13 | #123 |
+| M6.9هـ | إصلاحات المراجعة المستقلة لـ M6 ([ADR-0102](ADR/0102-m6-review-fixes-ingest-owner-reach-and-limits.md)): توكن الاستقبال بيتحقق من صاحبه وقت الاستعمال وبيتلغى عند إزالته، وتأكيد البيئة المحمية بيتحفظ والرفع بيترفض لحد ما يتأكد، وأخذ القفل المنتهي بالـ rename، ونص الـ hooks لمن يملك `environment.manage` بس، و8 رفعات متزامنة و2 لكل مؤسسة و2 لكل عنوان شبكة، ومحدد الطلبات إلزامي في `Environments`. L6 مقبولة | في انتظار الـ PR |
 
 شرط خلاص M2 اتحقق: اختبارات الصلاحيات خضرا، ومفيش finding مفتوح Critical أو High. والمراجعة الخارجية اتنقلت لـ M9 (ADR-0040).
 
@@ -167,6 +168,7 @@ M3.12 (الشرائح خلصت)          M3.13 في الآخر
 
 ## بنود مفتوحة اتأجلت
 
+- **قبل أول tag:** تشغيل `deploy/m6-demo/run.sh` يدويًا على VPS نضيف بـ Debian 13 قبل أول tag (شرط إغلاق M6 الباقي).
 - **SELinux enforcing (ADR-0067):** الـ runner مش مدعوم على Fedora وRHEL وRocky وAlma بـ enforcing، لأن `container_t` ممنوع من `connectto` على الـ control socket. اتأجّل لبعد أول نسخة (ADR-0068)، ووقتها نختار: نقلب اتجاه قناة التحكم، أو policy module بـ domain للـ runner. وبعدها نرجّع fedora وrocky-10 لـ `vm-test.yml`.
 
 - **الـ runner:** حقل سقف الموارد في `RegisterRequest`، ورفض `RESOURCE_REQUEST_EXCEEDS_RUNNER` وقت الإنشاء.

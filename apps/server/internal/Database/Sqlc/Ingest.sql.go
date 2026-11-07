@@ -12,6 +12,52 @@ import (
 	"github.com/google/uuid"
 )
 
+const acknowledgeIngestTokenReach = `-- name: AcknowledgeIngestTokenReach :one
+UPDATE "IngestTokens"
+SET "AcknowledgedEnvironments" = $1::text[], "UpdatedAt" = $2
+WHERE "Id" = $3 AND "OrganizationId" = $4 AND "ProjectId" = $5 AND NOT "IsDeleted" AND "RevokedAt" IS NULL
+  AND "ExpiresAt" > $2
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
+`
+
+type AcknowledgeIngestTokenReachParams struct {
+	Environments   []string
+	Now            time.Time
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	ProjectID      uuid.UUID
+}
+
+func (q *Queries) AcknowledgeIngestTokenReach(ctx context.Context, arg AcknowledgeIngestTokenReachParams) (IngestToken, error) {
+	row := q.db.QueryRow(ctx, acknowledgeIngestTokenReach,
+		arg.Environments,
+		arg.Now,
+		arg.ID,
+		arg.OrganizationID,
+		arg.ProjectID,
+	)
+	var i IngestToken
+	err := row.Scan(
+		&i.Id,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.OrganizationId,
+		&i.ProjectId,
+		&i.Name,
+		&i.TokenHash,
+		&i.Prefix,
+		&i.RefPatterns,
+		&i.ExpiresAt,
+		&i.LastUsedAt,
+		&i.RevokedAt,
+		&i.RevokedByUserId,
+		&i.CreatedByUserId,
+		&i.AcknowledgedEnvironments,
+	)
+	return i, err
+}
+
 const countActiveIngestTokens = `-- name: CountActiveIngestTokens :one
 SELECT count(*)::bigint AS "Active"
 FROM "IngestTokens"
@@ -69,29 +115,30 @@ func (q *Queries) CountIngestedArtifacts(ctx context.Context, arg CountIngestedA
 }
 
 const findIngestTokenByHash = `-- name: FindIngestTokenByHash :one
-SELECT t."Id", t."CreatedAt", t."UpdatedAt", t."IsDeleted", t."OrganizationId", t."ProjectId", t."Name", t."TokenHash", t."Prefix", t."RefPatterns", t."ExpiresAt", t."LastUsedAt", t."RevokedAt", t."RevokedByUserId", t."CreatedByUserId", p."State" AS "ProjectState"
+SELECT t."Id", t."CreatedAt", t."UpdatedAt", t."IsDeleted", t."OrganizationId", t."ProjectId", t."Name", t."TokenHash", t."Prefix", t."RefPatterns", t."ExpiresAt", t."LastUsedAt", t."RevokedAt", t."RevokedByUserId", t."CreatedByUserId", t."AcknowledgedEnvironments", p."State" AS "ProjectState"
 FROM "IngestTokens" t
 JOIN "Projects" p ON p."Id" = t."ProjectId" AND p."OrganizationId" = t."OrganizationId" AND NOT p."IsDeleted"
 WHERE t."TokenHash" = $1 AND NOT t."IsDeleted"
 `
 
 type FindIngestTokenByHashRow struct {
-	Id              uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	IsDeleted       bool
-	OrganizationId  uuid.UUID
-	ProjectId       uuid.UUID
-	Name            string
-	TokenHash       []byte
-	Prefix          string
-	RefPatterns     []byte
-	ExpiresAt       time.Time
-	LastUsedAt      *time.Time
-	RevokedAt       *time.Time
-	RevokedByUserId *uuid.UUID
-	CreatedByUserId uuid.UUID
-	ProjectState    string
+	Id                       uuid.UUID
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
+	IsDeleted                bool
+	OrganizationId           uuid.UUID
+	ProjectId                uuid.UUID
+	Name                     string
+	TokenHash                []byte
+	Prefix                   string
+	RefPatterns              []byte
+	ExpiresAt                time.Time
+	LastUsedAt               *time.Time
+	RevokedAt                *time.Time
+	RevokedByUserId          *uuid.UUID
+	CreatedByUserId          uuid.UUID
+	AcknowledgedEnvironments []string
+	ProjectState             string
 }
 
 func (q *Queries) FindIngestTokenByHash(ctx context.Context, tokenHash []byte) (FindIngestTokenByHashRow, error) {
@@ -113,6 +160,7 @@ func (q *Queries) FindIngestTokenByHash(ctx context.Context, tokenHash []byte) (
 		&i.RevokedAt,
 		&i.RevokedByUserId,
 		&i.CreatedByUserId,
+		&i.AcknowledgedEnvironments,
 		&i.ProjectState,
 	)
 	return i, err
@@ -167,7 +215,7 @@ func (q *Queries) FindIngestedArtifact(ctx context.Context, arg FindIngestedArti
 }
 
 const getIngestToken = `-- name: GetIngestToken :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
 FROM "IngestTokens"
 WHERE "Id" = $1 AND "OrganizationId" = $2 AND "ProjectId" = $3 AND NOT "IsDeleted"
 `
@@ -197,6 +245,7 @@ func (q *Queries) GetIngestToken(ctx context.Context, arg GetIngestTokenParams) 
 		&i.RevokedAt,
 		&i.RevokedByUserId,
 		&i.CreatedByUserId,
+		&i.AcknowledgedEnvironments,
 	)
 	return i, err
 }
@@ -287,20 +336,23 @@ func (q *Queries) IngestedArtifactRun(ctx context.Context, arg IngestedArtifactR
 }
 
 const insertIngestToken = `-- name: InsertIngestToken :one
-INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId"
+INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId",
+                            "AcknowledgedEnvironments")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+        $9::text[])
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
 `
 
 type InsertIngestTokenParams struct {
-	OrganizationID  uuid.UUID
-	ProjectID       uuid.UUID
-	Name            string
-	TokenHash       []byte
-	Prefix          string
-	RefPatterns     []byte
-	ExpiresAt       time.Time
-	CreatedByUserID uuid.UUID
+	OrganizationID           uuid.UUID
+	ProjectID                uuid.UUID
+	Name                     string
+	TokenHash                []byte
+	Prefix                   string
+	RefPatterns              []byte
+	ExpiresAt                time.Time
+	CreatedByUserID          uuid.UUID
+	AcknowledgedEnvironments []string
 }
 
 func (q *Queries) InsertIngestToken(ctx context.Context, arg InsertIngestTokenParams) (IngestToken, error) {
@@ -313,6 +365,7 @@ func (q *Queries) InsertIngestToken(ctx context.Context, arg InsertIngestTokenPa
 		arg.RefPatterns,
 		arg.ExpiresAt,
 		arg.CreatedByUserID,
+		arg.AcknowledgedEnvironments,
 	)
 	var i IngestToken
 	err := row.Scan(
@@ -331,6 +384,7 @@ func (q *Queries) InsertIngestToken(ctx context.Context, arg InsertIngestTokenPa
 		&i.RevokedAt,
 		&i.RevokedByUserId,
 		&i.CreatedByUserId,
+		&i.AcknowledgedEnvironments,
 	)
 	return i, err
 }
@@ -439,8 +493,65 @@ func (q *Queries) ListEnvironmentReach(ctx context.Context, arg ListEnvironmentR
 	return items, nil
 }
 
+const listIngestCreatorAccess = `-- name: ListIngestCreatorAccess :many
+SELECT u."Id" AS "UserId", m."Role",
+       ARRAY(SELECT r."Role" FROM "OrganizationTeamRoles" r
+             WHERE r."UserId" = u."Id" AND r."OrganizationId" = m."OrganizationId")::text[] AS "TeamRoles",
+       ARRAY(SELECT rb."Role"
+             FROM "RoleBindings" rb
+             WHERE rb."OrganizationId" = m."OrganizationId" AND rb."Scope" = 'project' AND rb."ProjectId" = $1::uuid
+               AND NOT rb."IsDeleted"
+               AND (rb."UserId" = u."Id"
+                    OR EXISTS (SELECT 1
+                               FROM "TeamMembers" tm
+                               JOIN "Teams" t ON t."Id" = tm."TeamId" AND t."OrganizationId" = tm."OrganizationId" AND NOT t."IsDeleted"
+                               WHERE tm."TeamId" = rb."TeamId" AND tm."OrganizationId" = rb."OrganizationId"
+                                 AND tm."UserId" = u."Id" AND NOT tm."IsDeleted")))::text[] AS "Bindings"
+FROM "Users" u
+JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = $2 AND NOT m."IsDeleted"
+WHERE u."Id" = ANY ($3::uuid[]) AND NOT u."IsDeleted" AND NOT u."Disabled"
+`
+
+type ListIngestCreatorAccessParams struct {
+	ProjectID      uuid.UUID
+	OrganizationID uuid.UUID
+	UserIds        []uuid.UUID
+}
+
+type ListIngestCreatorAccessRow struct {
+	UserId    uuid.UUID
+	Role      string
+	TeamRoles []string
+	Bindings  []string
+}
+
+func (q *Queries) ListIngestCreatorAccess(ctx context.Context, arg ListIngestCreatorAccessParams) ([]ListIngestCreatorAccessRow, error) {
+	rows, err := q.db.Query(ctx, listIngestCreatorAccess, arg.ProjectID, arg.OrganizationID, arg.UserIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListIngestCreatorAccessRow{}
+	for rows.Next() {
+		var i ListIngestCreatorAccessRow
+		if err := rows.Scan(
+			&i.UserId,
+			&i.Role,
+			&i.TeamRoles,
+			&i.Bindings,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listIngestTokens = `-- name: ListIngestTokens :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
 FROM "IngestTokens"
 WHERE "OrganizationId" = $1 AND "ProjectId" = $2 AND NOT "IsDeleted"
 ORDER BY "CreatedAt" DESC, "Id" DESC
@@ -484,6 +595,7 @@ func (q *Queries) ListIngestTokens(ctx context.Context, arg ListIngestTokensPara
 			&i.RevokedAt,
 			&i.RevokedByUserId,
 			&i.CreatedByUserId,
+			&i.AcknowledgedEnvironments,
 		); err != nil {
 			return nil, err
 		}
@@ -728,7 +840,7 @@ const revokeIngestToken = `-- name: RevokeIngestToken :one
 UPDATE "IngestTokens"
 SET "RevokedAt" = $1, "RevokedByUserId" = $2, "UpdatedAt" = $1
 WHERE "Id" = $3 AND "OrganizationId" = $4 AND "ProjectId" = $5 AND NOT "IsDeleted" AND "RevokedAt" IS NULL
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
 `
 
 type RevokeIngestTokenParams struct {
@@ -764,8 +876,54 @@ func (q *Queries) RevokeIngestToken(ctx context.Context, arg RevokeIngestTokenPa
 		&i.RevokedAt,
 		&i.RevokedByUserId,
 		&i.CreatedByUserId,
+		&i.AcknowledgedEnvironments,
 	)
 	return i, err
+}
+
+const revokeIngestTokensOfCreator = `-- name: RevokeIngestTokensOfCreator :many
+UPDATE "IngestTokens"
+SET "RevokedAt" = $1::timestamptz, "RevokedByUserId" = $2::uuid, "UpdatedAt" = $1::timestamptz
+WHERE "OrganizationId" = $3 AND "CreatedByUserId" = $4 AND NOT "IsDeleted" AND "RevokedAt" IS NULL
+RETURNING "Id", "ProjectId", "Name"
+`
+
+type RevokeIngestTokensOfCreatorParams struct {
+	Now            time.Time
+	ActorID        uuid.UUID
+	OrganizationID uuid.UUID
+	UserID         uuid.UUID
+}
+
+type RevokeIngestTokensOfCreatorRow struct {
+	Id        uuid.UUID
+	ProjectId uuid.UUID
+	Name      string
+}
+
+func (q *Queries) RevokeIngestTokensOfCreator(ctx context.Context, arg RevokeIngestTokensOfCreatorParams) ([]RevokeIngestTokensOfCreatorRow, error) {
+	rows, err := q.db.Query(ctx, revokeIngestTokensOfCreator,
+		arg.Now,
+		arg.ActorID,
+		arg.OrganizationID,
+		arg.UserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RevokeIngestTokensOfCreatorRow{}
+	for rows.Next() {
+		var i RevokeIngestTokensOfCreatorRow
+		if err := rows.Scan(&i.Id, &i.ProjectId, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const touchIngestToken = `-- name: TouchIngestToken :exec

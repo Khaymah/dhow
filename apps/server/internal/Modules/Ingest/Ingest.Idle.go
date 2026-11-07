@@ -76,33 +76,43 @@ func tooSlow(err error) bool {
 }
 
 type inflight struct {
-	mu      sync.Mutex
-	byToken map[uuid.UUID]int
-	byOrg   map[uuid.UUID]int
+	mu       sync.Mutex
+	byToken  map[uuid.UUID]int
+	byOrg    map[uuid.UUID]int
+	byNet    map[string]int
+	perToken int
+	perOrg   int
+	perNet   int
 }
 
 func newInflight() *inflight {
-	return &inflight{byToken: map[uuid.UUID]int{}, byOrg: map[uuid.UUID]int{}}
+	return &inflight{
+		byToken: map[uuid.UUID]int{}, byOrg: map[uuid.UUID]int{}, byNet: map[string]int{},
+		perToken: config.IngestPerTokenInflight, perOrg: config.IngestPerOrgInflight, perNet: config.IngestPerNetworkInflight,
+	}
 }
 
-func (f *inflight) acquire(token, org uuid.UUID) (func(), error) {
+func drop[K comparable](m map[K]int, key K) {
+	m[key]--
+	if m[key] <= 0 {
+		delete(m, key)
+	}
+}
+
+func (f *inflight) acquire(token, org uuid.UUID, network string) (func(), error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.byToken[token] >= config.IngestPerTokenInflight || f.byOrg[org] >= config.IngestPerOrgInflight {
+	if f.byToken[token] >= f.perToken || f.byOrg[org] >= f.perOrg || f.byNet[network] >= f.perNet {
 		return nil, apperrors.IngestBusy(config.IngestBusyRetry)
 	}
 	f.byToken[token]++
 	f.byOrg[org]++
+	f.byNet[network]++
 	return func() {
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		f.byToken[token]--
-		f.byOrg[org]--
-		if f.byToken[token] <= 0 {
-			delete(f.byToken, token)
-		}
-		if f.byOrg[org] <= 0 {
-			delete(f.byOrg, org)
-		}
+		drop(f.byToken, token)
+		drop(f.byOrg, org)
+		drop(f.byNet, network)
 	}, nil
 }
