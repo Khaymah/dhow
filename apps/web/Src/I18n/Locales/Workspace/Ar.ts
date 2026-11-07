@@ -4,6 +4,7 @@ import { EnvironmentsAr } from '@/I18n/Locales/Workspace/EnvironmentsAr';
 import { HomeAr } from '@/I18n/Locales/Workspace/HomeAr';
 import { IngestAr } from '@/I18n/Locales/Workspace/IngestAr';
 import { JobsAr } from '@/I18n/Locales/Workspace/JobsAr';
+import { LogViewerAr } from '@/I18n/Locales/Workspace/LogViewerAr';
 import { OrganizationAr } from '@/I18n/Locales/Workspace/OrganizationAr';
 import { OrgPagesAr } from '@/I18n/Locales/Workspace/OrgPagesAr';
 import { OidcSettingsAr } from '@/I18n/Locales/Workspace/OidcSettingsAr';
@@ -402,6 +403,7 @@ export const WorkspaceAr = {
   ...AuditAr,
   ...OrganizationAr,
   ...JobsAr,
+  ...LogViewerAr,
   ...RunnersAr,
   ...ProjectsAr,
   ...RunsAr,

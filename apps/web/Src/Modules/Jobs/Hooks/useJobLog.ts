@@ -1,130 +1,114 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { jobLogStreamUrl, type TJobLogChunk, type TJobLogStatus } from '@/Modules/Jobs/Api/JobsApi';
-import { appendChunks, EMPTY_LOG, type ILogBuffer } from '@/Modules/Jobs/Types/LogBuffer';
+import type { TJobLogChunk, TJobLogStatus } from '@/Modules/Jobs/Api/JobsApi';
+import {
+  type IJobLogTarget,
+  type ILogSink,
+  type TLogConnection,
+  type TLogMode,
+} from '@/Modules/Jobs/Hooks/LogSink';
+import { fetchOlder } from '@/Modules/Jobs/Hooks/LogOlder';
+import { useLogPolling } from '@/Modules/Jobs/Hooks/useLogPolling';
+import { FLUSH_MS, MAX_FAILURES, useLogStream } from '@/Modules/Jobs/Hooks/useLogStream';
+import { appendChunks, EMPTY_LOG, firstSeqOf, hasOlder, prependChunks, type ILogBuffer } from '@/Modules/Jobs/Types/LogBuffer';
 
-export type TLogConnection = 'connecting' | 'live' | 'reconnecting' | 'ended' | 'failed';
+export { FLUSH_MS, MAX_FAILURES };
+export type { IJobLogTarget, TLogConnection, TLogMode };
 
 export interface IJobLog {
   Buffer: ILogBuffer;
   Connection: TLogConnection;
+  Mode: TLogMode;
   Status: TJobLogStatus | null;
   Retry: () => void;
+  UsePolling: () => void;
+  HasOlder: boolean;
+  LoadingOlder: boolean;
+  OlderFailed: boolean;
+  LoadOlder: () => Promise<void>;
 }
 
-export interface IJobLogTarget {
-  organizationId: string;
-  jobId: string;
-  attempt: number;
-  onEnded?: () => void;
-}
-
-export const FLUSH_MS = 120;
-export const MAX_FAILURES = 5;
-const BACKOFF_MS = [1000, 2000, 4000, 8000, 15000];
-
-const parse = (event: Event): unknown => {
-  if (!(event instanceof MessageEvent) || typeof event.data !== 'string') return null;
-  try {
-    return JSON.parse(event.data) as unknown;
-  } catch {
-    return null;
-  }
-};
-
-export const useJobLog = ({ organizationId, jobId, attempt, onEnded }: IJobLogTarget): IJobLog => {
+export const useJobLog = (target: IJobLogTarget): IJobLog => {
+  const { organizationId, jobId, attempt, onEnded } = target;
   const [Buffer, setBuffer] = useState<ILogBuffer>(EMPTY_LOG);
   const [Connection, setConnection] = useState<TLogConnection>('connecting');
+  const [Mode, setMode] = useState<TLogMode>('stream');
   const [Status, setStatus] = useState<TJobLogStatus | null>(null);
   const [Generation, setGeneration] = useState(0);
+  const [LoadingOlder, setLoadingOlder] = useState(false);
+  const [OlderFailed, setOlderFailed] = useState(false);
   const lastSeq = useRef(0);
   const endedRef = useRef(onEnded);
+  const bufferRef = useRef(Buffer);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     endedRef.current = onEnded;
   }, [onEnded]);
 
   useEffect(() => {
-    let source: EventSource | null = null;
-    let pending: TJobLogChunk[] = [];
-    let flushTimer: ReturnType<typeof setTimeout> | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let failures = 0;
-    let stopped = false;
+    bufferRef.current = Buffer;
+  }, [Buffer]);
 
-    const flush = () => {
-      flushTimer = null;
-      if (pending.length === 0) return;
-      const batch = pending;
-      pending = [];
-      setBuffer((buffer) => appendChunks(buffer, batch));
-    };
+  const Append = useCallback((chunks: TJobLogChunk[]) => {
+    setBuffer((buffer) => appendChunks(buffer, chunks));
+  }, []);
+  const Ended = useCallback(() => {
+    endedRef.current?.();
+  }, []);
 
-    const onChunk = (event: Event) => {
-      const chunk = parse(event) as TJobLogChunk | null;
-      if (chunk === null || chunk.Seq <= lastSeq.current) return;
-      lastSeq.current = chunk.Seq;
-      pending.push(chunk);
-      flushTimer ??= setTimeout(flush, FLUSH_MS);
-    };
+  const sink = useMemo<ILogSink>(
+    () => ({
+      Target: { organizationId, jobId, attempt },
+      LastSeq: lastSeq,
+      Append,
+      SetConnection: setConnection,
+      SetStatus: setStatus,
+      Ended,
+    }),
+    [organizationId, jobId, attempt, Append, Ended],
+  );
 
-    const onStatus = (event: Event) => {
-      const status = parse(event) as TJobLogStatus | null;
-      failures = 0;
-      setConnection('live');
-      if (status !== null) setStatus(status);
-    };
-
-    const onEnd = (event: Event) => {
-      const status = parse(event) as TJobLogStatus | null;
-      if (status !== null) setStatus(status);
-      source?.close();
-      stopped = true;
-      flush();
-      setConnection('ended');
-      endedRef.current?.();
-    };
-
-    const connect = () => {
-      retryTimer = null;
-      source = new EventSource(jobLogStreamUrl(organizationId, jobId, attempt, lastSeq.current + 1), { withCredentials: true });
-      source.addEventListener('chunk', onChunk);
-      source.addEventListener('status', onStatus);
-      source.addEventListener('end', onEnd);
-      source.onopen = () => {
-        setConnection('live');
-      };
-      source.onerror = () => {
-        if (stopped || source === null) return;
-        if (source.readyState !== EventSource.CLOSED) {
-          setConnection('reconnecting');
-          return;
-        }
-        source.close();
-        failures += 1;
-        if (failures > MAX_FAILURES) {
-          setConnection('failed');
-          return;
-        }
-        setConnection('reconnecting');
-        retryTimer = setTimeout(connect, BACKOFF_MS[Math.min(failures, BACKOFF_MS.length) - 1]);
-      };
-    };
-
-    connect();
-    return () => {
-      stopped = true;
-      source?.close();
-      if (flushTimer !== null) clearTimeout(flushTimer);
-      if (retryTimer !== null) clearTimeout(retryTimer);
-      flush();
-    };
-  }, [organizationId, jobId, attempt, Generation]);
+  useLogStream(sink, Mode === 'stream', Generation);
+  useLogPolling(sink, Mode === 'polling', Generation);
 
   const Retry = useCallback(() => {
     setConnection('connecting');
     setGeneration((value) => value + 1);
   }, []);
 
-  return { Buffer, Connection, Status, Retry };
+  const UsePolling = useCallback(() => {
+    setMode('polling');
+    setConnection('connecting');
+  }, []);
+
+  const LoadOlder = useCallback(async () => {
+    const head = firstSeqOf(bufferRef.current);
+    if (loadingRef.current || head === null || head <= 1) return;
+    loadingRef.current = true;
+    setLoadingOlder(true);
+    setOlderFailed(false);
+    try {
+      const older = await fetchOlder(organizationId, jobId, attempt, head);
+      setBuffer((buffer) => prependChunks(buffer, older));
+    } catch {
+      setOlderFailed(true);
+    } finally {
+      loadingRef.current = false;
+      setLoadingOlder(false);
+    }
+  }, [organizationId, jobId, attempt]);
+
+  return {
+    Buffer,
+    Connection,
+    Mode,
+    Status,
+    Retry,
+    UsePolling,
+    HasOlder: hasOlder(Buffer),
+    LoadingOlder,
+    OlderFailed,
+    LoadOlder,
+  };
 };

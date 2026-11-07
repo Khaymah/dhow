@@ -17,7 +17,10 @@ import (
 	"github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1/runnerv1connect"
 )
 
-const LogStreamPath = "/organizations/{id}/jobs/{jobId}/logs/stream"
+const (
+	LogStreamPath = "/organizations/{id}/jobs/{jobId}/logs/stream"
+	LogRawPath    = "/organizations/{id}/jobs/{jobId}/logs/raw"
+)
 
 type Deps struct {
 	Service *Service
@@ -34,6 +37,7 @@ func Policies() []policy.Rule {
 		policy.Organization(http.MethodPost, "/organizations/{id}/jobs/{jobId}/cancel", policy.JobCancel, "id").AllowTokens(),
 		policy.Organization(http.MethodGet, "/organizations/{id}/jobs/{jobId}/logs", policy.LogRead, "id"),
 		policy.Organization(http.MethodGet, LogStreamPath, policy.LogRead, "id"),
+		policy.Organization(http.MethodGet, LogRawPath, policy.LogRead, "id"),
 	}
 }
 
@@ -69,9 +73,12 @@ func Routes(r chi.Router, d Deps) {
 func RouteTimeout(next http.Handler) http.Handler {
 	timed := middleware.Timeout(config.APITimeout)(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if rc := chi.RouteContext(r.Context()); rc != nil && rc.RoutePattern() == config.APIPrefix+LogStreamPath {
-			next.ServeHTTP(w, r)
-			return
+		if rc := chi.RouteContext(r.Context()); rc != nil {
+			switch rc.RoutePattern() {
+			case config.APIPrefix + LogStreamPath, config.APIPrefix + LogRawPath:
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 		timed.ServeHTTP(w, r)
 	})

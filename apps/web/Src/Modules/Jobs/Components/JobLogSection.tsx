@@ -8,6 +8,7 @@ import { useT } from '@/I18n/useT';
 import type { TJobDetail } from '@/Modules/Jobs/Api/JobsApi';
 import { JobLog } from '@/Modules/Jobs/Components/JobLog';
 import { canReadJobLogs } from '@/Modules/Jobs/Types/JobStates';
+import { readAttempt } from '@/Modules/Jobs/Types/LogLink';
 
 export interface IJobLogSectionProps {
   organizationId: string;
@@ -43,7 +44,7 @@ const AttemptPicker = ({ numbers, value, onChange }: { numbers: readonly number[
 
 export const JobLogSection = ({ organizationId, detail, role, onEnded }: IJobLogSectionProps) => {
   const t = useT();
-  const [Picked, setPicked] = useState<number | null>(null);
+  const [Picked, setPicked] = useState<number | null>(() => readAttempt(window.location.search));
   const numbers = detail.Attempts.map((attempt) => attempt.Number).sort((a, b) => b - a);
   const latest = numbers[0];
   const attempt = Picked !== null && numbers.includes(Picked) ? Picked : latest;

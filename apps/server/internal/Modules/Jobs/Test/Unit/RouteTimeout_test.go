@@ -23,6 +23,7 @@ func TestEveryJobRouteButTheLogStreamHasTheAPITimeout(t *testing.T) {
 		{"/organizations/{id}/jobs/{jobId}", true},
 		{"/organizations/{id}/jobs/{jobId}/logs", true},
 		{jobs.LogStreamPath, false},
+		{jobs.LogRawPath, false},
 	} {
 		t.Run(tt.pattern, func(t *testing.T) {
 			var left time.Duration
