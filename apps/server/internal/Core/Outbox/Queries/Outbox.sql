@@ -3,7 +3,7 @@ INSERT INTO "NotificationOutbox" (
     "OrganizationId", "ProjectId", "ChannelId", "RecipientUserId", "Kind", "EventId", "EventName", "Payload", "NextAttemptAt"
 )
 VALUES (
-    @organization_id, @project_id, @channel_id, @recipient_user_id, @kind, @event_id, @event_name, @payload, @next_attempt_at
+    sqlc.narg('organization_id'), @project_id, @channel_id, @recipient_user_id, @kind, @event_id, @event_name, @payload, @next_attempt_at
 )
 ON CONFLICT DO NOTHING;
 

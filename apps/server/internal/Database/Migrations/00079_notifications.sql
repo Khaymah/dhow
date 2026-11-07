@@ -52,7 +52,7 @@ CREATE TABLE "NotificationOutbox" (
     "CreatedAt"       timestamptz NOT NULL DEFAULT now(),
     "UpdatedAt"       timestamptz NOT NULL DEFAULT now(),
     "IsDeleted"       boolean NOT NULL DEFAULT false,
-    "OrganizationId"  uuid NOT NULL REFERENCES "Organizations" ("Id"),
+    "OrganizationId"  uuid REFERENCES "Organizations" ("Id"),
     "ProjectId"       uuid,
     "ChannelId"       uuid,
     "RecipientUserId" uuid REFERENCES "Users" ("Id"),
@@ -69,6 +69,7 @@ CREATE TABLE "NotificationOutbox" (
     "LastStatus"      integer CHECK ("LastStatus" BETWEEN 100 AND 599),
     "SentAt"          timestamptz,
     FOREIGN KEY ("ChannelId", "OrganizationId") REFERENCES "NotificationChannels" ("Id", "OrganizationId"),
+    CHECK ("OrganizationId" IS NOT NULL OR "Kind" = 'internal-email'),
     CHECK ("ChannelId" IS NOT NULL OR "Kind" = 'internal-email'),
     CHECK ("Kind" <> 'internal-email' OR "RecipientUserId" IS NOT NULL)
 );

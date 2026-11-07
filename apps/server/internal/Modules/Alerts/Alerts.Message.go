@@ -1,10 +1,7 @@
 package alerts
 
 import (
-	"net/netip"
-	"strings"
-	"time"
-
+	alert "github.com/Khaymah/dhow/apps/server/internal/Core/Alert"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	i18n "github.com/Khaymah/dhow/apps/server/internal/Core/I18n"
 	mailer "github.com/Khaymah/dhow/apps/server/internal/Core/Mail"
@@ -12,15 +9,7 @@ import (
 
 const (
 	ownerKey       = "Owner"
-	keySubject     = "mail.alert.subject"
-	keyBody        = "mail.alert.body"
-	keyResetBody   = "mail.alert.reset.body"
-	changeMfaReset = "mfa_reset"
-	keyUnknown     = "mail.alert.unknown"
-	keyChange      = "mail.alert.change."
-	mailDateLayout = "2006-01-02 15:04"
-	ipv4Prefix     = 24
-	ipv6Prefix     = 48
+	changeMfaReset = alert.ChangeMfaReset
 )
 
 func changeOf(event string) (string, bool) {
@@ -75,103 +64,10 @@ func Changes() []string {
 	return out
 }
 
-type Details struct {
-	To        string
-	Name      string
-	Change    string
-	At        time.Time
-	IP        string
-	UserAgent string
-	Link      string
-}
+type Details = alert.Details
 
-func Message(locale i18n.Locale, d Details) mailer.Message {
-	unknown := i18n.Translate(locale, keyUnknown)
-	change := i18n.Translate(locale, keyChange+d.Change)
-	r := strings.NewReplacer(
-		"{name}", d.Name, "{change}", change, "{time}", d.At.UTC().Format(mailDateLayout),
-		"{ip}", orUnknown(ApproximateIP(d.IP), unknown), "{browser}", orUnknown(Browser(d.UserAgent), unknown), "{link}", d.Link,
-	)
-	subject := strings.NewReplacer("{change}", change).Replace(i18n.Translate(locale, keySubject))
-	body := keyBody
-	if d.Change == changeMfaReset {
-		body = keyResetBody
-	}
-	return mailer.Message{To: d.To, Subject: oneLine(subject), Body: r.Replace(i18n.Translate(locale, body))}
-}
+func Message(locale i18n.Locale, d Details) mailer.Message { return alert.Message(locale, d) }
 
-func orUnknown(v, unknown string) string {
-	if v == "" {
-		return unknown
-	}
-	return v
-}
+func ApproximateIP(raw string) string { return alert.ApproximateIP(raw) }
 
-func oneLine(v string) string { return strings.NewReplacer("\r", " ", "\n", " ").Replace(v) }
-
-func ApproximateIP(raw string) string {
-	addr, err := netip.ParseAddr(raw)
-	if err != nil {
-		return ""
-	}
-	addr = addr.Unmap()
-	bits := ipv6Prefix
-	if addr.Is4() {
-		bits = ipv4Prefix
-	}
-	prefix, err := addr.Prefix(bits)
-	if err != nil {
-		return ""
-	}
-	return prefix.String()
-}
-
-type marker struct{ token, label string }
-
-func browsers() []marker {
-	return []marker{
-		{"Edg/", "Edge"},
-		{"OPR/", "Opera"},
-		{"Firefox/", "Firefox"},
-		{"FxiOS/", "Firefox"},
-		{"CriOS/", "Chrome"},
-		{"Chrome/", "Chrome"},
-		{"Safari/", "Safari"},
-		{"curl/", "curl"},
-		{"dhow/", "Dhow CLI"},
-	}
-}
-
-func systems() []marker {
-	return []marker{
-		{"Windows", "Windows"},
-		{"Android", "Android"},
-		{"iPhone", "iOS"},
-		{"iPad", "iPadOS"},
-		{"CrOS", "ChromeOS"},
-		{"Mac OS X", "macOS"},
-		{"Macintosh", "macOS"},
-		{"Linux", "Linux"},
-	}
-}
-
-func first(ua string, ms []marker) string {
-	for _, m := range ms {
-		if strings.Contains(ua, m.token) {
-			return m.label
-		}
-	}
-	return ""
-}
-
-func Browser(ua string) string {
-	b, sys := first(ua, browsers()), first(ua, systems())
-	switch {
-	case b != "" && sys != "":
-		return b + " · " + sys
-	case b != "":
-		return b
-	default:
-		return sys
-	}
-}
+func Browser(ua string) string { return alert.Browser(ua) }

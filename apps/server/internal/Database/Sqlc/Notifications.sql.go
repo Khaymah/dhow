@@ -50,7 +50,7 @@ WHERE o."OrganizationId" = $1 AND c."ProjectId" IS NOT DISTINCT FROM $2::uuid
 `
 
 type CountNotificationOutboxByScopeParams struct {
-	OrganizationID uuid.UUID
+	OrganizationID *uuid.UUID
 	ProjectID      *uuid.UUID
 	State          pgtype.Text
 }
@@ -312,7 +312,7 @@ FOR UPDATE OF o
 
 type GetNotificationDeliveryParams struct {
 	ID             uuid.UUID
-	OrganizationID uuid.UUID
+	OrganizationID *uuid.UUID
 	ProjectID      *uuid.UUID
 }
 
@@ -321,7 +321,7 @@ type GetNotificationDeliveryRow struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	IsDeleted        bool
-	OrganizationId   uuid.UUID
+	OrganizationId   *uuid.UUID
 	ProjectId        *uuid.UUID
 	ChannelId        *uuid.UUID
 	RecipientUserId  *uuid.UUID
@@ -923,7 +923,7 @@ LIMIT $5 OFFSET $4
 `
 
 type NotificationOutboxByScopeParams struct {
-	OrganizationID uuid.UUID
+	OrganizationID *uuid.UUID
 	ProjectID      *uuid.UUID
 	State          pgtype.Text
 	PageOffset     int32
@@ -935,7 +935,7 @@ type NotificationOutboxByScopeRow struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	IsDeleted       bool
-	OrganizationId  uuid.UUID
+	OrganizationId  *uuid.UUID
 	ProjectId       *uuid.UUID
 	ChannelId       *uuid.UUID
 	RecipientUserId *uuid.UUID

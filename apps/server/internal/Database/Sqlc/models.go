@@ -669,7 +669,7 @@ type NotificationOutbox struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	IsDeleted       bool
-	OrganizationId  uuid.UUID
+	OrganizationId  *uuid.UUID
 	ProjectId       *uuid.UUID
 	ChannelId       *uuid.UUID
 	RecipientUserId *uuid.UUID

@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	outbox "github.com/Khaymah/dhow/apps/server/internal/Core/Outbox"
+	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtest "github.com/Khaymah/dhow/apps/server/internal/Database/Testing"
 )
 
@@ -81,7 +82,7 @@ func seed(t *testing.T) world {
 func (w world) enqueue(t *testing.T) uuid.UUID {
 	t.Helper()
 	event := uuid.New()
-	ok, err := outbox.Enqueue(t.Context(), w.pool, outbox.Entry{
+	ok, err := outbox.Enqueue(t.Context(), sqlc.New(w.pool), outbox.Entry{
 		OrganizationID: w.org, ChannelID: &w.channel, Kind: outbox.KindWebhook, EventID: event, EventName: "deployment.finished",
 		Payload: []byte(`{"Status":"failed"}`), NextAttemptAt: w.clock.Now(),
 	})
@@ -256,9 +257,9 @@ func TestTheSameEventAndChannelIsWrittenOnce(t *testing.T) {
 		OrganizationID: w.org, ChannelID: &w.channel, Kind: outbox.KindWebhook, EventID: event, EventName: "deployment.finished",
 		Payload: []byte(`{}`), NextAttemptAt: w.clock.Now(),
 	}
-	first, err := outbox.Enqueue(t.Context(), w.pool, entry)
+	first, err := outbox.Enqueue(t.Context(), sqlc.New(w.pool), entry)
 	require.NoError(t, err)
-	second, err := outbox.Enqueue(t.Context(), w.pool, entry)
+	second, err := outbox.Enqueue(t.Context(), sqlc.New(w.pool), entry)
 	require.NoError(t, err)
 	assert.True(t, first)
 	assert.False(t, second)
@@ -285,7 +286,7 @@ func TestInvalidEntriesAreRefused(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := base
 			mutate(&e)
-			_, err := outbox.Enqueue(t.Context(), w.pool, e)
+			_, err := outbox.Enqueue(t.Context(), sqlc.New(w.pool), e)
 			require.Error(t, err)
 		})
 	}
@@ -326,7 +327,7 @@ func TestTheWorkerKeepsToTheChannelAndGlobalConcurrencyLimits(t *testing.T) {
 		w.enqueue(t)
 	}
 	for range 6 {
-		_, err := outbox.Enqueue(t.Context(), w.pool, outbox.Entry{
+		_, err := outbox.Enqueue(t.Context(), sqlc.New(w.pool), outbox.Entry{
 			OrganizationID: w.org, ChannelID: &other, Kind: outbox.KindWebhook, EventID: uuid.New(), EventName: "x",
 			Payload: []byte(`{}`), NextAttemptAt: w.clock.Now(),
 		})
@@ -422,16 +423,16 @@ func TestTheObserverSeesEveryAttemptAndWhichOneWasTheLast(t *testing.T) {
 func TestRequeueOnlyRevivesADeadDelivery(t *testing.T) {
 	w := seed(t)
 	id := w.enqueue(t)
-	ok, err := outbox.Requeue(t.Context(), w.pool, w.org, id, w.clock.Now())
+	ok, err := outbox.Requeue(t.Context(), sqlc.New(w.pool), w.org, id, w.clock.Now())
 	require.NoError(t, err)
 	assert.False(t, ok, "a pending delivery is not requeued")
 	worker := w.worker(t, &script{results: []outbox.Result{{Code: "blocked", Permanent: true}, {}}}, nil)
 	_, err = worker.Drain(t.Context())
 	require.NoError(t, err)
-	ok, err = outbox.Requeue(t.Context(), w.pool, uuid.New(), id, w.clock.Now())
+	ok, err = outbox.Requeue(t.Context(), sqlc.New(w.pool), uuid.New(), id, w.clock.Now())
 	require.NoError(t, err)
 	assert.False(t, ok, "another organization cannot requeue it")
-	ok, err = outbox.Requeue(t.Context(), w.pool, w.org, id, w.clock.Now())
+	ok, err = outbox.Requeue(t.Context(), sqlc.New(w.pool), w.org, id, w.clock.Now())
 	require.NoError(t, err)
 	assert.True(t, ok)
 	_, err = worker.Drain(t.Context())

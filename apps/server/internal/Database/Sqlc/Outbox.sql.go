@@ -99,7 +99,7 @@ ON CONFLICT DO NOTHING
 `
 
 type InsertOutboxParams struct {
-	OrganizationID  uuid.UUID
+	OrganizationID  *uuid.UUID
 	ProjectID       *uuid.UUID
 	ChannelID       *uuid.UUID
 	RecipientUserID *uuid.UUID
@@ -176,7 +176,7 @@ WHERE "Id" = $2 AND "OrganizationId" = $3 AND "State" = 'dead' AND NOT "IsDelete
 type RequeueOutboxParams struct {
 	Now            time.Time
 	ID             uuid.UUID
-	OrganizationID uuid.UUID
+	OrganizationID *uuid.UUID
 }
 
 func (q *Queries) RequeueOutbox(ctx context.Context, arg RequeueOutboxParams) (int64, error) {

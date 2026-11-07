@@ -72,6 +72,7 @@ type Querier interface {
 	CountOverviewInvitations(ctx context.Context, arg CountOverviewInvitationsParams) (int64, error)
 	CountOverviewJobs(ctx context.Context, arg CountOverviewJobsParams) (CountOverviewJobsRow, error)
 	CountOverviewRunners(ctx context.Context, arg CountOverviewRunnersParams) (CountOverviewRunnersRow, error)
+	CountPendingInternalEmails(ctx context.Context) (int64, error)
 	CountProjects(ctx context.Context, arg CountProjectsParams) (int64, error)
 	CountQueuedJobs(ctx context.Context, arg CountQueuedJobsParams) (int64, error)
 	CountRecentWebhookRuns(ctx context.Context, arg CountRecentWebhookRunsParams) (CountRecentWebhookRunsRow, error)
