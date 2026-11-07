@@ -33,12 +33,26 @@ const COLOR_CLASS: Record<TAnsiColor, string> = {
   white: 'text-primary',
 };
 
-const ESC = '\u001b';
-const BEL = '\u0007';
+export const BIDI_CLASS = 'text-accent-amber';
+
+const ESC = '\\u001b';
+const BEL = '\\u0007';
+const ST = '\\u009c';
 const SEQUENCE = new RegExp(
-  `${ESC}\\[([0-9;?]*)([@-~])|${ESC}\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)?|${ESC}[@-Z\\\\-_]?|[\\u0000-\\u0008\\u000b-\\u001f\\u007f]`,
+  [
+    `${ESC}\\[([0-?]*)([ -/]*)([@-~])`,
+    `${ESC}\\][^${BEL}${ESC}${ST}]*(?:${BEL}|${ESC}\\\\|${ST})?`,
+    `${ESC}[PX^_][^${ESC}${ST}]*(?:${ESC}\\\\|${ST})?`,
+    `${ESC}[@-Z\\\\-_]?`,
+    '[\\u0000-\\u0008\\u000b-\\u001f\\u007f-\\u009f]',
+  ].join('|'),
   'g',
 );
+const BIDI_CONTROLS = /[؜‎‏‪-‮⁦-⁩]/gu;
+const SGR_PARAMS = /^[0-9;:]*$/;
+
+export const bidiLabel = (character: string): string =>
+  `‹U+${(character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}›`;
 
 export const classOf = (style: IAnsiStyle): string =>
   [
@@ -51,11 +65,17 @@ export const classOf = (style: IAnsiStyle): string =>
     .filter((part) => part !== '')
     .join(' ');
 
-const extendedColorLength = (codes: readonly number[], at: number): number => {
+const BASIC_COLOR_COUNT = 16;
+
+const extendedColor = (codes: readonly number[], at: number): { Length: number; Fg: TAnsiColor | null } => {
   const mode = codes[at + 1];
-  if (mode === 5) return 2;
-  if (mode === 2) return 4;
-  return 0;
+  if (mode === 5) {
+    const index = codes[at + 2];
+    const basic = index !== undefined && index >= 0 && index < BASIC_COLOR_COUNT;
+    return { Length: 2, Fg: basic ? (COLORS[index % COLORS.length] ?? null) : null };
+  }
+  if (mode === 2) return { Length: 4, Fg: null };
+  return { Length: 0, Fg: null };
 };
 
 const applyCode = (style: IAnsiStyle, code: number): IAnsiStyle => {
@@ -73,14 +93,21 @@ const applyCode = (style: IAnsiStyle, code: number): IAnsiStyle => {
   return style;
 };
 
+const codeOf = (part: string): number => {
+  if (part === '') return 0;
+  if (part.includes(':')) return -1;
+  return Number(part);
+};
+
 export const applySgr = (style: IAnsiStyle, params: string): IAnsiStyle => {
-  const codes = params === '' ? [0] : params.split(';').map((part) => (part === '' ? 0 : Number(part)));
+  const codes = params === '' ? [0] : params.split(';').map(codeOf);
   let next = style;
   for (let at = 0; at < codes.length; at += 1) {
     const code = codes[at] ?? 0;
     if (code === 38 || code === 48) {
-      if (code === 38) next = { ...next, Fg: null };
-      at += extendedColorLength(codes, at);
+      const color = extendedColor(codes, at);
+      if (code === 38) next = { ...next, Fg: color.Fg };
+      at += color.Length;
       continue;
     }
     next = applyCode(next, code);
@@ -88,22 +115,35 @@ export const applySgr = (style: IAnsiStyle, params: string): IAnsiStyle => {
   return next;
 };
 
+const pushText = (segments: IAnsiSegment[], text: string, className: string) => {
+  if (text === '') return;
+  const previous = segments.at(-1);
+  if (previous?.ClassName === className) previous.Text += text;
+  else segments.push({ Text: text, ClassName: className });
+};
+
+const pushVisible = (segments: IAnsiSegment[], piece: string, className: string) => {
+  let last = 0;
+  for (const match of piece.matchAll(BIDI_CONTROLS)) {
+    pushText(segments, piece.slice(last, match.index), className);
+    segments.push({ Text: bidiLabel(match[0]), ClassName: BIDI_CLASS });
+    last = match.index + match[0].length;
+  }
+  pushText(segments, piece.slice(last), className);
+};
+
 export const parseAnsi = (text: string, start: IAnsiStyle = PLAIN_STYLE): IAnsiResult => {
   const segments: IAnsiSegment[] = [];
   let style = start;
   let last = 0;
   const push = (until: number) => {
-    if (until <= last) return;
-    const piece = text.slice(last, until);
-    const className = classOf(style);
-    const previous = segments.at(-1);
-    if (previous?.ClassName === className) previous.Text += piece;
-    else segments.push({ Text: piece, ClassName: className });
+    if (until > last) pushVisible(segments, text.slice(last, until), classOf(style));
   };
   for (const match of text.matchAll(SEQUENCE)) {
     push(match.index);
     last = match.index + match[0].length;
-    if (match[2] === 'm' && match[1] !== undefined && !match[1].includes('?')) style = applySgr(style, match[1]);
+    const params = match[1];
+    if (match[3] === 'm' && match[2] === '' && params !== undefined && SGR_PARAMS.test(params)) style = applySgr(style, params);
   }
   push(text.length);
   return { Segments: segments, Style: style };

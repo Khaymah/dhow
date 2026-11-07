@@ -1,13 +1,14 @@
 import type { TJobLogChunk, TJobLogStream } from '@/Modules/Jobs/Api/JobsApi';
 import { parseAnsi, PLAIN_STYLE, type IAnsiSegment, type IAnsiStyle } from '@/Modules/Jobs/Types/Ansi';
 
-export const MAX_LOG_LINES = 5000;
+export const MAX_LOG_LINES = 100_000;
 export const MAX_LINE_LENGTH = 8192;
 
 export type TLogLineKind = 'text' | 'step' | 'system';
 
 export interface ILogLine {
   Id: number;
+  Seq: number;
   Kind: TLogLineKind;
   Stream: TJobLogStream;
   Step: number | undefined;
@@ -56,8 +57,17 @@ const render = (draft: IDraft, line: ILogLine): ILogLine => {
   return { ...line, Segments };
 };
 
-const startLine = (draft: IDraft, kind: TLogLineKind, stream: TJobLogStream, step: number | undefined, raw: string) => {
-  const line: ILogLine = { Id: draft.nextId, Kind: kind, Stream: stream, Step: step, Raw: raw, StartStyle: draft.style, Segments: [] };
+const startLine = (draft: IDraft, kind: TLogLineKind, chunk: TJobLogChunk, raw: string) => {
+  const line: ILogLine = {
+    Id: draft.nextId,
+    Seq: chunk.Seq,
+    Kind: kind,
+    Stream: chunk.Stream,
+    Step: chunk.StepIndex,
+    Raw: raw,
+    StartStyle: draft.style,
+    Segments: [],
+  };
   draft.nextId += 1;
   draft.lines.push(render(draft, line));
 };
@@ -71,7 +81,7 @@ const extendOpen = (draft: IDraft, raw: string) => {
 
 const writePart = (draft: IDraft, chunk: TJobLogChunk, part: string, continues: boolean) => {
   if (continues) extendOpen(draft, part);
-  else startLine(draft, chunk.Stream === 'system' ? 'system' : 'text', chunk.Stream, chunk.StepIndex, part);
+  else startLine(draft, chunk.Stream === 'system' ? 'system' : 'text', chunk, part);
 };
 
 const splitLong = (part: string): string[] => {
@@ -87,7 +97,7 @@ const appendOne = (draft: IDraft, chunk: TJobLogChunk) => {
   if (chunk.StepIndex !== undefined && chunk.StepIndex !== draft.step) {
     draft.open = false;
     draft.step = chunk.StepIndex;
-    startLine(draft, 'step', chunk.Stream, chunk.StepIndex, '');
+    startLine(draft, 'step', chunk, '');
   }
   let continues = draft.open && sameSource && chunk.Stream !== 'system';
   const parts = chunk.Text.split('\n');
@@ -108,6 +118,12 @@ const appendOne = (draft: IDraft, chunk: TJobLogChunk) => {
   });
 };
 
+const cutAt = (lines: readonly ILogLine[], excess: number): number => {
+  let cut = excess;
+  while (cut < lines.length && lines[cut]?.Seq === lines[cut - 1]?.Seq) cut += 1;
+  return cut < lines.length ? cut : excess;
+};
+
 export const appendChunks = (buffer: ILogBuffer, chunks: readonly TJobLogChunk[]): ILogBuffer => {
   const fresh = chunks.filter((chunk) => chunk.Seq > buffer.LastSeq);
   if (fresh.length === 0) return buffer;
@@ -125,15 +141,41 @@ export const appendChunks = (buffer: ILogBuffer, chunks: readonly TJobLogChunk[]
     lastSeq = chunk.Seq;
   }
   const excess = Math.max(0, draft.lines.length - MAX_LOG_LINES);
+  const cut = excess > 0 ? cutAt(draft.lines, excess) : 0;
   return {
-    Lines: excess > 0 ? draft.lines.slice(excess) : draft.lines,
+    Lines: cut > 0 ? draft.lines.slice(cut) : draft.lines,
     NextId: draft.nextId,
     Open: draft.open,
     Style: draft.style,
     Step: draft.step,
     LastSeq: lastSeq,
-    Dropped: buffer.Dropped + excess,
+    Dropped: buffer.Dropped + cut,
   };
+};
+
+export const firstSeqOf = (buffer: ILogBuffer): number | null => buffer.Lines[0]?.Seq ?? null;
+
+export const hasOlder = (buffer: ILogBuffer): boolean => {
+  const first = firstSeqOf(buffer);
+  return first !== null && first > 1;
+};
+
+export interface IOlderChunks {
+  Chunks: readonly TJobLogChunk[];
+  ContextSeq: number | null;
+}
+
+export const prependChunks = (buffer: ILogBuffer, older: IOlderChunks): ILogBuffer => {
+  const head = buffer.Lines[0];
+  if (head === undefined) return buffer;
+  const chunks = older.Chunks.filter((chunk) => chunk.Seq < head.Seq);
+  if (chunks.length === 0) return buffer;
+  const parsed = appendChunks(EMPTY_LOG, chunks);
+  const lines = parsed.Lines.filter((line) => line.Seq !== older.ContextSeq);
+  if (lines.length === 0) return buffer;
+  const firstId = head.Id - lines.length;
+  const renumbered = lines.map((line, index) => ({ ...line, Id: firstId + index }));
+  return { ...buffer, Lines: [...renumbered, ...buffer.Lines], Dropped: Math.max(0, buffer.Dropped - lines.length) };
 };
 
 const SYSTEM_CODE = /^dhow: ([A-Z_]+):/;

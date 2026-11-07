@@ -4,6 +4,7 @@ import { EnvironmentsEn } from '@/I18n/Locales/Workspace/EnvironmentsEn';
 import { HomeEn } from '@/I18n/Locales/Workspace/HomeEn';
 import { IngestEn } from '@/I18n/Locales/Workspace/IngestEn';
 import { JobsEn } from '@/I18n/Locales/Workspace/JobsEn';
+import { LogViewerEn } from '@/I18n/Locales/Workspace/LogViewerEn';
 import { OrganizationEn } from '@/I18n/Locales/Workspace/OrganizationEn';
 import { OrgPagesEn } from '@/I18n/Locales/Workspace/OrgPagesEn';
 import { OidcSettingsEn } from '@/I18n/Locales/Workspace/OidcSettingsEn';
@@ -403,6 +404,7 @@ export const WorkspaceEn: TWorkspaceMessages = {
   ...AuditEn,
   ...OrganizationEn,
   ...JobsEn,
+  ...LogViewerEn,
   ...RunnersEn,
   ...ProjectsEn,
   ...RunsEn,

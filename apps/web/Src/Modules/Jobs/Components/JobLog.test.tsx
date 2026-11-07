@@ -1,10 +1,11 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FakeEventSource, installFakeEventSource } from '@/Core/Testing/FakeEventSource';
 import { ORG_ID } from '@/Core/Testing/Fetch';
 import { JOB_ID } from '@/Core/Testing/JobsBackend';
 import { renderWithProviders } from '@/Core/Testing/Render';
+import { installLayout } from '@/Core/Testing/Layout';
 import { Ar } from '@/I18n/Locales/Ar';
 import { JobLog } from '@/Modules/Jobs/Components/JobLog';
 import { FLUSH_MS } from '@/Modules/Jobs/Hooks/useJobLog';
@@ -38,8 +39,16 @@ const deliver = async (source: FakeEventSource, events: [string, unknown][]) => 
 
 const log = () => screen.getByRole('log', { name: Ar['jobs.log.label'].replace('{n}', isolate('2')) });
 
-beforeEach(() => {
+let restoreLayout = () => undefined as void;
+
+beforeEach(async () => {
   installFakeEventSource();
+  restoreLayout = installLayout();
+  await import('@/Modules/Jobs/Components/LogViewer');
+});
+
+afterEach(() => {
+  restoreLayout();
 });
 
 describe('the job log', () => {
@@ -66,7 +75,7 @@ describe('the job log', () => {
     expect(screen.getByText(Ar['jobs.log.stepHeader'].replace('{n}', isolate('1')).replace('{name}', isolate('install')))).toBeInTheDocument();
     expect(screen.getByText(Ar['jobs.log.stepHeader'].replace('{n}', isolate('2')).replace('{name}', isolate('test')))).toBeInTheDocument();
     expect(screen.getByText('oops').closest('[data-stream]')).toHaveAttribute('data-stream', 'stderr');
-    expect(log().querySelector('[style]')).toBeNull();
+    expect(document.querySelector('style')).toBeNull();
   });
 
   it('renders text as text, never as HTML', async () => {
