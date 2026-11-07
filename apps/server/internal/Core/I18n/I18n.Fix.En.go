@@ -1,6 +1,6 @@
 package i18n
 
-var enFixes = map[string]string{
+var enFixes = map[string]string{ //nolint:gosec // This is a message catalog, not credentials.
 	"ARTIFACT_GONE":                        "Open the run and press the run-again button to build the file once more.",
 	"INTERNAL":                             "Try again in a minute. If it keeps happening, tell your server admin the time of the error so they can check the server log.",
 	"NOT_FOUND":                            "Check the address, or go back to the list and open the item again. It may have been removed.",

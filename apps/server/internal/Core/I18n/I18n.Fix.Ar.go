@@ -1,6 +1,6 @@
 package i18n
 
-var arFixes = map[string]string{
+var arFixes = map[string]string{ //nolint:gosec // This is a message catalog, not credentials.
 	"ARTIFACT_GONE":                        "افتح التشغيل واضغط زر إعادة التشغيل لإنشاء الملف من جديد.",
 	"INTERNAL":                             "حاول مرة أخرى بعد دقيقة. إذا تكرر الخطأ، أخبر مسؤول السيرفر بوقته ليراجع سجل السيرفر.",
 	"NOT_FOUND":                            "تأكد من العنوان، أو ارجع إلى القائمة وافتح العنصر من جديد. ربما حُذف.",

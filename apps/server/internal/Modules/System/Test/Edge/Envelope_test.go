@@ -104,7 +104,10 @@ func TestEnvelopeShape(t *testing.T) {
 			require.NoError(t, json.Unmarshal(detail["Message"], &message))
 			assert.Equal(t, tt.wantCode, code)
 			assert.NotEmpty(t, message)
-			assert.Len(t, detail, 2, "Details is omitted when empty")
+			assert.NotContains(t, detail, "Details", "Details is omitted when empty")
+			if code != "METHOD_NOT_ALLOWED" {
+				assert.Contains(t, detail, "Fix", "a code with a fix returns it")
+			}
 		})
 	}
 }
@@ -141,7 +144,7 @@ func TestBodyLimitApplies(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
 	raw := keysOf(t, rec.Body.Bytes())
-	assert.JSONEq(t, `{"Code":"PAYLOAD_TOO_LARGE","Message":"حجم الطلب أكبر من المسموح."}`, string(raw["Error"]))
+	assert.JSONEq(t, `{"Code":"PAYLOAD_TOO_LARGE","Message":"حجم الطلب أكبر من المسموح.","Fix":"أرسل بيانات أقل في الطلب الواحد، مثل ملف أصغر أو عناصر أقل."}`, string(raw["Error"]))
 }
 
 func TestPanicIsRecoveredAndRequestIDIsReturned(t *testing.T) {
