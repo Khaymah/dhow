@@ -74,7 +74,7 @@ func ParseTarget(raw string, allowHTTP bool) (Target, error) {
 }
 
 func displayOf(u *url.URL) string {
-	host := strings.ToLower(u.Hostname())
+	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
 	if strings.Contains(host, ":") {
 		host = "[" + host + "]"
 	}

@@ -2,6 +2,7 @@ package notifications
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log/slog"
 	"strings"
@@ -56,7 +57,7 @@ type Options struct {
 	Mailer    mailer.Sender
 	Config    config.Notify
 	PublicURL string
-	AllowHTTP bool
+	TLS       *tls.Config
 	Lookup    netguard.Lookup
 	Dial      netguard.DialFunc
 	Log       *slog.Logger
@@ -72,7 +73,7 @@ type Service struct {
 	mailer    mailer.Sender
 	cfg       config.Notify
 	publicURL string
-	allowHTTP bool
+	tls       *tls.Config
 	lookup    netguard.Lookup
 	dial      netguard.DialFunc
 	log       *slog.Logger
@@ -108,7 +109,7 @@ func NewService(o Options) (*Service, error) {
 	}
 	s := &Service{
 		db: o.DB, pool: o.Pool, column: column, factors: o.Factors, bus: o.Bus, mailer: m, cfg: cfg,
-		publicURL: strings.TrimSuffix(o.PublicURL, "/"), allowHTTP: o.AllowHTTP, lookup: o.Lookup, dial: o.Dial, log: o.Log, now: now,
+		publicURL: strings.TrimSuffix(o.PublicURL, "/"), tls: o.TLS, lookup: o.Lookup, dial: o.Dial, log: o.Log, now: now,
 	}
 	return s, nil
 }

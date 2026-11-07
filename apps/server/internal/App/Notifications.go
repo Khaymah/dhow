@@ -14,7 +14,7 @@ import (
 func notificationsFor(in Infra, values *keys.Values, bus *eventbus.Bus, factors auth.FactorConfirmer, mail mailer.Sender) (*notifications.Service, error) {
 	service, err := notifications.NewService(notifications.Options{
 		DB: in.Pool, Pool: in.Pool, Values: values, Factors: factors, Bus: bus, Mailer: mail, Config: in.Config.Notify,
-		PublicURL: in.Config.PublicURL.String(), AllowHTTP: in.Config.Dev, Lookup: in.NotifyLookup, Dial: in.NotifyDial,
+		PublicURL: in.Config.PublicURL.String(), TLS: in.NotifyTLS, Lookup: in.NotifyLookup, Dial: in.NotifyDial,
 		Log: in.Log, Now: in.Now,
 	})
 	if err != nil {

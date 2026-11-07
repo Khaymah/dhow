@@ -53,7 +53,7 @@ func (s *Service) dialer() netguard.Dialer {
 }
 
 func (s *Service) checkTarget(ctx context.Context, raw string) (Target, error) {
-	target, err := ParseTarget(raw, s.allowHTTP)
+	target, err := ParseTarget(raw, false)
 	switch {
 	case errors.Is(err, ErrURLScheme), errors.Is(err, ErrURLUserinfo), errors.Is(err, ErrURLHost), errors.Is(err, ErrURLNumeric):
 		return Target{}, apperrors.ChannelHostNotAllowed()

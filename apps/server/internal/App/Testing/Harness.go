@@ -150,6 +150,9 @@ type Options struct {
 	Triggers       triggers.Sink
 	GitLookup      netguard.Lookup
 	GitDial        netguard.DialFunc
+	NotifyLookup   netguard.Lookup
+	NotifyDial     netguard.DialFunc
+	NotifyTLS      *tls.Config
 	Definitions    pipelines.Definitions
 	Images         pipelines.ImageResolver
 	CheckoutImage  string
@@ -215,6 +218,7 @@ func NewWithOptions(t *testing.T, o Options) *Env {
 		Config: cfg, Log: log, Pool: pool, Migrations: fakeMigrations{}, Build: buildinfo.Info{Version: "test", Commit: "test"},
 		Breach: breach, HashParams: &params, Now: clock.Now, Mailer: o.Mailer, OidcTransport: o.OidcTransport,
 		LogStreamWriteWait: o.LogStreamWriteWait, LogReadWait: o.LogReadWait, Triggers: o.Triggers, GitLookup: o.GitLookup, GitDial: o.GitDial,
+		NotifyLookup: o.NotifyLookup, NotifyDial: o.NotifyDial, NotifyTLS: o.NotifyTLS,
 		Definitions: o.Definitions, Images: o.Images, CheckoutImage: o.CheckoutImage, DeploySSHImage: cmp.Or(o.DeploySSHImage, TestDeploySSHImage), RegistryTLS: o.RegistryTLS, ManualJobs: !o.NoManualJobs,
 		PinBudget: o.PinBudget,
 	}

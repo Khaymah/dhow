@@ -44,7 +44,7 @@ func (s *Service) httpClient() *http.Client {
 		connect := &net.Dialer{Timeout: config.NotifyConnectTimeout, Control: d.Control}
 		d.Dial = connect.DialContext
 	}
-	return d.HTTPClient(netguard.ClientOptions{AllowHTTP: s.allowHTTP})
+	return d.HTTPClient(netguard.ClientOptions{TLS: s.tls})
 }
 
 func transportCode(err error) (string, bool) {
@@ -98,7 +98,7 @@ func (d webhookDeliverer) Deliver(ctx context.Context, item outbox.Item) outbox.
 }
 
 func (s *Service) signedRequest(ctx context.Context, cfg channelConfig, item outbox.Item) (*http.Request, error) {
-	target, err := ParseTarget(cfg.URL, s.allowHTTP)
+	target, err := ParseTarget(cfg.URL, false)
 	if err != nil {
 		return nil, err
 	}

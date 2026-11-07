@@ -75,6 +75,7 @@ type Infra struct {
 	GitDial            netguard.DialFunc
 	NotifyLookup       netguard.Lookup
 	NotifyDial         netguard.DialFunc
+	NotifyTLS          *tls.Config
 	Definitions        pipelines.Definitions
 	Images             pipelines.ImageResolver
 	CheckoutImage      string
