@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { docsUrl } from '@/Core/Help/DocsUrl';
+import { DOCS_BASE_URL, docsUrl } from '@/Core/Help/DocsUrl';
 
 describe('docsUrl', () => {
   it('picks the folder from the UI language', () => {
@@ -12,7 +12,7 @@ describe('docsUrl', () => {
 
   it('encodes an Arabic anchor', () => {
     expect(docsUrl('guides/secrets.md#الإصدارات', 'ar')).toBe(
-      `https://github.com/Khaymah/dhow/blob/main/docs/guides/secrets.md#${encodeURIComponent('الإصدارات')}`,
+      `${DOCS_BASE_URL}docs/guides/secrets.md#${encodeURIComponent('الإصدارات')}`,
     );
   });
 
