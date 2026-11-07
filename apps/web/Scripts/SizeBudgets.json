@@ -1,0 +1,8 @@
+{
+  "InitialJsKb": 128,
+  "InitialCssKb": 30,
+  "LazyJsKb": 60,
+  "LazyOverrides": [
+    { "Pattern": "^LogViewer", "Kb": 35 }
+  ]
+}

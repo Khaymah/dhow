@@ -30,7 +30,7 @@
 - **التسجيل.** التسجيل العام **مغلق**. حساب صاحب النسخة الأول يُنشأ عبر رابط إعداد يعمل مرة واحدة. بعد ذلك ينضم المستخدمون بدعوة. مزوّد الهوية الخارجي (OIDC أو GitHub) يُدخل فقط حسابًا موجودًا ربط هذه الهوية، ولا ينشئ حسابًا أبدًا (ADR-0039).
 - **الإغلاق عند الإعدادات الضعيفة.** **يرفض السيرفر البدء** مع أسرار ناقصة، أو مؤقتة، أو قصيرة، أو مكررة. متغيرات البيئة الحقيقية تغلب ملفات الإعدادات.
 - **TLS** مطلوب خارج localhost. HSTS مفعّل. الكوكيز `Secure` و`HttpOnly` و`SameSite=Strict`.
-- **CSP صارمة:** `default-src 'self'`، وبلا سكربتات مضمّنة، و`frame-ancestors 'none'`. نخطط لـ Trusted Types (`require-trusted-types-for 'script'`) مع اختبارات المتصفح في M7. حتى ذلك الوقت، hook في المشروع يمنع كل مداخل HTML (`innerHTML`، `dangerouslySetInnerHTML`) في كود الواجهة.
+- **CSP صارمة:** `default-src 'self'`، وبلا سكربتات مضمّنة، و`frame-ancestors 'none'`. في وضع التطوير (`DHOW_DEV=true`) يرسل السيرفر أيضًا `Content-Security-Policy-Report-Only: require-trusted-types-for 'script'`، وتفشل اختبارات المتصفح عند أي مخالفة. التوجيه نفسه لا يدخل الـ CSP الفعلية قبل M7.10 ([ADR-0107](../Plan/ADR/0107-trusted-types-report-only-then-enforce.md)). حتى ذلك الوقت، hook في المشروع يمنع كل مداخل HTML (`innerHTML`، `dangerouslySetInnerHTML`) في كود الواجهة.
 - **لا قيم أسرار في أي رد API، أو سطر سجل، أو رسالة خطأ، أو إشعار.**
 
 ## 4. المصادقة (ADR-0013)

@@ -328,6 +328,8 @@ pnpm -C apps/web build
 pnpm -C apps/web size
 ```
 
+يقرأ `size` الحدود من `apps/web/Scripts/SizeBudgets.json`: الـ JS الأولاني 128 KB بعد gzip، وكل chunk كسول 60 KB (و35 KB لعارض السجل)، والـ CSS 30 KB. لتجربة الفشل بحدّ أصغر شغّل `node Scripts/CheckSize.mjs --lazy-kb=5` من `apps/web`. ويقيس `E2E/LogPerf.spec.ts` أداء صفحة سجل التشغيل (عقد DOM والمهام الطويلة وذاكرة JS) على معالج مبطّأ 4 مرات، ولا يعمل إلا مع حزمة `make e2e`. وفي وضع التطوير يرسل السيرفر ترويسة Trusted Types في وضع التقرير فقط، وتفشل اختبارات المتصفح عند أي مخالفة CSP.
+
 ### عرض M3 وعرض M4
 
 `deploy/m4-demo/run.sh` يشغّل مسار M4 كاملًا في Docker ويطبع PASS أو FAIL لكل فحص. يبدأ Forgejo وPostgreSQL والسيرفر وجهاز تشغيل Podman من الحزمة السابقة، وسجل صور بـ TLS لصورة `dhow-git`. ثم يربط مستودعًا فيه `.dhow.yml` بـ DAG وmatrix وملف ناتج يمر عبر `needs` وcache، ويرفع مرتين، ويرسل webhook مزوّرًا وآخر مُعادًا، وينتهي بـ `deploy/m4-demo/leak-sweep.sh` الذي يبحث عن كل بيانات دخول مكتوبة كنص واضح. و`deploy/m3-demo/run.sh` يشغّل تشغيلات بلا خطوات نشر: البيئة المعزولة، وترتيب التشغيلات، وجهاز تشغيل يتوقف فجأة.

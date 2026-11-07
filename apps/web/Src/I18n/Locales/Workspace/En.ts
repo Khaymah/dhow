@@ -15,6 +15,7 @@ import { SecretsEn } from '@/I18n/Locales/Workspace/SecretsEn';
 import { TargetsEn } from '@/I18n/Locales/Workspace/TargetsEn';
 import { TargetsManageEn } from '@/I18n/Locales/Workspace/TargetsManageEn';
 import { SettingsEn } from '@/I18n/Locales/Workspace/SettingsEn';
+import { ShellEn } from '@/I18n/Locales/Workspace/ShellEn';
 import type { TWorkspaceMessages } from '@/I18n/Messages';
 
 export const WorkspaceEn: TWorkspaceMessages = {
@@ -416,4 +417,5 @@ export const WorkspaceEn: TWorkspaceMessages = {
   ...IngestEn,
   ...TargetsManageEn,
   ...ApprovalsEn,
+  ...ShellEn,
 };

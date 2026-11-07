@@ -82,7 +82,7 @@
 ### 10. الـ CI
 - job اسمه `web` بـ pnpm cache، بيشغّل `lint` و`typecheck` و`test` و`build` و`size`، ومن غير `hashFiles` على مستوى الـ job.
 - `javascript-typescript` يتضاف لـ CodeQL.
-- ميزانية الحجم: الـ JS الأولاني أقل من 180 KB gzip، والـ CSS أقل من 30 KB gzip.
+- ميزانية الحجم: الـ JS الأولاني 128 KB gzip كحد مفروض والهدف 120 أو أقل، وكل chunk كسول 60 KB (35 KB لعارض السجل)، والـ CSS أقل من 30 KB gzip ([ADR-0103](ADR/0103-web-size-budgets.md)).
 
 ### 11. التحقق قبل الـ push
 - `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm size`.

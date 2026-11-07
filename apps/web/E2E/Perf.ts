@@ -1,0 +1,102 @@
+import type { CDPSession, Page } from '@playwright/test';
+
+export interface ILongTaskStats {
+  Count: number;
+  TotalMs: number;
+  MaxMs: number;
+}
+
+export interface IPerfSample {
+  DomNodes: number;
+  LongTasks: ILongTaskStats;
+  HeapUsedBytes: number;
+}
+
+export interface IPerfLimits {
+  MaxDomNodes: number;
+  MaxLongTaskMs: number;
+  MaxHeapBytes: number;
+}
+
+export const LOOSE_LIMITS: IPerfLimits = {
+  MaxDomNodes: 250_000,
+  MaxLongTaskMs: 15_000,
+  MaxHeapBytes: 1_500_000_000,
+};
+
+export const CPU_THROTTLE = 4;
+const TASKS_KEY = '__dhowLongTasks';
+
+interface ILongTaskEntry {
+  duration: number;
+}
+
+export const observeLongTasks = async (page: Page): Promise<void> => {
+  await page.addInitScript((key) => {
+    const tasks: ILongTaskEntry[] = [];
+    Object.defineProperty(window, key, { value: tasks, configurable: true });
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) tasks.push({ duration: entry.duration });
+      }).observe({ type: 'longtask', buffered: true });
+    } catch {
+      return;
+    }
+  }, TASKS_KEY);
+};
+
+export const throttleCpu = async (page: Page, rate: number = CPU_THROTTLE): Promise<CDPSession> => {
+  const session = await page.context().newCDPSession(page);
+  await session.send('Emulation.setCPUThrottlingRate', { rate });
+  return session;
+};
+
+export const resetLongTasks = async (page: Page): Promise<void> => {
+  await page.evaluate((key) => {
+    const tasks = Reflect.get(window, key) as ILongTaskEntry[];
+    tasks.length = 0;
+  }, TASKS_KEY);
+};
+
+const longTasks = async (page: Page): Promise<ILongTaskStats> => {
+  const durations = await page.evaluate((key) => (Reflect.get(window, key) as ILongTaskEntry[]).map((entry) => entry.duration), TASKS_KEY);
+  return {
+    Count: durations.length,
+    TotalMs: Math.round(durations.reduce((sum, value) => sum + value, 0)),
+    MaxMs: Math.round(durations.reduce((max, value) => Math.max(max, value), 0)),
+  };
+};
+
+const heapUsed = async (session: CDPSession): Promise<number> => {
+  await session.send('HeapProfiler.collectGarbage');
+  const { metrics } = await session.send('Performance.getMetrics');
+  return metrics.find((metric) => metric.name === 'JSHeapUsedSize')?.value ?? 0;
+};
+
+export const measure = async (page: Page, session: CDPSession): Promise<IPerfSample> => {
+  await session.send('Performance.enable');
+  const domNodes = await page.evaluate(() => document.querySelectorAll('*').length);
+  return { DomNodes: domNodes, LongTasks: await longTasks(page), HeapUsedBytes: await heapUsed(session) };
+};
+
+export const withinLimits = (sample: IPerfSample, limits: IPerfLimits): string[] => {
+  const failures: string[] = [];
+  if (sample.DomNodes > limits.MaxDomNodes) failures.push(`DOM nodes ${sample.DomNodes} > ${limits.MaxDomNodes}`);
+  if (sample.LongTasks.MaxMs > limits.MaxLongTaskMs) failures.push(`longest task ${sample.LongTasks.MaxMs}ms > ${limits.MaxLongTaskMs}ms`);
+  if (sample.HeapUsedBytes > limits.MaxHeapBytes) failures.push(`heap ${sample.HeapUsedBytes} > ${limits.MaxHeapBytes}`);
+  return failures;
+};
+
+export const scrollThrough = async (page: Page, selector: string, steps: number): Promise<void> => {
+  for (let step = 1; step <= steps; step += 1) {
+    await page.evaluate(
+      ({ target, fraction }) => {
+        const element = document.querySelector(target);
+        if (element === null) throw new Error(`no element for ${target}`);
+        element.scrollTop = (element.scrollHeight - element.clientHeight) * fraction;
+      },
+      { target: selector, fraction: 1 - step / steps },
+    );
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => { resolve(); })));
+  }
+};

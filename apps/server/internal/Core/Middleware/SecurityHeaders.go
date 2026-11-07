@@ -5,7 +5,14 @@ import "net/http"
 const ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
 	"font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'"
 
-func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
+const TrustedTypesReportOnly = "require-trusted-types-for 'script'"
+
+type SecurityOptions struct {
+	HSTS               bool
+	ReportTrustedTypes bool
+}
+
+func SecurityHeaders(o SecurityOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()
@@ -16,7 +23,10 @@ func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
 			h.Set("Cross-Origin-Resource-Policy", "same-origin")
 			h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()")
 			h.Set("X-Frame-Options", "DENY")
-			if hsts {
+			if o.ReportTrustedTypes {
+				h.Set("Content-Security-Policy-Report-Only", TrustedTypesReportOnly)
+			}
+			if o.HSTS {
 				h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 			}
 			next.ServeHTTP(w, r)

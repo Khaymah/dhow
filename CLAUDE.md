@@ -71,7 +71,7 @@
 - `make check`: lint وactionlint واختبارات Go بـ `-race` وgovulncheck واختبارات الـ hooks و`make docs-check`. الـ CI بيشغّل نفس الـ targets، فشغّلها قبل أي push.
 - `make docs-check`: بيتأكد إن `docs/` و`docs/en/` (وملفات الـ root وجنبها `.en.md`) فيهم نفس الملفات، ونفس عدد العناوين في كل مستوى، ونفس الجداول والصفوف، ونفس الـ code blocks بالحرف، وإن كل رابط وanchor بيوصل جوه نسخته، وإن روابط الكود للوثائق موجودة (`deploy/docs-check`).
 - `make help` بيعرض كل الـ targets. نسخة Go مثبّتة في `go.mod`، والـ Makefile بيبني الأدوات بيها.
-- الواجهة: جوه `apps/web` شغّل `pnpm lint` و`pnpm typecheck` و`pnpm test` و`pnpm build` و`pnpm size` (ميزانية الحجم: JS أقل من 180 KB gzip وCSS أقل من 30 KB).
+- الواجهة: جوه `apps/web` شغّل `pnpm lint` و`pnpm typecheck` و`pnpm test` و`pnpm build` و`pnpm size` (ميزانية الحجم من `apps/web/Scripts/SizeBudgets.json`: JS الأولاني 128 KB gzip كحد مفروض (الحالي 123.8، وأي ميزة جديدة lazy عشان ما يكبرش)، وكل chunk كسول 60 KB و35 KB لعارض السجل، وCSS أقل من 30 KB).
 - `make web` بيبني الواجهة وينسخها في `apps/server/internal/App/WebDist/` (مش بيتعمله commit)، و`make release` بيبني الـ binary بيها. `make check` و`make build` Go بس، من غير الواجهة، والـ CI بيشغّل job الواجهة (`web`) لوحده.
 
 ## الـ Hooks (`.claude/settings.json`)

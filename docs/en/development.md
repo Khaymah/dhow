@@ -328,6 +328,8 @@ pnpm -C apps/web build
 pnpm -C apps/web size
 ```
 
+`size` reads its limits from `apps/web/Scripts/SizeBudgets.json`: 128 KB gzip for the initial JS, 60 KB for every lazy chunk (35 KB for the log viewer) and 30 KB for the CSS. To see it fail with a smaller limit, run `node Scripts/CheckSize.mjs --lazy-kb=5` from `apps/web`. `E2E/LogPerf.spec.ts` measures the job log page (DOM nodes, long tasks, JS heap) with the CPU throttled 4 times; it only runs with the `make e2e` stack. In development mode the server sends the Trusted Types header in report-only mode, and the browser tests fail on any CSP violation.
+
 ### The M3 and M4 demos
 
 `deploy/m4-demo/run.sh` runs the whole M4 flow in Docker and prints PASS or FAIL for each check. It starts Forgejo, PostgreSQL, the server and the Podman runner of the stack above, and a TLS registry for the `dhow-git` image. Then it links a repository whose `.dhow.yml` has a DAG, a matrix, an artifact passed through `needs` and a cache, pushes twice, sends a forged and a replayed webhook, and ends with `deploy/m4-demo/leak-sweep.sh`, which looks for every credential in clear. `deploy/m3-demo/run.sh` runs jobs without a pipeline: the sandbox, the order of jobs and a killed runner.

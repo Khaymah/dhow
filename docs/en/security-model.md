@@ -30,7 +30,7 @@ The assets to protect are:
 - **Registration.** Public registration is **closed**. The first owner account is created through a one-time setup URL. After that, users join by invitation. An external identity provider (OIDC or GitHub) only signs in an account that already exists and has linked that identity; it never creates an account (ADR-0039).
 - **Fail closed on weak configuration.** The server **refuses to boot** with missing, placeholder, short or reused secrets. Real environment variables take precedence over config files.
 - **TLS** is required outside localhost. HSTS is on. Cookies are `Secure`, `HttpOnly` and `SameSite=Strict`.
-- **Strict CSP:** `default-src 'self'`, no inline script, `frame-ancestors 'none'`. Trusted Types (`require-trusted-types-for 'script'`) are planned with the M7 browser tests; until then a project hook forbids every HTML sink (`innerHTML`, `dangerouslySetInnerHTML`) in the web code.
+- **Strict CSP:** `default-src 'self'`, no inline script, `frame-ancestors 'none'`. In development mode (`DHOW_DEV=true`) the server also sends `Content-Security-Policy-Report-Only: require-trusted-types-for 'script'`, and the browser tests fail on any violation. The directive itself does not enter the enforced CSP before M7.10 ([ADR-0107](../../Plan/ADR/0107-trusted-types-report-only-then-enforce.md)). Until then a project hook forbids every HTML sink (`innerHTML`, `dangerouslySetInnerHTML`) in the web code.
 - **No secret values in any API response, log line, error message or notification.**
 
 ## 4. Authentication (ADR-0013)

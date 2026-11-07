@@ -632,7 +632,7 @@ agent frame: IdTokenRequest { audience, lifetime }  (from /run/dhow/bin/id-token
 - **الحجم:** L، في PRين: **(أ)** صفحات الأسرار والمتغيّرات والـ registry والبيئات بعد M5.4 وM5.3، و**(ب)** الموافقات وصفحة التنفيذ والعدّاد بعد M5.6.
 - **المحتوى:** كل اللي في [الواجهة](#الواجهة)، والمفاتيح في `Locales/Workspace/{Ar,En}.ts`، والمصطلحات في `Plan/Glossary.md`، و`pnpm gen:api` بعد كل تغيير في الـ OpenAPI.
 - **قبول:**
-  - lint وtypecheck والاختبارات والـ build والـ size في الميزانية (JS أقل من 180 KB gzip وCSS أقل من 30 KB).
+  - lint وtypecheck والاختبارات والـ build والـ size في الميزانية (JS الأولاني 128 KB gzip وكل chunk كسول 60 KB وCSS أقل من 30 KB، [ADR-0103](ADR/0103-web-size-budgets.md)).
   - **الـ write-only في الواجهة:** القيمة مش في أي state بعد الحفظ، ولا في الـ URL ولا الـ history ولا `localStorage` ولا `sessionStorage` (اختبار بعد الحفظ بيدوّر على القيمة في كل دول وفي الـ DOM).
   - Playwright على سيرفر حقيقي وForgejo: سر في البيئة، وpush على فرع مش مسموح يبان «اتخطّى» بالسبب، وpush على `main` يبان «مستني موافقة»، ومستخدم تاني يوافق بـ TOTP والـ job يخلص. بالعربي والإنجليزي وموبايل 390px، ومفيش console error ولا مخالفة CSP ولا `<style>` اتحقن.
   - `App/Requests.test.tsx`: مفيش طلب متكرر في الصفحات الجديدة.
