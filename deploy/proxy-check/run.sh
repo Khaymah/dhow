@@ -156,6 +156,16 @@ start_postgres() {
   return 1
 }
 
+network_gateway() {
+  local gateway subnet
+  gateway=$(docker network inspect "$1" --format '{{(index .IPAM.Config 0).Gateway}}')
+  if [[ -z $gateway ]]; then
+    subnet=$(docker network inspect "$1" --format '{{(index .IPAM.Config 0).Subnet}}')
+    gateway="${subnet%.*/*}.1"
+  fi
+  printf '%s' "$gateway"
+}
+
 start_dhow() {
   local netns=$1 trusted=$2
   [[ -f $work/keyring/dhow-keyring ]] || make_keyring "$work/keyring/dhow-keyring"
@@ -407,7 +417,7 @@ run_traefik() {
     fi
     sleep 1
   done
-  check_scenario traefik "$(docker network inspect dhow_proxy --format '{{(index .IPAM.Config 0).Gateway}}')" yes
+  check_scenario traefik "$(network_gateway dhow_proxy)" yes
   note "certificate issuer: $(openssl s_client -connect "127.0.0.1:$https_port" -servername "$domain" </dev/null 2>/dev/null |
     openssl x509 -noout -issuer 2>/dev/null)"
 }
