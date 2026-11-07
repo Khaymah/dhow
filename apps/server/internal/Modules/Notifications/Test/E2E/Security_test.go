@@ -106,24 +106,23 @@ func TestAnAddressAllowedByTheOperatorIsAcceptedAndOthersStayBlocked(t *testing.
 }
 
 func TestADnsAnswerThatTurnsPrivateAfterTheSaveIsRefusedAtSendTimeWithoutAConnection(t *testing.T) {
-	for name, addr := range blockedAddresses() {
-		t.Run(name, func(t *testing.T) {
-			w := newWorld(t)
-			w.dns.set("rebind.example", publicAddr)
-			w.webhook("rebind", "https://rebind.example/hook")
-			w.dns.set("rebind.example", addr)
-			w.deploymentEvent(eventbus.DeploymentFinished, "failed")
-			w.drain()
-
-			assert.Zero(t, w.dials.Load(), "the address is checked again when Dhow connects, so nothing was dialed")
-			assert.Empty(t, w.recv.requests())
-			list := w.deliveries(w.projectPath("/notification-deliveries"))
-			require.Len(t, list, 1)
-			assert.Equal(t, "dead", list[0].State)
-			assert.Equal(t, "blocked", list[0].LastError)
-			assert.Equal(t, 1, list[0].Attempts, "a blocked address is final")
-		})
+	w := newWorld(t)
+	w.dns.set("rebind.example", publicAddr)
+	w.webhook("rebind", "https://rebind.example/hook")
+	targets := blockedAddresses()
+	for name, addr := range targets {
+		w.dns.set("rebind.example", addr)
+		w.deploymentEvent(eventbus.DeploymentFinished, "failed")
+		w.drain()
+		assert.Zero(t, w.dials.Load(), "%s: the address is checked again when Dhow connects, so nothing was dialed", name)
+		_, err := w.env.Pool.Exec(context.Background(),
+			`UPDATE "NotificationChannels" SET "Enabled" = true, "DisabledReason" = NULL, "ConsecutiveFailures" = 0`)
+		require.NoError(t, err)
 	}
+	assert.Empty(t, w.recv.requests())
+	assert.Equal(t, len(targets), w.count(
+		`SELECT count(*) FROM "NotificationOutbox" WHERE "State" = 'dead' AND "LastError" = 'blocked' AND "Attempts" = 1`),
+		"every blocked address ended dead on the first attempt, because waiting does not make it reachable")
 }
 
 func TestAMixedDnsAnswerIsRefusedAsAWhole(t *testing.T) {
@@ -164,7 +163,7 @@ func TestOnlyAMaintainerOrAboveCanManageChannelsAndEveryoneElseSeesNoSecret(t *t
 	}})
 	assert.Equal(t, http.StatusForbidden, orgRes.Status, "the channels of the organization need an Owner or an Admin")
 	token := w.env.SeedAPIToken(w.ownerID, w.org, "org.read", "project.read", "project.manage")
-	assert.Equal(t, http.StatusUnauthorized, w.env.Do(apptest.Request{
+	assert.Equal(t, http.StatusForbidden, w.env.Do(apptest.Request{
 		Method: http.MethodGet, Path: w.projectPath("/notification-channels"), Headers: map[string]string{"Authorization": "Bearer " + token.Value},
 	}).Status, "an API token never reaches the notification channels")
 }
@@ -177,9 +176,11 @@ func TestAChannelNeedsTheCurrentFactorToChangeOrRemove(t *testing.T) {
 	res := w.owner.Do(apptest.Request{Method: http.MethodPut, Path: path, Body: map[string]any{
 		"Name": "renamed", "Locale": "ar", "Version": created.Channel.Version, "Url": "https://example.com/other", "CurrentFactor": wrong,
 	}})
-	assert.Equal(t, http.StatusUnauthorized, res.Status, string(res.Raw))
+	assert.Equal(t, http.StatusForbidden, res.Status, string(res.Raw))
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "INVALID_CURRENT_FACTOR", res.Error.Code)
 	res = w.owner.Do(apptest.Request{Method: http.MethodPost, Path: path + "/remove", Body: map[string]any{"CurrentFactor": wrong}})
-	assert.Equal(t, http.StatusUnauthorized, res.Status, string(res.Raw))
+	assert.Equal(t, http.StatusForbidden, res.Status, string(res.Raw))
 	assert.Equal(t, 1, w.count(`SELECT count(*) FROM "NotificationChannels" WHERE NOT "IsDeleted" AND "Name" = 'ops'`))
 }
 
