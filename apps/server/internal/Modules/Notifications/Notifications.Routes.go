@@ -47,7 +47,9 @@ func projectRules(base string) []policy.Rule {
 }
 
 func orgRules(base string) []policy.Rule {
-	read := func(method, path string) policy.Rule { return policy.Organization(method, base+path, policy.OrgRead, "id") }
+	read := func(method, path string) policy.Rule {
+		return policy.Organization(method, base+path, policy.OrgRead, "id")
+	}
 	manage := func(method, path string) policy.Rule {
 		return policy.Organization(method, base+path, policy.OrgNotificationManage, "id")
 	}

@@ -42,7 +42,7 @@ MODULE_QUERY_SQL = re.compile(r"(^|/)(Modules|Core|Database)/[^/]+/Queries/[^/]+
 RETENTION_SQL = "apps/server/internal/Database/Retention/Queries/Retention.sql"
 RETENTION_TABLES = (
     '"LoginThrottles"', '"RunnerThrottles"', '"AuthChallenges"', '"OidcFlows"', '"Invitations"', '"SetupTokens"',
-    '"RateLimits"',
+    '"RateLimits"', '"NotificationOutbox"',
 )
 SQL_ANY_DELETE = re.compile(r"(?i)\bdelete\b\s*from\b")
 SQL_TRUNCATE = re.compile(r"(?i)\btruncate\b")

@@ -80,3 +80,12 @@ WHERE "Id" IN (
     LIMIT @batch
     FOR UPDATE SKIP LOCKED
 );
+
+-- name: PurgeNotificationOutbox :execrows
+DELETE FROM "NotificationOutbox"
+WHERE "Id" IN (
+    SELECT o."Id" FROM "NotificationOutbox" o
+    WHERE o."State" IN ('sent', 'dead') AND o."UpdatedAt" < @before
+    LIMIT @batch
+    FOR UPDATE SKIP LOCKED
+);

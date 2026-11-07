@@ -127,7 +127,7 @@ func TestRetentionDeletesOnlyRowsPastTheirPeriod(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, report.Ran)
 	assert.Equal(t, map[string]int64{
-		"LoginThrottles": 1, "RunnerThrottles": 1, "AuthChallenges": 1, "OidcFlows": 1, "Invitations": 2, "SetupTokens": 1, "RateLimits": 1, "SecretVersions": 0,
+		"LoginThrottles": 1, "RunnerThrottles": 1, "AuthChallenges": 1, "OidcFlows": 1, "Invitations": 2, "SetupTokens": 1, "RateLimits": 1, "NotificationOutbox": 0, "SecretVersions": 0,
 	}, report.Deleted)
 
 	keys := func(table string) []string {
@@ -240,7 +240,7 @@ func TestARowInUseIsSkipped(t *testing.T) {
 }
 
 func TestRetentionCoversTheFixedTableList(t *testing.T) {
-	assert.Equal(t, []string{"LoginThrottles", "RunnerThrottles", "AuthChallenges", "OidcFlows", "Invitations", "SetupTokens", "RateLimits", "SecretVersions"}, retention.Tables())
+	assert.Equal(t, []string{"LoginThrottles", "RunnerThrottles", "AuthChallenges", "OidcFlows", "Invitations", "SetupTokens", "RateLimits", "NotificationOutbox", "SecretVersions"}, retention.Tables())
 }
 
 func TestWithoutAClockRetentionUsesTheDatabaseTime(t *testing.T) {
@@ -254,4 +254,30 @@ func TestWithoutAClockRetentionUsesTheDatabaseTime(t *testing.T) {
 	require.NoError(t, err)
 	assert.WithinDuration(t, dbNow, report.Now, 5*time.Second)
 	assert.Equal(t, int64(1), report.Deleted["RateLimits"])
+}
+
+func outboxRow(t *testing.T, pool *pgxpool.Pool, s seeded, state string, updated time.Time) {
+	t.Helper()
+	exec(t, pool, `INSERT INTO "NotificationOutbox" ("OrganizationId", "RecipientUserId", "Kind", "EventId", "EventName", "Payload", "State", "UpdatedAt")
+		VALUES ($1, $2, 'internal-email', gen_random_uuid(), 'x', '{}', $3, $4)`, s.org, s.user, state, updated)
+}
+
+func TestRetentionKeepsTheNotificationLogForTheConfiguredDays(t *testing.T) {
+	pool := dbtest.NewPool(t)
+	s := seedOwner(t, pool)
+	day := 24 * time.Hour
+	outboxRow(t, pool, s, "sent", now.Add(-31*day))
+	outboxRow(t, pool, s, "dead", now.Add(-31*day))
+	outboxRow(t, pool, s, "sent", now.Add(-29*day))
+	outboxRow(t, pool, s, "pending", now.Add(-90*day))
+
+	report, err := retention.New(retention.Options{Pool: pool, Log: quiet(), Now: clock}).Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), report.Deleted["NotificationOutbox"])
+	assert.Equal(t, 2, count(t, pool, `SELECT count(*) FROM "NotificationOutbox"`), "a recent row and a waiting row stay, however old")
+
+	report, err = retention.New(retention.Options{Pool: pool, Log: quiet(), Now: clock, NotifyDays: 7}).Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), report.Deleted["NotificationOutbox"], "a shorter setting cleans the 29 day old row")
+	assert.Equal(t, 1, count(t, pool, `SELECT count(*) FROM "NotificationOutbox"`))
 }

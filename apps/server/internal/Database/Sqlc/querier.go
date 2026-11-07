@@ -501,6 +501,7 @@ type Querier interface {
 	PurgeAuthChallenges(ctx context.Context, arg PurgeAuthChallengesParams) (int64, error)
 	PurgeInvitations(ctx context.Context, arg PurgeInvitationsParams) (int64, error)
 	PurgeLoginThrottles(ctx context.Context, arg PurgeLoginThrottlesParams) (int64, error)
+	PurgeNotificationOutbox(ctx context.Context, arg PurgeNotificationOutboxParams) (int64, error)
 	PurgeOidcFlows(ctx context.Context, arg PurgeOidcFlowsParams) (int64, error)
 	PurgeRateLimits(ctx context.Context, arg PurgeRateLimitsParams) (int64, error)
 	PurgeRunnerThrottles(ctx context.Context, arg PurgeRunnerThrottlesParams) (int64, error)

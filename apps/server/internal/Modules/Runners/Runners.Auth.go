@@ -277,7 +277,6 @@ func (s *Service) RevokeSelf(ctx context.Context, signature []byte) error {
 	}
 	now := s.now()
 	var row sqlc.Runner
-	revoked := false
 	err := dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		r, err := q.RevokeRunner(ctx, sqlc.RevokeRunnerParams{ID: p.RunnerID, OrganizationID: p.OrganizationID, Now: now})
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -286,15 +285,14 @@ func (s *Service) RevokeSelf(ctx context.Context, signature []byte) error {
 		if err != nil {
 			return err
 		}
-		row, revoked = r, true
-		_, err = q.RevokeRunnerSessions(ctx, sqlc.RevokeRunnerSessionsParams{RunnerID: p.RunnerID, Now: now})
-		return err
+		row = r
+		if _, err = q.RevokeRunnerSessions(ctx, sqlc.RevokeRunnerSessionsParams{RunnerID: p.RunnerID, Now: now}); err != nil {
+			return err
+		}
+		return s.bus.Publish(ctx, eventbus.Event{Name: eventbus.RunnerRevoked, Payload: eventbus.Audited{
+			OrganizationIDs: []uuid.UUID{p.OrganizationID}, TargetType: "runner", TargetID: p.RunnerID.String(),
+			IP: runnerauth.RequestMetaFrom(ctx).IPString(), Data: map[string]string{"Name": row.Name, "Reason": "revoked_by_runner"}, Tx: q,
+		}})
 	})
-	if err != nil || !revoked {
-		return err
-	}
-	return s.bus.Publish(ctx, eventbus.Event{Name: eventbus.RunnerRevoked, Payload: eventbus.Audited{
-		OrganizationIDs: []uuid.UUID{p.OrganizationID}, TargetType: "runner", TargetID: p.RunnerID.String(),
-		IP: runnerauth.RequestMetaFrom(ctx).IPString(), Data: map[string]string{"Name": row.Name, "Reason": "revoked_by_runner"},
-	}})
+	return err
 }

@@ -246,6 +246,9 @@ func (s *Service) failStart(ctx context.Context, q *sqlc.Queries, run sqlc.Pipel
 	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: run.Id, State: p.state, FailureReason: p.reason}); err != nil {
 		return err
 	}
+	if err := s.runFinished(ctx, q, run, p.state, p.reason); err != nil {
+		return err
+	}
 	if p.state == models.RunFailed {
 		return s.recordStatus(ctx, q, run, commitstatus.StateFailed)
 	}

@@ -215,7 +215,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	wired := &Wired{
 		Options: opts, Handler: NewRouter(opts), Identity: identityService, Jobs: jobsService, JobQueue: jobsService.Queue(),
 		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, Ingest: ingestService, Notifications: notificationsService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
-		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now}),
+		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now, NotifyDays: in.Config.Notify.RetentionDays}),
 	}
 	if in.Config.RunnerPlaneSeparate() {
 		wired.RunnerHandler = RunnerPlaneServer(opts)

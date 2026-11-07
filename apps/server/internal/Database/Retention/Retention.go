@@ -41,6 +41,9 @@ var purges = []purge{
 	{"RateLimits", config.RetentionRateLimitAfter, func(ctx context.Context, q *sqlc.Queries, before time.Time, batch int32) (int64, error) {
 		return q.PurgeRateLimits(ctx, sqlc.PurgeRateLimitsParams{Before: before, Batch: batch})
 	}},
+	{"NotificationOutbox", time.Duration(config.NotifyRetentionDefault) * 24 * time.Hour, func(ctx context.Context, q *sqlc.Queries, before time.Time, batch int32) (int64, error) {
+		return q.PurgeNotificationOutbox(ctx, sqlc.PurgeNotificationOutboxParams{Before: before, Batch: batch})
+	}},
 	{"SecretVersions", config.SecretVersionRetention, func(ctx context.Context, q *sqlc.Queries, before time.Time, batch int32) (int64, error) {
 		return q.EraseExpiredSecretVersions(ctx, sqlc.EraseExpiredSecretVersionsParams{Before: before, Batch: batch})
 	}},
@@ -56,6 +59,7 @@ func Tables() []string {
 
 type Options struct {
 	Pool       *pgxpool.Pool
+	NotifyDays int
 	Log        *slog.Logger
 	Now        func() time.Time
 	Batch      int
@@ -64,6 +68,7 @@ type Options struct {
 
 type Runner struct {
 	pool       *pgxpool.Pool
+	notifyDays int
 	log        *slog.Logger
 	now        func() time.Time
 	batch      int32
@@ -86,7 +91,7 @@ func New(o Options) *Runner {
 		maxBatches = config.RetentionMaxBatches
 	}
 	return &Runner{
-		pool: o.Pool, log: o.Log, now: o.Now, maxBatches: maxBatches,
+		pool: o.Pool, log: o.Log, now: o.Now, maxBatches: maxBatches, notifyDays: o.NotifyDays,
 		batch: int32(batch),
 	}
 }
@@ -115,7 +120,7 @@ func (r *Runner) Run(ctx context.Context) (report Report, err error) {
 	}
 	report = Report{Ran: true, Now: now, Deleted: map[string]int64{}, Batches: map[string]int{}}
 	for _, p := range purges {
-		if err := r.purgeTable(ctx, q, p, now.Add(-p.after), &report); err != nil {
+		if err := r.purgeTable(ctx, q, p, now.Add(-r.periodOf(p)), &report); err != nil {
 			return report, err
 		}
 	}
@@ -184,4 +189,11 @@ func (r *Runner) runOnce(ctx context.Context) {
 			r.log.InfoContext(ctx, "expired rows deleted", "table", table, "count", n, "batches", report.Batches[table])
 		}
 	}
+}
+
+func (r *Runner) periodOf(p purge) time.Duration {
+	if p.table == "NotificationOutbox" && r.notifyDays > 0 {
+		return time.Duration(r.notifyDays) * 24 * time.Hour
+	}
+	return p.after
 }

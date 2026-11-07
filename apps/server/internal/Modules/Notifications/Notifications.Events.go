@@ -18,22 +18,46 @@ import (
 
 const maxEmailRecipients = 200
 
-func Subscribe(bus Subscriber, s *Service) {
-	bus.Subscribe(eventbus.DeploymentFinished, s.onDeploymentFinished)
-	bus.Subscribe(eventbus.DeploymentApprovalRequested, s.onApprovalRequested)
-	bus.Subscribe(eventbus.DeploymentReleaseRolledBack, s.onRelease(StatusRolledBack))
-	bus.Subscribe(eventbus.DeploymentReleaseRollbackFailed, s.onRelease(StatusRollbackFailed))
-	bus.Subscribe(eventbus.RunFinished, s.onRunFinished)
-	bus.Subscribe(eventbus.AuthLogin, s.onLogin)
-	for _, name := range []string{
-		eventbus.AuthTotpEnabled, eventbus.AuthTotpDisabled, eventbus.AuthPasskeyAdded, eventbus.AuthPasskeyRemoved,
-		eventbus.AuthRecoveryCodesRegenerated,
-	} {
-		bus.Subscribe(name, s.onSecondFactor)
+func HandledEvents() []string {
+	return []string{
+		eventbus.DeploymentFinished, eventbus.DeploymentApprovalRequested, eventbus.DeploymentReleaseRolledBack,
+		eventbus.DeploymentReleaseRollbackFailed, eventbus.RunFinished, eventbus.AuthLogin, eventbus.AuthTotpEnabled,
+		eventbus.AuthTotpDisabled, eventbus.AuthPasskeyAdded, eventbus.AuthPasskeyRemoved, eventbus.AuthRecoveryCodesRegenerated,
+		eventbus.IdentityMemberRemoved, eventbus.IdentityMemberLeft, eventbus.IdentityMemberRoleChanged,
 	}
-	bus.Subscribe(eventbus.IdentityMemberRemoved, s.onMemberRemoved)
-	bus.Subscribe(eventbus.IdentityMemberLeft, s.onMemberGone)
-	bus.Subscribe(eventbus.IdentityMemberRoleChanged, s.onRoleChanged)
+}
+
+func Subscribe(bus Subscriber, s *Service) {
+	for _, name := range HandledEvents() {
+		bus.Subscribe(name, s.Handle)
+	}
+}
+
+func (s *Service) Handle(ctx context.Context, ev eventbus.Event) error {
+	switch ev.Name {
+	case eventbus.DeploymentFinished:
+		return s.onDeploymentFinished(ctx, ev)
+	case eventbus.DeploymentApprovalRequested:
+		return s.onApprovalRequested(ctx, ev)
+	case eventbus.DeploymentReleaseRolledBack:
+		return s.onRelease(StatusRolledBack)(ctx, ev)
+	case eventbus.DeploymentReleaseRollbackFailed:
+		return s.onRelease(StatusRollbackFailed)(ctx, ev)
+	case eventbus.RunFinished:
+		return s.onRunFinished(ctx, ev)
+	case eventbus.AuthLogin:
+		return s.onLogin(ctx, ev)
+	case eventbus.AuthTotpEnabled, eventbus.AuthTotpDisabled, eventbus.AuthPasskeyAdded, eventbus.AuthPasskeyRemoved, eventbus.AuthRecoveryCodesRegenerated:
+		return s.onSecondFactor(ctx, ev)
+	case eventbus.IdentityMemberRemoved:
+		return s.onMemberRemoved(ctx, ev)
+	case eventbus.IdentityMemberLeft:
+		return s.onMemberGone(ctx, ev)
+	case eventbus.IdentityMemberRoleChanged:
+		return s.onRoleChanged(ctx, ev)
+	default:
+		return nil
+	}
 }
 
 func auditedOf(ev eventbus.Event) (eventbus.Audited, error) {
