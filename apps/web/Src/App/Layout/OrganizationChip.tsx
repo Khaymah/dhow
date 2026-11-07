@@ -24,7 +24,6 @@ export const OrganizationChip = ({ className }: IOrganizationChipProps) => {
       type="button"
       onPointerEnter={preloadOrganization}
       onFocus={preloadOrganization}
-      aria-label={t('shell.organization.switch', { name: membership.OrganizationName })}
       onClick={() => {
         void navigate({ to: '/organizations' });
       }}
@@ -35,6 +34,7 @@ export const OrganizationChip = ({ className }: IOrganizationChipProps) => {
       )}
     >
       <Icon name="building" size={16} />
+      <span className="sr-only">{t('shell.organization.switch')}</span>{' '}
       <span dir="auto" className="truncate">{membership.OrganizationName}</span>
       <Icon name="swap" size={14} className="ms-auto flex-none text-tertiary" />
     </button>

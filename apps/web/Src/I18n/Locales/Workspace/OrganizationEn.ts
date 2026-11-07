@@ -128,7 +128,7 @@ export const OrganizationEn: Record<keyof typeof OrganizationAr, string> = {
   'organization.new.create': 'Create the organization',
   'organization.new.creating': 'Creating the organization',
   'organization.new.created': '{name} is ready.',
-  'shell.organization.switch': 'Switch organization (now {name})',
+  'shell.organization.switch': 'Switch organization, now:',
   'mfaReset.banner.title': 'An admin reset your two-step verification.',
   'mfaReset.banner.body': 'Set up a new second step to protect your account.',
   'mfaReset.banner.action': 'Set it up now',

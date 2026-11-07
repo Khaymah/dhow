@@ -127,7 +127,7 @@ export const OrganizationAr = {
   'organization.new.create': 'أنشئ المؤسسة',
   'organization.new.creating': 'جارٍ إنشاء المؤسسة',
   'organization.new.created': '{name} جاهزة.',
-  'shell.organization.switch': 'غيّر المؤسسة (الحالية: {name})',
+  'shell.organization.switch': 'غيّر المؤسسة، والحالية:',
   'mfaReset.banner.title': 'صفّر مدير الخطوة الثانية في حسابك.',
   'mfaReset.banner.body': 'اضبط خطوة ثانية جديدة لتحمي حسابك.',
   'mfaReset.banner.action': 'اضبطها الآن',
