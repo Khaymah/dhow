@@ -131,7 +131,9 @@ func TestServerChecksTreatAnUnreadableDiskAsInformation(t *testing.T) {
 
 type failingFree struct{ *fakesys.Sys }
 
-func (failingFree) FreeBytes(string) (uint64, error) { return 0, errors.New("statfs /srv/dhow-private-state: denied") }
+func (failingFree) FreeBytes(string) (uint64, error) {
+	return 0, errors.New("statfs /srv/dhow-private-state: denied")
+}
 
 func TestServerChecksReportMPTCPWithTheCommandLineAdvice(t *testing.T) {
 	sys := fakesys.New()
