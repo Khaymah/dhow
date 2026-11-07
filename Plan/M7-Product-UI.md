@@ -1,0 +1,515 @@
+# خطة M7: واجهة المنتج
+
+**الحالة:** مسودة للمراجعة. القرارات الاتناشر تحت (قرار 1 لـ قرار 12) لسه مستنية Sabry، وكل واحد مكتوب بالبدائل والتوصية. لما Sabry يجاوب، كل قرار بيبقى ADR في أول المرحلة بتاعته (الأرقام من `0103`، والرقم الفعلي وقت الكتابة) · **التاريخ:** 2026-11-07
+
+## الهدف
+شرط خلاص M7 في `docs/roadmap.md` (الصف M7، بعد [ADR-0068](ADR/0068-first-production-release-scope.md)): **ميزانيات الأداء متحققة، ومراجعة WCAG 2.2 AA نجحت، والنصوص العربية اتراجعت.** ده معناه:
+- **مساحة العمل الكاملة:** نظرة عامة، ولوحات نشر بتقول حالة كل بيئة وهدف، وعارض سجلات افتراضي (virtualized) يستحمل مئات الآلاف من السطور، والموافقات، والإعدادات.
+- **الإشعارات:** بريد، وwebhook موقّع، وSlack، وTelegram، وDiscord، بتسليم مضمون (at-least-once) وأسرار للكتابة بس.
+- **المساعدة جوه التطبيق:** «عن داو»، و«الجديد»، والأسئلة الشائعة، ومساعدة في كل صفحة، ونتائج `doctor` في الواجهة، ورسائل خطأ بتقول الحل.
+- **الجودة:** سهولة وصول مثبتة بأداة ومراجعة يدوية، وأداء مقاس، وعربي مبسّط ([ADR-0062](ADR/0062-simple-arabic-for-users.md)).
+
+المراجع:
+- [ADR-0025](ADR/0025-notifications.md) (قنوات الإشعارات، وqueue مخصصة بمهلات، وحارس SSRF) و[ADR-0054](ADR/0054-second-factor-policy-sessions-and-credential-alerts.md) (تنبيهات بيانات الدخول بتتنقل على الـ queue لما توصل، والفجوة اللي فيها: مفيش outbox).
+- [ADR-0034](ADR/0034-ui-direction-calm-and-organized.md) و[ADR-0059](ADR/0059-ui-direction-control-room.md) (اتجاه التصميم) و[ADR-0062](ADR/0062-simple-arabic-for-users.md) (العربي المبسّط) و[ADR-0087](ADR/0087-browser-end-to-end-tests-in-ci.md) (اختبارات المتصفح).
+- [ADR-0046](ADR/0046-job-logs-storage-and-streaming.md) و[ADR-0052](ADR/0052-job-logs-implementation.md) (تخزين السجلات وبثها بـ seq وSSE).
+- [ADR-0072](ADR/0072-webhooks-and-git-credentials.md) (`netguard`) و[ADR-0057](ADR/0057-egress-proxy-implementation.md) و[ADR-0081](ADR/0081-keyring-and-envelope-encryption.md) و[ADR-0082](ADR/0082-sealer-users-move-to-the-envelope.md) (الأسرار المختومة بـ `Core/Keys`).
+- [`Upgrades-and-Help.md`](Upgrades-and-Help.md) §10 وU6 (المساعدة جوه التطبيق: «عن داو» و`Fix` و`DocsPath` و«الجديد» والأسئلة الشائعة و`doctor`). الخطة دي بتنفّذ U6 كلها.
+- [`UX-Review.md`](UX-Review.md) و[`Usability-Plan.md`](Usability-Plan.md) و[`Design-Proposal.md`](Design-Proposal.md)، و`docs/ui-principles.md` (سطر 93: هدف WCAG 2.2 AA، و`role="log"`)، و`docs/security-model.md` (سطر 33: Trusted Types مع M7، وسطر 199: طابور إشعارات منفصل بحارس SSRF).
+- [`M6-Deploy-Targets.md`](M6-Deploy-Targets.md): M7 بياخد الأهداف وسجل الإصدارات وحدث `deployment.finished` (فيه `Partial = true` عند فشل الرجوع) كما هم ويبني عليهم.
+
+**قبلها:**
+- **M6 خلص** (ما عدا تشغيل الـ demo على Debian 13 قبل أول tag، وده مش شرط هنا).
+- **U2 خلص** (#90): حالة الـ schema جاهزة لـ «عن داو».
+- U3 وU7 مش شرط. «الجديد» في M7 بيشتغل من ملف ملاحظات بسيط، وU7 (M10) بيأتمته ([قرار 9](#قرار-9)).
+
+## اللي موجود واللي ناقص (من مسح الكود يوم 2026-11-07)
+
+| المجال | الموجود | الناقص |
+|---|---|---|
+| **الشكل العام** | `apps/web/Src/App/Layout/` (القايمة الجانبية والشريط والـ slides والـ ⌘K)، و`Core/Ui/` (60+ مكوّن: `Card` و`Banner` و`Tabs` و`MasterDetail` و`SlideStack` و`CommandPalette` و`Toaster`...)، و`App/Navigation/Sections.ts` (20 قسم، منهم `notifications`) | مكان ثابت للمساعدة في رأس كل صفحة (WCAG 3.2.6)، وفحص حجم الهدف 24px (2.5.8) |
+| **الإشعارات (سيرفر)** | `Modules/Alerts` (إيميل واحد لتغيير بيانات الدخول، `Alerts.Service.go`، من غير outbox، سقف `AlertMaxPending`)، و`Core/Mail` و`Core/EventBus` بأحداث مسجّلة منها `deployment.finished` (`Events.Registry.go:117`) | قنوات (webhook وSlack وTelegram وDiscord)، وقواعد، وـ outbox، وـ worker، وأسرار القنوات، وحارس SSRF على الإرسال |
+| **الإشعارات (واجهة)** | `App/Pages/NotificationsPage.tsx`: صفحة فاضية بـ `EmptyState` فقط | كل شيء |
+| **عارض السجل** | `Modules/Jobs/Components/JobLog.tsx` و`LogLines.tsx` و`Hooks/useJobLog.ts` (SSE بـ `EventSource` واستئناف من آخر `Seq` وbackoff)، و`Types/Ansi.ts` وتست، و`Types/LogBuffer.ts` (سقف `MAX_LOG_LINES = 5000` وطول السطر 8192)، و`useFollowScroll`، و`role="log"` | **مفيش virtualization** (كل سطر `<div>` في DOM)، ومفيش بحث ولا روابط لسطر ولا تنزيل ولا طي للخطوات ولا تغيير التفاف. والسقف 5000 سطر |
+| **السجل الحي من السيرفر** | `Modules/Jobs/Jobs.Stream.go` و`Jobs.Hub.go` و`Jobs.Logs.go` (SSE بـ seq) | مفيش بث للوحات (الحالة بتتحدّث بالـ polling من react-query) |
+| **الموافقات** | `Modules/Approvals/Components/*`، و`App/Pages/ApprovalsPage.tsx`، و`MyApprovalsCard`، وحالات البوابة في صفحة التنفيذ (M5.7ب) | عرضها في لوحة النشر، وإشعارها |
+| **البيئات والأهداف والإصدارات** | `Modules/Environments/Components/*` (الأهداف وسيرفراتها وسجل الإصدارات والرجوع)، و`Modules/Ingest/*` | لوحة نشر موحّدة: بيئات × هدف × إصدار × حالة المجموعة (شارة «إصدارات مختلفة») بتتحدّث لوحدها |
+| **الصفحات** | 40+ صفحة في `App/Pages/` (الرئيسية والمشاريع والتنفيذات والمشغّلات والأعضاء والفرق وسجل الأحداث و`SystemPage` و`SystemSettingsPage` و`PreferencesPage`...) | «عن داو» الكاملة، و«الجديد»، و`/help`، وـ doctor |
+| **الإعدادات** | `OrgSettingsPage` و`ProjectSettingsPage` و`SystemSettingsPage` و`PreferencesPage` | تجميع الإشعارات فيها، وبنية موحّدة، وبحث |
+| **المساعدة** | ولا حاجة في الواجهة (`grep` على help/faq/changelog في `Sections.ts` مالقاش) | `Core/Help/DocLinks.ts`، والأسئلة الشائعة، و«الجديد» |
+| **`doctor`** | `Core/Installer/Doctor*.go` (للـ CLI بس: `dhow-runner doctor` و`dhow-server doctor`، رسايل `Messages.Ar.go` و`Messages.En.go`) | تعريض الفحوص اللي تشتغل جوه الـ process للواجهة بـ API |
+| **رسايل الخطأ** | `ErrorDetail` في `openapi.yaml` (سطر 5854) فيه `Code` و`Message` بس، والترجمة في السيرفر من `Accept-Language` | `Fix` و`DocsPath` ([`Upgrades-and-Help.md`](Upgrades-and-Help.md) §7)، وعددهم الفعلي للأكواد: لا توجد بيانات، M7.0 بيعدّه |
+| **ميزانية الحجم** | `apps/web/Scripts/CheckSize.mjs` سطر 7: `js: 128 * KB` و`css: 30 * KB`، والـ JS الأولاني حوالي 127.7 KB (هامش 0.3 KB) | **تناقض:** `CLAUDE.md` و`Plan/M1-Web.md` و`M5` و`M6` كلهم بيقولوا 180 KB والكود الفعلي 128. مفيش بيانات عن سبب النزول. فتحسم في [قرار 1](#قرار-1) |
+| **اختبارات المتصفح** | `apps/web/playwright.config.ts` و`make e2e` (`deploy/e2e/run.sh`: سيرفر حقيقي وForgejo وrunner)، و`eslint-plugin-jsx-a11y` | **مفيش axe** ولا فحص تباين فعلي ولا قياس أداء. (jsdom مابيحسبش layout فالتباين لازم متصفح) |
+| **CSP** | `'self'`، و`CheckSize` بيفحص إن `index.html` مافيهوش inline، واختبارات `SlideStack` و`CommandPalette` | Trusted Types ([قرار 12](#قرار-12))، وفحص `securitypolicyviolation` في كل e2e |
+
+## القرارات اللي الخطة مبنية عليها (ملزمة، من قبل M7)
+1. **اتجاه التصميم:** «غرفة التشغيل» (ADR-0059): قايمة جانبية 248px، وكروت مسطّحة بخط رفيع، وزرار أساسي واحد في كل منطقة، والخطر مرجاني بأيقونة، ومفيش blur ولا hover lift ولا gradient ولا ظل، ولا نص أصغر من 13px.
+2. **العربي أولًا والـ RTL افتراضي**، والـ CSS بـ logical properties بس، وكل نص مفتاح في `I18n/Locales/{Boot,Workspace}/{Ar,En}.ts` بالعربي المبسّط (ADR-0062).
+3. **الأسرار للكتابة بس:** مفيش قيمة سر في response ولا log ولا event ولا إشعار ولا state ولا URL، وفي اختبار يثبت (قاعدة ما بتتكسرش).
+4. **كل endpoint بـ `can()`** وصف في الـ route-table لكل دور لكل route جديد.
+5. **الـ CSP `'self'`:** مفيش inline script ولا style، ومفيش `dangerouslySetInnerHTML` ولا `innerHTML` (hook).
+6. **ما بيتبنيش في M7** (متأجّل بقرار قبل كده): المحرر المرئي للـ pipeline ([ADR-0008](ADR/0008-pipeline-as-code-with-visual-editor.md)) وإشعارات Teams وWhatsApp (ADR-0025). الاتنين "كانوا في M7" في جدول «بعد أول نسخة» في `docs/roadmap.md` (سطر 53 و54)، وADR-0068 بيأجّلهم. الـ adapter interface بيتكتب بحيث إضافتهم adapter جديد من غير تغيير في الـ outbox.
+7. **كله ببلاش** (ADR-0077): مفيش خدمة مدفوعة مطلوبة. الاختبارات بتستخدم receivers محلية، مش Slack ولا Telegram حقيقيين.
+8. **الاعتماديات:** بنسخ مثبّتة بالظبط، وبس لما تشيل تعقيد حقيقي، والـ CI بيفحصها.
+
+## النطاق
+1. **الإشعارات (`Modules/Notifications`):** قنوات (بريد وwebhook وSlack وTelegram وDiscord)، وقواعد اشتراك، وـ outbox بـ worker وإعادة محاولة، وأسرار مختومة للكتابة بس، وحارس SSRF، وسجل تسليم، وـ API وواجهة، ونقل `Alerts` على نفس الـ outbox.
+2. **عارض السجل:** virtualization، وبحث، وروابط لأسطر، وتنزيل، وطي الخطوات، وأمان ANSI وBidi، وإمكانية وصول.
+3. **اللوحات:** لوحة نشر لكل مشروع، ونظرة عامة محسّنة، والموافقات جواها، وتحديث حي.
+4. **الإعدادات:** بنية موحّدة وتفضيلات الإشعارات.
+5. **المساعدة (U6 كلها):** «عن داو» و`doctor`، و`Fix` و`DocsPath` في الأخطاء، و«الجديد»، والمساعدة حسب الصفحة، والأسئلة الشائعة.
+6. **الجودة:** ميزانيات حجم وأداء، وaxe في Playwright، وقايمة مراجعة يدوية، ومراجعة النصوص العربية، وTrusted Types.
+7. **الأمان:** مراجعة تهديدات (§15 في `docs/security-model.md`)، وفحص التسريب بيتوسّع للإشعارات، ومراجعة مستقلة.
+8. **الوثائق بالنسختين** (`make docs-check`).
+
+## مش في M7
+- **المحرر المرئي وTeams وWhatsApp:** ملزم فوق (بند 6).
+- **إشعارات تفاعلية (أزرار موافقة من Slack):** Business+ في ADR-0025، ومع M8.
+- **نظام إشعارات push للمتصفح** (Web Push/service worker): محتاج service worker ومفاتيح VAPID، والـ CSP والتعقيد مش مبرّرين دلوقتي. الـ inbox جوه التطبيق بس ([سؤال 1](#أسئلة-مفتوحة)).
+- **تحديثات الـ binary وفحص الـ feed** (U7 لـ U9): M10. «عن داو» بتعرض حالة الـ feed «غير مفعّل» لحد ما يتوصّل.
+- **فحوص `doctor` اللي بتحتاج root على الـ host** (`dhow-update.timer` وـ`status.json`): M10. M7 بيعرض الفحوص اللي بتشتغل جوه الـ process بس ([قرار 11](#قرار-11)).
+- **لغات تانية غير ar/en.**
+- **تطبيق موبايل أو PWA.**
+
+## المعمارية
+```
+ browser ─► proxy ─► /api/v1 ─┬─ Modules/Notifications   channels, rules, test-send, delivery log      (new)
+                              ├─ Modules/System          about, doctor (in-process checks), ServerBuild (extended)
+                              ├─ Modules/Environments    deployment board read model (releases + hosts + Partial)
+                              └─ Modules/Jobs            logs SSE (exists) + raw download + search endpoint
+ EventBus (deployment.finished, approval.requested, run.failed, ...)
+        └─► Notifications.Handle ──► "NotificationOutbox" (same tx as the audit row)  ─► worker (advisory lock, SKIP LOCKED)
+                                                        ├─ email  ─► Core/Mail
+                                                        └─ webhook/slack/telegram/discord ─► netguard dialer (pinned IP, no redirects, 5s)
+ web (lazy chunks):  Help (FAQ, WhatsNew, DocLinks) · LogViewer (virtualized) · Board · Notifications · About
+```
+
+## قرارات مطلوبة من Sabry
+
+كل قرار: البدائل وتبادلاتها والتوصية. مفيش قرار منهم بيبدأ تنفيذ قبل ما Sabry يجاوب، وبعد الإجابة بيتحول لـ ADR.
+
+### قرار 1: ميزانية حجم الـ JS<a id="قرار-1"></a>
+**الحالة:** `CheckSize.mjs` بيفرض 128 KB gzip للـ JS الأولاني (وCSS 30 KB)، والحالي 127.7 KB. وثائق الخطط والـ `CLAUDE.md` بتقول 180 KB. مفيش بيانات عن تركيب الـ 127.7 (أنهي chunks في الأولاني)؛ M7.0 بيطلّعها من مخرجات `pnpm size` (بتطبع حجم كل ملف).
+
+| الخيار | الإيجابيات | السلبيات |
+|---|---|---|
+| **أ. نرفع الميزانية لـ 180 KB** (يطابق الوثائق) | أبسط، 52 KB هامش | بيشجّع إن الأولاني يكبر، وبيوسّع وقت التحميل على الشبكات البطيئة. الرقم 128 اتحط لسبب مش موثّق (لا بيانات) |
+| **ب. نفضل 128 ونقسّم الأولاني بالـ lazy** (كل ميزة M7 في chunk لوحدها، وتحريك أي حاجة مش لازمة لأول شاشة بره) | أداء أحسن، ومتّسق مع القاعدة اللي ماشيين بيها | محتاج شغل قياس وتحريك، وممكن مايكفيش لو الـ shell نفسه كبير |
+| **ج. نفضل 128 للأولاني + ميزانية لكل chunk كسول** (مقترح: 60 KB gzip للـ chunk العادي، و35 KB لعارض السجل، يتأكد الرقم في M7.0 على القياس الفعلي) | بيمنع إن الميزة الجديدة تكبر من غير ما حد ياخد باله، ويوثّق الحدود | `CheckSize.mjs` بيتعدّل (يقرا chunks الـ async كمان) |
+| **د. ب أو ج، ولو M7.0 لقى إن الـ shell مستحيل ينزل تحت 120 KB، نرفع بـ ADR لرقم مقاس (مش 180 تلقائيًا)** | مرن ومبني على بيانات | بيحتاج قرار تاني |
+
+**التوصية: ج** (مع بند د كمخرج طوارئ). الهدف إن الأولاني ينزل لـ 120 KB أو أقل في M7.0 (هامش 8 KB)، وكل صفحة M7 جديدة lazy. وتصحيح `CLAUDE.md` وM1-Web ليبقوا 128 (أو الرقم الجديد) في نفس الـ PR.
+**قياس النجاح:** `pnpm size` بيعدّي، والأولاني ≤ 120 KB، وكل chunk كسول تحت حده.
+
+### قرار 2: ميزانيات الأداء وقت التشغيل<a id="قرار-2"></a>
+شرط الخلاص بيقول «ميزانيات الأداء متحققة» ومفيش ميزانيات runtime مكتوبة. لا بيانات حالية.
+
+| الخيار | الوصف | التبادل |
+|---|---|---|
+| **أ. حجم فقط** | `pnpm size` | مابيمسكش بطء الـ render ولا الذاكرة (عارض السجل أخطر مكان) |
+| **ب. حجم + قياس في Playwright** (CPU throttling عن طريق CDP، ومقاييس `PerformanceObserver`: long tasks وINP تقريبي، وعدد عقد DOM، وذاكرة JS heap) بحدود تتثبت بعد القياس | بدون اعتماديات جديدة، ومتصل بـ `make e2e` | الأرقام متقلبة على أجهزة CI فالحدود لازم تكون واسعة |
+| **ج. Lighthouse CI** | معيار معروف | اعتمادية ثقيلة، وبيدّي درجات مش حدود واضحة للمستخدم، وتقلّب كبير |
+
+**التوصية: ب.** الحدود المقترحة تتأكد بعد قياس M7.0 (لا بيانات الآن): عارض السجل بـ 50,000 سطر: عقد DOM للصفوف أقل من 300، وولا long task فوق 100ms أثناء التمرير، وفتح الصفحة لأول سطر ظاهر أقل من ثانيتين على CPU مبطّأ 4x. اللوحة بـ 200 بيئة×هدف: أول render أقل من 1 ثانية على نفس الإعداد.
+
+### قرار 3: نقل السجل الحي وتحديثات اللوحات<a id="قرار-3"></a>
+**الحالة:** السجل بيتبث بـ SSE من السيرفر (`Jobs.Stream.go`) وبيستأنف بالـ `Seq`، وـ`useJobLog` فيه backoff. نفس الـ origin، فالـ CSP `connect-src 'self'` بتسمح.
+
+| الخيار | الإيجابيات | السلبيات |
+|---|---|---|
+| **أ. نفضل SSE للسجل (موجود)** | يستأنف، بسيط، من غير مكتبة، متوافق مع الـ CSP، ويعدّي أغلب الـ proxies لو الـ buffering مقفول | اتجاه واحد (كفاية)، وحد 6 اتصالات لكل origin في HTTP/1.1 |
+| **ب. WebSocket** | اتجاهين | الـ CSP تحتاج `connect-src ws:`، وـ proxy وتوثيق أصعب، والتحقق من الجلسة والـ CSRF أعقد، ومفيش حاجة تحتاج اتجاهين |
+| **ج. Polling** | يشتغل في أي proxy | ثقيل على السجل، وبطيء |
+| **د. SSE للسجل + polling ذكي للوحات (كل 5 ثواني، يتوقف لما التبويب مش ظاهر، وبـ `ETag`)، وSSE للوحات بعدين لو القياس قال لازم** | أقل تعقيد دلوقتي | الوحة متأخرة لحد 5 ثواني |
+
+**التوصية: د.** SSE للسجل زي ما هو (مع زرار «اتصال بديل» بـ polling لما الـ proxy بيقطع، وتوثيق في `docs/install/reverse-proxy.md`)، وpolling للوحات. لو M7.5 قاس إن الـ polling بيزوّد حمل السيرفر فوق حد يتحدد (لا بيانات)، نضيف SSE على مستوى المؤسسة في ADR جديد. WebSocket مرفوض لأن مفيش حاجة محتاجاه.
+
+### قرار 4: تقنية الـ virtualization في عارض السجل<a id="قرار-4"></a>
+**الحالة:** الأسطر بتتلف (`whitespace-pre-wrap break-words`) فارتفاعها متغيّر. السقف الحالي 5000 سطر في الذاكرة.
+
+| الخيار | الحجم | الإيجابيات | السلبيات |
+|---|---|---|---|
+| **أ. `@tanstack/react-virtual`** | حوالي 3 KB gzip (تقدير، لا قياس في الريبو؛ يتقاس في M7.0) | بيدعم ارتفاعات متغيّرة (`measureElement`)، واحنا أصلًا على `@tanstack/react-query` و`react-router`، ومصانة | اعتمادية جديدة (بنسخة مثبّتة)، والـ `style` على الصفوف بيتعمل بـ CSSOM (مسموح بالـ CSP) |
+| **ب. in-house بارتفاع ثابت** (مفيش التفاف، تمرير أفقي) | صفر تقريبًا | من غير اعتمادية، وكود صغير | العربي والسطور الطويلة أسوأ تجربة، وبيكسر الالتفاف |
+| **ج. in-house بارتفاعات متغيّرة (قياس + prefix sums)** | 1.5 إلى 2 KB تقدير | من غير اعتمادية | كود معقد نصونه بنفسنا، وbugs في scroll anchoring |
+| **د. نسيب كما هو (5000 سطر)** | صفر | من غير شغل | مايحققش ميزانية الأداء، ويقطع سجلات طويلة |
+
+**التوصية: أ** بنسخة مثبّتة بالظبط تتراجع في أول المرحلة (OSV وتاريخ الإصدار) في chunk عارض السجل الكسول فقط. نفس الـ ADR يقرر: (1) رفع السقف في الذاكرة لـ 100,000 سطر مع جلب الأقدم عند الطلب من السيرفر بـ `Seq` (مش تحميل كله)، (2) `Ctrl+F` بتاع المتصفح مابيشوفش الأسطر اللي بره الشاشة فبنضيف بحث داخلي (`/` للتركيز) بالسيرفر أو بالـ buffer، (3) `role="log"` مع `aria-live` على كل سطر بيسبب ضوضاء مع الـ virtualization فنستخدم `aria-live="off"` على القايمة وـ status region منفصل بيقول «٣٢ سطر جديد» (تتجرب مع قارئ شاشة، [قرار 10](#قرار-10)). لو ميزانية الـ chunk (35 KB) اتخطّت، الاحتياطي ج.
+
+### قرار 5: مكان أسرار قنوات الإشعارات<a id="قرار-5"></a>
+رابط Slack/Discord webhook هو نفسه سر (فيه توكن في المسار)، وTelegram محتاج bot token، والـ webhook العام عنده سر توقيع.
+
+| الخيار | الوصف | التبادل |
+|---|---|---|
+| **أ. جدول `"NotificationChannels"` بعمود `"ConfigSealed"`** مختوم بـ `Core/Keys` (التشفير المغلّف، ADR-0081 وADR-0082)، والإعدادات غير السرية (النوع والاسم واللغة) أعمدة عادية | معزول عن أسرار الـ jobs فعمره ما يتوصل لـ runner، ويدور مع `keys rekey` و`Core/Backfill` | جدول جديد وعمود ملحوظ في `keys rekey` |
+| **ب. نخزّنها كأسرار عادية** (`Core/SecretStore`، نطاق مشروع/مؤسسة) | كود أقل | **خطر:** أسرار الـ jobs بتتوصّل للـ runner ويقدر job يقرأها (نطاق وbinding)، فرابط Slack يتسرب لكود المشروع |
+| **ج. env في السيرفر بس** | بسيط | مش لكل مشروع، ومحتاج إعادة تشغيل |
+
+**التوصية: أ.** القواعد: الـ API بيرجّع `HasSecret` والمضيف (host) بس، من غير أي جزء من التوكن (مفيش «آخر 4 حروف»)، والاستبدال بيحتاج `CurrentFactor` (ADR-0054)، ومنشئ القناة لازم يفضل بدور بيديرها (زي توكن الاستقبال في ADR-0102: القناة بتتعطّل لو منشئها اتخفّض أو اتشال)، وكل تغيير في الـ audit بأسماء وأنواع بس. وسر توقيع الـ webhook العام بيتولّد من داو وبيظهر مرة واحدة. وبيتضاف عمود `"ConfigSealed"` لقايمة `keys rekey` وـ backfill، وـ hook `appcrypto.NewSealer` بيفضل مانع الاستخدام المباشر.
+
+### قرار 6: التسليم: outbox وإعادة المحاولة<a id="قرار-6"></a>
+**الحالة:** `Alerts` بيبعت من الذاكرة بعد الحدث من غير outbox؛ وفي `Plan/Status.md` بند مفتوح عن `runner.revoked` اللي بيضيع لو الـ process وقع بين الـ commit والنشر.
+
+| الخيار | التبادل |
+|---|---|
+| **أ. fire-and-forget على الـ EventBus (زي `Alerts` النهارده)** | أبسط، لكن الإشعار بيضيع مع أي وقوع، وبدون إعادة محاولة |
+| **ب. outbox في Postgres** (`"NotificationOutbox"`: صف لكل (حدث، قناة) بنفس transaction الحدث والـ audit، وworker بـ `FOR UPDATE SKIP LOCKED` تحت advisory lock على مستوى instance، وbackoff: 1د ثم 5د ثم 30د ثم 2س ثم 6س بحد 5 محاولات، ثم `dead` ظاهر في الواجهة بزرار «أعد المحاولة») | at-least-once (ممكن تكرار، فبنبعت `Idempotency-Key`/معرّف الحدث)، وبيقفل بند الـ outbox المفتوح، ونفس نمط `Core/Backfill`. شغل أكتر في السيرفر |
+| **ج. queue خارجية (Redis أو NATS)** | مرفوض: خدمة إضافية للمشغّل، وضد «تنصيب بسيط» |
+
+**التوصية: ب.** والتفاصيل: سقف تزامن لكل قناة (2) وعام (16)، ومهلة 5 ثواني للاتصال و10 للطلب، وحد قراية الرد 64 KiB ويتهمل، وقاطع دايرة (circuit breaker): بعد 10 فشل متتالي القناة بتتعطّل `Disabled` وبتتنبه (بالبريد للمنشئ)، والاحتفاظ بصفوف `sent`/`dead` 30 يوم (قابل للضبط) ثم يتنضّف. و`Alerts` بيتنقل لنفس الـ outbox (قناة بريد داخلية) بنفس المرحلة، وده بيفي بوعد ADR-0054. وبيتوثّق إن التسليم at-least-once فاللي بيستقبل لازم يتحمّل التكرار.
+
+### قرار 7: الاشتراكات: لكل مستخدم أم لكل مشروع<a id="قرار-7"></a>
+
+| الخيار | الوصف | التبادل |
+|---|---|---|
+| **أ. لكل مستخدم بس** | كل مستخدم يختار أحداثه (بريد) | ما بيخدمش Slack/Discord (قنوات مشتركة)، وبيكرّر الإعداد |
+| **ب. لكل مشروع بس** | القنوات والقواعد على المشروع | ما فيهوش تحكم شخصي (مستخدم يريد يكتم بريده) |
+| **ج. الاتنين:** قنوات وقواعد على المشروع (وافتراضات على المؤسسة)، والبريد بيروح لأعضاء بالدور المحدد في القاعدة، ولكل مستخدم كتم شخصي في `PreferencesPage` | بيغطي الحالات كلها | نموذج أكبر شوية (جدولين: `"NotificationChannels"` و`"NotificationRules"`، وعمود كتم في تفضيلات المستخدم) |
+
+**التوصية: ج.** القاعدة = (أحداث) × (بيئات) × (حالات: `failed` و`rolled_back` و`rollback_failed` و`awaiting_approval` و`succeeded`...) → قناة. الافتراضي عند إنشاء قناة: `failed` و`rolled_back` و`rollback_failed` و`awaiting_approval` (مش `succeeded`، ضوضاء). إدارة القنوات والقواعد لـ Owner/Admin/Maintainer للمشروع بخطوة تانية (`notification.manage`، إجراء جديد في `Core/Policy`). قائمة الأحداث المدعومة في أول نسخة وتتأكد في ADR المرحلة: `deployment.finished` و`deployment.approval.requested` و`run.finished` (فاشل فقط) و`runner.offline`.
+
+### قرار 8: حماية SSRF وتوقيع الـ webhook<a id="قرار-8"></a>
+
+| الخيار | التبادل |
+|---|---|
+| **أ. مضيفين ثابتة لـ Slack/Discord/Telegram، و`netguard` للـ webhook العام، وبدون redirects، وتوقيع HMAC-SHA256 على `timestamp.body`** (بنمط Standard Webhooks، من غير مكتبة) | الأقوى والأبسط للتحقق. Slack على Enterprise Grid أو Mattermost اللي بيقلد Slack مش هيشتغل إلا عن طريق webhook العام |
+| **ب. `netguard` للكل، من غير مضيفين ثابتة** | أمرن (Mattermost) لكن مساحة الهجوم أكبر (قناة «Slack» ممكن توجّه أي مكان عام) |
+| **ج. webhook مجهول من غير توقيع** | مرفوض |
+
+**التوصية: أ.** `netguard` على كل إرسال (مش وقت الحفظ بس: لازم يحل DNS ويثبّت الـ IP وقت الاتصال، ضد DNS rebinding)، والـ private/loopback/metadata مرفوضة إلا لنطاقات المشغّل `DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` (زي `ALLOW_PRIVATE_CIDRS` في الـ runner، افتراضيًا فاضي)، وIPv6 والتمثيلات الغريبة (decimal/octal/IPv4-mapped) بتعدّي من نفس الفحص. التوقيع بيتعمل من سر بيتولّد مرة، ومعاه `Dhow-Timestamp` ونافذة 5 دقايق في وثيقة المستقبل.
+
+### قرار 9: تأليف محتوى المساعدة والأسئلة الشائعة و«الجديد»<a id="قرار-9"></a>
+**الحالة:** [`Upgrades-and-Help.md`](Upgrades-and-Help.md) §10 قال: الأسئلة الشائعة في الكتالوج (lazy chunk) ومصدرها `docs/install/troubleshooting.md`، والمساعدة حسب الصفحة روابط في `Core/Help/DocLinks.ts` باختبار، و«الجديد» من JSON متضمّن بيطلّعه U7 (M10). U7 لسه، فـ«الجديد» محتاج بديل دلوقتي.
+
+| الخيار | الإيجابيات | السلبيات |
+|---|---|---|
+| **أ. كل النص في كتالوجات الـ i18n** | مفيش مصدر تاني، وhook العربي المبسّط بيغطيه | بيتكرر مع `docs/` (مصدرين للحقيقة) وبيضخّم الكتالوج |
+| **ب. عارض markdown وقت التشغيل لملفات `docs/`** | مصدر واحد | محتاج parser (اعتمادية وحجم) وسطح XSS (روابط/HTML) |
+| **ج. مولّد وقت البناء:** سكربت `gen:help` بيحوّل ملفات محددة من `docs/` و`docs/en/` (FAQ، وقسم من `troubleshooting.md`، وملاحظات الإصدار) لـ JSON بنوع مقيّد (عناوين وفقرات وقوايم وروابط) بيتحمّل كسول، ومن غير parser في المتصفح، وبيرفض HTML خام وروابط بره allowlist | مصدر واحد (الوثائق)، وبدون سطح XSS وقت التشغيل، وhook الوثائق بيغطيه | سكربت جديد وملف متولّد (محتاج استثناء في hook الملفات المتولّدة، وقاعدة «أي قاعدة جديدة ليها hook واختبار») |
+| **د. روابط للوثائق بس** | أبسط | المستخدم يخرج من التطبيق، وده ضد "المساعدة جوه التطبيق" |
+
+**التوصية: ج** للأسئلة الشائعة و«الجديد»، **ومعاها د** للمساعدة حسب الصفحة (زرار «مساعدة» في رأس كل صفحة يفتح صفحتها في الوثائق بلغة الواجهة) + سطر تلميح قصير لكل صفحة في الكتالوج (`help.<page>.hint`). مصدر الأسئلة الشائعة `docs/faq.md` الجديد (وفيه أسئلة من `troubleshooting.md` والدعم) بالنسختين. «الجديد» من `docs/releases/<version>.md` بنفس الصيغة اللي U7 هيستخدمها (ملف صغير بالعربي والإنجليزي)، فU7 بيأتمت التوليد مش بيغيّر الصيغة. الاختبار: كل صفحة في `Sections.ts` ليها رابط، وكل رابط ملف موجود في `docs/` و`docs/en/`.
+
+### قرار 10: طريقة التحقق من سهولة الوصول<a id="قرار-10"></a>
+
+| الخيار | التبادل |
+|---|---|
+| **أ. أداة آلية بس** (`axe` في Playwright) | بتمسك حوالي ثلث المشاكل فقط (تقدير شائع، لا بيانات هنا)، ومابتثبتش قارئ الشاشة ولا الـ reflow |
+| **ب. axe + قايمة يدوية موقّعة** | `@axe-core/playwright` (devDependency، من غير تأثير على الـ bundle) على صفحات أساسية × ar-RTL وen-LTR × الثيم الفاتح وثيمين داكنين، بـ fail على أي violation من نوع serious/critical. والقايمة اليدوية في `Plan/` (وملخصها `docs/guides/accessibility.md`): لوحة المفاتيح بس، وNVDA مع Firefox أو VoiceOver مع Safari بالعربي، وzoom 200% و400% (1.4.10)، وحجم الهدف 24px (2.5.8)، والتركيز غير مخفي (2.4.11)، والسحب له بديل (2.5.7)، والمساعدة في مكان ثابت (3.2.6)، وعدم إعادة الإدخال (3.3.7)، والتحقق من الهوية من غير حفظ ذاكرة (3.3.8: اللصق مسموح لكلمة السر وTOTP، ومفاتيح المرور) |
+| **ج. مراجعة خارجية مدفوعة** | الأدق لكن تكلفة (لا بيانات عن السعر) وخارج قيد "ببلاش"، وM9 فيه مراجعة أمنية خارجية مش سهولة وصول |
+
+**التوصية: ب.** والمراجعة اليدوية يعملها Sabry أو شخص من الفريق قبل الخلاص بقايمة موقّعة بالتاريخ والمتصفح وقارئ الشاشة. وجزء من قبول كل مرحلة واجهة: صفر violation في الصفحات اللي لمستها. المراجعة الخارجية لسهولة الوصول بعد أول نسخة لو فيه ميزانية.
+
+### قرار 11: `doctor` في الواجهة<a id="قرار-11"></a>
+**الحالة:** الفحوص في `Core/Installer/Doctor*.go` بتشتغل من الـ CLI على الـ host. جزء منها محتاج root أو systemd (مش متاح من process السيرفر).
+
+| الخيار | التبادل |
+|---|---|
+| **أ. نستخرج الفحوص اللي تشتغل جوه الـ process** (الإعدادات ومصدرها، والقاعدة، وحالة الـ schema، وMPTCP، ومساحة مجلد الحالة، وفرق الساعة، وعمر آخر نسخة احتياطية لو موجودة) لـ library مشتركة، و`GET /system/doctor` لمالك السيرفر بس | مفيد من أول يوم، ومفيش privilege. الفحوص اللي محتاجة root تتأجل |
+| **ب. نقرأ `status.json` من `dhow-update.timer`** | `dhow-update.timer` مش موجود قبل M10 |
+| **ج. نشغّل `dhow-server doctor` كـ subprocess** | مرفوض: تشغيل process من request، وسطح أكبر |
+
+**التوصية: أ.** الرسايل من نفس الكتالوجات (`Messages.*`) بحيث الـ CLI والواجهة يقولوا نفس الجملة، وكل فحص بيرجّع (حالة، رمز، `Fix`). مالك السيرفر بس، وكل فحص من غير قيم أسرار ولا مسارات حساسة (اسم الـ env فقط، مش قيمته). فحوص الـ host تضاف في M10.
+
+### قرار 12: Trusted Types<a id="قرار-12"></a>
+`docs/security-model.md` سطر 33 وعد بـ Trusted Types مع M7.
+
+| الخيار | التبادل |
+|---|---|
+| **أ. enforce من أول المرحلة** | أمان أعلى، لكن لو مكتبة (virtualizer أو غيره) كتبت sink بيكسر الصفحة |
+| **ب. `report-only` أول، ثم enforce في آخر M7 لو صفر violation في كل e2e** | آمن للتنفيذ، وبيمسك الكسر بدري |
+| **ج. نأجّل لما بعد M7** | يكسر وعد مكتوب |
+
+**التوصية: ب.** header `Content-Security-Policy-Report-Only: require-trusted-types-for 'script'` في dev وe2e من M7.0، والاختبار بيسجّل `securitypolicyviolation` ويفشل على أي واحد، ثم enforce في M7.10 مع `trusted-types 'none'` (من غير policies) لو التطبيق مابيحتاجش sink. لو أي مكتبة احتاجت policy: ADR صريح.
+
+## أسئلة مفتوحة
+1. **صفحة `/notifications` (inbox جوه التطبيق):** حاليًا فاضية. التوصية: تعرض آخر الإشعارات الموجّهة للمستخدم (موافقة مطلوبة، نشر فشل) من نفس الـ outbox بقناة `inapp`، بتكلفة صغيرة (S) في M7.3. لو Sabry مش عايزها، الصفحة تتشال من القايمة.
+2. **عدد أحداث الإشعار في أول نسخة** ([قرار 7](#قرار-7)): قايمة الأربعة تتأكد.
+3. **اللغة اللي بتروح بها رسايل القنوات:** لغة القناة (حقل `Locale`، الافتراضي لغة المؤسسة)، مش لغة اللي ضغط الزرار. تتأكد.
+
+## الإشعارات (`Modules/Notifications`)
+
+### النموذج
+- **القناة (`"NotificationChannels"`):** `Kind` (`email` أو `webhook` أو `slack` أو `telegram` أو `discord` أو `inapp`)، والاسم (فريد في المشروع)، و`Locale`، و`Enabled`، و`DisabledReason`، و`ConfigSealed` ([قرار 5](#قرار-5))، والمنشئ، و`Version`. بالأعمدة الأربعة. التفاصيل: مفيش قيم سر في أي DTO.
+- **القاعدة (`"NotificationRules"`):** القناة، والأحداث، والبيئات (فاضي = الكل)، والحالات.
+- **الـ outbox (`"NotificationOutbox"`):** الحدث (id وname)، والقناة، و`Payload` (jsonb بحقول من allowlist فقط)، و`State` (`pending` و`sending` و`sent` و`dead`)، و`Attempts` و`NextAttemptAt` و`LastError` (enum وكود حالة HTTP، مش جسم الرد).
+- **كله expand** (ADR-0077): جداول جديدة، والـ binary القديم بيتجاهلها.
+
+### الحمولة (payload)
+- حقول من allowlist: النوع، والمشروع والبيئة والهدف بالاسم، والإصدار والـ digest (قصير)، والحالة، والسبب (enum)، ورابط داو للصفحة (من `PublicURL`)، والوقت. **ممنوع:** سطور سجل، وقيم متغيّرات، وأي سر.
+- النصوص اللي جاية من المستخدم (اسم branch، ورسالة commit إن اتعرضت، واسم المشروع) بتتهرّب حسب القناة: في Slack `<!channel>` و`<!here>` و`<@U...>` وروابط `<url|text>`، وفي Discord `@everyone` و`@here` والـ mentions (`allowed_mentions: {parse: []}`)، وفي Telegram `parse_mode` من غير markdown (نص عادي)، وطول أقصى.
+- الـ webhook العام: JSON بـ PascalCase (`{Success, Data}` مش لازم، لكن الحقول PascalCase زي باقي الـ API)، والـ headers: `Dhow-Event` و`Dhow-Delivery` (معرّف فريد) و`Dhow-Timestamp` و`Dhow-Signature: v1=<hex>`.
+
+### الـ API (للإضافة)
+| Route | الإجراء | ملاحظة |
+|---|---|---|
+| `GET /projects/{p}/notification-channels` و`.../{c}` | `project.read` | من غير سر: `HasSecret` والمضيف بس |
+| `POST /projects/{p}/notification-channels` | `notification.manage` | `CurrentFactor`، سر التوقيع للـ webhook بيظهر مرة |
+| `PUT .../{c}` و`POST .../{c}/remove` | `notification.manage` | `Version` و`CurrentFactor` |
+| `POST .../{c}/test` | `notification.manage` | يبعت رسالة اختبار حقيقية، وبحد معدّل (5 في الدقيقة) |
+| `GET/PUT .../notification-rules` | `notification.manage` للكتابة، `project.read` للقراية | |
+| `GET .../notification-deliveries` | `notification.manage` | صفحات، وحالة كل محاولة |
+| `POST .../notification-deliveries/{d}/retry` | `notification.manage` | لـ `dead` بس |
+| `PUT /me/notification-mute` | الجلسة | كتم شخصي ([قرار 7](#قرار-7)) |
+
+- الأدوار والتوكنات: التوكنات مافيهاش `notification.manage`. كل route ليه صف في الـ route-table لكل دور.
+- **الأخطاء الجديدة (`UPPER_SNAKE`، مترجمة ومعاها `Fix`):** `CHANNEL_EXISTS` و`CHANNEL_HOST_NOT_ALLOWED` و`CHANNEL_HOST_BLOCKED` و`CHANNEL_SECRET_INVALID` و`CHANNEL_VERSION_CONFLICT` و`CHANNEL_DISABLED` و`DELIVERY_NOT_RETRYABLE` و`TEST_RATE_LIMITED`.
+- **الـ audit (بعد الـ commit، أسماء وأنواع بس):** `notification.channel_created` و`_updated` و`_removed` و`_disabled` و`notification.rule_updated` و`notification.test_sent`. وفي القناة اللي اتعطّلت تلقائيًا سبب الفشل (enum).
+
+## عارض السجل
+
+- **البنية:** chunk كسول `Modules/Jobs/Components/LogViewer*` (ملفات تحت 500 سطر والـ function تحت 100) فوق `useJobLog` الموجود ([قرار 3](#قرار-3) و[قرار 4](#قرار-4)).
+- **الإمكانيات:** تمرير سلس بـ 100,000 سطر، وبحث (نص عادي، ومع الحساسية للحالة اختياري، وتنقل بين النتايج بـ Enter/Shift+Enter)، ورابط ثابت لسطر (`?line=<seq>` ويفتح عليه)، وطي الخطوات وتوسيعها، وتغيير الالتفاف، وتنزيل السجل الخام (`GET /jobs/{j}/log/raw`، بـ `Content-Disposition: attachment` و`nosniff` و`text/plain`)، و«اذهب للنهاية» الموجود، وزرار نسخ سطر.
+- **الأمان:** الأسطر نص بس (text nodes)، من غير `dangerouslySetInnerHTML`. روابط URL في السجل (اختياري) بتتحوّل لـ `<a>` لـ `http` و`https` فقط بـ `rel="noopener noreferrer"` وـ`target="_blank"`. الـ ANSI: SGR (ألوان وbold وunderline) فقط من allowlist، وكل CSI/OSC/DCS تاني (تحريك المؤشر، تغيير العنوان، OSC 8 للروابط) بيتشال. أحرف التحكم في الاتجاه (U+202A-202E وU+2066-2069) بتتعرض كرموز مرئية بدل ما تعيد ترتيب النص (Trojan Source)، وكل سطر `dir="auto"`. الـ class المطبوع من enum مش من النص.
+- **سهولة الوصول:** القايمة `role="log"` بـ `aria-live="off"` وـ status region منفصلة ([قرار 4](#قرار-4))، واختصارات لوحة مفاتيح موثّقة وبدائل (`/` للبحث، `End` للنهاية)، وتركيز ظاهر، وألوان ANSI بتحقق التباين 4.5:1 في كل ثيم (وفيه fallback للوّن الأقرب لو ثيم مخصص مايحققش).
+
+## اللوحات والموافقات والإعدادات
+
+- **لوحة نشر المشروع (`ProjectPage` + تبويب «النشر»):** صف لكل بيئة: الهدف، والإصدار المنشور (digest قصير)، وحالة آخر نشر، وشارة «رجع تلقائيًا» و«إصدارات مختلفة» (من `Partial`)، وتقدّم الدفعات للنشر الشغّال، وزرار «رجّع» (الموجود في M6.8) وزرار «افحص الهدف». تحديث كل 5 ثواني ([قرار 3](#قرار-3)). الحالة بتتقال بالنص والأيقونة مش باللون وحده (WCAG 1.4.1).
+- **الموافقات:** كارت «بانتظار موافقتك» في اللوحة والرئيسية بنفس خطوة الموافقة الموجودة (`Modules/Approvals`)، من غير تغيير في الـ API.
+- **النظرة العامة:** `GET /organizations/{id}/overview` (ADR-0061) بيتوسّع بعدّادات النشر والإشعارات الميتة (`dead`) للمالك/الأدمن بس.
+- **الإعدادات:** نفس الصفحات الأربع (`OrgSettings` و`ProjectSettings` و`SystemSettings` و`Preferences`) بترتيب موحّد وعناوين أقسام متّسقة، وتبويب «الإشعارات» في المشروع، وكتم الإشعارات الشخصي في التفضيلات. مفيش إعدادات جديدة للسيرفر غير `DHOW_NOTIFY_*` (في `docs/install/configuration.md`).
+
+## المساعدة جوه التطبيق (U6)
+
+| العنصر | التفاصيل |
+|---|---|
+| **عن داو** (`/system`) | بيكبّر `BuildInfoCard`: النسخة والـ commit والنسخة (Community) والترخيص (AGPL-3.0 برابط) والصحة وحالة الـ schema والـ backfills للمالك، والنسخة والترخيص والصحة للأعضاء. `ServerBuild` في `/me` وشريط «حدّثنا داو. أعد تحميل الصفحة» وفشل تحميل chunk بيعرض نفس الشريط بدل شاشة بيضا |
+| **doctor** | كارت «فحوص الجهاز» لمالك السيرفر ([قرار 11](#قرار-11)) |
+| **Fix وDocsPath** | في `ErrorDetail` (مفاتيح اختيارية، توافق للخلف)، ومترجمين من السيرفر، وتحت كل رسالة خطأ في الواجهة «الحل: ...» ورابط «اعرف أكثر». وallowlist مكتوب فيها السبب (زي `INTERNAL`). اختبار بيتأكد إن كل كود له `Fix` بالنسختين أو في الـ allowlist |
+| **الجديد** | كارت في الرئيسية مرة واحدة لكل مستخدم بعد الترقية (`ReleaseNotesSeen` في التفضيلات، expand migration)، من JSON متولّد ([قرار 9](#قرار-9)) |
+| **مساعدة حسب الصفحة** | زرار «مساعدة» في رأس كل صفحة (نفس المكان دايمًا، WCAG 3.2.6)، وخريطة `Core/Help/DocLinks.ts` باختبار |
+| **الأسئلة الشائعة** (`/help`) | بحث وأسئلة قصيرة، chunk كسول، من `docs/faq.md` |
+
+## الأمان
+| الخطر | التخفيف | فين بيتختبر |
+|---|---|---|
+| SSRF من رابط webhook (loopback وmetadata `169.254.169.254` وRFC1918 وIPv6 وIPv4-mapped وdecimal وDNS rebinding وredirect) | `netguard` وقت الحفظ ووقت كل اتصال (يثبّت الـ IP بعد الحل)، وبدون redirects، ومضيفين ثابتة لـ Slack/Discord/Telegram، ونطاقات المشغّل `DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` | اختبار جدولي بالعناوين دي: `CHANNEL_HOST_BLOCKED` ومفيش اتصال (dialer الاختبار بيعدّ المحاولات)، ورد 302 لـ metadata مابيتتبعش، ومضيف بيرد بـ IP عام أول مرة وخاص تاني مرة مرفوض، و`FuzzNotifyURL` |
+| سر القناة يظهر في رد أو log أو audit أو خطأ | `ConfigSealed` بـ `Core/Keys`، والـ DTO من غير الحقل، وإخفاء الرابط من رسايل الخطأ (المضيف فقط) | اختبار انعكاس (reflection) على كل DTO، و`leak-sweep.sh` بيزرع رابط Slack وتوكن Telegram وسر webhook ويدوّر في كل log وaudit وevent و`pg_dump` |
+| سر في حمولة الإشعار (قيمة متغيّر أو سطر سجل) | الحمولة من allowlist حقول، ومفيش سطور سجل | اختبار زرع سر في سجل job ومتغيّر بيئة وبعدين فحص الحمولة المُرسلة للـ receiver الاختبار |
+| حقن mentions أو روابط في Slack/Discord من branch أو اسم مشروع | تهريب حسب القناة و`allowed_mentions: {parse: []}` | اسم branch `<!channel> @everyone` يطلع نص حرفي في receiver الاختبار |
+| القناة كقناة تسريب بيانات (عضو يوجّه الإشعارات لجهة خارجية) | الإدارة لـ Maintainer فأعلى بخطوة تانية، والحمولة مقيّدة، والقناة بتتعطّل لو منشئها اتخفّض أو اتشال، وaudit | اختبار: Developer يحاول ينشئ قناة: `403`، ومنشئ اتخفّض: القناة `Disabled` وما بتبعتش |
+| تزوير أو إعادة إرسال webhook عند المستقبل | `Dhow-Signature` HMAC على `timestamp.body` ونافذة 5 دقايق وـ`Dhow-Delivery` | test vector ثابت في الوثيقة والاختبار، وتحقق بمقارنة ثابتة الوقت في مثال المستقبل |
+| مستقبل بطيء أو خبيث بيجوّع الـ worker | مهل 5/10 ثواني، وسقف تزامن لكل قناة وعام، وقاطع دايرة، وسقف قراية الرد | receiver slow-loris: الـ worker بيكمّل لقنوات تانية وبتتعطّل القناة بعد 10 فشل |
+| تكرار الإرسال أو ضياعه | outbox بنفس transaction الحدث، `SKIP LOCKED`، و`Idempotency-Key`، و at-least-once موثّق | chaos: قتل السيرفر بعد الـ commit وقبل الإرسال: يتبعت مرة (أو أكتر) بعد الإقلاع ومفيش ضياع |
+| إعادة المحاولة بتفرّغ الـ outbox (storm) | backoff أسي وحد 5 محاولات وسقف عمر وتنضيف | اختبار بساعة وهمية: الجدول الزمني بالظبط، وصف `dead` بعد 5 |
+| XSS من سطر سجل | text nodes بس، وروابط `http(s)` بس، وhook ضد `dangerouslySetInnerHTML` | سجل فيه `<img src=x onerror=...>` و`javascript:alert(1)`: يظهر نص ولا يتنفّذ، ولا يتحوّل لرابط |
+| حقن ANSI/OSC (تغيير العنوان، تحريك المؤشر لإخفاء سطر، OSC 8) أو Bidi | allowlist لـ SGR، وشيل باقي التسلسلات، ورموز Bidi مرئية | `Ansi.test.ts` بتوسّع بحالات OSC وCSI وDCS ومقاطع مبتورة، و`FuzzAnsi`/property test (وقت التنفيذ: vitest) على إن المخرج مافيهوش `\x1b` |
+| الـ virtualizer أو مكتبة بتكسر الـ CSP | `style` عن طريق CSSOM بس، ومفيش `<style>`، و`securitypolicyviolation` | Playwright بيسمع `securitypolicyviolation` ويفشل على أي واحد في كل e2e، واختبار `<style>` الموجود يتوسّع |
+| محتوى المساعدة بيحقن HTML أو روابط خبيثة | مولّد وقت البناء بنوع مقيّد، يرفض HTML خام وروابط بره allowlist (نسبية للوثائق أو `https` لـ نطاقات داو) | اختبار المولّد على ملف فيه `<script>` ورابط `javascript:`: يفشل البناء |
+| `Fix`/`DocsPath` يسرّب تفاصيل داخلية أو يتلاعب برابط | نص `Fix` ثابت من الكتالوج من غير قيم المستخدم، و`DocsPath` مسار نسبي من allowlist | اختبار: كل `DocsPath` يطابق ملف في `docs/`، ومفيش `Fix` فيه `%s` من مدخل مستخدم |
+| `doctor` يكشف معلومات للأعضاء | مالك السيرفر بس، واسم الإعداد ومصدره من غير قيمته | صف route-table لكل دور، واختبار انعكاس على الـ DTO |
+| بث السجل لمؤسسة مش بتاعتك | `can()` وقت الاتصال وفحص المؤسسة والجلسة (موجود) | اختبار `Stream_test.go` يتوسّع: مؤسسة تانية `404`، وجلسة انتهت أثناء البث تقفل الاتصال |
+| تسريب بيانات من الذاكرة في السجل الكبير (DoS في المتصفح) | سقف 100,000 سطر وجلب الأقدم عند الطلب، وحد طول السطر 8192 | قياس الذاكرة والـ DOM في Playwright ([قرار 2](#قرار-2)) |
+| Trusted Types يكسر الصفحة | `report-only` أول ثم enforce بعد صفر violation | e2e على كل صفحة رئيسية |
+
+**الأسرار للكتابة بس (اختبار):** نفس اختبار M4 وM5 وM6 بيتوسّع على كل DTO جديد (قنوات، ومحاولات التسليم، وـ doctor).
+
+## الوثائق (بالنسختين، و`make docs-check`)
+| الملف | المرحلة | المحتوى |
+|---|---|---|
+| `docs/guides/notifications.md` (جديد) | M7.2 وM7.3 | القنوات الخمس، وإعداد كل واحدة، والقواعد والكتم، والتوقيع وكود تحقق للمستقبل، والتسليم at-least-once، وSSRF ونطاقات المشغّل، واستكشاف الأخطاء |
+| `docs/guides/jobs.md` | M7.4 | عارض السجل: البحث والاختصارات والروابط والتنزيل والحدود |
+| `docs/guides/accessibility.md` (جديد) | M7.1 وM7.10 | اختصارات لوحة المفاتيح، وقارئات الشاشة المجرّبة، وبيان سهولة الوصول، وحدود معروفة |
+| `docs/faq.md` (جديد) | M7.8 | الأسئلة الشائعة (مصدر صفحة `/help`) |
+| `docs/guides/about-and-doctor.md` (جديد) | M7.9 | «عن داو» وفحوص `doctor` والفرق بينها وبين الـ CLI |
+| `docs/releases/<version>.md` (جديد) | M7.8 | ملاحظات الإصدار الحالية بالنسختين (صيغة U7) |
+| `docs/guides/home.md` وـ`environments.md` وـ`organization.md` وـ`projects.md` | M7.5 وM7.6 | اللوحة والموافقات والإعدادات الموحّدة |
+| `docs/install/configuration.md` | M7.2 | `DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` وحدود التزامن والاحتفاظ |
+| `docs/install/reverse-proxy.md` | M7.4 | عدم عمل buffering لـ SSE وزرار الاتصال البديل |
+| `docs/install/troubleshooting.md` | M7.8 | مصدر جزء من الأسئلة الشائعة، وروابط من `Fix` |
+| `docs/ui-principles.md` | M7.1 وM7.10 | ميزانيات الحجم والأداء، ومكان المساعدة، وسهولة الوصول |
+| `docs/architecture.md` | M7.2 | الـ outbox والـ worker |
+| `docs/security-model.md` | M7.11 | §15 مراجعة تهديدات M7 (الجدول والمخاطر المقبولة)، وتحديث سطر Trusted Types |
+| `docs/development.md` | M7.0 وM7.1 | `gen:help` وaxe وقياس الأداء محليًا |
+| `docs/roadmap.md` | M7.11 | M7 خلص |
+| `CLAUDE.md` | M7.0 | تصحيح رقم الميزانية، و`Modules/Notifications` و`Core/Help` في الهيكل، وسطر `gen:help` |
+
+## تقسيم الـ PRs
+كل PR بيعدّي `make check` وCI أخضر، وفيه اختبارات سلبية لكل مسار أمني، وبيحدّث `Plan/Progress/` في يومه، وبيكتب الـ ADR بتاع قراراته في أوله، وصفر violation من axe في الصفحات اللي لمسها. وبيتفتح كـ draft PR من أول commit. المراحل اللي بتلمس الإشعارات عليها مراجعة أمنية مستقلة قبل الـ merge.
+
+### M7.0: القياس والميزانيات والـ ADRs
+- **الحجم:** S. **الاعتماد:** M6.
+- **المحتوى:** قياس تركيب الأولاني (من مخرجات `pnpm size`) وعدّ أكواد الأخطاء الحالية؛ `CheckSize.mjs` يقرا chunks الـ async كمان ويفرض ميزانية لكل chunk؛ نقل ما يلزم لـ lazy علشان الأولاني ≤ 120 KB ([قرار 1](#قرار-1))؛ هيكل قياس الأداء في Playwright ([قرار 2](#قرار-2)) مع تسجيل `securitypolicyviolation` وheader Trusted Types في وضع report-only ([قرار 12](#قرار-12)); تصحيح `CLAUDE.md`؛ ADRs للقرارات 1 و2 و3 و10 و12.
+- **قبول:**
+  - `pnpm size` يعدّي والأولاني ≤ 120 KB، وصف جدول بحجم كل chunk في وصف الـ PR.
+  - chunk بيعدّي حده (اختبار سلبي بميزانية مخفّضة) يفشّل `pnpm size`.
+  - الأرقام الأساسية (baseline) مكتوبة: وقت الـ render وعقد DOM لسجل 5000 و50,000 سطر في الوضع الحالي.
+- **التحقق:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm size`، و`make docs-check`.
+
+### M7.1: أساس سهولة الوصول
+- **الحجم:** M. **الاعتماد:** M7.0.
+- **المحتوى:** `@axe-core/playwright` (devDependency بنسخة مثبّتة) وـ spec بيمسح الصفحات الأساسية (الدخول، والرئيسية، والمشاريع، والتنفيذ، والبيئة، والأعضاء، والإعدادات) × ar/en × 3 ثيمات؛ إصلاح كل violation serious/critical الموجودة في `Core/Ui`؛ مكان ثابت لزرار المساعدة في `PageHeader` (فاضي لحد M7.8)؛ حجم الهدف 24px وفحص التركيز غير المخفي؛ `docs/guides/accessibility.md`.
+- **قبول:** صفر violation serious/critical على الصفحات دي؛ تقرير بالـ moderate المتبقي؛ كل زرار أيقونة له تسمية؛ التنقل بلوحة المفاتيح بس في المسارات الأساسية يشتغل.
+- **التحقق:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm size` و`make e2e`.
+
+### M7.2أ: الإشعارات: الأساس (outbox وworker وبريد وwebhook)
+- **الحجم:** L. **الاعتماد:** M7.0 (ADRs القرارات 5 و6 و7 و8 مكتوبة في أولها).
+- **المحتوى:** migrations (expand): `"NotificationChannels"` و`"NotificationRules"` و`"NotificationOutbox"`؛ `Modules/Notifications` (service وcontroller وملفات تحت 500 سطر)؛ الاشتراك في أحداث الـ EventBus وكتابة الـ outbox بنفس transaction الـ audit؛ الـ worker؛ adapter البريد (فوق `Core/Mail`) وadapter الـ webhook العام الموقّع؛ `netguard` dialer؛ `notification.manage` في `Core/Policy` وصفوف الـ route-table؛ `openapi.yaml` (tag `notifications`) ثم `make gen`؛ نقل `Alerts` على الـ outbox؛ `DHOW_NOTIFY_*` في الـ config بقيم افتراضية آمنة؛ إضافة `"ConfigSealed"` لـ `keys rekey`.
+- **قبول:**
+  - نشر فشل → صف outbox في نفس الـ transaction → webhook اتبعت مرة بتوقيع صحيح (receiver الاختبار تحقق منه).
+  - receiver بيرد 500 ثلاث مرات ثم 200: نجح بعد المحاولة الرابعة بالجدول الزمني (ساعة وهمية). بعد 5 فشل: `dead`.
+  - قتل السيرفر بعد الـ commit وقبل الإرسال: الإشعار بيتبعت بعد الإقلاع.
+  - كل هدف SSRF في الجدول فوق مرفوض ومفيش اتصال.
+  - الرابط والسر والتوقيع مش في أي رد ولا log ولا audit.
+  - تنبيهات بيانات الدخول (`Alerts`) لسه بتوصل (اختبارات `Alerts` الموجودة بتعدّي من غير تغيير).
+- **التحقق:** `go test -race -count=1 ./apps/server/internal/Modules/Notifications/... ./apps/server/internal/Modules/Alerts/... ./apps/server/internal/Core/Policy/... ./apps/server/internal/Core/EventBus/...` و`go test -run '^$' -fuzz FuzzNotifyURL -fuzztime 60s ./apps/server/internal/Modules/Notifications` و`make gen && git diff --exit-code` و`make hooks-test` و`make check`.
+- **الـ chaos:** سيناريو جديد في suite الفوضى (قتل السيرفر بعد الـ commit)، ويشتغل ليلي وعلى label `chaos`.
+
+### M7.2ب: الإشعارات: Slack وTelegram وDiscord
+- **الحجم:** M. **الاعتماد:** M7.2أ.
+- **المحتوى:** ثلاث adapters بمضيفين ثابتة وتهريب حسب القناة (`allowed_mentions` وblocks آمنة)؛ receivers اختبار محلية في `deploy/e2e-targets/notify-receiver` (خادم Go صغير بيحاكي الثلاث بدون إنترنت)؛ قواعد الاشتراك الكاملة؛ كتم المستخدم.
+- **قبول:**
+  - لكل قناة: رسالة وصلت بالشكل الصح بالعربي والإنجليزي حسب `Locale`.
+  - `<!channel>` و`@everyone` في اسم branch ظاهرين نصًا.
+  - مضيف مش في الـ allowlist: `CHANNEL_HOST_NOT_ALLOWED`.
+  - توكن Telegram مش في أي log ولا رسالة خطأ (الرابط فيه التوكن في المسار).
+- **التحقق:** نفس M7.2أ + `go test -race -count=1 ./deploy/e2e-targets/notify-receiver/...`.
+
+### M7.3: الإشعارات: الواجهة
+- **الحجم:** M. **الاعتماد:** M7.2ب وM7.1.
+- **المحتوى:** `Modules/Notifications` في الواجهة (chunk كسول): القنوات (شريحة إنشاء بخطوة تانية، والسر بيظهر مرة واحدة ويتمسح من الـ state)، والقواعد، و«أرسل رسالة اختبار»، وسجل التسليم (حالة ومحاولات وزرار إعادة)، وكتم شخصي في التفضيلات؛ استبدال `NotificationsPage` الفاضية (حسب [سؤال 1](#أسئلة-مفتوحة)).
+- **قبول:** السر لا يظهر في state أو URL أو DOM بعد الإنشاء؛ تأكيد بخطوة تانية؛ صفر violation axe؛ الأدوار (Developer ما بيشوفش زرار الإنشاء)؛ عربي وإنجليزي بنفس المفاتيح.
+- **التحقق:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm size` و`make e2e` (قناة webhook ← نشر فاشل ← الإشعار وصل ← يظهر في السجل).
+
+### M7.4: عارض السجل
+- **الحجم:** L. **الاعتماد:** M7.0 وM7.1 (ADR القرارين 3 و4).
+- **المحتوى:** حسب [عارض السجل](#عارض-السجل): virtualization، وبحث، وروابط الأسطر، وتنزيل (`log/raw` في `Modules/Jobs` وفي `openapi.yaml`)، وطي الخطوات، وتوسيع Ansi.ts، وزرار الاتصال البديل بالـ polling، وسقف 100,000 وجلب الأقدم.
+- **قبول:**
+  - سجل 50,000 سطر: عقد DOM للصفوف تحت 300، وبدون long task فوق الحد المتفق عليه بعد M7.0.
+  - البحث بيلاقي سطر خارج الشاشة وبيروح له؛ الرابط `?line=` بيفتح على السطر.
+  - الحالات الخبيثة (HTML وOSC وBidi) تتعرض بأمان.
+  - chunk عارض السجل تحت ميزانيته؛ ومفيش `securitypolicyviolation`.
+  - قارئ الشاشة: التنقل بلوحة المفاتيح ونتيجة البحث بتتقال (يدوي، قايمة M7.10).
+- **التحقق:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm size`، و`go test -race -count=1 ./apps/server/internal/Modules/Jobs/...`، و`make gen && git diff --exit-code`، و`make e2e` (يولّد سجل كبير من job حقيقي).
+
+### M7.5: لوحة النشر والموافقات والنظرة العامة
+- **الحجم:** L. **الاعتماد:** M7.1 (ممكن بالتوازي مع M7.2 وM7.4).
+- **المحتوى:** حسب [اللوحات](#اللوحات-والموافقات-والإعدادات): تبويب «النشر»، والتحديث الدوري بـ `ETag`، والشارات بالنص والأيقونة، وكارت الموافقات، وتوسيع `overview`؛ وإن قياس الحمل قال لازم: ADR لبث SSE ([قرار 3](#قرار-3)).
+- **قبول:** بيئة بنشر شغّال بتظهر تقدّم الدفعات؛ هدف بـ `rollback_failed` بتظهر له شارة حمرا ثابتة؛ اللوحة بتتحدث من غير reload خلال 5 ثواني؛ الطلبات ما بتتكررش (اختبار `Requests.test.tsx` الموجود يتوسّع)؛ لوحة بـ 200 بيئة×هدف تحت حد الأداء.
+- **التحقق:** نفس M7.3 + `go test -race -count=1 ./apps/server/internal/Modules/Environments/...`.
+
+### M7.6: الإعدادات الموحّدة
+- **الحجم:** M. **الاعتماد:** M7.3.
+- **المحتوى:** ترتيب موحّد لصفحات الإعدادات الأربع، وتبويب الإشعارات، وتفضيلات الكتم، وروابط من ⌘K.
+- **قبول:** كل إعداد قابل للوصول من ⌘K؛ مفيش تغيير في الصلاحيات (route-table يعدّي من غير تعديل)؛ axe نضيف.
+- **التحقق:** نفس M7.3.
+
+### M7.7: رسايل خطأ بتذكر الحل (`Fix` و`DocsPath`)
+- **الحجم:** L (عدد الأكواد: لا بيانات، يتقاس في M7.0؛ لو كتير بيتقسم حسب الموديول).
+- **الاعتماد:** M7.0.
+- **المحتوى:** `Fix` و`DocsPath` في `ErrorDetail` (`openapi.yaml` ثم `make gen`)؛ كتالوجات الرسايل في السيرفر بالعربي المبسّط والإنجليزي؛ العرض في كل مكان بيعرض خطأ في الواجهة (`InlineAlert` و`Toast`)؛ allowlist مكتوب فيها السبب؛ اختبار التغطية.
+- **قبول:** كل كود له `Fix` بالنسختين أو في الـ allowlist؛ كل `DocsPath` ملف موجود في `docs/` و`docs/en/`؛ hook العربي المبسّط عدّى؛ الواجهة بتعرض الحل تحت الرسالة وبتقراه قارئ الشاشة (`role="alert"` أو `aria-describedby`).
+- **التحقق:** `go test -race -count=1 ./apps/server/internal/Core/Errors/... ./apps/server/internal/Core/I18n/...` و`make gen && git diff --exit-code` و`pnpm test` و`make docs-check` و`make check`.
+
+### M7.8: المساعدة والأسئلة الشائعة و«الجديد»
+- **الحجم:** M. **الاعتماد:** M7.1 وM7.7 ([قرار 9](#قرار-9)).
+- **المحتوى:** `gen:help` (مولّد وقت البناء + hook للملفات المتولّدة + اختبار)؛ `Core/Help/DocLinks.ts` وزرار المساعدة في كل صفحة؛ `/help` بالبحث؛ كارت «الجديد» و`ReleaseNotesSeen` (expand migration)؛ `docs/faq.md` وـ`docs/releases/`.
+- **قبول:** كل صفحة في `Sections.ts` ليها رابط مساعدة يفتح ملف موجود بالنسختين؛ الأسئلة الشائعة مفيدة من غير إنترنت (مضمنة)؛ المولّد بيرفض HTML خام ورابط `javascript:`؛ «الجديد» بيظهر مرة لكل مستخدم؛ حجم chunk تحت ميزانيته.
+- **التحقق:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm size`، و`make docs-check`، و`make hooks-test`.
+
+### M7.9: «عن داو» و`doctor`
+- **الحجم:** M. **الاعتماد:** M7.1 ([قرار 11](#قرار-11)).
+- **المحتوى:** library الفحوص المشتركة من `Core/Installer/Doctor*.go` (من غير تغيير سلوك الـ CLI)؛ `GET /system/doctor` ومعاه `ServerBuild`؛ كارت الفحوص وصفحة «عن داو»؛ شريط إعادة التحميل.
+- **قبول:** مالك السيرفر يشوف الفحوص، والعضو يشوف النسخة والصحة بس (route-table واختبار الواجهة)؛ مفيش قيمة سر ولا مسار حساس في الرد؛ نفس جملة الـ CLI في الواجهة؛ قطع القاعدة بيظهر فحص فاشل بـ `Fix`؛ اختبارات `Doctor_test.go` الموجودة بتعدّي.
+- **التحقق:** `go test -race -count=1 ./apps/server/internal/Core/Installer/... ./apps/server/internal/Modules/System/...` و`make gen && git diff --exit-code` و`pnpm test` و`make check`.
+
+### M7.10: المراجعة النهائية: سهولة الوصول والعربي والأداء وTrusted Types
+- **الحجم:** M. **الاعتماد:** M7.3 وM7.4 وM7.5 وM7.6 وM7.8 وM7.9.
+- **المحتوى:** مسح axe كامل لكل صفحة؛ القايمة اليدوية ([قرار 10](#قرار-10)) بقارئ شاشة بالعربي؛ مراجعة النصوص العربية بإنسان ضد `Plan/Glossary.md` وADR-0062؛ قياس الأداء مقابل الحدود اللي اتثبتت؛ enforce لـ Trusted Types لو صفر violation ([قرار 12](#قرار-12)).
+- **قبول (جزء من شرط الخلاص):** صفر violation serious/critical؛ قايمة يدوية موقّعة؛ ميزانيات الحجم والأداء محققة؛ كل نص جديد عدّى hook العربي المبسّط ومراجعة إنسان؛ Trusted Types enforce أو ADR بسبب التأجيل.
+- **التحقق:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm size` و`make e2e` و`make check`.
+
+### M7.11: التقوية وإثبات شرط الخلاص
+- **الحجم:** M. **الاعتماد:** كل اللي فات.
+- **المحتوى:** `deploy/m7-demo/run.sh` فوق demo M6 (receivers الإشعارات، وسجل كبير، وقتل السيرفر وقت الإرسال)؛ فحص التسريب بيتوسّع (رابط Slack وتوكن Telegram وسر webhook)؛ fuzz targets في `FUZZ_TARGETS` و`fuzz-nightly.yml`؛ مراجعة التهديدات §15 في `docs/security-model.md`؛ مراجعة أمنية مستقلة وإصلاح الـ Critical والـ High؛ `docs/roadmap.md`: M7 خلص.
+- **قبول (شرط خلاص M7):** `deploy/m7-demo/run.sh` عدّى في `demo.yml`؛ فحص التسريب لقى الحالات المزروعة فقط؛ مفيش finding مفتوح Critical أو High.
+- **التحقق:** `make check` و`make runner-chaos` و`make e2e` و`make upgrade-test` (binary M6 على قاعدة M7: كله expand) و`deploy/m7-demo/run.sh`.
+
+### الترتيب
+```
+M6 ─► M7.0 ─┬─► M7.1 ─┬─► M7.5 ───────────────────────────────┐
+            │         ├─► M7.8 (بعد M7.7) ───────────────────┤
+            │         └─► M7.9 ──────────────────────────────┤
+            ├─► M7.2أ ─► M7.2ب ─► M7.3 ─► M7.6 ──────────────┼─► M7.10 ─► M7.11
+            ├─► M7.4 (بعد M7.1) ─────────────────────────────┤
+            └─► M7.7 ─────────────────────────────────────────┘
+```
+- **بالتوازي:** M7.2أ وM7.4 وM7.7 مستقلين بعد M7.0 (ملفات مختلفة: سيرفر الإشعارات، وعارض السجل، وكتالوجات الأخطاء). M7.5 وM7.9 بعد M7.1.
+- **الأحجام:** M7.0 (S) وM7.1 (M) وM7.2أ (L) وM7.2ب (M) وM7.3 (M) وM7.4 (L) وM7.5 (L) وM7.6 (M) وM7.7 (L) وM7.8 (M) وM7.9 (M) وM7.10 (M) وM7.11 (M). يعني أربع مراحل L (M7.2أ وM7.4 وM7.5 وM7.7) وسبع M، فالإجمالي أكبر من "L" الواحدة اللي في الـ roadmap؛ صف M7 في الـ roadmap بيتحدّث بالحجم الفعلي في M7.0.
+- **قبل إيه:** M7.7 قبل M7.8 (الأسئلة الشائعة بتشاور على `Fix`)؛ M7.2أ قبل أي واجهة إشعارات.
+
+### الاختبارات: إيه بيشتغل فين
+| الاختبار | كل PR | ليلي أو label | قبل كل release |
+|---|---|---|---|
+| وحدات `Notifications` (قنوات وقواعد وoutbox وworker وadapters) | ✅ | — | — |
+| route-table للـ routes الجديدة لكل دور | ✅ | — | — |
+| `Alerts` بعد النقل على الـ outbox | ✅ | — | — |
+| SSRF للقنوات (جدول عناوين) و`FuzzNotifyURL` | ✅ | ✅ fuzz ليلي (30 دقيقة) | — |
+| الفوضى: قتل السيرفر بعد الـ commit وقبل الإرسال، ومستقبل بطيء | — | ✅ ليلي وعلى label `chaos` | ✅ |
+| `pnpm lint` وtypecheck وtest وbuild وsize | ✅ | — | ✅ |
+| Playwright e2e: قناة ← نشر فاشل ← إشعار، وسجل كبير، ولوحة النشر | ✅ لو الـ PR بيلمس `apps/web` أو الإشعارات | ✅ | ✅ |
+| axe في Playwright (صفر serious/critical) | ✅ لو الـ PR بيلمس `apps/web` | ✅ | ✅ |
+| قياس الأداء (عقد DOM وlong tasks وذاكرة) | ✅ لو الـ PR بيلمس عارض السجل أو اللوحة | ✅ | ✅ |
+| قايمة سهولة الوصول اليدوية (قارئ شاشة وzoom) | — | — | ✅ |
+| `make upgrade-test` (binary M6 على قاعدة M7) | ✅ لو الـ PR بيلمس migrations | ✅ | ✅ |
+| `deploy/m7-demo/run.sh` بفحص التسريب | ✅ لو الـ PR بيلمس الكود | ✅ ليلي في `demo.yml` | ✅ |
+
+### `deploy/m7-demo/run.sh`
+فوق M6 demo، ومعاه `notify-receiver` (Slack وTelegram وDiscord وwebhook بتوقيع). السيناريو:
+1. قناة من كل نوع على مشروع، وقاعدة «فشل أو رجوع أو موافقة مطلوبة».
+2. نشر فاشل برجوع تلقائي ← الإشعارات الأربعة وصلت مرة بالتوقيع الصح بالعربي، وسجل التسليم فيه كل واحدة.
+3. موافقة مطلوبة ← إشعار ← موافقة بخطوة تانية.
+4. قتل السيرفر بعد الـ commit وقبل الإرسال ← تتبعت بعد الإقلاع.
+5. receiver بيرد 500 ← retries ← `dead` ← «أعد المحاولة».
+6. رابط webhook على `169.254.169.254` ← مرفوض.
+7. سجل job بـ 100,000 سطر فيه ANSI وBidi وHTML ← بيتعرض بأمان وبيتبحث فيه.
+8. فحص التسريب على كل شيء (رابط Slack، وتوكن Telegram، وسر التوقيع).
+
+## المخاطر
+| الخطر | التخفيف |
+|---|---|
+| الأولاني 127.7 من 128 KB، وأي ميزة تكسره | M7.0 الأول، وميزانية لكل chunk، وكل ميزة كسولة ([قرار 1](#قرار-1)) |
+| تناقض رقم الميزانية بين الوثائق والكود | تصحيح في M7.0 وفي نفس الـ PR |
+| L كتير في M7 (خمس مراحل) فالتأخير | الترتيب بيسمح بتوازي ثلاث مسارات؛ ممكن نأجّل M7.2ب (Slack وTelegram وDiscord) بعد الأساس لو الوقت ضاق، مع قبول إن الشرط في الـ roadmap بيذكرهم |
+| الـ virtualization بيكسر البحث بالمتصفح وقارئ الشاشة | بحث داخلي، و`aria-live="off"` ومنطقة حالة، واختبار يدوي بقارئ شاشة قبل الخلاص |
+| Slack/Telegram/Discord بيغيّروا الـ API | adapters صغيرة معزولة، ومضيفين وحقول في ثوابت، وـ receivers الاختبار بتوثّق الشكل؛ ولا يعتمد الاختبار على خدمات حقيقية (مفيش بيانات عن ثبات الـ APIs دي) |
+| الإشعارات بتتكرر (at-least-once) | `Idempotency-Key` وتوثيق، وده الثمن المقبول للضمان |
+| القناة تسرّب بيانات داخلية لجهة خارجية | الإدارة لـ Maintainer فأعلى بخطوة تانية، وحمولة مقيّدة، وaudit، وتعطيل لو المنشئ اتخفّض |
+| المولّد (`gen:help`) ملف متولّد جديد | hook وـ اختبار، والملف مش بيتعدّل بإيد، ومصدره `docs/` |
+| قياس الأداء متقلب على CI | حدود واسعة مقاسة بعد baseline، وإعادة تشغيل واحدة قبل الفشل، وحدود صارمة محليًا |
+| مراجعة سهولة الوصول اليدوية تتأخر لأنها بتحتاج وقت بشري | القايمة تتجهز في M7.1 وتتجرّب على الصفحات أول بأول، مش كلها في الآخر |
+| أي اعتمادية جديدة (virtualizer وaxe) | نسخ مثبّتة، وفحص OSV وتاريخ الإصدار في أول المرحلة، وـ axe devDependency فقط |
+| نقل `Alerts` على الـ outbox بيكسر تنبيهات الدخول | اختبارات `Alerts` الموجودة بتفضل بتعدّي، والنقل في M7.2أ بعد ما الـ outbox يتثبت |
+
+## الاعتماديات المتوقعة (بنسخ مثبّتة)
+النسخ تتأكد في أول المرحلة اللي بتضيفها (proxy.golang.org وnpm و OSV)، ومش متأكدة النهارده (لا بيانات).
+
+| الاعتمادية | النسخة | المرحلة | ليه |
+|---|---|---|---|
+| `@tanstack/react-virtual` | تتحدد في M7.4 | M7.4 | الـ virtualization ([قرار 4](#قرار-4)) |
+| `@axe-core/playwright` | تتحدد في M7.1 | M7.1 | axe (devDependency فقط، [قرار 10](#قرار-10)) |
+| Go standard library (`net/http` و`crypto/hmac` و`crypto/sha256` و`net`) | Go 1.27.3 (`go.mod`) | M7.2 | التسليم والتوقيع من غير مكتبات |
+| `internal/netguard` (موجود) | — | M7.2 | حارس SSRF |
+
+**مش هنضيف:**
+- مكتبة Slack/Telegram/Discord SDK: الطلبات بسيطة (HTTP POST بـ JSON) وبـ `net/http`.
+- مكتبة webhook أو queue (Redis وNATS): الـ outbox في Postgres.
+- parser markdown في المتصفح ([قرار 9](#قرار-9)).
+- مكتبة ANSI خارجية: `Ansi.ts` الموجود.
+- Lighthouse CI ([قرار 2](#قرار-2)).
+- Web Push وservice worker.
+
+## قرارات تانية اتاخدت بالتوصية (Sabry يقدر يرجع فيها)
+1. **الاحتفاظ بصفوف الـ outbox:** 30 يوم لـ `sent` و`dead`.
+2. **اختبار القناة:** بحد 5 في الدقيقة لكل قناة.
+3. **قاطع الدايرة:** 10 فشل متتالي.
+4. **أحداث البريد الافتراضية:** الفشل والرجوع والموافقة المطلوبة، مش النجاح.
+5. **لغة رسالة القناة:** حقل `Locale` للقناة، الافتراضي لغة المؤسسة.
+6. **سقف السجل في الذاكرة:** 100,000 سطر، والأقدم بيتجاب عند الطلب.
+7. **تنزيل السجل الخام:** `text/plain` مع `attachment` و`nosniff`.
+
+## ملاحظات
+- **Freelancer-Trap:** مفيش ميزة هنا مطلوبة من عميل واحد. M7 كله من المنتج نفسه، والإشعارات الخمس من ADR-0025.
+- **ADR-0025 بيحتاج تحديث:** القرار الأصلي بيذكر Teams وWhatsApp. ADR جديد في M7.2أ بيسجّل إن M7 بيسلّم خمس قنوات، وإن Teams وWhatsApp بعد أول نسخة (من غير تعديل ADR القديم، حسب قاعدة الريبو).
