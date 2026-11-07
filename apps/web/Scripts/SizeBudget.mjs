@@ -10,14 +10,31 @@ export const lazyBudgetKb = (name, config) => {
   return match === undefined ? config.LazyJsKb : match.Kb;
 };
 
-export const withOverrides = (config, overrides) => ({
-  ...config,
-  InitialJsKb: overrides.InitialJsKb ?? config.InitialJsKb,
-  InitialCssKb: overrides.InitialCssKb ?? config.InitialCssKb,
-  LazyJsKb: overrides.LazyJsKb ?? config.LazyJsKb,
-  LazyOverrides:
-    overrides.LazyJsKb === undefined ? config.LazyOverrides : config.LazyOverrides.map((rule) => ({ ...rule, Kb: Math.min(rule.Kb, overrides.LazyJsKb) })),
-});
+const lowered = (flag, configured, requested) => {
+  if (requested === undefined) return configured;
+  if (requested > configured) {
+    throw new Error(`--${flag}=${requested} is above the configured ${configured} KB: overrides can only lower a budget`);
+  }
+  return requested;
+};
+
+export const withOverrides = (config, overrides) => {
+  const lazy = lowered('lazy-kb', config.LazyJsKb, overrides.LazyJsKb);
+  return {
+    ...config,
+    InitialJsKb: lowered('initial-js-kb', config.InitialJsKb, overrides.InitialJsKb),
+    InitialCssKb: lowered('initial-css-kb', config.InitialCssKb, overrides.InitialCssKb),
+    LazyJsKb: lazy,
+    LazyOverrides: config.LazyOverrides.map((rule) => ({ ...rule, Kb: Math.min(rule.Kb, lazy) })),
+  };
+};
+
+export const overrideMatches = (names, config) =>
+  config.LazyOverrides.map((rule) => ({
+    Pattern: rule.Pattern,
+    Kb: rule.Kb,
+    Matches: names.filter((name) => new RegExp(rule.Pattern).test(name)).length,
+  }));
 
 export const totalBytes = (sizes) => sizes.reduce((sum, [, bytes]) => sum + bytes, 0);
 

@@ -14,6 +14,7 @@ export interface IView {
   Lang: TLang;
   Problems: string[];
   Violations: string[];
+  ReportOnly: (string | undefined)[];
 }
 
 export const MESSAGES: Record<TLang, TMessages> = { ar: Ar, en: En };
@@ -43,12 +44,21 @@ export const open = async (browser: Browser, lang: TLang, viewport: { width: num
   page.on('console', (message) => {
     if (message.type() === 'error') problems.push(`console: ${message.text()}`);
   });
+  const reportOnly: (string | undefined)[] = [];
+  page.on('response', (response) => {
+    const request = response.request();
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame() && response.ok()) {
+      reportOnly.push(response.headers()['content-security-policy-report-only']);
+    }
+  });
   page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
-  return { Context: context, Page: page, T: MESSAGES[lang], Lang: lang, Problems: problems, Violations: violations };
+  return { Context: context, Page: page, T: MESSAGES[lang], Lang: lang, Problems: problems, Violations: violations, ReportOnly: reportOnly };
 };
 
 export const expectClean = async (view: IView): Promise<void> => {
   await expect(view.Page.locator('style')).toHaveCount(0);
+  expect(view.ReportOnly.length).toBeGreaterThan(0);
+  for (const header of view.ReportOnly) expect(header).toContain('require-trusted-types-for');
   expect(view.Violations).toEqual([]);
   expect(view.Problems).toEqual([]);
   expect(await view.Page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

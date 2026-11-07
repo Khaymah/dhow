@@ -12,6 +12,7 @@ export const BootEn: TBootMessages = {
   'ui.close': 'Close',
   'ui.loading': 'Loading',
 
+  'i18n.switchFailed': 'We could not change the language. Try again.',
   'toast.dismiss': 'Dismiss',
 
   'notFound.text': 'This page does not exist.',

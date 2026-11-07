@@ -3,12 +3,19 @@ import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
-import { evaluate, KB, parseOverrides, withOverrides } from './SizeBudget.mjs';
+import { evaluate, KB, overrideMatches, parseOverrides, withOverrides } from './SizeBudget.mjs';
 
-const config = withOverrides(
-  JSON.parse(readFileSync(fileURLToPath(new URL('./SizeBudgets.json', import.meta.url)), 'utf8')),
-  parseOverrides(process.argv.slice(2)),
-);
+const loadConfig = () => {
+  const base = JSON.parse(readFileSync(fileURLToPath(new URL('./SizeBudgets.json', import.meta.url)), 'utf8'));
+  try {
+    return withOverrides(base, parseOverrides(process.argv.slice(2)));
+  } catch (error) {
+    process.stderr.write(`size: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(1);
+  }
+};
+
+const config = loadConfig();
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 
@@ -106,6 +113,9 @@ process.stdout.write('lazy js (2 KB and over, and any over budget)\n');
 for (const chunk of report.Lazy.filter((entry) => entry.Over || entry.Bytes >= 2 * KB)) {
   const verdict = chunk.Over ? ` OVER ${kb(chunk.Budget)} KB` : '';
   process.stdout.write(`${kb(chunk.Bytes).padStart(7)} KB  ${chunk.Ref}${verdict}\n`);
+}
+for (const rule of overrideMatches(report.Lazy.map((chunk) => chunk.Name), config)) {
+  process.stdout.write(`size: lazy override ${rule.Pattern} (${rule.Kb} KB) matches ${rule.Matches} chunks\n`);
 }
 for (const row of report.Initial) {
   const verdict = row.Over ? 'OVER' : 'ok';

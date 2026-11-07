@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { chunkName, evaluate, KB, lazyBudgetKb, parseOverrides, withOverrides } from './SizeBudget.mjs';
+import { chunkName, evaluate, KB, lazyBudgetKb, overrideMatches, parseOverrides, withOverrides } from './SizeBudget.mjs';
 import budgets from './SizeBudgets.json' with { type: 'json' };
 
 const sample = (lazy) => ({
@@ -17,6 +17,22 @@ describe('chunkName', () => {
   it('drops the content hash and the extension', () => {
     expect(chunkName('/assets/LogViewer-Ca7MMyuI.js')).toBe('LogViewer');
     expect(chunkName('/assets/useSlideGuardStore-cs-62bg-.js')).toBe('useSlideGuardStore');
+    expect(chunkName('/assets/is-svg-component-B1Qxi7QF.js')).toBe('is-svg-component');
+    expect(chunkName('/assets/dist-D322Jb2e.js')).toBe('dist');
+    expect(chunkName('/assets/index-Ca7MMyuI.js')).toBe('index');
+  });
+
+  it('leaves a name without a hash alone', () => {
+    expect(chunkName('/assets/LogViewer.js')).toBe('LogViewer');
+    expect(chunkName('/assets/is-svg-component.js')).toBe('is-svg-component');
+  });
+
+  it('lets the log viewer pattern match its hashed chunk and nothing else', () => {
+    const names = ['/assets/LogViewer-D322Jb2e.js', '/assets/JobPage-B471HyZt.js', '/assets/LogViewerToolbar-D322Jb2e.js'].map(chunkName);
+    const [rule] = overrideMatches(names, budgets);
+    expect(rule?.Pattern).toBe('^LogViewer');
+    expect(rule?.Matches).toBe(2);
+    expect(overrideMatches(['JobPage'], budgets)[0]?.Matches).toBe(0);
   });
 });
 
@@ -62,6 +78,13 @@ describe('parseOverrides', () => {
     expect(parseOverrides([]).LazyJsKb).toBeUndefined();
     expect(() => parseOverrides(['--lazy-kb=zero'])).toThrow();
   });
+
+  it('refuses an override that would raise a budget', () => {
+    expect(() => withOverrides(budgets, { LazyJsKb: 61 })).toThrow(/can only lower/);
+    expect(() => withOverrides(budgets, { InitialJsKb: 200 })).toThrow(/can only lower/);
+    expect(() => withOverrides(budgets, { InitialCssKb: 31 })).toThrow(/can only lower/);
+    expect(withOverrides(budgets, { LazyJsKb: 60 }).LazyJsKb).toBe(60);
+  });
 });
 
 const dist = join(process.cwd(), 'dist', 'index.html');
@@ -73,5 +96,9 @@ describe.skipIf(!existsSync(dist))('pnpm size on a real build', () => {
     const lowered = spawnSync('node', [script, '--lazy-kb=1'], { encoding: 'utf8' });
     expect(lowered.status).toBe(1);
     expect(lowered.stdout).toContain('OVER');
+    expect(lowered.stdout).toContain('lazy override ^LogViewer');
+    const raised = spawnSync('node', [script, '--lazy-kb=500'], { encoding: 'utf8' });
+    expect(raised.status).toBe(1);
+    expect(raised.stderr).toContain('can only lower');
   });
 });
