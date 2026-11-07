@@ -542,3 +542,4 @@ M6 ─► M7.0 ─┬─► M7.1 ─┬─► M7.5 ─────────�
 ## ملاحظات
 - **Freelancer-Trap:** مفيش ميزة هنا مطلوبة من عميل واحد. M7 كله من المنتج نفسه، والإشعارات الخمس من ADR-0025.
 - **ADR-0025 بيحتاج تحديث:** القرار الأصلي بيذكر Teams وWhatsApp. ADR جديد في M7.2أ بيسجّل إن M7 بيسلّم خمس قنوات، وإن Teams وWhatsApp بعد أول نسخة (من غير تعديل ADR القديم، حسب قاعدة الريبو).
+- **M7.2أ اتنفذت ([ADR-0108](ADR/0108-notifications-foundation.md)):** الفرق عن الخطة فوق: (1) الطابور في `Core/Outbox` مش جوه `Modules/Notifications`، علشان `Alerts` يكتب فيه من غير استيراد موديول؛ (2) قنوات المؤسسة (`ProjectId` فاضي، وإجراء `org.notification.manage`) اتضافت لأن `runner.offline` وأحداث الحساب مالهاش مشروع؛ (3) الجدول الزمني 1د/5د/30د/2س بين المحاولات الخمس (6س مش مستخدمة)؛ (4) الـ webhook https بس بدون استثناء `DHOW_DEV`؛ (5) `FuzzNotifyURL` في `Modules/Notifications/Test/Edge` زي باقي الـ fuzz.

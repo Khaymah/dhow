@@ -118,9 +118,10 @@
 | الشغل | الـ branch | الـ PR | اللي فاضل |
 |---|---|---|---|
 | صفحات `secret-edit-*` و`variable-edit-*` و`registry-edit-*` مالهاش بوابة دور في `Panels.ts`، والسيرفر بس اللي بيرفض | — | — | نفس بوابات `*-new` |
-| `runner.revoked` (إلغاء اللوحة وإلغاء الـ runner لنفسه) بيتنشر على الـ event bus بعد الـ commit، فلو الـ process وقع بينهم الـ audit بيضيع. الـ bus مافيهوش outbox | — | — | outbox للأحداث اللي بتتسجّل، أو نشرها جوه نفس الـ transaction (خطة M7 بتقفله في M7.2أ) |
+| ~~`runner.revoked` بيتنشر بعد الـ commit فلو الـ process وقع الـ audit بيضيع~~ | `feat/notifications-m72a` | — | اتقفل في M7.2أ ([ADR-0108](ADR/0108-notifications-foundation.md)): النشر بقى جوه transaction الإلغاء (`Audited.Tx`) والإشعار بيتكتب في الـ outbox معاه. نفس الشيء لـ `auth.*` لسه بعد الـ commit (مذكور في الـ ADR) |
 | خطة M7: واجهة المنتج ([`M7-Product-UI.md`](M7-Product-UI.md)) | `plan/m7-product-ui` | #126 | اتجاوبت كلها (قرار 3: SSE لكل حاجة، وأحداث الحساب في الإشعارات)، وبعد الدمج M7.0 |
 | M7.0: القياس والميزانيات ([ADR-0103](ADR/0103-web-size-budgets.md) لـ [0107](ADR/0107-trusted-types-report-only-then-enforce.md)) | `feat/m7-baseline-m70` | #127 (draft) | اتعمل: `pnpm size` بيفرض سقف لكل chunk كسول (60 KB و35 KB للعارض)، والأولاني 127.7 لـ 123.8 KB، وأدوات قياس الأداء و`LogPerf.spec.ts`، وترويسة Trusted Types report-only في `DHOW_DEV`، وحارس الـ e2e على كل مخالفة CSP. لسه: الهدف 120 KB ما اتحققش، وأرقام الـ CI بتتسجّل بعد أول تشغيل لـ `make e2e` |
+| M7.2أ: الإشعارات: الأساس ([ADR-0108](ADR/0108-notifications-foundation.md)) | `feat/notifications-m72a` | draft | اتعمل: `Core/Outbox` (طابور في Postgres بقفل advisory و`SKIP LOCKED` وتأجير وإعادة محاولة 1د/5د/30د/2س وقاطع دايرة)، و`Modules/Notifications` (قنوات بريد وwebhook موقّع، قواعد، سجل تسليم، كتم شخصي، قنوات المؤسسة)، و`netguard` على كل إرسال، و`ConfigSealed` في `keys rekey` والـ backfill، و`notification.manage`، ونقل `Alerts` على الـ outbox، ونشر `runner.revoked` جوه الـ transaction، وأحداث الحساب (جهاز جديد والخطوة التانية والأعضاء). لسه: Slack وTelegram وDiscord (M7.2ب)، والواجهة وصندوق `inapp` (M7.3)، ونشر `auth.*` جوه الـ transaction، وبريد القنوات بدور المؤسسة بس (من غير ربط المشروع) |
 
 M2.6 وM3.6 والتطوير المحلي وإصلاحات مراجعة M3.6 وتغيير الاسم وM3.7 وتجهيز Windows وM3.9 اتدمجوا في 2026-10-28، ومن #35 لـ #59 اتدمجوا في 2026-10-28 و2026-10-29.
 
