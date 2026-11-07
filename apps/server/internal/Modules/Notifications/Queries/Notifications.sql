@@ -6,15 +6,10 @@ SELECT pg_advisory_xact_lock(hashtextextended('dhow.notification-channels:' || @
 
 -- name: InsertNotificationChannel :one
 INSERT INTO "NotificationChannels" (
-    "OrganizationId", "ProjectId", "Kind", "Name", "Locale", "Host", "ConfigSealed", "CreatedByUserId"
+    "Id", "OrganizationId", "ProjectId", "Kind", "Name", "Locale", "Host", "ConfigSealed", "CreatedByUserId"
 )
-VALUES (@organization_id, sqlc.narg('project_id'), @kind, @name, @locale, @host, sqlc.narg('config_sealed'), @created_by_user_id)
+VALUES (@id, @organization_id, sqlc.narg('project_id'), @kind, @name, @locale, @host, sqlc.narg('config_sealed'), @created_by_user_id)
 RETURNING *;
-
--- name: SetNotificationChannelConfig :exec
-UPDATE "NotificationChannels"
-SET "ConfigSealed" = @config_sealed, "Host" = @host, "UpdatedAt" = now()
-WHERE "Id" = @id;
 
 -- name: GetNotificationChannel :one
 SELECT * FROM "NotificationChannels"
@@ -59,7 +54,8 @@ RETURNING *;
 
 -- name: EnableNotificationChannel :one
 UPDATE "NotificationChannels"
-SET "Enabled" = true, "DisabledReason" = NULL, "ConsecutiveFailures" = 0, "Version" = "Version" + 1, "UpdatedAt" = now()
+SET "Enabled" = true, "DisabledReason" = NULL, "ConsecutiveFailures" = 0, "CreatedByUserId" = @actor_id,
+    "Version" = "Version" + 1, "UpdatedAt" = now()
 WHERE "Id" = @id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"
 RETURNING *;
 

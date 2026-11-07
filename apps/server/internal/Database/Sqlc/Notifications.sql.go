@@ -166,18 +166,20 @@ func (q *Queries) DisableNotificationChannelsOfCreator(ctx context.Context, arg 
 
 const enableNotificationChannel = `-- name: EnableNotificationChannel :one
 UPDATE "NotificationChannels"
-SET "Enabled" = true, "DisabledReason" = NULL, "ConsecutiveFailures" = 0, "Version" = "Version" + 1, "UpdatedAt" = now()
-WHERE "Id" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+SET "Enabled" = true, "DisabledReason" = NULL, "ConsecutiveFailures" = 0, "CreatedByUserId" = $1,
+    "Version" = "Version" + 1, "UpdatedAt" = now()
+WHERE "Id" = $2 AND "OrganizationId" = $3 AND NOT "IsDeleted"
 RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Kind", "Name", "Locale", "Enabled", "DisabledReason", "ConsecutiveFailures", "Host", "ConfigSealed", "Version", "CreatedByUserId"
 `
 
 type EnableNotificationChannelParams struct {
+	ActorID        uuid.UUID
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 }
 
 func (q *Queries) EnableNotificationChannel(ctx context.Context, arg EnableNotificationChannelParams) (NotificationChannel, error) {
-	row := q.db.QueryRow(ctx, enableNotificationChannel, arg.ID, arg.OrganizationID)
+	row := q.db.QueryRow(ctx, enableNotificationChannel, arg.ActorID, arg.ID, arg.OrganizationID)
 	var i NotificationChannel
 	err := row.Scan(
 		&i.Id,
@@ -429,13 +431,14 @@ func (q *Queries) GetNotificationUser(ctx context.Context, id uuid.UUID) (GetNot
 
 const insertNotificationChannel = `-- name: InsertNotificationChannel :one
 INSERT INTO "NotificationChannels" (
-    "OrganizationId", "ProjectId", "Kind", "Name", "Locale", "Host", "ConfigSealed", "CreatedByUserId"
+    "Id", "OrganizationId", "ProjectId", "Kind", "Name", "Locale", "Host", "ConfigSealed", "CreatedByUserId"
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Kind", "Name", "Locale", "Enabled", "DisabledReason", "ConsecutiveFailures", "Host", "ConfigSealed", "Version", "CreatedByUserId"
 `
 
 type InsertNotificationChannelParams struct {
+	ID              uuid.UUID
 	OrganizationID  uuid.UUID
 	ProjectID       *uuid.UUID
 	Kind            string
@@ -448,6 +451,7 @@ type InsertNotificationChannelParams struct {
 
 func (q *Queries) InsertNotificationChannel(ctx context.Context, arg InsertNotificationChannelParams) (NotificationChannel, error) {
 	row := q.db.QueryRow(ctx, insertNotificationChannel,
+		arg.ID,
 		arg.OrganizationID,
 		arg.ProjectID,
 		arg.Kind,
@@ -1211,23 +1215,6 @@ func (q *Queries) ResolveRunnerOutages(ctx context.Context, arg ResolveRunnerOut
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const setNotificationChannelConfig = `-- name: SetNotificationChannelConfig :exec
-UPDATE "NotificationChannels"
-SET "ConfigSealed" = $1, "Host" = $2, "UpdatedAt" = now()
-WHERE "Id" = $3
-`
-
-type SetNotificationChannelConfigParams struct {
-	ConfigSealed []byte
-	Host         string
-	ID           uuid.UUID
-}
-
-func (q *Queries) SetNotificationChannelConfig(ctx context.Context, arg SetNotificationChannelConfigParams) error {
-	_, err := q.db.Exec(ctx, setNotificationChannelConfig, arg.ConfigSealed, arg.Host, arg.ID)
-	return err
 }
 
 const touchNotificationDevice = `-- name: TouchNotificationDevice :one

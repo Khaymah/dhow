@@ -626,7 +626,6 @@ type Querier interface {
 	SetLocalLockTimeout(ctx context.Context, timeout string) error
 	SetMemberRole(ctx context.Context, arg SetMemberRoleParams) (int64, error)
 	SetMfaChallengeWebauthn(ctx context.Context, arg SetMfaChallengeWebauthnParams) (int64, error)
-	SetNotificationChannelConfig(ctx context.Context, arg SetNotificationChannelConfigParams) error
 	SetOrganizationLogRetention(ctx context.Context, arg SetOrganizationLogRetentionParams) (SetOrganizationLogRetentionRow, error)
 	SetOrganizationSecondFactor(ctx context.Context, arg SetOrganizationSecondFactorParams) (SetOrganizationSecondFactorRow, error)
 	SetPreflightTimeouts(ctx context.Context, arg SetPreflightTimeoutsParams) error
