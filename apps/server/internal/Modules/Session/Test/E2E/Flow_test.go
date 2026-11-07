@@ -28,7 +28,7 @@ func TestSetupLoginMeLogout(t *testing.T) {
 	env := apptest.New(t)
 
 	before := env.Do(apptest.Request{Method: http.MethodGet, Path: "/meta"})
-	assert.JSONEq(t, `{"Version":"test","Commit":"test","SetupRequired":true}`, string(before.Data))
+	assert.JSONEq(t, `{"Version":"test","Commit":"test","ServerBuild":{"Version":"test","Commit":"test"},"SetupRequired":true}`, string(before.Data))
 
 	d := apptest.DefaultSetup()
 	setup := env.Setup(d)
@@ -46,7 +46,7 @@ func TestSetupLoginMeLogout(t *testing.T) {
 	assert.Equal(t, "dhow-co", created.Organization.Slug)
 
 	after := env.Do(apptest.Request{Method: http.MethodGet, Path: "/meta"})
-	assert.JSONEq(t, `{"Version":"test","Commit":"test","SetupRequired":false}`, string(after.Data))
+	assert.JSONEq(t, `{"Version":"test","Commit":"test","ServerBuild":{"Version":"test","Commit":"test"},"SetupRequired":false}`, string(after.Data))
 
 	anonymous := env.Do(apptest.Request{Method: http.MethodGet, Path: "/me"})
 	assert.Equal(t, http.StatusUnauthorized, anonymous.Status)
