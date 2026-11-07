@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"net"
 	"net/http"
@@ -225,4 +226,17 @@ func TestTheCertificateCoversTheThreeServiceHostsAndOnlyTheIssuedCaTrustsIt(t *t
 		require.NoError(t, refused.Body.Close())
 	}
 	require.Error(t, err, "a client that does not trust the generated CA refuses the receiver")
+}
+
+func TestTheCaCanOnlySignTheServiceHosts(t *testing.T) {
+	_, caPEM, err := receiver.NewTLS(time.Now())
+	require.NoError(t, err)
+	block, _ := pem.Decode(caPEM)
+	require.NotNil(t, block)
+	ca, err := x509.ParseCertificate(block.Bytes)
+	require.NoError(t, err)
+	assert.True(t, ca.PermittedDNSDomainsCritical)
+	assert.ElementsMatch(t, receiver.ServiceHosts(), ca.PermittedDNSDomains)
+	assert.True(t, ca.MaxPathLenZero)
+	assert.Zero(t, ca.MaxPathLen)
 }

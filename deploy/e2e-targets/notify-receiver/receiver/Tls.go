@@ -31,6 +31,7 @@ func NewTLS(now time.Time) (*tls.Config, []byte, error) {
 	caTemplate := &x509.Certificate{
 		SerialNumber: serial(), Subject: pkix.Name{CommonName: "Dhow notify receiver CA"}, NotBefore: now.Add(-time.Minute),
 		NotAfter: now.Add(certLifetime), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		MaxPathLen: 0, MaxPathLenZero: true, PermittedDNSDomainsCritical: true, PermittedDNSDomains: ServiceHosts(),
 	}
 	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
 	if err != nil {

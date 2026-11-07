@@ -18,7 +18,7 @@ const (
 	defaultListen = "127.0.0.1:8443"
 	headerTimeout = 5 * time.Second
 	stopTimeout   = 5 * time.Second
-	caFileMode    = 0o644
+	caFileMode    = 0o600
 )
 
 func main() {
