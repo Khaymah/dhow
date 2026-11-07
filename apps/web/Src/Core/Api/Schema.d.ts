@@ -3478,6 +3478,16 @@ export interface components {
              * @example Something went wrong. Try again later.
              */
             Message: string;
+            /**
+             * @description One short, fixed sentence in the Accept-Language locale that tells the user what to do. It never holds a value from the request. Absent when the code has no useful step to name.
+             * @example Wait a minute and reload the page.
+             */
+            Fix?: string;
+            /**
+             * @description Relative path of a page under `docs/` (Arabic) or `docs/en/` (English), with an optional `#anchor` already in the locale of the response. The client picks the folder from the UI language. Absent when no page helps.
+             * @example install/troubleshooting.md#setup-or-sign-in-fails-with-csrf_failed
+             */
+            DocsPath?: string;
             Details?: components["schemas"]["ErrorFieldDetail"][];
         };
         ErrorFieldDetail: {

@@ -44,9 +44,11 @@ func Error(w http.ResponseWriter, r *http.Request, ae *apperrors.AppError) {
 func Localize(ctx context.Context, ae *apperrors.AppError) *apperrors.AppError {
 	locale := i18n.LocaleFrom(ctx)
 	out := &apperrors.AppError{
-		Status:  ae.Status,
-		Code:    ae.Code,
-		Message: i18n.Translate(locale, ae.Message),
+		Status:   ae.Status,
+		Code:     ae.Code,
+		Message:  i18n.Translate(locale, ae.Message),
+		Fix:      i18n.Fix(locale, ae.Code),
+		DocsPath: i18n.DocsPath(locale, ae.Code),
 	}
 	for _, d := range ae.Details {
 		out.Details = append(out.Details, apperrors.IErrorDetail{Field: d.Field, Message: i18n.Translate(locale, d.Message)})

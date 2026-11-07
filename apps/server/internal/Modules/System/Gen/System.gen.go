@@ -103,6 +103,16 @@ type ErrorDetail struct {
 	Code    string              `json:"Code"`
 	Details *[]ErrorFieldDetail `json:"Details,omitempty"`
 
+	// DocsPath Relative path of a page under `docs/` (Arabic) or `docs/en/` (English), with an optional `#anchor` already in the locale of the response. The client picks the folder from the UI language. Absent when no page helps.
+	//
+	// Example: install/troubleshooting.md#setup-or-sign-in-fails-with-csrf_failed
+	DocsPath *string `json:"DocsPath,omitempty"`
+
+	// Fix One short, fixed sentence in the Accept-Language locale that tells the user what to do. It never holds a value from the request. Absent when the code has no useful step to name.
+	//
+	// Example: Wait a minute and reload the page.
+	Fix *string `json:"Fix,omitempty"`
+
 	// Message Message translated by the server for the Accept-Language locale (Arabic by default).
 	//
 	// Example: Something went wrong. Try again later.
