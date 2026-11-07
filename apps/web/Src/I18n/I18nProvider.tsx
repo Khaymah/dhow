@@ -2,28 +2,28 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { I18nContext, type II18nValue } from '@/I18n/I18nContext';
 import { DIRECTION, readStoredLocale, storeLocale, type TLocale } from '@/I18n/Locale';
+import { loadBootMessages } from '@/I18n/BootCatalog';
 import { translate } from '@/I18n/Translate';
 import { useCatalogStore } from '@/I18n/useCatalogStore';
 import { anyWorkspaceMessages, loadWorkspaceMessages } from '@/I18n/WorkspaceCatalog';
 
 export const I18nProvider = ({ children }: { children: ReactNode }) => {
   const [Locale, setLocaleState] = useState<TLocale>(readStoredLocale);
+  const Boot = useCatalogStore((state) => state.Boot[Locale]);
   const Workspace = useCatalogStore((state) => state.Workspace[Locale]);
   const Requested = useRef<TLocale>(Locale);
 
   const t = useCallback<II18nValue['t']>(
     (key, params) => translate(Locale, key, params, Workspace),
-    [Locale, Workspace],
+    [Locale, Boot, Workspace],
   );
 
   const SetLocale = useCallback((next: TLocale) => {
     Requested.current = next;
     storeLocale(next);
-    if (!anyWorkspaceMessages()) {
-      setLocaleState(next);
-      return;
-    }
-    void loadWorkspaceMessages(next).finally(() => {
+    const loading = [loadBootMessages(next)];
+    if (anyWorkspaceMessages()) loading.push(loadWorkspaceMessages(next));
+    void Promise.allSettled(loading).then(() => {
       if (Requested.current === next) setLocaleState(next);
     });
   }, []);
