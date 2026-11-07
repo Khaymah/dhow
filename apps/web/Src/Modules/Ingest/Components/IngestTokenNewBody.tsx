@@ -13,7 +13,7 @@ import { IngestFactorSubmit } from '@/Modules/Ingest/Components/IngestFactorSubm
 import { IngestReachConfirm } from '@/Modules/Ingest/Components/IngestReachConfirm';
 import { IngestTokenCreated } from '@/Modules/Ingest/Components/IngestTokenCreated';
 import { IngestTokenFields } from '@/Modules/Ingest/Components/IngestTokenFields';
-import { canManageIngest } from '@/Modules/Ingest/Types/IngestAccess';
+import { canConfirmProtectedReach, canManageIngest } from '@/Modules/Ingest/Types/IngestAccess';
 import { useCreateIngestToken } from '@/Modules/Ingest/Hooks/useCreateIngestToken';
 import { useIngestRefresh } from '@/Modules/Ingest/Hooks/useIngest';
 import { draftProblem, EMPTY_TOKEN_DRAFT, type ITokenDraft } from '@/Modules/Ingest/Types/IngestForm';
@@ -31,10 +31,11 @@ interface INewFormProps {
   organizationId: string;
   projectId: string;
   methods: readonly TFactorMethod[];
+  canConfirm: boolean;
   onDone: () => void;
 }
 
-const NewForm = ({ organizationId, projectId, methods, onDone }: INewFormProps) => {
+const NewForm = ({ organizationId, projectId, methods, canConfirm, onDone }: INewFormProps) => {
   const t = useT();
   const refresh = useIngestRefresh(organizationId, projectId);
   const [Draft, setDraft] = useState<ITokenDraft>(EMPTY_TOKEN_DRAFT);
@@ -56,15 +57,10 @@ const NewForm = ({ organizationId, projectId, methods, onDone }: INewFormProps) 
   });
 
   if (Created !== null) {
-    return (
-      <IngestTokenCreated
-        created={Created}
-        onDone={() => {
-          setCreated(null);
-          onDone();
-        }}
-      />
-    );
+    return <IngestTokenCreated created={Created} onDone={() => {
+      setCreated(null);
+      onDone();
+    }} />;
   }
 
   const HandleChange = (next: ITokenDraft) => {
@@ -117,7 +113,8 @@ const NewForm = ({ organizationId, projectId, methods, onDone }: INewFormProps) 
         <IngestReachConfirm
           names={Reach}
           acknowledged={Acknowledged}
-          disabled={action.Busy}
+          disabled={action.Busy || !canConfirm}
+          needsAdmin={!canConfirm}
           onChange={(value) => {
             setAcknowledged(value);
             setProblem(null);
@@ -148,7 +145,7 @@ export const IngestTokenNewBody = ({ projectId, role, active, onDone }: IIngestT
   if (!active) return <InlineAlert accent="building" title={t('projects.archived.blocked')} />;
   return (
     <FactorGate>
-      {(methods) => <NewForm organizationId={membership.OrganizationId} projectId={projectId} methods={methods} onDone={onDone} />}
+      {(methods) => <NewForm organizationId={membership.OrganizationId} projectId={projectId} methods={methods} canConfirm={canConfirmProtectedReach(role)} onDone={onDone} />}
     </FactorGate>
   );
 };

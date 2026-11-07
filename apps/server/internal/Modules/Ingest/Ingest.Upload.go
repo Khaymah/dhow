@@ -76,6 +76,13 @@ func (s *Service) authenticate(ctx context.Context, header string) (tokenAuth, e
 	if err != nil {
 		return tokenAuth{}, err
 	}
+	allowed, err := s.creatorAllowed(ctx, s.queries(), row.OrganizationId, row.ProjectId, row.CreatedByUserId)
+	if err != nil {
+		return tokenAuth{}, err
+	}
+	if !allowed {
+		return tokenAuth{row: row}, apperrors.IngestCreatorNotAllowed()
+	}
 	if err := s.queries().TouchIngestToken(ctx, sqlc.TouchIngestTokenParams{
 		ID: row.Id, Now: &now, StaleBefore: ptrOf(now.Add(-config.IngestLastUsedEvery)),
 	}); err != nil {
@@ -145,6 +152,9 @@ func (s *Service) put(w http.ResponseWriter, r *http.Request, got **tokenAuth) (
 	if !allows(tok.patterns, meta) {
 		return models.Received{}, apperrors.RefNotAllowedForToken()
 	}
+	if err := s.checkAcknowledged(ctx, s.queries(), tok, tok.row.AcknowledgedEnvironmentIds); err != nil {
+		return models.Received{}, err
+	}
 	switch {
 	case r.ContentLength < 0:
 		return models.Received{}, apperrors.LengthRequired()
@@ -160,7 +170,7 @@ func (s *Service) put(w http.ResponseWriter, r *http.Request, got **tokenAuth) (
 	if err := s.checkTokenQuota(ctx, s.queries(), tok.row.Id, r.ContentLength); err != nil {
 		return models.Received{}, err
 	}
-	release, err := s.inflight.acquire(tok.row.Id, tok.row.OrganizationId)
+	release, err := s.inflight.acquire(tok.row.Id, tok.row.OrganizationId, network)
 	if err != nil {
 		return models.Received{}, err
 	}

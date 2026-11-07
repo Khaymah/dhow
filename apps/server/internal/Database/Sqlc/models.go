@@ -414,21 +414,22 @@ type GitSetupFlow struct {
 }
 
 type IngestToken struct {
-	Id              uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	IsDeleted       bool
-	OrganizationId  uuid.UUID
-	ProjectId       uuid.UUID
-	Name            string
-	TokenHash       []byte
-	Prefix          string
-	RefPatterns     []byte
-	ExpiresAt       time.Time
-	LastUsedAt      *time.Time
-	RevokedAt       *time.Time
-	RevokedByUserId *uuid.UUID
-	CreatedByUserId uuid.UUID
+	Id                         uuid.UUID
+	CreatedAt                  time.Time
+	UpdatedAt                  time.Time
+	IsDeleted                  bool
+	OrganizationId             uuid.UUID
+	ProjectId                  uuid.UUID
+	Name                       string
+	TokenHash                  []byte
+	Prefix                     string
+	RefPatterns                []byte
+	ExpiresAt                  time.Time
+	LastUsedAt                 *time.Time
+	RevokedAt                  *time.Time
+	RevokedByUserId            *uuid.UUID
+	CreatedByUserId            uuid.UUID
+	AcknowledgedEnvironmentIds []uuid.UUID
 }
 
 type IngestedArtifact struct {

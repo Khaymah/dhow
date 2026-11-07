@@ -120,3 +120,7 @@ Some changes convert many rows, such as moving sealed values to the format of th
 Every server records itself in the `"ServerInstances"` table when it starts: its stable name, the host name, its version, and the last migration it knows. The stable name is `DHOW_INSTANCE_ID`, or the host name when it is not set, and the Compose stack names the container `dhow`. After a restart the server reuses the same row, so the table does not grow. It updates its last-seen time every 30 seconds and marks itself stopped on a clean stop. A server not seen for 90 seconds counts as stopped. `dhow-server migrate status` lists the servers running now, so before an upgrade you know whether an old release still runs.
 
 Because of the `expand` and `contract` rule, the old and the new release can run side by side during an upgrade: upgrade one server, check that it is healthy, then upgrade the rest.
+
+## Notes for particular releases
+
+Ingest tokens made before migration 00078 have no recorded confirmation for protected environments. Dhow refuses the upload of any such token that reaches a protected environment with `403 INGEST_REACH_NOT_ACKNOWLEDGED` until a project admin confirms the reach from the token list. This is intended, because it fails closed. No release was published before this one, so in practice nobody is affected.

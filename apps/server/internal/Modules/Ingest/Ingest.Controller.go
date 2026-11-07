@@ -14,6 +14,7 @@ const (
 	messageTokensListed    = "ingest.tokens.listed"
 	messageTokenCreated    = "ingest.token.created" //nolint:gosec // An i18n key, not a credential.
 	messageTokenRevoked    = "ingest.token.revoked" //nolint:gosec // An i18n key, not a credential.
+	messageReachAcked      = "ingest.token.reachAcknowledged"
 	messageArtifactsListed = "ingest.artifacts.listed"
 )
 
@@ -59,7 +60,7 @@ func tokenView(t models.Token) gen.IngestToken {
 	return gen.IngestToken{
 		Id: t.ID, ProjectId: t.ProjectID, Name: t.Name, Prefix: t.Prefix, RefPatterns: patterns, Status: gen.IngestTokenStatus(t.Status),
 		CreatedAt: t.CreatedAt, ExpiresAt: t.ExpiresAt, LastUsedAt: t.LastUsedAt, RevokedAt: t.RevokedAt, CreatedByUserId: ptrOf(t.CreatedByUserID),
-		Reaches: ptrOf(nonNil(t.Reaches)),
+		Reaches: ptrOf(nonNil(t.Reaches)), CreatorAllowed: ptrOf(t.CreatorAllowed), UnacknowledgedReach: ptrOf(nonNil(t.UnacknowledgedReach)),
 	}
 }
 
@@ -124,6 +125,20 @@ func (c *Controller) RevokeIngestToken(ctx context.Context, req gen.RevokeIngest
 	}
 	data := tokenView(t)
 	return gen.RevokeIngestToken200JSONResponse{Success: true, Message: ptrOf(messageTokenRevoked), Data: &data}, nil
+}
+
+func (c *Controller) AcknowledgeIngestTokenReach(
+	ctx context.Context, req gen.AcknowledgeIngestTokenReachRequestObject,
+) (gen.AcknowledgeIngestTokenReachResponseObject, error) {
+	if req.Body == nil {
+		return nil, apperrors.BadRequest()
+	}
+	t, err := c.service.AcknowledgeReach(ctx, req.Id, req.ProjectId, req.IngestTokenId, req.Body.Environments, factorOf(req.Body.CurrentFactor))
+	if err != nil {
+		return nil, err
+	}
+	data := tokenView(t)
+	return gen.AcknowledgeIngestTokenReach200JSONResponse{Success: true, Message: ptrOf(messageReachAcked), Data: &data}, nil
 }
 
 func (c *Controller) ListIngestedArtifacts(ctx context.Context, req gen.ListIngestedArtifactsRequestObject) (gen.ListIngestedArtifactsResponseObject, error) {

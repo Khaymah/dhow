@@ -3,7 +3,9 @@ package environments
 import (
 	"context"
 
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	response "github.com/Khaymah/dhow/apps/server/internal/Core/Response"
 	gen "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments/Gen"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments/Models"
@@ -57,15 +59,29 @@ func settingsInOf(in *gen.DeployTargetSettings) *models.TargetSettings {
 	return out
 }
 
-func settingsView(s models.TargetSettings) gen.DeployTargetSettings {
+func canSeeHooks(ctx context.Context) bool {
+	p, ok := auth.PrincipalFrom(ctx)
+	return ok && !p.ViaToken() && policy.Allows(p.ProjectRole, policy.EnvironmentManage)
+}
+
+func hookText(text string, reveal bool) *string {
+	if !reveal {
+		return nil
+	}
+	return ptrOf(text)
+}
+
+func settingsView(s models.TargetSettings, reveal bool) gen.DeployTargetSettings {
 	out := gen.DeployTargetSettings{AllowRoot: ptrOf(s.AllowRoot)}
 	if s.Rolling != nil {
 		out.Rolling = &gen.DeployTargetRolling{BatchSize: ptrOf(s.Rolling.BatchSize), BatchPauseSeconds: ptrOf(s.Rolling.BatchPauseSeconds)}
 	}
 	if s.SSH != nil {
 		out.Ssh = &gen.DeployTargetSshSettings{
-			ReloadCommand: ptrOf(s.SSH.ReloadCommand), PreSwitchCommand: ptrOf(s.SSH.PreSwitchCommand),
-			PostSwitchCommand: ptrOf(s.SSH.PostSwitchCommand), Shared: ptrOf(nonNil(s.SSH.Shared)),
+			ReloadCommand: hookText(s.SSH.ReloadCommand, reveal), PreSwitchCommand: hookText(s.SSH.PreSwitchCommand, reveal),
+			PostSwitchCommand: hookText(s.SSH.PostSwitchCommand, reveal), Shared: ptrOf(nonNil(s.SSH.Shared)),
+			ReloadCommandSet: ptrOf(s.SSH.ReloadCommand != ""), PreSwitchCommandSet: ptrOf(s.SSH.PreSwitchCommand != ""),
+			PostSwitchCommandSet: ptrOf(s.SSH.PostSwitchCommand != ""),
 		}
 	}
 	if s.Compose != nil {
@@ -92,7 +108,8 @@ func hostView(h models.TargetHost) gen.DeployTargetHost {
 	}
 }
 
-func targetView(t models.Target) gen.DeployTarget {
+func targetView(ctx context.Context, t models.Target) gen.DeployTarget {
+	reveal := canSeeHooks(ctx)
 	hosts := make([]gen.DeployTargetHost, 0, len(t.Hosts))
 	for _, h := range t.Hosts {
 		hosts = append(hosts, hostView(h))
@@ -104,7 +121,7 @@ func targetView(t models.Target) gen.DeployTarget {
 	return gen.DeployTarget{
 		Id: t.ID, EnvironmentId: t.EnvironmentID, Name: t.Name, Kind: gen.DeployTargetKind(t.Kind), Username: t.Username,
 		KeySecretName: optionalText(t.KeySecretName), PublicKey: optionalText(t.PublicKey), DeployPath: t.DeployPath,
-		KeepReleases: t.KeepReleases, Settings: settingsView(t.Settings), AllowedImages: nonNil(t.AllowedImages), Hosts: hosts,
+		KeepReleases: t.KeepReleases, Settings: settingsView(t.Settings, reveal), AllowedImages: nonNil(t.AllowedImages), Hosts: hosts,
 		Ready: t.Ready, NotReady: notReady, Version: t.Version, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
 	}
 }
@@ -117,7 +134,7 @@ func (c *Controller) ListDeployTargets(ctx context.Context, req gen.ListDeployTa
 	}
 	items := make([]gen.DeployTarget, 0, len(list.Items))
 	for _, t := range list.Items {
-		items = append(items, targetView(t))
+		items = append(items, targetView(ctx, t))
 	}
 	return gen.ListDeployTargets200JSONResponse{
 		Success: true, Message: ptrOf(messageTargetsListed), Data: &items, Meta: &gen.PageMeta{Page: page, Limit: limit, Total: int(list.Total)},
@@ -140,7 +157,7 @@ func (c *Controller) CreateDeployTarget(ctx context.Context, req gen.CreateDeplo
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.CreateDeployTarget201JSONResponse{Success: true, Message: ptrOf(messageTargetCreated), Data: &data}, nil
 }
 
@@ -149,7 +166,7 @@ func (c *Controller) GetDeployTarget(ctx context.Context, req gen.GetDeployTarge
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.GetDeployTarget200JSONResponse{Success: true, Message: ptrOf(messageTargetLoaded), Data: &data}, nil
 }
 
@@ -165,7 +182,7 @@ func (c *Controller) UpdateDeployTarget(ctx context.Context, req gen.UpdateDeplo
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.UpdateDeployTarget200JSONResponse{Success: true, Message: ptrOf(messageTargetUpdated), Data: &data}, nil
 }
 
@@ -177,7 +194,7 @@ func (c *Controller) RemoveDeployTarget(ctx context.Context, req gen.RemoveDeplo
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.RemoveDeployTarget200JSONResponse{Success: true, Message: ptrOf(messageTargetRemoved), Data: &data}, nil
 }
 
@@ -189,7 +206,7 @@ func (c *Controller) GenerateDeployTargetKey(ctx context.Context, req gen.Genera
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.GenerateDeployTargetKey200JSONResponse{Success: true, Message: ptrOf(messageKeyGenerated), Data: &data}, nil
 }
 
@@ -203,7 +220,7 @@ func (c *Controller) AddDeployTargetHost(ctx context.Context, req gen.AddDeployT
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.AddDeployTargetHost200JSONResponse{Success: true, Message: ptrOf(messageHostAdded), Data: &data}, nil
 }
 
@@ -216,7 +233,7 @@ func (c *Controller) ReorderDeployTargetHosts(ctx context.Context, req gen.Reord
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.ReorderDeployTargetHosts200JSONResponse{Success: true, Message: ptrOf(messageHostsReordered), Data: &data}, nil
 }
 
@@ -230,7 +247,7 @@ func (c *Controller) UpdateDeployTargetHost(ctx context.Context, req gen.UpdateD
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.UpdateDeployTargetHost200JSONResponse{Success: true, Message: ptrOf(messageHostUpdated), Data: &data}, nil
 }
 
@@ -243,7 +260,7 @@ func (c *Controller) RemoveDeployTargetHost(ctx context.Context, req gen.RemoveD
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.RemoveDeployTargetHost200JSONResponse{Success: true, Message: ptrOf(messageHostRemoved), Data: &data}, nil
 }
 
@@ -252,7 +269,7 @@ func (c *Controller) FetchDeployTargetHostKey(ctx context.Context, req gen.Fetch
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.FetchDeployTargetHostKey200JSONResponse{Success: true, Message: ptrOf(messageHostKeyFetched), Data: &data}, nil
 }
 
@@ -264,7 +281,7 @@ func (c *Controller) SetDeployTargetPendingHostKey(ctx context.Context, req gen.
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.SetDeployTargetPendingHostKey200JSONResponse{Success: true, Message: ptrOf(messageHostKeyPending), Data: &data}, nil
 }
 
@@ -277,6 +294,6 @@ func (c *Controller) ConfirmDeployTargetHostKey(ctx context.Context, req gen.Con
 	if err != nil {
 		return nil, err
 	}
-	data := targetView(t)
+	data := targetView(ctx, t)
 	return gen.ConfirmDeployTargetHostKey200JSONResponse{Success: true, Message: ptrOf(messageHostKeyConfirmed), Data: &data}, nil
 }

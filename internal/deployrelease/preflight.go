@@ -2,6 +2,8 @@ package deployrelease
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -15,6 +17,10 @@ const (
 	lockName     = "lock"
 	ownerName    = "owner"
 	maxSmallFile = 4 << 10
+
+	staleInfix       = ".stale-"
+	gateSuffix       = ".takeover"
+	staleSuffixBytes = 8
 )
 
 type lockOwner struct {
@@ -133,6 +139,7 @@ func (d *run) choosePrevious() *Failure {
 
 func (d *run) lock() *Failure {
 	dir := d.dhow + "/" + lockName
+	d.sweepStale()
 	for range 2 {
 		err := d.r.Mkdir(dir, 0o700)
 		if err == nil {
@@ -147,14 +154,72 @@ func (d *run) lock() *Failure {
 			return fail(ExitFailed, CauseOther, "cannot take the lock of the target", err)
 		}
 		if !d.lockExpired(dir) {
-			return fail(ExitTargetLocked, CauseOther, "another deployment holds the lock of the target", ErrTargetLocked)
+			return lockedFailure()
 		}
-		d.e.Log.Warn("the lock of the target had expired, so this deployment takes it")
-		if err := d.r.RemoveAll(dir); err != nil {
-			return fail(ExitFailed, CauseOther, "cannot clear the expired lock", err)
+		if f := d.takeOver(dir); f != nil {
+			return f
 		}
 	}
 	return fail(ExitTargetLocked, CauseOther, "another deployment holds the lock of the target", ErrTargetLocked)
+}
+
+func staleName(dir string) (string, error) {
+	raw := make([]byte, staleSuffixBytes)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return dir + staleInfix + hex.EncodeToString(raw), nil
+}
+
+func lockedFailure() *Failure {
+	return fail(ExitTargetLocked, CauseOther, "another deployment holds the lock of the target", ErrTargetLocked)
+}
+
+func (d *run) takeOver(dir string) *Failure {
+	gate := dir + gateSuffix
+	if err := d.r.Mkdir(gate, 0o700); err != nil {
+		if errors.Is(err, fs.ErrExist) {
+			return lockedFailure()
+		}
+		return fail(ExitFailed, CauseOther, "cannot start taking the expired lock", err)
+	}
+	defer func() { _ = d.r.Remove(gate) }()
+	if _, err := d.r.Lstat(dir); isNotExist(err) {
+		return nil
+	}
+	if !d.lockExpired(dir) {
+		return lockedFailure()
+	}
+	stale, err := staleName(dir)
+	if err != nil {
+		return fail(ExitFailed, CauseOther, "cannot name the expired lock", err)
+	}
+	if err := d.r.Rename(dir, stale); err != nil {
+		if isNotExist(err) {
+			return nil
+		}
+		return fail(ExitFailed, CauseOther, "cannot move the expired lock aside", err)
+	}
+	d.e.Log.Warn("the lock of the target had expired, so this deployment takes it")
+	if err := d.r.RemoveAll(stale); err != nil {
+		d.e.Log.Warn("an expired lock could not be removed", "error", err.Error())
+	}
+	return nil
+}
+
+func (d *run) sweepStale() {
+	list, err := d.r.ReadDir(d.dhow)
+	if err != nil {
+		return
+	}
+	for _, e := range list {
+		if !strings.HasPrefix(e.Name, lockName+staleInfix) && e.Name != lockName+gateSuffix {
+			continue
+		}
+		if d.now().Sub(e.ModTime) > LockTTL {
+			_ = d.r.RemoveAll(d.dhow + "/" + e.Name)
+		}
+	}
 }
 
 func (d *run) writeOwner(dir string) *Failure {

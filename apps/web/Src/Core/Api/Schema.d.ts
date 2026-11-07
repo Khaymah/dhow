@@ -2867,7 +2867,7 @@ export interface paths {
         put?: never;
         /**
          * Make an ingest token
-         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409 `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true`, otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`, whose `Details` carry one `ProtectedReach` entry for each such environment, with its name as `Message`.
+         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409 `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true` from a caller who holds `environment.manage` on the project (403 `INGEST_REACH_NEEDS_ENVIRONMENT_ADMIN` otherwise; a Maintainer can still make a token that reaches only unprotected environments), otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`, whose `Details` carry one `ProtectedReach` entry for each such environment, with its name as `Message`.
          */
         post: operations["createIngestToken"];
         delete?: never;
@@ -2890,6 +2890,26 @@ export interface paths {
          * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The next upload with the token is 401 `INGEST_TOKEN_REVOKED`. Files it already uploaded stay.
          */
         post: operations["revokeIngestToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/acknowledge-reach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm the protected environments an ingest token reaches
+         * @description Needs `ingest.manage` on the project and a fresh `CurrentFactor`. Use it after an environment became protected (it got a deploy target or a reviewer, or its allowed refs changed) and the list shows the environment in `UnacknowledgedReach`. It needs `environment.manage` on the project (Owner and Admin, or a project Admin binding), otherwise 403 `INGEST_REACH_NEEDS_ENVIRONMENT_ADMIN`. It records every protected environment the token reaches now, by id. The body carries the names the page showed in `Environments`: if they differ from the server's set it is 409 `INGEST_REACH_CHANGED`. A revoked or expired token is 409 `CONFLICT`.
+         */
+        post: operations["acknowledgeIngestTokenReach"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3795,6 +3815,11 @@ export interface components {
         CurrentFactorRequest: {
             CurrentFactor: components["schemas"]["CurrentFactor"];
         };
+        AcknowledgeIngestReachRequest: {
+            /** @description The names of the unconfirmed protected environments of the token (`UnacknowledgedReach`), as the page showed them. If the set the server computes now differs, the answer is 409 `INGEST_REACH_CHANGED` and nothing is confirmed. */
+            Environments: string[];
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
         MfaStatus: {
             /** @description True when the account has TOTP or at least one passkey. */
             Enabled: boolean;
@@ -4686,10 +4711,18 @@ export interface components {
             BatchPauseSeconds?: number;
         };
         DeployTargetSshSettings: {
-            /** @description A single line that runs on the host after the switch. Written by an admin only. */
+            /** @description A single line that runs on the host after the switch. Written by an admin only. An answer shows the text only to a session that holds `environment.manage` on the project; for everyone else, including every API token, the field is missing and the matching `...Set` flag tells whether a command exists. A hook must never contain a secret: use a deploy secret instead. */
             ReloadCommand?: string;
+            /** @description Same rules as `ReloadCommand`. */
             PreSwitchCommand?: string;
+            /** @description Same rules as `ReloadCommand`. */
             PostSwitchCommand?: string;
+            /** @description Answers only. `true` when a reload command exists, whether or not its text is shown. */
+            readonly ReloadCommandSet?: boolean;
+            /** @description Answers only. `true` when a pre-switch command exists. */
+            readonly PreSwitchCommandSet?: boolean;
+            /** @description Answers only. `true` when a post-switch command exists. */
+            readonly PostSwitchCommandSet?: boolean;
             /** @description Names of files and folders kept in `shared/` and linked into each release. */
             Shared?: string[];
         };
@@ -5204,6 +5237,10 @@ export interface components {
             CreatedByUserId?: string;
             /** @description The environments of the project whose allowed refs could match one of the token's patterns. The check is conservative: a wide pattern such as `**` reaches every environment that allows any branch. */
             Reaches?: string[];
+            /** @description `false` when the person who made the token is no longer a member of the organization, or no longer holds a role that allows `ingest.manage` on the project. An upload with such a token is 403 `INGEST_CREATOR_NOT_ALLOWED`. */
+            CreatorAllowed?: boolean;
+            /** @description The protected environments (with deploy targets or reviewers) the token reaches now but nobody confirmed. An upload with such a token is 403 `INGEST_REACH_NOT_ACKNOWLEDGED` (it does not name the environments) until `acknowledgeIngestTokenReach` confirms them. */
+            UnacknowledgedReach?: string[];
         };
         CreateIngestTokenRequest: {
             Name: string;
@@ -9939,6 +9976,35 @@ export interface operations {
         };
         responses: {
             /** @description The revoked token. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestTokenResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    acknowledgeIngestTokenReach: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                ingestTokenId: components["parameters"]["IngestTokenId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcknowledgeIngestReachRequest"];
+            };
+        };
+        responses: {
+            /** @description The token with its reach confirmed. */
             200: {
                 headers: {
                     [name: string]: unknown;

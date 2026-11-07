@@ -51,6 +51,7 @@ func patternsReach(token []models.RefPattern, env []models.RefPattern) bool {
 }
 
 type reachEnv struct {
+	id        uuid.UUID
 	name      string
 	protected bool
 	refs      []models.RefPattern
@@ -67,19 +68,19 @@ func (s *Service) environmentsOf(ctx context.Context, q *sqlc.Queries, org, proj
 		if err := json.Unmarshal(r.AllowedRefs, &refs); err != nil {
 			return nil, fmt.Errorf("decode the allowed refs of environment %q: %w", r.Name, err)
 		}
-		out = append(out, reachEnv{name: r.Name, protected: r.HasTargets || r.HasReviewers, refs: refs})
+		out = append(out, reachEnv{id: r.Id, name: r.Name, protected: r.HasTargets || r.HasReviewers, refs: refs})
 	}
 	return out, nil
 }
 
-func reachOf(patterns []models.RefPattern, envs []reachEnv) (names []string, protected []string) {
+func reachOf(patterns []models.RefPattern, envs []reachEnv) (names []string, protected []reachEnv) {
 	names = []string{}
-	protected = []string{}
+	protected = []reachEnv{}
 	for _, e := range envs {
 		if patternsReach(patterns, e.refs) {
 			names = append(names, e.name)
 			if e.protected {
-				protected = append(protected, e.name)
+				protected = append(protected, e)
 			}
 		}
 	}

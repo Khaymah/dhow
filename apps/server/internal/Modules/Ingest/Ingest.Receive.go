@@ -229,5 +229,12 @@ func (s *Service) recheckToken(ctx context.Context, q *sqlc.Queries, tok tokenAu
 	case row.ProjectState != projectActive:
 		return apperrors.ProjectArchived()
 	}
-	return nil
+	allowed, err := s.creatorAllowed(ctx, q, tok.row.OrganizationId, tok.row.ProjectId, tok.row.CreatedByUserId)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return apperrors.IngestCreatorNotAllowed()
+	}
+	return s.checkAcknowledged(ctx, q, tok, row.AcknowledgedEnvironmentIds)
 }

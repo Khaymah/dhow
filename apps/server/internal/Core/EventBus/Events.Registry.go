@@ -140,8 +140,10 @@ const (
 
 	IngestTokenCreated = "ingest_token.created" //nolint:gosec // An audit action name, not a credential.
 	IngestTokenRevoked = "ingest_token.revoked" //nolint:gosec // An audit action name, not a credential.
-	ArtifactIngested   = "artifact.ingested"
-	IngestRejected     = "ingest.rejected"
+
+	ArtifactIngested        = "artifact.ingested"
+	IngestRejected          = "ingest.rejected"
+	IngestReachAcknowledged = "ingest_token.reach_acknowledged"
 )
 
 //nolint:funlen // A flat list of event names.
@@ -244,6 +246,7 @@ func AuditedEvents() []string {
 		RegistryCredentialRemoved,
 		IngestTokenCreated,
 		IngestTokenRevoked,
+		IngestReachAcknowledged,
 		ArtifactIngested,
 		IngestRejected,
 		JobSecretsDelivered,

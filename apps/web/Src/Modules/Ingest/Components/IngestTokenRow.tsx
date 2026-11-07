@@ -13,12 +13,15 @@ export interface IIngestTokenRowProps {
   token: TIngestToken;
   creator: string;
   onAskRevoke?: (() => void) | undefined;
+  onAskAcknowledge?: (() => void) | undefined;
+  confirmNeedsAdmin?: boolean;
 }
 
-export const IngestTokenRow = ({ token, creator, onAskRevoke }: IIngestTokenRowProps) => {
+export const IngestTokenRow = ({ token, creator, onAskRevoke, onAskAcknowledge, confirmNeedsAdmin = false }: IIngestTokenRowProps) => {
   const t = useT();
   const time = useRelativeTime();
   const live = token.Status === 'active';
+  const unconfirmed = token.UnacknowledgedReach ?? [];
   const facts = [
     t('ingest.token.createdBy', { name: creator }),
     live ? t('ingest.token.expires', { when: time.full(token.ExpiresAt) }) : t('ingest.token.expired', { when: time.full(token.ExpiresAt) }),
@@ -60,6 +63,24 @@ export const IngestTokenRow = ({ token, creator, onAskRevoke }: IIngestTokenRowP
         <span className="text-body-sm text-secondary">{t('ingest.reach.label')}</span>
         <ReachList names={token.Reaches ?? []} />
       </div>
+      {live && token.CreatorAllowed === false ? (
+        <p className="m-0 flex min-w-0 items-center gap-2 text-body-sm text-warn-fg">
+          <Icon name="alert" size={14} className="flex-none" />
+          {t('ingest.token.creatorGone', { name: creator })}
+        </p>
+      ) : null}
+      {live && unconfirmed.length > 0 ? (
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="text-body-sm text-warn-fg">{t('ingest.token.unconfirmed')}</span>
+          <ReachList names={unconfirmed} tone="warn" />
+          {onAskAcknowledge ? (
+            <Button size="sm" variant="ghost" iconStart="check" aria-label={t('ingest.ack.aria', { name: token.Name })} onClick={onAskAcknowledge}>
+              {t('ingest.ack')}
+            </Button>
+          ) : null}
+          {confirmNeedsAdmin ? <small className="text-body-sm text-tertiary">{t('ingest.ack.needAdmin')}</small> : null}
+        </div>
+      ) : null}
       <small className="min-w-0 text-body-sm break-words text-tertiary">{facts.join(' · ')}</small>
     </li>
   );

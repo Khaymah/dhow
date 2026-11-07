@@ -36,6 +36,9 @@ type Token struct {
 	RevokedAt       *time.Time
 	CreatedByUserID uuid.UUID
 	Reaches         []string
+
+	CreatorAllowed      bool
+	UnacknowledgedReach []string
 }
 
 type TokenPage struct {

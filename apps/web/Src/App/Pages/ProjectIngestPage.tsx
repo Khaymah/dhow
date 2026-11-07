@@ -13,7 +13,7 @@ import { useT } from '@/I18n/useT';
 import { IngestTokensCard } from '@/Modules/Ingest/Components/IngestTokensCard';
 import { ReceivedFilesCard } from '@/Modules/Ingest/Components/ReceivedFilesCard';
 import { SendBuildPanel } from '@/Modules/Ingest/Components/SendBuildPanel';
-import { canManageIngest, canReadIngested } from '@/Modules/Ingest/Types/IngestAccess';
+import { canConfirmProtectedReach, canManageIngest, canReadIngested } from '@/Modules/Ingest/Types/IngestAccess';
 import { ProjectGate } from '@/Modules/Projects/Components/ProjectGate';
 
 export const ProjectIngestPage = () => {
@@ -40,6 +40,7 @@ export const ProjectIngestPage = () => {
                       organizationId={organizationId}
                       projectId={projectId}
                       writable={active}
+                      canConfirm={canConfirmProtectedReach(role)}
                       onNew={() => {
                         open('ingest-token-new');
                       }}

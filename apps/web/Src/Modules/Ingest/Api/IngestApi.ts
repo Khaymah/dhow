@@ -51,6 +51,20 @@ export const revokeIngestToken = (organizationId: string, projectId: string, tok
     }),
   );
 
+export const acknowledgeIngestTokenReach = (
+  organizationId: string,
+  projectId: string,
+  tokenId: string,
+  environments: readonly string[],
+  factor: TCurrentFactor,
+): Promise<TIngestToken> =>
+  request(() =>
+    ApiClient.POST('/organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/acknowledge-reach', {
+      params: { path: { id: organizationId, projectId, ingestTokenId: tokenId } },
+      body: { CurrentFactor: factor, Environments: [...environments] },
+    }),
+  );
+
 export const listIngestedArtifacts = (organizationId: string, projectId: string, page: number): Promise<IPage<TIngestedArtifact>> =>
   requestPage(() =>
     ApiClient.GET('/organizations/{id}/projects/{projectId}/ingested-artifacts', {

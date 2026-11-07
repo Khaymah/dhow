@@ -180,6 +180,16 @@ export const ReleasesSection = ({ organizationId, projectId, environmentName, ta
   );
 };
 
+const hooksHidden = (target: TTarget): boolean => {
+  const ssh = target.Settings.Ssh;
+  if (ssh === undefined) return false;
+  return (
+    (ssh.ReloadCommandSet === true && ssh.ReloadCommand === undefined) ||
+    (ssh.PreSwitchCommandSet === true && ssh.PreSwitchCommand === undefined) ||
+    (ssh.PostSwitchCommandSet === true && ssh.PostSwitchCommand === undefined)
+  );
+};
+
 export const Header = ({ target, current, different }: { target: TTarget; current: string | undefined; different: boolean }) => {
   const t = useT();
   return (
@@ -189,6 +199,7 @@ export const Header = ({ target, current, different }: { target: TTarget; curren
         <span>{t('targets.hosts', { count: target.Hosts.length })}</span>
         <span>{current ? t('targets.current', { release: current }) : t('targets.current.none')}</span>
       </p>
+      {hooksHidden(target) ? <p className="m-0 text-body-sm text-tertiary">{t('targets.hooks.hidden')}</p> : null}
       {target.Ready ? null : <InlineAlert accent="awaiting" title={t('targets.notReady')} />}
       {different ? <InlineAlert accent="failed" title={t('targets.partial')}>{t('targets.partial.hint')}</InlineAlert> : null}
     </div>

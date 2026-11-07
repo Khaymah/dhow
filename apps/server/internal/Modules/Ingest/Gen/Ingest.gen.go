@@ -80,6 +80,15 @@ func (e IngestTokenStatus) Valid() bool {
 	}
 }
 
+// AcknowledgeIngestReachRequest defines model for AcknowledgeIngestReachRequest.
+type AcknowledgeIngestReachRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+
+	// Environments The names of the unconfirmed protected environments of the token (`UnacknowledgedReach`), as the page showed them. If the set the server computes now differs, the answer is 409 `INGEST_REACH_CHANGED` and nothing is confirmed.
+	Environments []string `json:"Environments"`
+}
+
 // CreateIngestTokenRequest defines model for CreateIngestTokenRequest.
 type CreateIngestTokenRequest struct {
 	// AcknowledgeProtectedReach Must be `true` when the token reaches an environment that has deploy targets or reviewers. Otherwise the answer is 422 `INGEST_TOKEN_REACH_UNCONFIRMED`.
@@ -193,10 +202,13 @@ type IngestRefPattern struct {
 type IngestToken struct {
 	CreatedAt       time.Time           `json:"CreatedAt"`
 	CreatedByUserId *openapi_types.UUID `json:"CreatedByUserId,omitempty"`
-	ExpiresAt       time.Time           `json:"ExpiresAt"`
-	Id              openapi_types.UUID  `json:"Id"`
-	LastUsedAt      *time.Time          `json:"LastUsedAt,omitempty"`
-	Name            string              `json:"Name"`
+
+	// CreatorAllowed `false` when the person who made the token is no longer a member of the organization, or no longer holds a role that allows `ingest.manage` on the project. An upload with such a token is 403 `INGEST_CREATOR_NOT_ALLOWED`.
+	CreatorAllowed *bool              `json:"CreatorAllowed,omitempty"`
+	ExpiresAt      time.Time          `json:"ExpiresAt"`
+	Id             openapi_types.UUID `json:"Id"`
+	LastUsedAt     *time.Time         `json:"LastUsedAt,omitempty"`
+	Name           string             `json:"Name"`
 
 	// Prefix The first characters of the token, to tell tokens apart. Not enough to use it.
 	Prefix    string             `json:"Prefix"`
@@ -207,6 +219,9 @@ type IngestToken struct {
 	RefPatterns []IngestRefPattern `json:"RefPatterns"`
 	RevokedAt   *time.Time         `json:"RevokedAt,omitempty"`
 	Status      IngestTokenStatus  `json:"Status"`
+
+	// UnacknowledgedReach The protected environments (with deploy targets or reviewers) the token reaches now but nobody confirmed. An upload with such a token is 403 `INGEST_REACH_NOT_ACKNOWLEDGED` (it does not name the environments) until `acknowledgeIngestTokenReach` confirms them.
+	UnacknowledgedReach *[]string `json:"UnacknowledgedReach,omitempty"`
 }
 
 // IngestTokenListResponse defines model for IngestTokenListResponse.
@@ -324,6 +339,9 @@ type ListIngestedArtifactsParams struct {
 // CreateIngestTokenJSONRequestBody defines body for CreateIngestToken for application/json ContentType.
 type CreateIngestTokenJSONRequestBody = CreateIngestTokenRequest
 
+// AcknowledgeIngestTokenReachJSONRequestBody defines body for AcknowledgeIngestTokenReach for application/json ContentType.
+type AcknowledgeIngestTokenReachJSONRequestBody = AcknowledgeIngestReachRequest
+
 // RevokeIngestTokenJSONRequestBody defines body for RevokeIngestToken for application/json ContentType.
 type RevokeIngestTokenJSONRequestBody = CurrentFactorRequest
 
@@ -335,6 +353,9 @@ type ServerInterface interface {
 	// CreateIngestToken Make an ingest token
 	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens)
 	CreateIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId)
+	// AcknowledgeIngestTokenReach Confirm the protected environments an ingest token reaches
+	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/acknowledge-reach)
+	AcknowledgeIngestTokenReach(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, ingestTokenId IngestTokenId)
 	// RevokeIngestToken Revoke an ingest token
 	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/revoke)
 	RevokeIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, ingestTokenId IngestTokenId)
@@ -356,6 +377,12 @@ func (_ Unimplemented) ListIngestTokens(w http.ResponseWriter, r *http.Request, 
 // CreateIngestToken Make an ingest token
 // (POST /organizations/{id}/projects/{projectId}/ingest-tokens)
 func (_ Unimplemented) CreateIngestToken(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// AcknowledgeIngestTokenReach Confirm the protected environments an ingest token reaches
+// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/acknowledge-reach)
+func (_ Unimplemented) AcknowledgeIngestTokenReach(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, ingestTokenId IngestTokenId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -470,6 +497,50 @@ func (siw *ServerInterfaceWrapper) CreateIngestToken(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateIngestToken(w, r, id, projectId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcknowledgeIngestTokenReach operation middleware
+func (siw *ServerInterfaceWrapper) AcknowledgeIngestTokenReach(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "ingestTokenId" -------------
+	var ingestTokenId IngestTokenId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ingestTokenId", chi.URLParam(r, "ingestTokenId"), &ingestTokenId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ingestTokenId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcknowledgeIngestTokenReach(w, r, id, projectId, ingestTokenId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -710,6 +781,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/revoke", wrapper.RevokeIngestToken)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/acknowledge-reach", wrapper.AcknowledgeIngestTokenReach)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/ingested-artifacts", wrapper.ListIngestedArtifacts)
 	})
 
@@ -789,6 +863,48 @@ type CreateIngestTokendefaultJSONResponse struct {
 }
 
 func (response CreateIngestTokendefaultJSONResponse) VisitCreateIngestTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcknowledgeIngestTokenReachRequestObject struct {
+	Id            Id            `json:"id"`
+	ProjectId     ProjectId     `json:"projectId"`
+	IngestTokenId IngestTokenId `json:"ingestTokenId"`
+	Body          *AcknowledgeIngestTokenReachJSONRequestBody
+}
+
+type AcknowledgeIngestTokenReachResponseObject interface {
+	VisitAcknowledgeIngestTokenReachResponse(w http.ResponseWriter) error
+}
+
+type AcknowledgeIngestTokenReach200JSONResponse IngestTokenResponse
+
+func (response AcknowledgeIngestTokenReach200JSONResponse) VisitAcknowledgeIngestTokenReachResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcknowledgeIngestTokenReachdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response AcknowledgeIngestTokenReachdefaultJSONResponse) VisitAcknowledgeIngestTokenReachResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -891,6 +1007,9 @@ type StrictServerInterface interface {
 	// CreateIngestToken Make an ingest token
 	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens)
 	CreateIngestToken(ctx context.Context, request CreateIngestTokenRequestObject) (CreateIngestTokenResponseObject, error)
+	// AcknowledgeIngestTokenReach Confirm the protected environments an ingest token reaches
+	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/acknowledge-reach)
+	AcknowledgeIngestTokenReach(ctx context.Context, request AcknowledgeIngestTokenReachRequestObject) (AcknowledgeIngestTokenReachResponseObject, error)
 	// RevokeIngestToken Revoke an ingest token
 	// (POST /organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/revoke)
 	RevokeIngestToken(ctx context.Context, request RevokeIngestTokenRequestObject) (RevokeIngestTokenResponseObject, error)
@@ -993,6 +1112,41 @@ func (sh *strictHandler) CreateIngestToken(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateIngestTokenResponseObject); ok {
 		if err := validResponse.VisitCreateIngestTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AcknowledgeIngestTokenReach operation middleware
+func (sh *strictHandler) AcknowledgeIngestTokenReach(w http.ResponseWriter, r *http.Request, id Id, projectId ProjectId, ingestTokenId IngestTokenId) {
+	var request AcknowledgeIngestTokenReachRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.IngestTokenId = ingestTokenId
+
+	var body AcknowledgeIngestTokenReachJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AcknowledgeIngestTokenReach(ctx, request.(AcknowledgeIngestTokenReachRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcknowledgeIngestTokenReach")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AcknowledgeIngestTokenReachResponseObject); ok {
+		if err := validResponse.VisitAcknowledgeIngestTokenReachResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
