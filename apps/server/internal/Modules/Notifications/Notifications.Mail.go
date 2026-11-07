@@ -52,8 +52,15 @@ func RenderMail(locale i18n.Locale, p Payload) (string, string) {
 	var b strings.Builder
 	b.WriteString(title + "\n\n")
 	for _, f := range [][2]string{
-		{"status", status}, {"project", p.Project}, {"environment", p.Environment}, {"ref", p.Ref}, {"run", run},
-		{"runner", p.Runner}, {"browser", p.Browser}, {"network", p.Network}, {"time", p.Time},
+		{"status", status},
+		{"project", p.Project},
+		{"environment", p.Environment},
+		{"ref", p.Ref},
+		{"run", run},
+		{"runner", p.Runner},
+		{"browser", p.Browser},
+		{"network", p.Network},
+		{"time", p.Time},
 	} {
 		b.WriteString(line(locale, f[0], f[1]))
 	}

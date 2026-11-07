@@ -106,7 +106,7 @@ func (w *Worker) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			w.wg.Wait()
-			w.release()
+			w.release(ctx)
 			return
 		case <-timer.C:
 		case <-w.wake:
@@ -123,7 +123,7 @@ func (w *Worker) leader(ctx context.Context) bool {
 		if err := w.lock.Ping(ctx); err == nil {
 			return true
 		}
-		w.drop()
+		w.drop(ctx)
 	}
 	conn, err := w.pool.Acquire(ctx)
 	if err != nil {
@@ -139,24 +139,24 @@ func (w *Worker) leader(ctx context.Context) bool {
 	return true
 }
 
-func (w *Worker) drop() {
+func (w *Worker) drop(ctx context.Context) {
 	if w.lock == nil {
 		return
 	}
-	if err := w.lock.Hijack().Close(context.Background()); err != nil {
+	if err := w.lock.Hijack().Close(context.WithoutCancel(ctx)); err != nil {
 		w.log.Warn("notification worker closed a broken lock connection", "error", err)
 	}
 	w.lock = nil
 }
 
-func (w *Worker) release() {
+func (w *Worker) release(ctx context.Context) {
 	if w.lock == nil {
 		return
 	}
-	ctx := context.Background()
+	ctx = context.WithoutCancel(ctx)
 	released, err := sqlc.New(w.lock).ReleaseOutboxLock(ctx, w.lockKey)
 	if err != nil || !released {
-		w.drop()
+		w.drop(ctx)
 		return
 	}
 	w.lock.Release()
@@ -270,7 +270,7 @@ func statusOf(n int) pgtype.Int4 {
 	if n < 100 || n > 599 {
 		return pgtype.Int4{}
 	}
-	return pgtype.Int4{Int32: int32(n), Valid: true} //nolint:gosec // Bounded to an HTTP status above.
+	return pgtype.Int4{Int32: int32(n), Valid: true}
 }
 
 func (w *Worker) settle(ctx context.Context, item Item, res Result) {

@@ -21,7 +21,7 @@ const (
 	HeaderSignature = "Dhow-Signature"
 	HeaderIdempKey  = "Idempotency-Key"
 	SignatureScheme = "v1="
-	SecretPrefix    = "dhow_whsec_"
+	SecretPrefix    = "dhow_whsec_" //nolint:gosec // A public prefix, not a credential.
 	ReplayWindow    = 5 * time.Minute
 )
 

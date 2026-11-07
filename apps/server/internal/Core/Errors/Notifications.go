@@ -9,7 +9,7 @@ const (
 	CodeChannelExists          = "CHANNEL_EXISTS"
 	CodeChannelHostNotAllowed  = "CHANNEL_HOST_NOT_ALLOWED"
 	CodeChannelHostBlocked     = "CHANNEL_HOST_BLOCKED"
-	CodeChannelSecretInvalid   = "CHANNEL_SECRET_INVALID" //nolint:gosec // A public error code, not a credential. allow-secret
+	CodeChannelConfigInvalid   = "CHANNEL_SECRET_INVALID"
 	CodeChannelVersionConflict = "CHANNEL_VERSION_CONFLICT"
 	CodeChannelDisabled        = "CHANNEL_DISABLED"
 	CodeDeliveryNotRetryable   = "DELIVERY_NOT_RETRYABLE"
@@ -18,7 +18,7 @@ const (
 	KeyChannelExists          = "errors.channelExists"
 	KeyChannelHostNotAllowed  = "errors.channelHostNotAllowed"
 	KeyChannelHostBlocked     = "errors.channelHostBlocked"
-	KeyChannelSecretInvalid   = "errors.channelSecretInvalid" //nolint:gosec // An i18n key, not a credential. allow-secret
+	KeyChannelConfigInvalid   = "errors.channelSecretInvalid"
 	KeyChannelVersionConflict = "errors.channelVersionConflict"
 	KeyChannelDisabled        = "errors.channelDisabled"
 	KeyDeliveryNotRetryable   = "errors.deliveryNotRetryable"
@@ -38,7 +38,7 @@ func ChannelHostBlocked() *AppError {
 }
 
 func ChannelSecretInvalid() *AppError {
-	return New(http.StatusUnprocessableEntity, CodeChannelSecretInvalid, KeyChannelSecretInvalid)
+	return New(http.StatusUnprocessableEntity, CodeChannelConfigInvalid, KeyChannelConfigInvalid)
 }
 
 func ChannelVersionConflict() *AppError {

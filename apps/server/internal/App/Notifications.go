@@ -8,10 +8,12 @@ import (
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	mailer "github.com/Khaymah/dhow/apps/server/internal/Core/Mail"
+	alerts "github.com/Khaymah/dhow/apps/server/internal/Modules/Alerts"
 	notifications "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications"
 )
 
-func notificationsFor(in Infra, values *keys.Values, bus *eventbus.Bus, factors auth.FactorConfirmer, mail mailer.Sender) (*notifications.Service, error) {
+func notificationsFor(in Infra, values *keys.Values, bus *eventbus.Bus, factors auth.FactorConfirmer, mail mailer.Sender, alertsService *alerts.Service,
+) (*notifications.Service, error) {
 	service, err := notifications.NewService(notifications.Options{
 		DB: in.Pool, Pool: in.Pool, Values: values, Factors: factors, Bus: bus, Mailer: mail, Config: in.Config.Notify,
 		PublicURL: in.Config.PublicURL.String(), TLS: in.NotifyTLS, Lookup: in.NotifyLookup, Dial: in.NotifyDial,
@@ -21,6 +23,7 @@ func notificationsFor(in Infra, values *keys.Values, bus *eventbus.Bus, factors 
 		return nil, err
 	}
 	notifications.Subscribe(bus, service)
+	alertsService.UseFlush(service.Drain)
 	return service, nil
 }
 

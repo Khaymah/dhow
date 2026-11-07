@@ -43,7 +43,7 @@ func ParseTarget(raw string, allowHTTP bool) (Target, error) {
 	if err != nil {
 		return Target{}, ErrURLInvalid
 	}
-	if u.Scheme != "https" && !(allowHTTP && u.Scheme == "http") {
+	if u.Scheme != "https" && (!allowHTTP || u.Scheme != "http") {
 		return Target{}, ErrURLScheme
 	}
 	if u.User != nil || strings.Contains(u.Host, "@") {
@@ -78,7 +78,9 @@ func displayOf(u *url.URL) string {
 	if strings.Contains(host, ":") {
 		host = "[" + host + "]"
 	}
-	if port := u.Port(); port != "" && !((u.Scheme == "https" && port == "443") || (u.Scheme == "http" && port == "80")) {
+	port := u.Port()
+	defaultPort := (u.Scheme == "https" && port == "443") || (u.Scheme == "http" && port == "80")
+	if port != "" && !defaultPort {
 		return host + ":" + port
 	}
 	return host

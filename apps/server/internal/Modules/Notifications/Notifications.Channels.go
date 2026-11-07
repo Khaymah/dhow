@@ -134,7 +134,7 @@ func isUnique(err error) bool {
 }
 
 func (s *Service) sealConfig(ctx context.Context, q *sqlc.Queries, scope models.Scope, id uuid.UUID, cfg channelConfig) ([]byte, error) {
-	raw, err := json.Marshal(cfg)
+	raw, err := json.Marshal(cfg) //nolint:gosec // The settings are sealed with the keyring right after, and never leave the server.
 	if err != nil {
 		return nil, fmt.Errorf("encode the settings of a notification channel: %w", err)
 	}

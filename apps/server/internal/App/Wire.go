@@ -115,12 +115,16 @@ func (w *Wired) Close() {
 	}
 }
 
-func Build(ctx context.Context, in Infra) (*Wired, error) {
+func hasherFor(ctx context.Context, in Infra) (*auth.Hasher, error) {
 	params := auth.DefaultParams()
 	if in.HashParams != nil {
 		params = *in.HashParams
 	}
-	hasher, err := auth.NewHasher(ctx, params, runtime.NumCPU())
+	return auth.NewHasher(ctx, params, runtime.NumCPU())
+}
+
+func Build(ctx context.Context, in Infra) (*Wired, error) {
+	hasher, err := hasherFor(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +146,6 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	bus := eventbus.New(in.Log)
 	limits := func() config.RateLimits { return store.Current().Values.RateLimits }
 	limiter := ratelimit.NewPostgres(in.Pool, in.Now)
-
 	auditService := audit.NewService(in.Pool, in.Log, in.Now)
 	audit.Subscribe(bus, auditService)
 	sessionService := session.NewService(session.Options{
@@ -174,11 +177,10 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	notificationsService, err := notificationsFor(in, values, bus, sessionService, mail)
+	notificationsService, err := notificationsFor(in, values, bus, sessionService, mail, alertsService)
 	if err != nil {
 		return nil, err
 	}
-	alertsService.UseFlush(notificationsService.Drain)
 
 	opts := Options{
 		Config: in.Config,
