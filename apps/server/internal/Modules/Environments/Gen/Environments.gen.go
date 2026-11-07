@@ -1000,6 +1000,9 @@ type EnvironmentName = string
 // Id defines model for Id.
 type Id = openapi_types.UUID
 
+// IfNoneMatch defines model for IfNoneMatch.
+type IfNoneMatch = string
+
 // Limit defines model for Limit.
 type Limit = int
 
@@ -1024,6 +1027,9 @@ type Error = ErrorResponse
 // ListPendingApprovalsParams defines parameters for ListPendingApprovals.
 type ListPendingApprovalsParams struct {
 	Mine *bool `form:"Mine,omitempty" json:"Mine,omitempty"`
+
+	// IfNoneMatch The `ETag` of the answer the client already has.
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
 }
 
 // ListEnvironmentsParams defines parameters for ListEnvironments.
@@ -1417,6 +1423,27 @@ func (siw *ServerInterfaceWrapper) ListPendingApprovals(w http.ResponseWriter, r
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Mine", Err: err})
 		}
 		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch IfNoneMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3200,18 +3227,36 @@ type ListPendingApprovalsResponseObject interface {
 	VisitListPendingApprovalsResponse(w http.ResponseWriter) error
 }
 
-type ListPendingApprovals200JSONResponse DeploymentApprovalListResponse
+type ListPendingApprovals200ResponseHeaders struct {
+	ETag *string
+}
+
+type ListPendingApprovals200JSONResponse struct {
+	Body    DeploymentApprovalListResponse
+	Headers ListPendingApprovals200ResponseHeaders
+}
 
 func (response ListPendingApprovals200JSONResponse) VisitListPendingApprovalsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
+}
+
+type ListPendingApprovals304Response struct {
+}
+
+func (response ListPendingApprovals304Response) VisitListPendingApprovalsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
 }
 
 type ListPendingApprovalsdefaultJSONResponse struct {

@@ -20,6 +20,8 @@ sql:
       - internal/Modules/Ingest/Queries
       - internal/Modules/Alerts/Queries
       - internal/Modules/Overview/Queries
+      - internal/Modules/Events/Queries
+      - internal/Modules/Boards/Queries
       - internal/Core/RateLimit/Queries
       - internal/Core/Settings/Queries
       - internal/Database/Retention/Queries

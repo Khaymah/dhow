@@ -47,6 +47,7 @@ type Querier interface {
 	CountActiveIngestTokens(ctx context.Context, arg CountActiveIngestTokensParams) (int64, error)
 	CountActiveUserTokens(ctx context.Context, arg CountActiveUserTokensParams) (int64, error)
 	CountAuditEvents(ctx context.Context, arg CountAuditEventsParams) (int64, error)
+	CountBoardApprovals(ctx context.Context, arg CountBoardApprovalsParams) ([]CountBoardApprovalsRow, error)
 	CountDataKeysByVersion(ctx context.Context) ([]CountDataKeysByVersionRow, error)
 	CountDataKeysOnVersions(ctx context.Context, versions []int32) (int64, error)
 	CountDataKeysToSupersede(ctx context.Context, cutoff time.Time) (int64, error)
@@ -69,8 +70,12 @@ type Querier interface {
 	CountOrganizationProjects(ctx context.Context, arg CountOrganizationProjectsParams) (int64, error)
 	CountOtherActiveOwners(ctx context.Context, arg CountOtherActiveOwnersParams) (int64, error)
 	CountOverviewApprovals(ctx context.Context, arg CountOverviewApprovalsParams) (int64, error)
+	CountOverviewDeadNotifications(ctx context.Context, organizationID *uuid.UUID) (int64, error)
+	CountOverviewDeployments(ctx context.Context, arg CountOverviewDeploymentsParams) (CountOverviewDeploymentsRow, error)
 	CountOverviewInvitations(ctx context.Context, arg CountOverviewInvitationsParams) (int64, error)
 	CountOverviewJobs(ctx context.Context, arg CountOverviewJobsParams) (CountOverviewJobsRow, error)
+	CountOverviewPendingApprovals(ctx context.Context, arg CountOverviewPendingApprovalsParams) (int64, error)
+	CountOverviewRollbackFailed(ctx context.Context, organizationID uuid.UUID) (int64, error)
 	CountOverviewRunners(ctx context.Context, arg CountOverviewRunnersParams) (CountOverviewRunnersRow, error)
 	CountPendingInternalEmails(ctx context.Context) (int64, error)
 	CountProjects(ctx context.Context, arg CountProjectsParams) (int64, error)
@@ -127,6 +132,7 @@ type Querier interface {
 	EraseExpiredSecretVersions(ctx context.Context, arg EraseExpiredSecretVersionsParams) (int64, error)
 	EraseSecretVersionsBelow(ctx context.Context, arg EraseSecretVersionsBelowParams) (int64, error)
 	EraseSecretVersionsOf(ctx context.Context, arg EraseSecretVersionsOfParams) (int64, error)
+	EventTargetScope(ctx context.Context, arg EventTargetScopeParams) (EventTargetScopeRow, error)
 	EvictCacheEntries(ctx context.Context, ids []uuid.UUID) (int64, error)
 	ExpireArtifacts(ctx context.Context, arg ExpireArtifactsParams) (int64, error)
 	ExpireIngestedArtifacts(ctx context.Context, batch int32) (int64, error)
@@ -314,6 +320,11 @@ type Querier interface {
 	ListApiTokens(ctx context.Context, arg ListApiTokensParams) ([]ListApiTokensRow, error)
 	ListAuditEvents(ctx context.Context, arg ListAuditEventsParams) ([]ListAuditEventsRow, error)
 	ListBackfills(ctx context.Context) ([]ListBackfillsRow, error)
+	ListBoardEnvironments(ctx context.Context, arg ListBoardEnvironmentsParams) ([]ListBoardEnvironmentsRow, error)
+	ListBoardHostChecks(ctx context.Context, arg ListBoardHostChecksParams) ([]ListBoardHostChecksRow, error)
+	ListBoardReleases(ctx context.Context, arg ListBoardReleasesParams) ([]ListBoardReleasesRow, error)
+	ListBoardRunningHosts(ctx context.Context, arg ListBoardRunningHostsParams) ([]ListBoardRunningHostsRow, error)
+	ListBoardTargets(ctx context.Context, arg ListBoardTargetsParams) ([]ListBoardTargetsRow, error)
 	ListDataKeysToRewrap(ctx context.Context, arg ListDataKeysToRewrapParams) ([]ListDataKeysToRewrapRow, error)
 	ListDataKeysToSupersede(ctx context.Context, arg ListDataKeysToSupersedeParams) ([]ListDataKeysToSupersedeRow, error)
 	ListDeployTargetHosts(ctx context.Context, arg ListDeployTargetHostsParams) ([]DeployTargetHost, error)
@@ -388,6 +399,7 @@ type Querier interface {
 	ListVariablesInScope(ctx context.Context, arg ListVariablesInScopeParams) ([]Variable, error)
 	ListenJobsQueued(ctx context.Context) error
 	ListenLogAppended(ctx context.Context) error
+	ListenOrgEvents(ctx context.Context) error
 	ListenSettingsChanged(ctx context.Context) error
 	LiveApproval(ctx context.Context, arg LiveApprovalParams) (DeploymentApproval, error)
 	LockActiveDataKeyForOwner(ctx context.Context, arg LockActiveDataKeyForOwnerParams) (LockActiveDataKeyForOwnerRow, error)
@@ -478,6 +490,7 @@ type Querier interface {
 	NotificationScopeProject(ctx context.Context, arg NotificationScopeProjectParams) (string, error)
 	NotifyJobsQueued(ctx context.Context, organizationID string) error
 	NotifyLogAppended(ctx context.Context, payload string) error
+	NotifyOrgEvent(ctx context.Context, payload string) error
 	NotifySettingsChanged(ctx context.Context, groupName string) error
 	OlderGroupRuns(ctx context.Context, arg OlderGroupRunsParams) ([]uuid.UUID, error)
 	OldestCacheEntries(ctx context.Context, arg OldestCacheEntriesParams) ([]OldestCacheEntriesRow, error)

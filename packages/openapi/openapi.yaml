@@ -100,6 +100,16 @@ tags:
     description: >-
       Counts for the home page and the sidebar, in one request. Served by the Overview module, which reads the jobs,
       runners and invitations tables and never writes them.
+  - name: events
+    description: >-
+      The live stream of an organization (ADR-0111). Served by the Events module. Small server-sent events (an id, a
+      type, a status and the ids of the project and environment) that tell the client what to fetch again; they never
+      carry the data itself.
+  - name: boards
+    description: >-
+      The deploy board of a project: one row for each environment with its targets, what is deployed and how a running
+      deploy is going. Served by the Boards module, which reads the environments, targets and releases tables and never
+      writes them.
   - name: settings
     description: >-
       Server settings that the instance owner changes from the dashboard (ADR-0063): mail, organization creation, the
@@ -3374,13 +3384,19 @@ paths:
           required: false
           schema:
             type: boolean
+        - $ref: "#/components/parameters/IfNoneMatch"
       responses:
         "200":
           description: The pending requests.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeploymentApprovalListResponse"
+        "304":
+          description: The list is the one the `ETag` names.
         default:
           $ref: "#/components/responses/Error"
   /organizations/{id}/secrets:
@@ -5276,20 +5292,93 @@ paths:
         `Jobs.FailedLast24h` counts the `failed` and `timed_out` states that finished in the last 24 hours.
         `Runners.Online` and `Runners.Offline` follow the `Status` rule of the runners list (seen in the last two
         minutes) for active runners, and `Runners.Paused` counts disabled runners. Revoked runners are not counted.
-        `Invitations.Pending` counts invitations that are not accepted, revoked or expired. A caller who is not a
-        member gets 404.
+        `Invitations.Pending` counts invitations that are not accepted, revoked or expired. `Deployments` needs
+        `run.read`: `Running` counts running deployments, `FailedLast24h` the ones that failed in the last 24 hours,
+        `RollbackFailed` the targets whose last finished release could not be rolled back and `Pending` the approval
+        requests nobody has decided. `Notifications.Dead` needs `org.notification.manage` (Owner and Admin) and counts
+        the notifications given up after every try. The answer carries an `ETag`; `If-None-Match` of the same value
+        answers 304. A caller who is not a member gets 404.
       security:
         - SessionCookie: []
         - ApiToken: []
       parameters:
         - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IfNoneMatch"
       responses:
         "200":
           description: The counts the caller may read.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrganizationOverviewResponse"
+        "304":
+          description: The counts are the ones the `ETag` names.
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/events:
+    get:
+      operationId: streamOrganizationEvents
+      tags: [events]
+      summary: Follow what changes in an organization as server-sent events
+      description: >-
+        Needs `org.read` and a session; an API token is refused. One stream for every screen of the organization. Each
+        `change` event carries a `Seq`, a `Type`, a `Status` and the ids it is about, never the data: the client fetches
+        again through the normal endpoints. The `id` of an event is `<epoch>-<seq>`. Every event is checked against the
+        caller's role when it is sent, not when the stream opens: an event about a project is sent only to a caller who
+        may read that project's runs (an approval request, only to a caller who may decide it), and the stream ends
+        when the caller stops being a member or the session ends. A comment arrives every 15 seconds and checks the
+        session again. After `Last-Event-ID` the stream resumes from the bounded in-memory ring of the server instance
+        (4096 events); when the id is older than the ring, belongs to another server start or another instance, the
+        stream sends one `reset` event and the client fetches everything again. One user may hold 5 streams, one
+        organization a tenth of `DHOW_SSE_MAX_STREAMS` (at least 10) and one server instance `DHOW_SSE_MAX_STREAMS`;
+        more answer 429 `TOO_MANY_STREAMS` with `Retry-After`. The stream has no request timeout, and a proxy in front
+        must not buffer it (`docs/install/reverse-proxy.md`).
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/OrganizationEventsLastEventId"
+      responses:
+        "200":
+          description: An event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/deploy-board:
+    get:
+      operationId: getProjectDeployBoard
+      tags: [boards]
+      summary: The deploy board of a project
+      description: >-
+        Needs `project.read`. One row for each environment (by name) with its targets: what is deployed now, the last
+        release and how it ended, the progress of a running deploy by batch, and whether the target rolled back by
+        itself, failed to roll back, or runs different releases on its hosts. At most 500 targets are listed. The answer
+        carries an `ETag`; a request with `If-None-Match` of the same value answers 304 with no body.
+      security:
+        - SessionCookie: []
+        - ApiToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: The board.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployBoardResponse"
+        "304":
+          description: The board is the one the `ETag` names.
         default:
           $ref: "#/components/responses/Error"
   /instance/settings:
@@ -5743,6 +5832,25 @@ components:
         type: string
         maxLength: 32
         pattern: "^[0-9]{1,10}:[0-9]{1,19}$"
+    OrganizationEventsLastEventId:
+      name: Last-Event-ID
+      in: header
+      required: false
+      description: >-
+        The `id` of the last event the client received, `<epoch>-<seq>`. The browser sends it by itself when it
+        reconnects.
+      schema:
+        type: string
+        maxLength: 32
+        pattern: "^[0-9]{1,12}-[0-9]{1,19}$"
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: The `ETag` of the answer the client already has.
+      schema:
+        type: string
+        maxLength: 80
     JobStateFilter:
       name: State
       in: query
@@ -5899,6 +6007,11 @@ components:
         minimum: 1
         maximum: 100
         default: 25
+  headers:
+    ETag:
+      description: A strong validator of the answer. Send it back in `If-None-Match` to learn that nothing changed.
+      schema:
+        type: string
   responses:
     Error:
       description: An error. Never contains internal details.
@@ -10780,10 +10893,163 @@ components:
           description: >-
             Deploy approval requests waiting on an environment where you are a reviewer, directly or through a team. The
             exact list of the ones you may decide is `GET /organizations/{id}/deployment-approvals?Mine=true`.
+    DeployBoardRelease:
+      type: object
+      additionalProperties: false
+      required: [Id, ReleaseId, Kind, State, StartedAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        ReleaseId:
+          type: string
+        Kind:
+          type: string
+          enum: [deploy, rollback]
+        State:
+          type: string
+          enum: [running, succeeded, failed, rolled_back, rollback_failed, unknown]
+        RollbackReason:
+          type: string
+        StartedAt:
+          type: string
+          format: date-time
+        FinishedAt:
+          type: string
+          format: date-time
+    DeployBoardProgress:
+      type: object
+      additionalProperties: false
+      required: [ReleaseId, Hosts, HostsDone, BatchSize, Batch, Batches]
+      properties:
+        ReleaseId:
+          type: string
+        Hosts:
+          type: integer
+          minimum: 0
+        HostsDone:
+          type: integer
+          minimum: 0
+          description: Hosts that switched, were verified or are already final.
+        BatchSize:
+          type: integer
+          minimum: 1
+        Batch:
+          type: integer
+          minimum: 0
+          description: The batch the deploy is in now, from 1; 0 before the first host starts.
+        Batches:
+          type: integer
+          minimum: 1
+    DeployBoardTarget:
+      type: object
+      additionalProperties: false
+      required: [Id, Name, Kind, Hosts, Partial, AutoRolledBack, RollbackFailed]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        Name:
+          type: string
+        Kind:
+          type: string
+          enum: [ssh, compose]
+        Hosts:
+          type: integer
+          minimum: 0
+        CurrentReleaseId:
+          type: string
+          description: The release the target was last deployed or rolled back to successfully.
+        CurrentDigest:
+          type: string
+          description: The SHA-256 of the artifact of that release, in lowercase hex, when it is known.
+        Last:
+          $ref: "#/components/schemas/DeployBoardRelease"
+        Running:
+          $ref: "#/components/schemas/DeployBoardProgress"
+        Partial:
+          type: boolean
+          description: The hosts run different releases, or the last release left the target in a state that needs a check.
+        AutoRolledBack:
+          type: boolean
+          description: The last finished release was rolled back by itself.
+        RollbackFailed:
+          type: boolean
+          description: The last finished release could not be rolled back. It stays true until a release finishes after it.
+    DeployBoardEnvironment:
+      type: object
+      additionalProperties: false
+      required: [Id, Name, Paused, PendingApprovals, Targets]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        Name:
+          type: string
+        Paused:
+          type: boolean
+        PendingApprovals:
+          type: integer
+          minimum: 0
+        Targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeployBoardTarget"
+    DeployBoard:
+      type: object
+      additionalProperties: false
+      required: [Environments, Truncated]
+      properties:
+        Environments:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeployBoardEnvironment"
+        Truncated:
+          type: boolean
+          description: True when the project has more than 500 targets and the list stops there.
+    DeployBoardResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/DeployBoard"
+    OverviewDeployments:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required: [Running, FailedLast24h, RollbackFailed, Pending]
+      properties:
+        Running:
+          type: integer
+          minimum: 0
+          description: Deployments that are running now.
+        FailedLast24h:
+          type: integer
+          minimum: 0
+          description: Deployments that failed in the last 24 hours.
+        RollbackFailed:
+          type: integer
+          minimum: 0
+          description: Targets whose last finished release could not be rolled back.
+        Pending:
+          type: integer
+          minimum: 0
+          description: Deploy approval requests that nobody has decided yet, in the whole organization.
+    OverviewNotifications:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required: [Dead]
+      properties:
+        Dead:
+          type: integer
+          minimum: 0
+          description: Notifications that failed every try and were given up. Needs `org.notification.manage`.
     OrganizationOverview:
       type: object
       additionalProperties: false
-      required: [Jobs, Runners, Invitations, Approvals]
+      required: [Jobs, Runners, Invitations, Approvals, Deployments, Notifications]
       properties:
         Jobs:
           $ref: "#/components/schemas/OverviewJobs"
@@ -10793,6 +11059,10 @@ components:
           $ref: "#/components/schemas/OverviewInvitations"
         Approvals:
           $ref: "#/components/schemas/OverviewApprovals"
+        Deployments:
+          $ref: "#/components/schemas/OverviewDeployments"
+        Notifications:
+          $ref: "#/components/schemas/OverviewNotifications"
     OrganizationOverviewResponse:
       allOf:
         - $ref: "#/components/schemas/Envelope"

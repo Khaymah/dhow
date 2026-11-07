@@ -32,7 +32,9 @@ import (
 	alerts "github.com/Khaymah/dhow/apps/server/internal/Modules/Alerts"
 	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
 	audit "github.com/Khaymah/dhow/apps/server/internal/Modules/Audit"
+	boards "github.com/Khaymah/dhow/apps/server/internal/Modules/Boards"
 	environments "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments"
+	events "github.com/Khaymah/dhow/apps/server/internal/Modules/Events"
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
 	ingest "github.com/Khaymah/dhow/apps/server/internal/Modules/Ingest"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
@@ -99,6 +101,7 @@ type Wired struct {
 	Artifacts     *artifacts.Service
 	Ingest        *ingest.Service
 	Notifications *notifications.Service
+	Events        *events.Service
 	LogPool       *pgxpool.Pool
 	Retention     *retention.Runner
 	Alerts        *alerts.Service
@@ -182,6 +185,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		return nil, err
 	}
 
+	eventsService := eventsFor(in, bus)
 	opts := Options{
 		Config: in.Config,
 		Log:    in.Log,
@@ -203,6 +207,8 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Ingest:        ingestService,
 		Notifications: notificationsService,
 		Overview:      overview.NewService(overview.Options{Counter: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
+		Boards:        boards.NewService(boards.Options{Store: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
+		Events:        eventsService,
 		Tokens:        tokensService,
 		Prefs:         preferences.NewService(in.Pool, in.Log, in.Now),
 		Gate:          gate,
@@ -217,7 +223,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	}
 	wired := &Wired{
 		Options: opts, Handler: NewRouter(opts), Identity: identityService, Jobs: jobsService, JobQueue: jobsService.Queue(),
-		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, Ingest: ingestService, Notifications: notificationsService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
+		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, Ingest: ingestService, Notifications: notificationsService, Events: eventsService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
 		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now, NotifyDays: in.Config.Notify.RetentionDays}),
 	}
 	if in.Config.RunnerPlaneSeparate() {

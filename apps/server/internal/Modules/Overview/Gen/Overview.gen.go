@@ -71,10 +71,12 @@ type ErrorResponse struct {
 
 // OrganizationOverview defines model for OrganizationOverview.
 type OrganizationOverview struct {
-	Approvals   *OverviewApprovals   `json:"Approvals"`
-	Invitations *OverviewInvitations `json:"Invitations"`
-	Jobs        *OverviewJobs        `json:"Jobs"`
-	Runners     *OverviewRunners     `json:"Runners"`
+	Approvals     *OverviewApprovals     `json:"Approvals"`
+	Deployments   *OverviewDeployments   `json:"Deployments"`
+	Invitations   *OverviewInvitations   `json:"Invitations"`
+	Jobs          *OverviewJobs          `json:"Jobs"`
+	Notifications *OverviewNotifications `json:"Notifications"`
+	Runners       *OverviewRunners       `json:"Runners"`
 }
 
 // OrganizationOverviewResponse defines model for OrganizationOverviewResponse.
@@ -96,6 +98,21 @@ type OverviewApprovals struct {
 	Pending int `json:"Pending"`
 }
 
+// OverviewDeployments defines model for OverviewDeployments.
+type OverviewDeployments struct {
+	// FailedLast24h Deployments that failed in the last 24 hours.
+	FailedLast24h int `json:"FailedLast24h"`
+
+	// Pending Deploy approval requests that nobody has decided yet, in the whole organization.
+	Pending int `json:"Pending"`
+
+	// RollbackFailed Targets whose last finished release could not be rolled back.
+	RollbackFailed int `json:"RollbackFailed"`
+
+	// Running Deployments that are running now.
+	Running int `json:"Running"`
+}
+
 // OverviewInvitations defines model for OverviewInvitations.
 type OverviewInvitations struct {
 	// Pending Invitations that are not accepted, revoked or expired.
@@ -115,6 +132,12 @@ type OverviewJobs struct {
 
 	// Running Jobs in the `leased` or `running` state.
 	Running int `json:"Running"`
+}
+
+// OverviewNotifications defines model for OverviewNotifications.
+type OverviewNotifications struct {
+	// Dead Notifications that failed every try and were given up. Needs `org.notification.manage`.
+	Dead int `json:"Dead"`
 }
 
 // OverviewRunners defines model for OverviewRunners.
@@ -139,14 +162,23 @@ type PageMeta struct {
 // Id defines model for Id.
 type Id = openapi_types.UUID
 
+// IfNoneMatch defines model for IfNoneMatch.
+type IfNoneMatch = string
+
 // Error defines model for Error.
 type Error = ErrorResponse
+
+// GetOrganizationOverviewParams defines parameters for GetOrganizationOverview.
+type GetOrganizationOverviewParams struct {
+	// IfNoneMatch The `ETag` of the answer the client already has.
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetOrganizationOverview Counts of what needs attention in an organization
 	// (GET /organizations/{id}/overview)
-	GetOrganizationOverview(w http.ResponseWriter, r *http.Request, id Id)
+	GetOrganizationOverview(w http.ResponseWriter, r *http.Request, id Id, params GetOrganizationOverviewParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -155,7 +187,7 @@ type Unimplemented struct{}
 
 // GetOrganizationOverview Counts of what needs attention in an organization
 // (GET /organizations/{id}/overview)
-func (_ Unimplemented) GetOrganizationOverview(w http.ResponseWriter, r *http.Request, id Id) {
+func (_ Unimplemented) GetOrganizationOverview(w http.ResponseWriter, r *http.Request, id Id, params GetOrganizationOverviewParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -183,8 +215,32 @@ func (siw *ServerInterfaceWrapper) GetOrganizationOverview(w http.ResponseWriter
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetOrganizationOverviewParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch IfNoneMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetOrganizationOverview(w, r, id)
+		siw.Handler.GetOrganizationOverview(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -317,25 +373,44 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 type ErrorJSONResponse ErrorResponse
 
 type GetOrganizationOverviewRequestObject struct {
-	Id Id `json:"id"`
+	Id     Id `json:"id"`
+	Params GetOrganizationOverviewParams
 }
 
 type GetOrganizationOverviewResponseObject interface {
 	VisitGetOrganizationOverviewResponse(w http.ResponseWriter) error
 }
 
-type GetOrganizationOverview200JSONResponse OrganizationOverviewResponse
+type GetOrganizationOverview200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetOrganizationOverview200JSONResponse struct {
+	Body    OrganizationOverviewResponse
+	Headers GetOrganizationOverview200ResponseHeaders
+}
 
 func (response GetOrganizationOverview200JSONResponse) VisitGetOrganizationOverviewResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
+}
+
+type GetOrganizationOverview304Response struct {
+}
+
+func (response GetOrganizationOverview304Response) VisitGetOrganizationOverviewResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
 }
 
 type GetOrganizationOverviewdefaultJSONResponse struct {
@@ -402,10 +477,11 @@ type strictHandler struct {
 }
 
 // GetOrganizationOverview operation middleware
-func (sh *strictHandler) GetOrganizationOverview(w http.ResponseWriter, r *http.Request, id Id) {
+func (sh *strictHandler) GetOrganizationOverview(w http.ResponseWriter, r *http.Request, id Id, params GetOrganizationOverviewParams) {
 	var request GetOrganizationOverviewRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.GetOrganizationOverview(ctx, request.(GetOrganizationOverviewRequestObject))

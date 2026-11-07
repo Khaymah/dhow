@@ -18,10 +18,23 @@ type Invitations struct {
 }
 
 type Overview struct {
-	Jobs        *Jobs
-	Runners     *Runners
-	Invitations *Invitations
-	Approvals   *Approvals
+	Jobs          *Jobs
+	Runners       *Runners
+	Invitations   *Invitations
+	Approvals     *Approvals
+	Deployments   *Deployments
+	Notifications *Notifications
+}
+
+type Deployments struct {
+	Running        int
+	FailedLast24h  int
+	RollbackFailed int
+	Pending        int
+}
+
+type Notifications struct {
+	Dead int
 }
 
 type Approvals struct {
