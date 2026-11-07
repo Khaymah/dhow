@@ -276,6 +276,7 @@ Dhow keeps, for each release, the target, the release id, the previous release, 
 - A manual rollback puts back files and reloads only. It does not undo changes outside the files, such as database migrations. And a manual rollback that failed is not rolled back by itself.
 - Dhow does not write application secrets on the server. Put the `.env` file in `shared/` yourself.
 - The commands written by the Admin run in the login shell of the deploy account on the server. This is the only exception to the rule "no text goes through a shell", and it is written in the architecture decision.
+- The plugin keeps the last 64 KiB of what a command prints on the server, in memory only. It writes only the last 4 KiB of it to the step log, after the secrets are masked. A report event larger than 4 KiB is dropped whole, not cut.
 
 ## Try it on a clean machine
 

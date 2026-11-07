@@ -32,7 +32,7 @@ var allowedDataKeys = map[string]struct{}{
 	"AllowExtraDeployEgress": {}, "Kind": {}, "Username": {}, "DeployPath": {}, "Hosts": {}, "KeyName": {}, "PreviousKeyName": {},
 	"HostId": {}, "Address": {}, "Position": {}, "DroppedFingerprint": {}, "Source": {}, "PinnedFingerprint": {},
 	"PreviousFingerprint": {}, "Environment": {}, "DeploymentId": {}, "ReleaseId": {}, "Step": {}, "TargetId": {},
-	"Patterns": {}, "RejectCode": {}, "Digest": {}, "SizeBytes": {}, "Uploader": {}, "UploaderId": {}, "Triggered": {}, "RunNumber": {},
+	"Patterns": {}, "RejectCode": {}, "Digest": {}, "SizeBytes": {}, "Uploader": {}, "UploaderId": {}, "Triggered": {}, "RunNumber": {}, "RunnerId": {}, "Actor": {},
 }
 
 var credentialMarkers = []string{config.APITokenPrefix, config.RunnerAccessTokenPrefix, config.RunnerRegistrationTokenPrefix, config.IngestTokenPrefix}

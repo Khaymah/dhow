@@ -161,6 +161,7 @@ start_dhow() {
   [[ -f $work/keyring/dhow-keyring ]] || make_keyring "$work/keyring/dhow-keyring"
   docker run -d --name "$prefix-dhow" --label "$label" --network "container:$netns" \
     --read-only --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:size=16m \
+    --tmpfs /var/lib/dhow/blobs:size=64m,mode=0700,uid=65532,gid=65532 \
     -v "$work/keyring/dhow-keyring:/run/secrets/dhow-keyring:ro" -e DHOW_KEYRING_FILE=/run/secrets/dhow-keyring \
     -e DHOW_DATABASE_URL="postgres://dhow:$pg_password@postgres:5432/dhow?sslmode=require" \
     -e DHOW_SECRET_KEY="$(openssl rand -hex 32)" \
