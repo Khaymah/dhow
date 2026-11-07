@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -151,7 +152,7 @@ func newWorld(t *testing.T, statuses ...int) *world {
 	})
 	var d apptest.SetupDetails
 	w.owner, d = w.env.SetupAndLogin()
-	w.password, w.email = d.Password, d.Email
+	w.password, w.email = d.Password, strings.ToLower(d.Email)
 	w.org = w.env.OrganizationID(d.OrgSlug)
 	w.ownerID = uuid.MustParse(w.owner.UserID)
 	w.project = w.env.SeedProject(w.org, w.ownerID)
