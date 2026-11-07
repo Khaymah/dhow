@@ -30,6 +30,8 @@ const ToastItem = ({ toast, dismissLabel }: IToastItemProps) => {
       accent={toast.Accent}
       title={toast.Title}
       detail={toast.Detail}
+      fix={toast.Fix}
+      helpHref={toast.HelpHref}
       dismissLabel={dismissLabel}
       onDismiss={() => {
         Dismiss(toast.Id);

@@ -19,4 +19,25 @@ describe('PageHeader', () => {
     expect(container.querySelector('p')).toBeNull();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
+
+  it('keeps an empty help slot after the actions that hides itself until help arrives', () => {
+    const { container } = renderUi(<PageHeader title="Home" action={<button type="button">Add</button>} />);
+    const slot = container.querySelector('[data-slot="help"]');
+    expect(slot).not.toBeNull();
+    expect(slot).toBeEmptyDOMElement();
+    expect(slot).toHaveClass('empty:hidden');
+    expect(slot?.previousElementSibling).toContainElement(screen.getByRole('button', { name: 'Add' }));
+  });
+
+  it('puts the help button in the same slot, last in the tab order', async () => {
+    const { container, user } = renderUi(
+      <PageHeader title="Home" action={<button type="button">Add</button>} help={<button type="button">Help</button>} />,
+    );
+    const slot = container.querySelector('[data-slot="help"]');
+    expect(slot).toContainElement(screen.getByRole('button', { name: 'Help' }));
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Help' })).toHaveFocus();
+  });
 });

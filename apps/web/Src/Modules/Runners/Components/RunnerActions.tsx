@@ -1,11 +1,10 @@
 import { useState } from 'react';
 
-import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Button } from '@/Core/Ui/Button';
 import { Card } from '@/Core/Ui/Card';
 import { Field } from '@/Core/Ui/Field';
-import { InlineAlert } from '@/Core/Ui/InlineAlert';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { Input } from '@/Core/Ui/Input';
 import { useT } from '@/I18n/useT';
 import type { TRunner } from '@/Modules/Runners/Api/RunnersApi';
@@ -20,7 +19,6 @@ export interface IRunnerPartProps {
 
 export const RunnerEditCard = ({ organizationId, runner }: IRunnerPartProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const Push = useToastStore((state) => state.Push);
   const save = useUpdateRunner(organizationId, runner.Id);
   const [Name, setName] = useState(runner.Name);
@@ -59,7 +57,7 @@ export const RunnerEditCard = ({ organizationId, runner }: IRunnerPartProps) => 
           HandleSubmit();
         }}
       >
-        {save.error ? <InlineAlert accent="failed" title={errorText(save.error)} /> : null}
+        {save.error ? <ErrorAlert error={save.error} /> : null}
         <Field label={t('runners.edit.name')} error={Problem.Name}>
           <Input
             maxLength={RUNNER_NAME_MAX}
@@ -91,7 +89,6 @@ export const RunnerEditCard = ({ organizationId, runner }: IRunnerPartProps) => 
 
 export const RunnerPauseCard = ({ organizationId, runner }: IRunnerPartProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const Push = useToastStore((state) => state.Push);
   const update = useUpdateRunner(organizationId, runner.Id);
   const paused = runner.State === 'disabled';
@@ -100,7 +97,7 @@ export const RunnerPauseCard = ({ organizationId, runner }: IRunnerPartProps) =>
     <Card title={paused ? t('runners.resume.title') : t('runners.pause.title')} icon="queue" padded>
       <div className="grid gap-3">
         <p className="m-0 text-body-sm text-secondary">{paused ? t('runners.resume.about') : t('runners.pause.about')}</p>
-        {update.error ? <InlineAlert accent="failed" title={errorText(update.error)} /> : null}
+        {update.error ? <ErrorAlert error={update.error} /> : null}
         <Button
           size="sm"
           className="justify-self-start"
@@ -125,7 +122,6 @@ export const RunnerPauseCard = ({ organizationId, runner }: IRunnerPartProps) =>
 
 export const RunnerRevokeCard = ({ organizationId, runner }: IRunnerPartProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const Push = useToastStore((state) => state.Push);
   const revoke = useRevokeRunner(organizationId, runner.Id);
   const [Confirming, setConfirming] = useState(false);
@@ -134,7 +130,7 @@ export const RunnerRevokeCard = ({ organizationId, runner }: IRunnerPartProps) =
     <Card title={t('runners.revoke.title')} icon="trash" padded>
       <div className="grid gap-3">
         <p className="m-0 text-body-sm text-secondary">{Confirming ? t('runners.revoke.question') : t('runners.revoke.about')}</p>
-        {revoke.error ? <InlineAlert accent="failed" title={errorText(revoke.error)} /> : null}
+        {revoke.error ? <ErrorAlert error={revoke.error} /> : null}
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"

@@ -2,11 +2,10 @@ import { useRef, useState } from 'react';
 
 import { isApiError } from '@/Core/Api/ApiError';
 import { useAction } from '@/Core/Hooks/useAction';
-import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Button } from '@/Core/Ui/Button';
 import { Field } from '@/Core/Ui/Field';
-import { InlineAlert } from '@/Core/Ui/InlineAlert';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { Input } from '@/Core/Ui/Input';
 import { Textarea } from '@/Core/Ui/Textarea';
 import { useT } from '@/I18n/useT';
@@ -24,7 +23,6 @@ export interface IKeySecretFormProps {
 
 export const KeySecretForm = ({ scope, target }: IKeySecretFormProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const refresh = useTargetRefresh(scope.OrganizationId, scope.ProjectId, scope.EnvironmentName);
   const Push = useToastStore((state) => state.Push);
   const valueRef = useRef<HTMLTextAreaElement>(null);
@@ -60,7 +58,7 @@ export const KeySecretForm = ({ scope, target }: IKeySecretFormProps) => {
           HandleSubmit();
         }}
       >
-        {save.Failure ? <InlineAlert focus accent="failed" title={errorText(save.Failure)} /> : null}
+        {save.Failure ? <ErrorAlert error={save.Failure} focus /> : null}
         <Field label={t('targets.keySecret.name')}>
           <Input
             dir="ltr"

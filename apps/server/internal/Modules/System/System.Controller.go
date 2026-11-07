@@ -64,6 +64,12 @@ func healthToGen(h models.HealthStatus) gen.HealthStatus {
 
 func errorToGen(ae *apperrors.AppError) *gen.ErrorDetail {
 	detail := &gen.ErrorDetail{Code: ae.Code, Message: ae.Message}
+	if ae.Fix != "" {
+		detail.Fix = &ae.Fix
+	}
+	if ae.DocsPath != "" {
+		detail.DocsPath = &ae.DocsPath
+	}
 	if len(ae.Details) > 0 {
 		fields := make([]gen.ErrorFieldDetail, 0, len(ae.Details))
 		for _, d := range ae.Details {

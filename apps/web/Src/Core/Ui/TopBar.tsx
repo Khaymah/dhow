@@ -16,7 +16,6 @@ export const TopBar = ({ start, searchLabel, shortcut, onSearch, children }: ITo
     <button
       type="button"
       onClick={onSearch}
-      aria-label={searchLabel}
       className={
         'flex h-btn max-w-[480px] flex-1 cursor-pointer items-center gap-2.5 rounded-input border border-line-2 bg-input px-3.5 ' +
         'text-start text-body-sm text-tertiary hover:border-line-2 hover:text-secondary ' +
@@ -24,8 +23,8 @@ export const TopBar = ({ start, searchLabel, shortcut, onSearch, children }: ITo
       }
     >
       <Icon name="search" size={18} />
-      <span className="max-md:hidden">{searchLabel}</span>
-      <kbd className="ms-auto rounded-xs border border-line-2 px-1.5 font-mono text-code text-tertiary max-md:hidden">
+      <span className="max-md:sr-only">{searchLabel}</span>
+      <kbd aria-hidden="true" className="ms-auto rounded-xs border border-line-2 px-1.5 font-mono text-code text-tertiary max-md:hidden">
         {shortcut}
       </kbd>
     </button>

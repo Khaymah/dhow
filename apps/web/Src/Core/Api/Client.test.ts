@@ -36,6 +36,31 @@ describe('API client', () => {
     expect(failure).toMatchObject({ Code: 'SERVICE_UNAVAILABLE', Message: 'غير جاهز', Status: 503 });
   });
 
+  it('keeps Fix and DocsPath from the error envelope and defaults them to empty', async () => {
+    stubFetch(() =>
+      envelope(
+        { Success: false, Error: { Code: 'CSRF_FAILED', Message: 'm', Fix: 'Reload the page.', DocsPath: 'install/troubleshooting.md' } },
+        403,
+      ),
+    );
+    await expect(getMeta().catch((error: unknown) => error)).resolves.toMatchObject({
+      Fix: 'Reload the page.',
+      DocsPath: 'install/troubleshooting.md',
+    });
+    stubFetch(() => envelope({ Success: false, Error: { Code: 'X', Message: 'm', Fix: 7, DocsPath: null } }, 400));
+    await expect(getMeta().catch((error: unknown) => error)).resolves.toMatchObject({ Fix: '', DocsPath: '' });
+  });
+
+  it('records the language the server answered in', async () => {
+    stubFetch(() =>
+      new Response(JSON.stringify({ Success: false, Error: { Code: 'X', Message: 'm' } }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', 'Content-Language': 'EN' },
+      }),
+    );
+    await expect(getMeta().catch((error: unknown) => error)).resolves.toMatchObject({ Language: 'en' });
+  });
+
   it('reports an unreachable server as NETWORK', async () => {
     stubFetch(() => {
       throw new TypeError('Failed to fetch');

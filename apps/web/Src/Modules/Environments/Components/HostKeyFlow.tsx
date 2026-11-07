@@ -2,11 +2,11 @@ import { useState } from 'react';
 
 import { isApiError } from '@/Core/Api/ApiError';
 import { useAction } from '@/Core/Hooks/useAction';
-import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useRelativeTime } from '@/Core/Hooks/useRelativeTime';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Button } from '@/Core/Ui/Button';
 import { Field } from '@/Core/Ui/Field';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Textarea } from '@/Core/Ui/Textarea';
 import { useT } from '@/I18n/useT';
@@ -39,7 +39,6 @@ const PasteForm = ({ scope, target, host, onDone }: IHostKeyFlowProps & { onDone
   const refresh = useTargetRefresh(scope.OrganizationId, scope.ProjectId, scope.EnvironmentName);
   const [Text, setText] = useState('');
   const paste = useAction((text: string) => pasteHostKey(scope, target.Name, host.Id, text));
-  const errorText = useApiErrorText();
 
   return (
     <form
@@ -55,7 +54,7 @@ const PasteForm = ({ scope, target, host, onDone }: IHostKeyFlowProps & { onDone
         });
       }}
     >
-      {paste.Failure ? <InlineAlert focus accent="failed" title={errorText(paste.Failure)} /> : null}
+      {paste.Failure ? <ErrorAlert error={paste.Failure} focus /> : null}
       <Field label={t('targets.hostkey.paste.label')}>
         <Textarea
           dir="ltr"
@@ -125,7 +124,6 @@ export const HostKeyFlow = (props: IHostKeyFlowProps) => {
   const { scope, target, host, canManage } = props;
   const t = useT();
   const time = useRelativeTime();
-  const errorText = useApiErrorText();
   const refresh = useTargetRefresh(scope.OrganizationId, scope.ProjectId, scope.EnvironmentName);
   const [Pasting, setPasting] = useState(false);
   const fetched = useAction(() => fetchHostKey(scope, target.Name, host.Id));
@@ -152,7 +150,7 @@ export const HostKeyFlow = (props: IHostKeyFlowProps) => {
       ) : (
         <InlineAlert accent="awaiting" title={t('targets.hostkey.unpinned')} />
       )}
-      {fetched.Failure ? <InlineAlert focus accent="failed" title={errorText(fetched.Failure)} /> : null}
+      {fetched.Failure ? <ErrorAlert error={fetched.Failure} focus /> : null}
       {host.PendingHostKeyFingerprint ? <PendingConfirm key={host.PendingHostKeyFingerprint} {...props} /> : null}
       {canManage && !Pasting ? (
         <div className="flex flex-wrap gap-2">

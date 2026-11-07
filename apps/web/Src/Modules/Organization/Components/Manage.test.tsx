@@ -195,7 +195,7 @@ describe('switching and leaving organizations', () => {
       expect(useOrganizationStore.getState().CurrentId).toBe(OTHER_ORG);
     });
     expect(
-      (await screen.findAllByRole('button', { name: Ar['shell.organization.switch'].replace('{name}', isolate('Sweets Store')) })).length,
+      (await screen.findAllByRole('button', { name: `${Ar['shell.organization.switch']} Sweets Store` })).length,
     ).toBeGreaterThan(0);
   });
 

@@ -328,7 +328,7 @@ pnpm -C apps/web build
 pnpm -C apps/web size
 ```
 
-`size` reads its limits from `apps/web/Scripts/SizeBudgets.json`: 128 KB gzip for the initial JS, 60 KB for every lazy chunk (35 KB for the log viewer) and 30 KB for the CSS. To see it fail with a smaller limit, run `node Scripts/CheckSize.mjs --lazy-kb=5` from `apps/web`. `E2E/LogPerf.spec.ts` measures the job log page (DOM nodes, long tasks, JS heap) with the CPU throttled 4 times; it only runs with the `make e2e` stack. In development mode the server sends the Trusted Types header in report-only mode, and the browser tests fail on any CSP violation.
+`size` reads its limits from `apps/web/Scripts/SizeBudgets.json`: 128 KB gzip for the initial JS, 60 KB for every lazy chunk (35 KB for the log viewer) and 30 KB for the CSS. To see it fail with a smaller limit, run `node Scripts/CheckSize.mjs --lazy-kb=5` from `apps/web`. `E2E/LogPerf.spec.ts` measures the job log page (DOM nodes, long tasks, JS heap) with the CPU throttled 4 times; it only runs with the `make e2e` stack. In development mode the server sends the Trusted Types header in report-only mode, and the browser tests fail on any CSP violation. `E2E/Accessibility.spec.ts` checks accessibility with the axe library on the core pages in Arabic and English and in the four system themes, fails on any serious or critical violation, and only runs with the `make e2e` stack. See [Accessibility](guides/accessibility.md).
 
 ### The M3 and M4 demos
 
@@ -366,6 +366,21 @@ What you can do depends on your system:
 
 - **The sandbox.** Jobs run in rootless Podman. It needs Linux with Podman 5.4 or newer, `crun`, `uidmap`, cgroup v2 with the `cpu`, `io`, `memory` and `pids` controllers delegated to the runner (run it under systemd with `Delegate=yes`), at least 65536 sub-ids per job in `/etc/subuid` and `/etc/subgid`, and user namespaces (on Ubuntu 24.04 and newer, `kernel.apparmor_restrict_unprivileged_userns=0`). See [Install a runner](runner/install.md). On macOS and Windows, the [Docker stack](#run-jobs-in-the-stack) runs real jobs with nothing else to install. To run the runner natively there, use a Linux VM with systemd, such as [Lima](https://lima-vm.io/) or Multipass on macOS, or WSL2 with systemd turned on, and run the runner there against the server on your machine.
 - **The isolation suites.** `make runner-isolation` builds the runner and an escape probe, runs them in real rootless containers, and fails if any escape works or a limit is not enforced. It needs the sandbox requirements above and `busybox-static`. CI runs it on `ubuntu-26.04` as a dedicated user under `systemd-run -p Delegate=yes` (see the `isolation` job in `.github/workflows/ci.yml`); copy that setup on your machine with `make runner-isolation ISOLATION_RUN="sudo systemd-run --uid=$USER --pipe --wait --collect -p Delegate=yes --"`.
+
+## Add a new error code
+
+Every error code needs a fix sentence in Arabic and English. If it has no useful fix for a person, write the reason in the allowlist.
+
+1. Add the code in `apps/server/internal/Core/Errors` and its message in `I18n.Ar.go` and `I18n.En.go`.
+2. Add the fix sentence in `I18n.Fix.Ar.go` and `I18n.Fix.En.go`, under the code name. The sentence is short and fixed, and holds no value from the request.
+3. If a page explains the problem, add its path in `I18n.Docs.go`, with the heading in Arabic and in English.
+4. If the code has no useful fix, write the reason in `fixAllowlist` inside `Fix_test.go`.
+
+The server returns `Fix` and `DocsPath` inside `Error`, in the `Accept-Language` locale. The web app shows them under the message, with a "Learn more" link to the folder of the chosen language. Run the test with this command:
+
+```sh
+go test ./apps/server/internal/Core/Errors/...
+```
 
 ## Common problems
 
