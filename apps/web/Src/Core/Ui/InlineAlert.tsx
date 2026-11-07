@@ -41,7 +41,6 @@ export const InlineAlert = ({
       ref={ref}
       tabIndex={focus ? -1 : undefined}
       role={accent === "failed" ? "alert" : "note"}
-      aria-describedby={fix === "" ? undefined : fixId}
       data-accent={accent}
       className={cx(
         "box-border flex w-full gap-3 rounded-md border px-4 py-3 text-body-sm",

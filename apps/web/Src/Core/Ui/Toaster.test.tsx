@@ -37,7 +37,7 @@ describe('Toaster', () => {
     const status = screen.getByRole('status');
     const fix = screen.getByText('Choose another name.');
     expect(status).toContainElement(fix);
-    expect(status.getAttribute('aria-describedby')).toBe(fix.id);
+    expect(status).not.toHaveAttribute('aria-describedby');
     expect(screen.getByRole('link')).toHaveAttribute('href', 'https://github.com/Khaymah/dhow/blob/main/docs/en/guides/secrets.md');
   });
 

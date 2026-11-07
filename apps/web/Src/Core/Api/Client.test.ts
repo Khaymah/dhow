@@ -51,6 +51,16 @@ describe('API client', () => {
     await expect(getMeta().catch((error: unknown) => error)).resolves.toMatchObject({ Fix: '', DocsPath: '' });
   });
 
+  it('records the language the server answered in', async () => {
+    stubFetch(() =>
+      new Response(JSON.stringify({ Success: false, Error: { Code: 'X', Message: 'm' } }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', 'Content-Language': 'EN' },
+      }),
+    );
+    await expect(getMeta().catch((error: unknown) => error)).resolves.toMatchObject({ Language: 'en' });
+  });
+
   it('reports an unreachable server as NETWORK', async () => {
     stubFetch(() => {
       throw new TypeError('Failed to fetch');

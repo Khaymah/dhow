@@ -23,7 +23,9 @@ export const ErrorHelp = ({ fix, helpHref, fixId }: IErrorHelpProps) => {
           aria-describedby={fix === '' ? undefined : fixId}
           className="w-fit text-primary underline underline-offset-4"
         >
-          {t('api.error.help')}
+          {t('api.error.help')}{' '}
+          <span aria-hidden="true">{'↗'}</span>
+          <span className="sr-only">{`(${t('api.error.newTab')})`}</span>
         </a>
       ) : null}
     </span>

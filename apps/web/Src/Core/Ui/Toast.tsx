@@ -19,7 +19,6 @@ export const Toast = ({ accent = 'live', title, detail, fix = '', helpHref = nul
   return (
   <div
     role="status"
-    aria-describedby={fix === '' ? undefined : fixId}
     data-accent={accent}
     className="flex min-w-[300px] items-center gap-3 rounded-lg border border-line-2 bg-surface px-4 py-3 text-body-sm shadow-overlay"
   >

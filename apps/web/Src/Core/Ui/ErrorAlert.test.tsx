@@ -21,25 +21,39 @@ beforeEach(() => {
 });
 
 describe('ErrorAlert', () => {
-  it('shows the fix under the message inside an alert that describes itself with it', () => {
+  it('shows the fix under the message inside the alert, without a second description that would read it twice', () => {
     renderWithProviders(<ErrorAlert error={withFix} />);
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('The request could not be verified.');
     const fix = screen.getByText('Reload the page and try again.');
     expect(alert).toContainElement(fix);
-    expect(alert.getAttribute('aria-describedby')).toBe(fix.id);
+    expect(alert).not.toHaveAttribute('aria-describedby');
     expect(fix).toHaveTextContent('Fix:');
   });
 
   it('links to the docs page of the UI language and ties the link to the fix', () => {
     renderWithProviders(<ErrorAlert error={withFix} />);
-    const link = screen.getByRole('link', { name: 'Learn more' });
+    const link = screen.getByRole('link', { name: /Learn more/ });
     expect(link).toHaveAttribute(
       'href',
       'https://github.com/Khaymah/dhow/blob/main/docs/en/install/troubleshooting.md#finding-the-setup-link',
     );
     expect(link).toHaveAttribute('rel', 'noreferrer noopener');
     expect(link.getAttribute('aria-describedby')).toBe(screen.getByText('Reload the page and try again.').id);
+    expect(link).toHaveAccessibleName('Learn more (opens in a new tab)');
+  });
+
+  it('keeps the anchor when the response language matches the UI', () => {
+    const same = new ApiError({ Code: 'X', Message: 'm', Fix: 'f', DocsPath: 'install/troubleshooting.md#finding-the-setup-link' }, 403, null, 'en');
+    renderWithProviders(<ErrorAlert error={same} />);
+    expect(screen.getByRole('link')).toHaveAttribute('href', expect.stringContaining('#finding-the-setup-link'));
+  });
+
+  it('drops the anchor when the response was in another language than the UI', () => {
+    const other = new ApiError({ Code: 'X', Message: 'm', Fix: 'f', DocsPath: 'install/troubleshooting.md#finding-the-setup-link' }, 403, null, 'ar');
+    renderWithProviders(<ErrorAlert error={other} />);
+    const href = screen.getByRole('link').getAttribute('href') ?? '';
+    expect(href).toMatch(/docs\/en\/install\/troubleshooting\.md$/);
   });
 
   it('uses the Arabic docs folder when the UI is Arabic', () => {

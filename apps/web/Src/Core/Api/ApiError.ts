@@ -21,8 +21,9 @@ export class ApiError extends Error implements TApiError {
   readonly Status: number;
   readonly Details: readonly TApiFieldError[];
   readonly RetryAfterSeconds: number | null;
+  readonly Language: string;
 
-  constructor(error: TApiError, status: number, retryAfterSeconds: number | null = null) {
+  constructor(error: TApiError, status: number, retryAfterSeconds: number | null = null, language = '') {
     super(error.Message);
     this.name = 'ApiError';
     this.Code = error.Code;
@@ -32,6 +33,7 @@ export class ApiError extends Error implements TApiError {
     this.Status = status;
     this.Details = error.Details ?? [];
     this.RetryAfterSeconds = retryAfterSeconds;
+    this.Language = language.toLowerCase();
   }
 }
 
