@@ -143,6 +143,7 @@ Before the keyring, values were encrypted with a key derived from `DHOW_SECRET_K
 | `"Repositories"."WebhookSecretSealed"` | The project |
 | `"SecretVersions"."ValueSealed"` | The organization, project or environment |
 | `"RegistryCredentials"."PasswordSealed"` | The organization or project |
+| `"NotificationChannels"."ConfigSealed"` | The organization or project |
 | `"GitConnections"."TokenSealed"` | Not used yet: nothing writes it before GitHub and GitLab connections arrive |
 
 Stop every server of the older release before you upgrade, so that no server writes a value in the old format while the migration runs. The migration that adds these constraints stops with `BACKFILL_NOT_DONE` if a column still holds a value in the old format whose conversion has not finished. In that case run the previous Dhow release until `dhow-server migrate status` says the conversion is done, then upgrade again. If the conversion is done and a value that cannot be opened is left, the next migration stops at that constraint, so delete that value or save it again, then restart.

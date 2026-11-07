@@ -91,7 +91,7 @@ func (s *Service) Update(ctx context.Context, org, id uuid.UUID, in models.Updat
 	if in.Disabled != nil {
 		data["Disabled"] = strconv.FormatBool(*in.Disabled)
 	}
-	if err := s.publishByUser(ctx, eventbus.RunnerUpdated, p, org, id, data); err != nil {
+	if err := s.publishByUser(ctx, nil, eventbus.RunnerUpdated, p, org, id, data); err != nil {
 		return models.Runner{}, err
 	}
 	return runnerOf(row, now), nil
@@ -118,7 +118,6 @@ func (s *Service) Revoke(ctx context.Context, org, id uuid.UUID) (models.Runner,
 	}
 	now := s.now()
 	var row sqlc.Runner
-	var revoked bool
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		r, err := q.RevokeRunner(ctx, sqlc.RevokeRunnerParams{ID: id, OrganizationID: org, Now: now})
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -131,25 +130,22 @@ func (s *Service) Revoke(ctx context.Context, org, id uuid.UUID) (models.Runner,
 		if err != nil {
 			return err
 		}
-		row, revoked = r, true
-		_, err = q.RevokeRunnerSessions(ctx, sqlc.RevokeRunnerSessionsParams{RunnerID: id, Now: now})
-		return err
+		row = r
+		if _, err = q.RevokeRunnerSessions(ctx, sqlc.RevokeRunnerSessionsParams{RunnerID: id, Now: now}); err != nil {
+			return err
+		}
+		return s.publishByUser(ctx, q, eventbus.RunnerRevoked, p, org, id, map[string]string{"Name": row.Name})
 	})
 	if err != nil {
 		return models.Runner{}, err
 	}
-	if revoked {
-		if err := s.publishByUser(ctx, eventbus.RunnerRevoked, p, org, id, map[string]string{"Name": row.Name}); err != nil {
-			return models.Runner{}, err
-		}
-	}
 	return runnerOf(row, now), nil
 }
 
-func (s *Service) publishByUser(ctx context.Context, name string, p auth.Principal, org, id uuid.UUID, data map[string]string) error {
+func (s *Service) publishByUser(ctx context.Context, q *sqlc.Queries, name string, p auth.Principal, org, id uuid.UUID, data map[string]string) error {
 	actor := p.UserID
 	return s.bus.Publish(ctx, eventbus.Event{Name: name, Payload: eventbus.Audited{
 		OrganizationIDs: []uuid.UUID{org}, ActorUserID: &actor, TargetType: "runner", TargetID: id.String(),
-		IP: auth.RequestMetaFrom(ctx).IPString(), Data: data,
+		IP: auth.RequestMetaFrom(ctx).IPString(), Data: data, Tx: q,
 	}})
 }

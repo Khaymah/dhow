@@ -144,6 +144,15 @@ const (
 	ArtifactIngested        = "artifact.ingested"
 	IngestRejected          = "ingest.rejected"
 	IngestReachAcknowledged = "ingest_token.reach_acknowledged"
+
+	NotificationChannelCreated  = "notification.channel_created"
+	NotificationChannelUpdated  = "notification.channel_updated"
+	NotificationChannelRemoved  = "notification.channel_removed"
+	NotificationChannelDisabled = "notification.channel_disabled"
+	NotificationRuleUpdated     = "notification.rule_updated"
+	NotificationTestSent        = "notification.test_sent"
+
+	RunFinished = "project.run_finished"
 )
 
 //nolint:funlen // A flat list of event names.
@@ -250,6 +259,8 @@ func AuditedEvents() []string {
 		ArtifactIngested,
 		IngestRejected,
 		JobSecretsDelivered,
+		NotificationChannelCreated, NotificationChannelUpdated, NotificationChannelRemoved, NotificationChannelDisabled,
+		NotificationRuleUpdated, NotificationTestSent,
 	}
 }
 

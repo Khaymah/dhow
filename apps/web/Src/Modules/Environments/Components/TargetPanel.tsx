@@ -11,6 +11,7 @@ import { Card } from '@/Core/Ui/Card';
 import { CardStates, cardStateOf } from '@/Core/Ui/CardStates';
 import { FactorGate } from '@/Core/Ui/FactorGate';
 import { Icon } from '@/Core/Ui/Icon';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { followInApp } from '@/Core/Ui/PlainClick';
 import { useT } from '@/I18n/useT';
@@ -87,7 +88,7 @@ export const CheckSection = ({ organizationId, projectId, environmentName, targe
       </div>
       {start.Failure ? (
         <div className="px-card">
-          <InlineAlert accent="failed" title={errorText(start.Failure)} />
+          <ErrorAlert error={start.Failure} />
         </div>
       ) : null}
       {Waiting ? (

@@ -4,6 +4,7 @@ import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Button } from '@/Core/Ui/Button';
 import { Card } from '@/Core/Ui/Card';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { useT } from '@/I18n/useT';
 import { rotateWebhookSecret } from '@/Modules/Projects/Api/ProjectsApi';
@@ -77,14 +78,13 @@ const SecretRotation = ({ organizationId, projectId }: IRepositoryActionsProps) 
 
 const DeployKeyRotation = ({ organizationId, projectId, previous }: IRepositoryActionsProps & { previous: boolean }) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const Push = useToastStore((state) => state.Push);
   const rotate = useRepositoryAction(organizationId, projectId, 'rotate-deploy-key');
   const confirm = useRepositoryAction(organizationId, projectId, 'confirm-deploy-key');
   const error = rotate.error ?? confirm.error;
   return (
     <div className="grid gap-3">
-      {error ? <InlineAlert accent="failed" title={errorText(error)} /> : null}
+      {error ? <ErrorAlert error={error} /> : null}
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
@@ -109,14 +109,13 @@ const DeployKeyRotation = ({ organizationId, projectId, previous }: IRepositoryA
 
 export const RepositoryUnlink = ({ organizationId, projectId }: IRepositoryActionsProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const Push = useToastStore((state) => state.Push);
   const unlink = useUnlinkRepository(organizationId, projectId);
   const [Confirming, setConfirming] = useState(false);
   return (
     <div className="grid gap-3">
       {Confirming ? <p className="m-0 text-body-sm text-secondary">{t('repository.unlink.question')}</p> : null}
-      {unlink.error ? <InlineAlert accent="failed" title={errorText(unlink.error)} /> : null}
+      {unlink.error ? <ErrorAlert error={unlink.error} /> : null}
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"

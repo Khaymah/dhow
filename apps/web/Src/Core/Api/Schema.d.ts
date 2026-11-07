@@ -498,6 +498,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/notification-mute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether the signed-in user muted the emails of notification channels
+         * @description Account security emails are never muted.
+         */
+        get: operations["getNotificationMute"];
+        /**
+         * Mute or unmute the emails of notification channels
+         * @description A muted user gets none of the emails that a channel sends to members by role. Account security emails still arrive.
+         */
+        put: operations["setNotificationMute"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/password": {
         parameters: {
             query?: never;
@@ -2956,6 +2980,310 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/projects/{projectId}/notification-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the notification channels of the project
+         * @description Needs `project.read` and a session. A channel shows its kind, name, language, state, `Host` and `HasSecret`. The address and the secret are never shown.
+         */
+        get: operations["listNotificationChannels"];
+        put?: never;
+        /**
+         * Make a notification channel
+         * @description Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Kind` is `email` or `webhook`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret and shows it once in `Secret`. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
+         */
+        post: operations["createNotificationChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/notification-channels/{channelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a notification channel
+         * @description Needs `project.read` and a session.
+         */
+        get: operations["getNotificationChannel"];
+        /**
+         * Change a notification channel
+         * @description Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`. `Url` replaces the address, `RotateSecret` makes a new signing secret (shown once in `Secret`), and `Enable` turns a stopped channel on again and makes you its owner.
+         */
+        put: operations["updateNotificationChannel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/notification-channels/{channelId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a notification channel
+         * @description Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. Deliveries still waiting end as `dead` with `channel_removed`.
+         */
+        post: operations["removeNotificationChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/notification-channels/{channelId}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test message through a channel
+         * @description Needs `notification.manage` on the project (Maintainer and above). Queues a real message and answers at once; look for it in the delivery log. At most 5 a minute for each channel, otherwise 429 `TEST_RATE_LIMITED`. A stopped channel is 409 `CHANNEL_DISABLED`.
+         */
+        post: operations["testNotificationChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/notification-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the notification rules of the project
+         * @description Needs `project.read` and a session. One rule for each channel: the events, the environments (empty means all), the statuses and, for an email channel, the member roles that get the email.
+         */
+        get: operations["getNotificationRules"];
+        /**
+         * Set the notification rules of some channels
+         * @description Needs `notification.manage` on the project (Maintainer and above). Sets the rule of each channel in the body and leaves the other channels as they are.
+         */
+        put: operations["putNotificationRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/notification-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the notification deliveries of the project
+         * @description Needs `notification.manage` on the project (Maintainer and above). Newest first. `State` is `pending`, `sending`, `sent` or `dead`. `LastError` is a short code and `LastStatus` the HTTP status of the receiver. The address, the body and the answer are never kept.
+         */
+        get: operations["listNotificationDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/notification-deliveries/{deliveryId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Try a dead delivery again
+         * @description Needs `notification.manage` on the project (Maintainer and above). Only a `dead` delivery, otherwise 409 `DELIVERY_NOT_RETRYABLE`. A stopped channel is 409 `CHANNEL_DISABLED`.
+         */
+        post: operations["retryNotificationDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/notification-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the notification channels of the organization
+         * @description Needs `org.read` and a session. A channel shows its kind, name, language, state, `Host` and `HasSecret`. The address and the secret are never shown.
+         */
+        get: operations["listOrgNotificationChannels"];
+        put?: never;
+        /**
+         * Make a notification channel
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Kind` is `email` or `webhook`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret and shows it once in `Secret`. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
+         */
+        post: operations["createOrgNotificationChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/notification-channels/{channelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a notification channel
+         * @description Needs `org.read` and a session.
+         */
+        get: operations["getOrgNotificationChannel"];
+        /**
+         * Change a notification channel
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`. `Url` replaces the address, `RotateSecret` makes a new signing secret (shown once in `Secret`), and `Enable` turns a stopped channel on again and makes you its owner.
+         */
+        put: operations["updateOrgNotificationChannel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/notification-channels/{channelId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a notification channel
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. Deliveries still waiting end as `dead` with `channel_removed`.
+         */
+        post: operations["removeOrgNotificationChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/notification-channels/{channelId}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test message through a channel
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin). Queues a real message and answers at once; look for it in the delivery log. At most 5 a minute for each channel, otherwise 429 `TEST_RATE_LIMITED`. A stopped channel is 409 `CHANNEL_DISABLED`.
+         */
+        post: operations["testOrgNotificationChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/notification-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the notification rules of the organization
+         * @description Needs `org.read` and a session. One rule for each channel: the events, the environments (empty means all), the statuses and, for an email channel, the member roles that get the email.
+         */
+        get: operations["getOrgNotificationRules"];
+        /**
+         * Set the notification rules of some channels
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin). Sets the rule of each channel in the body and leaves the other channels as they are.
+         */
+        put: operations["putOrgNotificationRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/notification-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the notification deliveries of the organization
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin). Newest first. `State` is `pending`, `sending`, `sent` or `dead`. `LastError` is a short code and `LastStatus` the HTTP status of the receiver. The address, the body and the answer are never kept.
+         */
+        get: operations["listOrgNotificationDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/notification-deliveries/{deliveryId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Try a dead delivery again
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin). Only a `dead` delivery, otherwise 409 `DELIVERY_NOT_RETRYABLE`. A stopped channel is 409 `CHANNEL_DISABLED`.
+         */
+        post: operations["retryOrgNotificationDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/projects/{projectId}/manual-inputs": {
         parameters: {
             query?: never;
@@ -3498,6 +3826,16 @@ export interface components {
              * @example Something went wrong. Try again later.
              */
             Message: string;
+            /**
+             * @description One short, fixed sentence in the Accept-Language locale that tells the user what to do. It never holds a value from the request. Absent when the code has no useful step to name.
+             * @example Wait a minute and reload the page.
+             */
+            Fix?: string;
+            /**
+             * @description Relative path of a page under `docs/` (Arabic) or `docs/en/` (English), with an optional `#anchor` already in the locale of the response. The client picks the folder from the UI language. Absent when no page helps.
+             * @example install/troubleshooting.md#setup-or-sign-in-fails-with-csrf_failed
+             */
+            DocsPath?: string;
             Details?: components["schemas"]["ErrorFieldDetail"][];
         };
         ErrorFieldDetail: {
@@ -5288,6 +5626,148 @@ export interface components {
         IngestTokenListResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["IngestToken"][];
         };
+        /** @enum {string} */
+        NotificationChannelKind: "email" | "webhook";
+        /** @enum {string} */
+        NotificationDeliveryState: "pending" | "sending" | "sent" | "dead";
+        NotificationChannel: {
+            /** Format: uuid */
+            Id: string;
+            /**
+             * Format: uuid
+             * @description Empty for a channel of the organization.
+             */
+            ProjectId?: string;
+            Kind: components["schemas"]["NotificationChannelKind"];
+            Name: string;
+            /**
+             * @description The language of the messages this channel sends.
+             * @enum {string}
+             */
+            Locale: "ar" | "en";
+            Enabled: boolean;
+            /**
+             * @description Why a stopped channel stopped. `creator-removed` means the member who made it left or lost the role to manage it.
+             * @enum {string}
+             */
+            DisabledReason?: "creator-removed" | "failures";
+            /** @description The host of the webhook address, with its port when it is not the default. Never the path or the query. Only a caller who manages channels sees it; a reader gets name, kind and state only. */
+            Host?: string;
+            /** @description True when the channel keeps an address and a signing secret. Neither is ever shown. */
+            HasSecret: boolean;
+            /** Format: int64 */
+            Version: number;
+            ConsecutiveFailures: number;
+            /**
+             * Format: uuid
+             * @description Only a caller who manages channels sees who made the channel.
+             */
+            CreatedByUserId?: string;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            UpdatedAt: string;
+        };
+        CreateNotificationChannelRequest: {
+            Kind: components["schemas"]["NotificationChannelKind"];
+            Name: string;
+            /** @enum {string} */
+            Locale?: "ar" | "en";
+            /** @description The https address of a webhook. Required for a webhook and refused for an email channel. */
+            Url?: string;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        UpdateNotificationChannelRequest: {
+            Name: string;
+            /** @enum {string} */
+            Locale: "ar" | "en";
+            /** Format: int64 */
+            Version: number;
+            Url?: string;
+            RotateSecret?: boolean;
+            Enable?: boolean;
+            CurrentFactor: components["schemas"]["CurrentFactor"];
+        };
+        CreatedNotificationChannel: {
+            Channel: components["schemas"]["NotificationChannel"];
+            /** @description The signing secret of a webhook (`dhow_whsec_...`). In this answer only; Dhow cannot show it again. */
+            Secret?: string;
+        };
+        NotificationRuleInput: {
+            /** Format: uuid */
+            ChannelId: string;
+            Events: ("deployment.finished" | "deployment.approval.requested" | "run.finished" | "runner.offline" | "account.new_device_login" | "account.second_factor_changed" | "member.removed" | "member.role_changed")[];
+            /** @description Environment names. Empty means all environments. */
+            Environments?: string[];
+            Statuses: ("succeeded" | "failed" | "canceled" | "rolled_back" | "rollback_failed" | "awaiting_approval")[];
+            /** @description For an email channel, the member roles that get the email. Empty for a webhook. */
+            Roles?: ("owner" | "admin" | "maintainer" | "developer" | "viewer")[];
+        };
+        NotificationRule: components["schemas"]["NotificationRuleInput"] & {
+            Environments: string[];
+            Roles: string[];
+            /** Format: int64 */
+            Version: number;
+        };
+        PutNotificationRulesRequest: {
+            Rules: components["schemas"]["NotificationRuleInput"][];
+        };
+        NotificationDelivery: {
+            /** Format: uuid */
+            Id: string;
+            /** Format: uuid */
+            ChannelId: string;
+            ChannelName: string;
+            ChannelKind: components["schemas"]["NotificationChannelKind"];
+            Event: string;
+            /** Format: uuid */
+            EventId: string;
+            State: components["schemas"]["NotificationDeliveryState"];
+            Attempts: number;
+            /** Format: date-time */
+            NextAttemptAt: string;
+            /** Format: date-time */
+            LastAttemptAt?: string;
+            /** Format: date-time */
+            SentAt?: string;
+            /** @description A short code such as `timeout`, `connect`, `http_status`, `blocked` or `channel_disabled`. Never the answer of the receiver. */
+            LastError: string;
+            LastStatus?: number;
+            /** Format: date-time */
+            CreatedAt: string;
+        };
+        NotificationMute: {
+            Muted: boolean;
+        };
+        NotificationChannelResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["NotificationChannel"];
+        };
+        NotificationChannelListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["NotificationChannel"][];
+        };
+        CreatedNotificationChannelResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["CreatedNotificationChannel"];
+        };
+        NotificationRuleListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["NotificationRule"][];
+        };
+        NotificationDeliveryListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["NotificationDelivery"][];
+        };
+        NotificationMuteResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["NotificationMute"];
+        };
+        NotificationTestResponse: components["schemas"]["Envelope"] & {
+            Data?: {
+                /** Format: uuid */
+                EventId: string;
+            };
+        };
+        NotificationAckResponse: components["schemas"]["Envelope"] & {
+            Data?: {
+                Retried?: boolean;
+            };
+        };
         IngestedArtifact: {
             /** Format: uuid */
             Id: string;
@@ -5589,6 +6069,9 @@ export interface components {
         RunId: string;
         ArtifactId: string;
         IngestTokenId: string;
+        ChannelId: string;
+        DeliveryId: string;
+        DeliveryState: components["schemas"]["NotificationDeliveryState"];
         SecretName: string;
         VariableName: string;
         RegistryCredentialId: string;
@@ -6266,6 +6749,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PreferencesResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getNotificationMute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The mute state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationMuteResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    setNotificationMute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationMute"];
+            };
+        };
+        responses: {
+            /** @description The mute state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationMuteResponse"];
                 };
             };
             default: components["responses"]["Error"];
@@ -10087,6 +10616,532 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IngestedArtifactListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listNotificationChannels: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of channels, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateNotificationChannelRequest"];
+            };
+        };
+        responses: {
+            /** @description The channel, and the secret of a webhook (shown once). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedNotificationChannelResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The channel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNotificationChannelRequest"];
+            };
+        };
+        responses: {
+            /** @description The channel, and a new secret if one was made. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedNotificationChannelResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CurrentFactorRequest"];
+            };
+        };
+        responses: {
+            /** @description The removed channel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    testNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The message was queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationTestResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getNotificationRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationRuleListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putNotificationRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutNotificationRulesRequest"];
+            };
+        };
+        responses: {
+            /** @description The saved rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationRuleListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listNotificationDeliveries: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+                State?: components["parameters"]["DeliveryState"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of deliveries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    retryNotificationDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+                deliveryId: components["parameters"]["DeliveryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery was queued again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationAckResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listOrgNotificationChannels: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of channels, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createOrgNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateNotificationChannelRequest"];
+            };
+        };
+        responses: {
+            /** @description The channel, and the secret of a webhook (shown once). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedNotificationChannelResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getOrgNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The channel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateOrgNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNotificationChannelRequest"];
+            };
+        };
+        responses: {
+            /** @description The channel, and a new secret if one was made. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedNotificationChannelResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    removeOrgNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CurrentFactorRequest"];
+            };
+        };
+        responses: {
+            /** @description The removed channel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    testOrgNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The message was queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationTestResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getOrgNotificationRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationRuleListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putOrgNotificationRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutNotificationRulesRequest"];
+            };
+        };
+        responses: {
+            /** @description The saved rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationRuleListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listOrgNotificationDeliveries: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+                State?: components["parameters"]["DeliveryState"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of deliveries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    retryOrgNotificationDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                deliveryId: components["parameters"]["DeliveryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery was queued again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationAckResponse"];
                 };
             };
             default: components["responses"]["Error"];

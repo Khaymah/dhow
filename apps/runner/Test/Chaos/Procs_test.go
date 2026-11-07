@@ -95,17 +95,22 @@ type stack struct {
 	runnerDir                        string
 	keyring                          string
 	runnerProxy                      *faultyProxy
+	notifyCA, notifyAllow            string
 	mu                               sync.Mutex
 	server, runner                   *process
 }
 
 func (s *stack) serverEnv() []string {
-	return []string{
+	env := []string{
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"DHOW_DATABASE_URL=" + s.dbURL, "DHOW_SECRET_KEY=" + s.secretKey, "DHOW_KEYRING_FILE=" + s.keyring,
 		"DHOW_PUBLIC_URL=" + s.publicURL,
 		"DHOW_LISTEN_ADDR=" + s.serverAddr, "DHOW_DEV=true", "DHOW_BREACHED_PASSWORD_CHECK=false", "DHOW_LOG_LEVEL=debug",
 	}
+	if s.notifyCA != "" {
+		env = append(env, "SSL_CERT_FILE="+s.notifyCA, "DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS="+s.notifyAllow)
+	}
+	return env
 }
 
 func (s *stack) initKeyring() error {

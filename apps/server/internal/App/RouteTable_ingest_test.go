@@ -35,7 +35,7 @@ func ingestBody(env *apptest.Env, rule policy.Rule) any {
 	case rule.Method == http.MethodPost && (strings.HasSuffix(rule.Path, "/revoke") || strings.HasSuffix(rule.Path, "/acknowledge-reach")):
 		return map[string]any{"CurrentFactor": wrong}
 	default:
-		return targetsBody(env, rule)
+		return notificationsBody(env, rule)
 	}
 }
 

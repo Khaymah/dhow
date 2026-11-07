@@ -96,6 +96,8 @@ func Run(ctx context.Context) error {
 	defer stopArtifacts()
 	stopMaintenance := StartMaintenance(ctx, wired.Retention, config.RetentionEvery)
 	defer stopMaintenance()
+	stopNotifications := StartNotifications(ctx, wired.Notifications)
+	defer stopNotifications()
 	servers := []served{{srv: NewHTTPServer(cfg, wired.Handler, log), attrs: []any{"public_url", cfg.PublicURL.String()}}}
 	if wired.RunnerHandler != nil {
 		runner := NewHTTPServer(cfg, wired.RunnerHandler, log)

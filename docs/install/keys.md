@@ -143,6 +143,7 @@ docker compose run --rm --no-deps -T dhow keys status
 | `"Repositories"."WebhookSecretSealed"` | المشروع |
 | `"SecretVersions"."ValueSealed"` | المنظمة أو المشروع أو البيئة |
 | `"RegistryCredentials"."PasswordSealed"` | المنظمة أو المشروع |
+| `"NotificationChannels"."ConfigSealed"` | المنظمة أو المشروع |
 | `"GitConnections"."TokenSealed"` | غير مستخدم بعد: لا يكتب فيه شيء قبل ربط GitHub وGitLab |
 
 أوقف كل سيرفر من الإصدار الأقدم قبل التحديث، حتى لا يكتب أي سيرفر قيمة بالصيغة القديمة أثناء التحديث. التحديث الذي يضيف هذه القيود يتوقف بـ `BACKFILL_NOT_DONE` إذا بقيت في أحد الأعمدة قيمة بالصيغة القديمة لم ينتهِ تحويلها. في هذه الحالة شغّل الإصدار السابق من داو حتى يقول `dhow-server migrate status` إن التحويل انتهى، ثم رقِّ مرة أخرى. وإذا انتهى التحويل وبقيت قيمة لا تُفتح، يتوقف التحديث الذي يليه عند هذا القيد، فاحذف هذه القيمة أو أعد حفظها ثم أعد التشغيل.

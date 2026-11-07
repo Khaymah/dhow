@@ -74,6 +74,11 @@ tags:
     description: >-
       Ingest tokens and the artifacts an outside CI uploaded with them. Served by the Ingest module. The upload itself
       is `PUT /ingest/v1/artifacts/{sha256}`, outside this API, with an ingest token instead of a session.
+  - name: notifications
+    description: >-
+      Notification channels, their rules and the delivery log, for a project and for the organization (the defaults of
+      every project). Served by the Notifications module. A channel is an email list or a signed webhook. Its address and
+      secret are write-only: no response carries them, only `Host` and `HasSecret`.
   - name: secrets
     description: >-
       Secrets, variables and private registry credentials of an organization, a project or an environment. Served by
@@ -746,6 +751,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PreferencesResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /me/notification-mute:
+    get:
+      operationId: getNotificationMute
+      tags: [notifications]
+      summary: Whether the signed-in user muted the emails of notification channels
+      description: >-
+        Account security emails are never muted.
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: The mute state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationMuteResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: setNotificationMute
+      tags: [notifications]
+      summary: Mute or unmute the emails of notification channels
+      description: >-
+        A muted user gets none of the emails that a channel sends to members by role. Account security emails still arrive.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationMute"
+      responses:
+        "200":
+          description: The mute state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationMuteResponse"
         default:
           $ref: "#/components/responses/Error"
   /me/password:
@@ -4688,6 +4735,508 @@ paths:
                 $ref: "#/components/schemas/IngestedArtifactListResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/notification-channels:
+    get:
+      operationId: listNotificationChannels
+      tags: [notifications]
+      summary: List the notification channels of the project
+      description: >-
+        Needs `project.read` and a session. A channel shows its kind, name, language, state, `Host` and `HasSecret`.
+        The address and the secret are never shown.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of channels, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createNotificationChannel
+      tags: [notifications]
+      summary: Make a notification channel
+      description: >-
+        Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Kind` is `email` or `webhook`. A webhook needs `Url`: https, without a user name,
+        and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed).
+        Dhow makes the signing secret and shows it once in `Secret`. A new channel starts with a rule for failed deployments,
+        rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationChannelRequest"
+      responses:
+        "201":
+          description: The channel, and the secret of a webhook (shown once).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedNotificationChannelResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/notification-channels/{channelId}:
+    get:
+      operationId: getNotificationChannel
+      tags: [notifications]
+      summary: Read a notification channel
+      description: >-
+        Needs `project.read` and a session.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "200":
+          description: The channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateNotificationChannel
+      tags: [notifications]
+      summary: Change a notification channel
+      description: >-
+        Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`.
+        `Url` replaces the address, `RotateSecret` makes a new signing secret (shown once in `Secret`), and `Enable` turns a stopped
+        channel on again and makes you its owner.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/ChannelId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationChannelRequest"
+      responses:
+        "200":
+          description: The channel, and a new secret if one was made.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedNotificationChannelResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/notification-channels/{channelId}/remove:
+    post:
+      operationId: removeNotificationChannel
+      tags: [notifications]
+      summary: Remove a notification channel
+      description: >-
+        Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. Deliveries still waiting end as `dead` with `channel_removed`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/ChannelId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
+      responses:
+        "200":
+          description: The removed channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/notification-channels/{channelId}/test:
+    post:
+      operationId: testNotificationChannel
+      tags: [notifications]
+      summary: Send a test message through a channel
+      description: >-
+        Needs `notification.manage` on the project (Maintainer and above). Queues a real message and answers at once; look for it in the delivery log.
+        At most 5 a minute for each channel, otherwise 429 `TEST_RATE_LIMITED`. A stopped channel is 409 `CHANNEL_DISABLED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "202":
+          description: The message was queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTestResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/notification-rules:
+    get:
+      operationId: getNotificationRules
+      tags: [notifications]
+      summary: Read the notification rules of the project
+      description: >-
+        Needs `project.read` and a session. One rule for each channel: the events, the environments (empty means all), the statuses
+        and, for an email channel, the member roles that get the email.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: The rules.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationRuleListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: putNotificationRules
+      tags: [notifications]
+      summary: Set the notification rules of some channels
+      description: >-
+        Needs `notification.manage` on the project (Maintainer and above). Sets the rule of each channel in the body and leaves the other channels as they are.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutNotificationRulesRequest"
+      responses:
+        "200":
+          description: The saved rules.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationRuleListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/notification-deliveries:
+    get:
+      operationId: listNotificationDeliveries
+      tags: [notifications]
+      summary: List the notification deliveries of the project
+      description: >-
+        Needs `notification.manage` on the project (Maintainer and above). Newest first. `State` is `pending`, `sending`, `sent` or `dead`. `LastError` is a short code and
+        `LastStatus` the HTTP status of the receiver. The address, the body and the answer are never kept.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/DeliveryState"
+      responses:
+        "200":
+          description: A page of deliveries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationDeliveryListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/projects/{projectId}/notification-deliveries/{deliveryId}/retry:
+    post:
+      operationId: retryNotificationDelivery
+      tags: [notifications]
+      summary: Try a dead delivery again
+      description: >-
+        Needs `notification.manage` on the project (Maintainer and above). Only a `dead` delivery, otherwise 409 `DELIVERY_NOT_RETRYABLE`. A stopped channel is 409 `CHANNEL_DISABLED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/DeliveryId"
+      responses:
+        "200":
+          description: The delivery was queued again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationAckResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/notification-channels:
+    get:
+      operationId: listOrgNotificationChannels
+      tags: [notifications]
+      summary: List the notification channels of the organization
+      description: >-
+        Needs `org.read` and a session. A channel shows its kind, name, language, state, `Host` and `HasSecret`.
+        The address and the secret are never shown.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of channels, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createOrgNotificationChannel
+      tags: [notifications]
+      summary: Make a notification channel
+      description: >-
+        Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Kind` is `email` or `webhook`. A webhook needs `Url`: https, without a user name,
+        and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed).
+        Dhow makes the signing secret and shows it once in `Secret`. A new channel starts with a rule for failed deployments,
+        rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationChannelRequest"
+      responses:
+        "201":
+          description: The channel, and the secret of a webhook (shown once).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedNotificationChannelResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/notification-channels/{channelId}:
+    get:
+      operationId: getOrgNotificationChannel
+      tags: [notifications]
+      summary: Read a notification channel
+      description: >-
+        Needs `org.read` and a session.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "200":
+          description: The channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateOrgNotificationChannel
+      tags: [notifications]
+      summary: Change a notification channel
+      description: >-
+        Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`.
+        `Url` replaces the address, `RotateSecret` makes a new signing secret (shown once in `Secret`), and `Enable` turns a stopped
+        channel on again and makes you its owner.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ChannelId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationChannelRequest"
+      responses:
+        "200":
+          description: The channel, and a new secret if one was made.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedNotificationChannelResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/notification-channels/{channelId}/remove:
+    post:
+      operationId: removeOrgNotificationChannel
+      tags: [notifications]
+      summary: Remove a notification channel
+      description: >-
+        Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. Deliveries still waiting end as `dead` with `channel_removed`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ChannelId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrentFactorRequest"
+      responses:
+        "200":
+          description: The removed channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/notification-channels/{channelId}/test:
+    post:
+      operationId: testOrgNotificationChannel
+      tags: [notifications]
+      summary: Send a test message through a channel
+      description: >-
+        Needs `org.notification.manage` on the organization (Owner and Admin). Queues a real message and answers at once; look for it in the delivery log.
+        At most 5 a minute for each channel, otherwise 429 `TEST_RATE_LIMITED`. A stopped channel is 409 `CHANNEL_DISABLED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "202":
+          description: The message was queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTestResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/notification-rules:
+    get:
+      operationId: getOrgNotificationRules
+      tags: [notifications]
+      summary: Read the notification rules of the organization
+      description: >-
+        Needs `org.read` and a session. One rule for each channel: the events, the environments (empty means all), the statuses
+        and, for an email channel, the member roles that get the email.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: The rules.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationRuleListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: putOrgNotificationRules
+      tags: [notifications]
+      summary: Set the notification rules of some channels
+      description: >-
+        Needs `org.notification.manage` on the organization (Owner and Admin). Sets the rule of each channel in the body and leaves the other channels as they are.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutNotificationRulesRequest"
+      responses:
+        "200":
+          description: The saved rules.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationRuleListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/notification-deliveries:
+    get:
+      operationId: listOrgNotificationDeliveries
+      tags: [notifications]
+      summary: List the notification deliveries of the organization
+      description: >-
+        Needs `org.notification.manage` on the organization (Owner and Admin). Newest first. `State` is `pending`, `sending`, `sent` or `dead`. `LastError` is a short code and
+        `LastStatus` the HTTP status of the receiver. The address, the body and the answer are never kept.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/DeliveryState"
+      responses:
+        "200":
+          description: A page of deliveries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationDeliveryListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /organizations/{id}/notification-deliveries/{deliveryId}/retry:
+    post:
+      operationId: retryOrgNotificationDelivery
+      tags: [notifications]
+      summary: Try a dead delivery again
+      description: >-
+        Needs `org.notification.manage` on the organization (Owner and Admin). Only a `dead` delivery, otherwise 409 `DELIVERY_NOT_RETRYABLE`. A stopped channel is 409 `CHANNEL_DISABLED`.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/DeliveryId"
+      responses:
+        "200":
+          description: The delivery was queued again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationAckResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/projects/{projectId}/manual-inputs:
     get:
       operationId: getManualInputs
@@ -5264,6 +5813,26 @@ components:
       schema:
         type: string
         format: uuid
+    ChannelId:
+      name: channelId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DeliveryId:
+      name: deliveryId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DeliveryState:
+      name: State
+      in: query
+      required: false
+      schema:
+        $ref: "#/components/schemas/NotificationDeliveryState"
     SecretName:
       name: secretName
       in: path
@@ -5912,6 +6481,18 @@ components:
           type: string
           description: Message translated by the server for the Accept-Language locale (Arabic by default).
           example: Something went wrong. Try again later.
+        Fix:
+          type: string
+          description: >-
+            One short, fixed sentence in the Accept-Language locale that tells the user what to do. It never holds a
+            value from the request. Absent when the code has no useful step to name.
+          example: Wait a minute and reload the page.
+        DocsPath:
+          type: string
+          description: >-
+            Relative path of a page under `docs/` (Arabic) or `docs/en/` (English), with an optional `#anchor` already
+            in the locale of the response. The client picks the folder from the UI language. Absent when no page helps.
+          example: install/troubleshooting.md#setup-or-sign-in-fails-with-csrf_failed
         Details:
           type: array
           items:
@@ -9609,6 +10190,305 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/IngestToken"
+    NotificationChannelKind:
+      type: string
+      enum: [email, webhook]
+    NotificationDeliveryState:
+      type: string
+      enum: [pending, sending, sent, dead]
+    NotificationChannel:
+      type: object
+      additionalProperties: false
+      required: [Id, Kind, Name, Locale, Enabled, HasSecret, Version, ConsecutiveFailures, CreatedAt, UpdatedAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        ProjectId:
+          type: string
+          format: uuid
+          description: Empty for a channel of the organization.
+        Kind:
+          $ref: "#/components/schemas/NotificationChannelKind"
+        Name:
+          type: string
+        Locale:
+          type: string
+          enum: [ar, en]
+          description: The language of the messages this channel sends.
+        Enabled:
+          type: boolean
+        DisabledReason:
+          type: string
+          enum: [creator-removed, failures]
+          description: Why a stopped channel stopped. `creator-removed` means the member who made it left or lost the role to manage it.
+        Host:
+          type: string
+          description: >-
+            The host of the webhook address, with its port when it is not the default. Never the path or the query. Only a
+            caller who manages channels sees it; a reader gets name, kind and state only.
+        HasSecret:
+          type: boolean
+          description: True when the channel keeps an address and a signing secret. Neither is ever shown.
+        Version:
+          type: integer
+          format: int64
+        ConsecutiveFailures:
+          type: integer
+        CreatedByUserId:
+          type: string
+          format: uuid
+          description: Only a caller who manages channels sees who made the channel.
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+    CreateNotificationChannelRequest:
+      type: object
+      additionalProperties: false
+      required: [Kind, Name, CurrentFactor]
+      properties:
+        Kind:
+          $ref: "#/components/schemas/NotificationChannelKind"
+        Name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        Locale:
+          type: string
+          enum: [ar, en]
+        Url:
+          type: string
+          maxLength: 2048
+          description: The https address of a webhook. Required for a webhook and refused for an email channel.
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    UpdateNotificationChannelRequest:
+      type: object
+      additionalProperties: false
+      required: [Name, Locale, Version, CurrentFactor]
+      properties:
+        Name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        Locale:
+          type: string
+          enum: [ar, en]
+        Version:
+          type: integer
+          format: int64
+          minimum: 1
+        Url:
+          type: string
+          maxLength: 2048
+        RotateSecret:
+          type: boolean
+        Enable:
+          type: boolean
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    CreatedNotificationChannel:
+      type: object
+      additionalProperties: false
+      required: [Channel]
+      properties:
+        Channel:
+          $ref: "#/components/schemas/NotificationChannel"
+        Secret:
+          type: string
+          description: The signing secret of a webhook (`dhow_whsec_...`). In this answer only; Dhow cannot show it again.
+    NotificationRuleInput:
+      type: object
+      additionalProperties: false
+      required: [ChannelId, Events, Statuses]
+      properties:
+        ChannelId:
+          type: string
+          format: uuid
+        Events:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum:
+              - deployment.finished
+              - deployment.approval.requested
+              - run.finished
+              - runner.offline
+              - account.new_device_login
+              - account.second_factor_changed
+              - member.removed
+              - member.role_changed
+        Environments:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+          description: Environment names. Empty means all environments.
+        Statuses:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [succeeded, failed, canceled, rolled_back, rollback_failed, awaiting_approval]
+        Roles:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            enum: [owner, admin, maintainer, developer, viewer]
+          description: For an email channel, the member roles that get the email. Empty for a webhook.
+    NotificationRule:
+      allOf:
+        - $ref: "#/components/schemas/NotificationRuleInput"
+        - type: object
+          required: [Environments, Roles, Version]
+          properties:
+            Environments:
+              type: array
+              items:
+                type: string
+            Roles:
+              type: array
+              items:
+                type: string
+            Version:
+              type: integer
+              format: int64
+    PutNotificationRulesRequest:
+      type: object
+      additionalProperties: false
+      required: [Rules]
+      properties:
+        Rules:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/NotificationRuleInput"
+    NotificationDelivery:
+      type: object
+      additionalProperties: false
+      required: [Id, ChannelId, ChannelName, ChannelKind, Event, EventId, State, Attempts, NextAttemptAt, LastError, CreatedAt]
+      properties:
+        Id:
+          type: string
+          format: uuid
+        ChannelId:
+          type: string
+          format: uuid
+        ChannelName:
+          type: string
+        ChannelKind:
+          $ref: "#/components/schemas/NotificationChannelKind"
+        Event:
+          type: string
+        EventId:
+          type: string
+          format: uuid
+        State:
+          $ref: "#/components/schemas/NotificationDeliveryState"
+        Attempts:
+          type: integer
+        NextAttemptAt:
+          type: string
+          format: date-time
+        LastAttemptAt:
+          type: string
+          format: date-time
+        SentAt:
+          type: string
+          format: date-time
+        LastError:
+          type: string
+          description: A short code such as `timeout`, `connect`, `http_status`, `blocked` or `channel_disabled`. Never the answer of the receiver.
+        LastStatus:
+          type: integer
+        CreatedAt:
+          type: string
+          format: date-time
+    NotificationMute:
+      type: object
+      additionalProperties: false
+      required: [Muted]
+      properties:
+        Muted:
+          type: boolean
+    NotificationChannelResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/NotificationChannel"
+    NotificationChannelListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/NotificationChannel"
+    CreatedNotificationChannelResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/CreatedNotificationChannel"
+    NotificationRuleListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/NotificationRule"
+    NotificationDeliveryListResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: "#/components/schemas/NotificationDelivery"
+    NotificationMuteResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/NotificationMute"
+    NotificationTestResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: object
+              additionalProperties: false
+              required: [EventId]
+              properties:
+                EventId:
+                  type: string
+                  format: uuid
+    NotificationAckResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              type: object
+              additionalProperties: false
+              properties:
+                Retried:
+                  type: boolean
     IngestedArtifact:
       type: object
       additionalProperties: false

@@ -5,7 +5,7 @@ import "slices"
 func ProjectActions() []Action {
 	return []Action{
 		ProjectRead, ProjectManage, RunRead, RunTrigger, RunCancel, RunApprove, ArtifactRead,
-		EnvironmentManage, EnvironmentPause, EnvironmentBypass, DeploymentApprove, DeploymentRollback, DeploymentCheck, SecretRead, SecretManage, IngestManage,
+		EnvironmentManage, EnvironmentPause, EnvironmentBypass, DeploymentApprove, DeploymentRollback, DeploymentCheck, SecretRead, SecretManage, IngestManage, NotificationManage,
 	}
 }
 

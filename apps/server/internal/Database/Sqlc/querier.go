@@ -30,6 +30,7 @@ type Querier interface {
 	CancelRunApprovals(ctx context.Context, arg CancelRunApprovalsParams) error
 	CheckoutRepositoryOfJob(ctx context.Context, arg CheckoutRepositoryOfJobParams) (CheckoutRepositoryOfJobRow, error)
 	ClaimCommitStatuses(ctx context.Context, arg ClaimCommitStatusesParams) ([]ClaimCommitStatusesRow, error)
+	ClaimOutbox(ctx context.Context, arg ClaimOutboxParams) (NotificationOutbox, error)
 	ClaimPendingRun(ctx context.Context, arg ClaimPendingRunParams) (PipelineRun, error)
 	ClaimQueuedJob(ctx context.Context, arg ClaimQueuedJobParams) (Job, error)
 	ClaimUpload(ctx context.Context, arg ClaimUploadParams) (uuid.UUID, error)
@@ -38,6 +39,7 @@ type Querier interface {
 	ClearSecretProjectAccess(ctx context.Context, arg ClearSecretProjectAccessParams) error
 	CloseApproval(ctx context.Context, arg CloseApprovalParams) (int64, error)
 	CompleteInstanceSetup(ctx context.Context, completedAt time.Time) error
+	CompleteOutbox(ctx context.Context, arg CompleteOutboxParams) (int64, error)
 	ConfirmDeployTargetHostKey(ctx context.Context, arg ConfirmDeployTargetHostKeyParams) (DeployTargetHost, error)
 	ConfirmTotpFactor(ctx context.Context, arg ConfirmTotpFactorParams) error
 	ConsumeRecoveryCode(ctx context.Context, arg ConsumeRecoveryCodeParams) (int64, error)
@@ -57,6 +59,11 @@ type Querier interface {
 	CountJobs(ctx context.Context, arg CountJobsParams) (int64, error)
 	CountMatchingRunners(ctx context.Context, arg CountMatchingRunnersParams) (int64, error)
 	CountMembers(ctx context.Context, organizationID uuid.UUID) (int64, error)
+	CountNotificationChannels(ctx context.Context, arg CountNotificationChannelsParams) (int64, error)
+	CountNotificationConfigsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
+	CountNotificationDevices(ctx context.Context, userID uuid.UUID) (int64, error)
+	CountNotificationOutboxByScope(ctx context.Context, arg CountNotificationOutboxByScopeParams) (int64, error)
+	CountNotificationTestsSince(ctx context.Context, arg CountNotificationTestsSinceParams) (int64, error)
 	CountOidcProviderSecretsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
 	CountOidcProviders(ctx context.Context) (int64, error)
 	CountOrganizationProjects(ctx context.Context, arg CountOrganizationProjectsParams) (int64, error)
@@ -65,8 +72,10 @@ type Querier interface {
 	CountOverviewInvitations(ctx context.Context, arg CountOverviewInvitationsParams) (int64, error)
 	CountOverviewJobs(ctx context.Context, arg CountOverviewJobsParams) (CountOverviewJobsRow, error)
 	CountOverviewRunners(ctx context.Context, arg CountOverviewRunnersParams) (CountOverviewRunnersRow, error)
+	CountPendingInternalEmails(ctx context.Context) (int64, error)
 	CountProjects(ctx context.Context, arg CountProjectsParams) (int64, error)
 	CountQueuedJobs(ctx context.Context, arg CountQueuedJobsParams) (int64, error)
+	CountRecentChannelEmails(ctx context.Context, arg CountRecentChannelEmailsParams) (int64, error)
 	CountRecentWebhookRuns(ctx context.Context, arg CountRecentWebhookRunsParams) (CountRecentWebhookRunsRow, error)
 	CountRegistrationTokens(ctx context.Context, organizationID uuid.UUID) (int64, error)
 	CountRegistryCredentialsInScope(ctx context.Context, arg CountRegistryCredentialsInScopeParams) (int64, error)
@@ -92,12 +101,15 @@ type Querier interface {
 	DestroyDataKeysOfOwner(ctx context.Context, arg DestroyDataKeysOfOwnerParams) (int64, error)
 	DestroyDataKeysOnVersions(ctx context.Context, versions []int32) (int64, error)
 	DestroySupersededDataKeys(ctx context.Context, ids []uuid.UUID) (int64, error)
+	DisableNotificationChannel(ctx context.Context, arg DisableNotificationChannelParams) (NotificationChannel, error)
+	DisableNotificationChannelsOfCreator(ctx context.Context, arg DisableNotificationChannelsOfCreatorParams) ([]NotificationChannel, error)
 	DisableRunnerAsClone(ctx context.Context, arg DisableRunnerAsCloneParams) (int64, error)
 	DiscardPendingTotp(ctx context.Context, arg DiscardPendingTotpParams) error
 	DiscoveryLog(ctx context.Context, jobID uuid.UUID) ([][]byte, error)
 	DowngradeRelease(ctx context.Context, arg DowngradeReleaseParams) error
 	DropLogPartitions(ctx context.Context, retentionDays int32) (int32, error)
 	DropWebhookPartitions(ctx context.Context, retentionDays int32) (int32, error)
+	EnableNotificationChannel(ctx context.Context, arg EnableNotificationChannelParams) (NotificationChannel, error)
 	EndAttemptStep(ctx context.Context, arg EndAttemptStepParams) (int64, error)
 	EndBackfillPass(ctx context.Context, arg EndBackfillPassParams) error
 	EndLease(ctx context.Context, arg EndLeaseParams) (int64, error)
@@ -170,6 +182,13 @@ type Querier interface {
 	GetManualDefinition(ctx context.Context, arg GetManualDefinitionParams) (GetManualDefinitionRow, error)
 	GetMember(ctx context.Context, arg GetMemberParams) (GetMemberRow, error)
 	GetMfaFactors(ctx context.Context, userID uuid.UUID) (GetMfaFactorsRow, error)
+	GetNotificationChannel(ctx context.Context, arg GetNotificationChannelParams) (NotificationChannel, error)
+	GetNotificationChannelByID(ctx context.Context, id uuid.UUID) (NotificationChannel, error)
+	GetNotificationChannelForUpdate(ctx context.Context, arg GetNotificationChannelForUpdateParams) (NotificationChannel, error)
+	GetNotificationDelivery(ctx context.Context, arg GetNotificationDeliveryParams) (GetNotificationDeliveryRow, error)
+	GetNotificationMute(ctx context.Context, userID uuid.UUID) (bool, error)
+	GetNotificationRule(ctx context.Context, channelID uuid.UUID) (NotificationRule, error)
+	GetNotificationUser(ctx context.Context, id uuid.UUID) (GetNotificationUserRow, error)
 	GetOpenInvitation(ctx context.Context, arg GetOpenInvitationParams) (GetOpenInvitationRow, error)
 	GetOpenKeyRekey(ctx context.Context) (GetOpenKeyRekeyRow, error)
 	GetOrganizationByID(ctx context.Context, id uuid.UUID) (GetOrganizationByIDRow, error)
@@ -243,9 +262,12 @@ type Querier interface {
 	InsertLease(ctx context.Context, arg InsertLeaseParams) (Lease, error)
 	InsertLogChunks(ctx context.Context, arg InsertLogChunksParams) (int64, error)
 	InsertMembership(ctx context.Context, arg InsertMembershipParams) error
+	InsertNotificationChannel(ctx context.Context, arg InsertNotificationChannelParams) (NotificationChannel, error)
+	InsertNotificationRule(ctx context.Context, arg InsertNotificationRuleParams) (NotificationRule, error)
 	InsertOidcFlow(ctx context.Context, arg InsertOidcFlowParams) (uuid.UUID, error)
 	InsertOidcProvider(ctx context.Context, arg InsertOidcProviderParams) (int64, error)
 	InsertOrganization(ctx context.Context, arg InsertOrganizationParams) (InsertOrganizationRow, error)
+	InsertOutbox(ctx context.Context, arg InsertOutboxParams) (int64, error)
 	InsertPasskey(ctx context.Context, arg InsertPasskeyParams) (InsertPasskeyRow, error)
 	InsertProject(ctx context.Context, arg InsertProjectParams) (Project, error)
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
@@ -281,6 +303,7 @@ type Querier interface {
 	IsMemberByEmail(ctx context.Context, arg IsMemberByEmailParams) (bool, error)
 	JobCancelRequestedAt(ctx context.Context, id uuid.UUID) (*time.Time, error)
 	JobExists(ctx context.Context, arg JobExistsParams) (bool, error)
+	KillOutbox(ctx context.Context, arg KillOutboxParams) (int64, error)
 	KnownBlobs(ctx context.Context, digests [][]byte) ([][]byte, error)
 	LatestApproval(ctx context.Context, arg LatestApprovalParams) (DeploymentApproval, error)
 	LatestEnvironmentRef(ctx context.Context, arg LatestEnvironmentRefParams) (string, error)
@@ -300,6 +323,7 @@ type Querier interface {
 	ListDeployments(ctx context.Context, arg ListDeploymentsParams) ([]Deployment, error)
 	ListDoneBackfills(ctx context.Context, names []string) ([]string, error)
 	ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobsParams) ([]ListDriftedRunJobsRow, error)
+	ListEmailCandidates(ctx context.Context, arg ListEmailCandidatesParams) ([]ListEmailCandidatesRow, error)
 	ListEnvironmentReach(ctx context.Context, arg ListEnvironmentReachParams) ([]ListEnvironmentReachRow, error)
 	ListEnvironmentReviewers(ctx context.Context, arg ListEnvironmentReviewersParams) ([]ListEnvironmentReviewersRow, error)
 	ListEnvironments(ctx context.Context, arg ListEnvironmentsParams) ([]Environment, error)
@@ -321,6 +345,10 @@ type Querier interface {
 	ListLogChunks(ctx context.Context, arg ListLogChunksParams) ([]ListLogChunksRow, error)
 	ListMemberRoles(ctx context.Context, arg ListMemberRolesParams) ([]ListMemberRolesRow, error)
 	ListMembers(ctx context.Context, arg ListMembersParams) ([]ListMembersRow, error)
+	ListNotificationChannels(ctx context.Context, arg ListNotificationChannelsParams) ([]NotificationChannel, error)
+	ListNotificationCreatorAccess(ctx context.Context, arg ListNotificationCreatorAccessParams) ([]ListNotificationCreatorAccessRow, error)
+	ListNotificationRules(ctx context.Context, arg ListNotificationRulesParams) ([]NotificationRule, error)
+	ListOfflineRunners(ctx context.Context, before time.Time) ([]ListOfflineRunnersRow, error)
 	ListOidcProviders(ctx context.Context) ([]ListOidcProvidersRow, error)
 	ListOidcProvidersForUpdate(ctx context.Context) ([]ListOidcProvidersForUpdateRow, error)
 	ListOpenInvitations(ctx context.Context, arg ListOpenInvitationsParams) ([]ListOpenInvitationsRow, error)
@@ -333,6 +361,7 @@ type Querier interface {
 	ListRegistryCredentialsInScope(ctx context.Context, arg ListRegistryCredentialsInScopeParams) ([]ListRegistryCredentialsInScopeRow, error)
 	ListReleaseHostStates(ctx context.Context, arg ListReleaseHostStatesParams) ([]string, error)
 	ListReleaseHostsForUpdate(ctx context.Context, arg ListReleaseHostsForUpdateParams) ([]DeploymentReleaseHost, error)
+	ListRoutingRules(ctx context.Context, arg ListRoutingRulesParams) ([]ListRoutingRulesRow, error)
 	ListRunApprovals(ctx context.Context, arg ListRunApprovalsParams) ([]ListRunApprovalsRow, error)
 	ListRunArtifacts(ctx context.Context, arg ListRunArtifactsParams) ([]Artifact, error)
 	ListRunCancellations(ctx context.Context, batch int32) ([]ListRunCancellationsRow, error)
@@ -384,6 +413,7 @@ type Querier interface {
 	LockKeyring(ctx context.Context) error
 	LockLeaseForCompletion(ctx context.Context, arg LockLeaseForCompletionParams) (LockLeaseForCompletionRow, error)
 	LockMfaChallenge(ctx context.Context, arg LockMfaChallengeParams) (LockMfaChallengeRow, error)
+	LockNotificationScope(ctx context.Context, scope string) error
 	LockOidcProviderList(ctx context.Context, lockKey int64) error
 	LockOidcProvidersShared(ctx context.Context, lockKey int64) error
 	LockOpenInvitation(ctx context.Context, arg LockOpenInvitationParams) (LockOpenInvitationRow, error)
@@ -439,11 +469,19 @@ type Querier interface {
 	NextAuditId(ctx context.Context) (uuid.UUID, error)
 	NextFencingToken(ctx context.Context) (int64, error)
 	NextRunNumber(ctx context.Context, projectID uuid.UUID) (int64, error)
+	NotificationChannelNameTaken(ctx context.Context, arg NotificationChannelNameTakenParams) (bool, error)
+	NotificationDeploymentContext(ctx context.Context, arg NotificationDeploymentContextParams) (NotificationDeploymentContextRow, error)
+	NotificationEnvironmentName(ctx context.Context, arg NotificationEnvironmentNameParams) (string, error)
+	NotificationOutboxByScope(ctx context.Context, arg NotificationOutboxByScopeParams) ([]NotificationOutboxByScopeRow, error)
+	NotificationProjectContext(ctx context.Context, arg NotificationProjectContextParams) (NotificationProjectContextRow, error)
+	NotificationRunContext(ctx context.Context, arg NotificationRunContextParams) (NotificationRunContextRow, error)
+	NotificationScopeProject(ctx context.Context, arg NotificationScopeProjectParams) (string, error)
 	NotifyJobsQueued(ctx context.Context, organizationID string) error
 	NotifyLogAppended(ctx context.Context, payload string) error
 	NotifySettingsChanged(ctx context.Context, groupName string) error
 	OlderGroupRuns(ctx context.Context, arg OlderGroupRunsParams) ([]uuid.UUID, error)
 	OldestCacheEntries(ctx context.Context, arg OldestCacheEntriesParams) ([]OldestCacheEntriesRow, error)
+	OpenRunnerOutage(ctx context.Context, arg OpenRunnerOutageParams) (int64, error)
 	OrganizationArtifactBytes(ctx context.Context, arg OrganizationArtifactBytesParams) (int64, error)
 	OrganizationProjectIDs(ctx context.Context, organizationID uuid.UUID) ([]uuid.UUID, error)
 	OrganizationsWithLogRetention(ctx context.Context) ([]OrganizationsWithLogRetentionRow, error)
@@ -464,12 +502,15 @@ type Querier interface {
 	PurgeAuthChallenges(ctx context.Context, arg PurgeAuthChallengesParams) (int64, error)
 	PurgeInvitations(ctx context.Context, arg PurgeInvitationsParams) (int64, error)
 	PurgeLoginThrottles(ctx context.Context, arg PurgeLoginThrottlesParams) (int64, error)
+	PurgeNotificationOutbox(ctx context.Context, arg PurgeNotificationOutboxParams) (int64, error)
 	PurgeOidcFlows(ctx context.Context, arg PurgeOidcFlowsParams) (int64, error)
 	PurgeRateLimits(ctx context.Context, arg PurgeRateLimitsParams) (int64, error)
 	PurgeRunnerThrottles(ctx context.Context, arg PurgeRunnerThrottlesParams) (int64, error)
 	PurgeSetupTokens(ctx context.Context, arg PurgeSetupTokensParams) (int64, error)
 	QueueRun(ctx context.Context, id uuid.UUID) error
 	RecheckIngestToken(ctx context.Context, id uuid.UUID) (RecheckIngestTokenRow, error)
+	RecordNotificationFailure(ctx context.Context, id uuid.UUID) (RecordNotificationFailureRow, error)
+	RecordNotificationSuccess(ctx context.Context, id uuid.UUID) error
 	RecordPasskeyUse(ctx context.Context, arg RecordPasskeyUseParams) (int64, error)
 	RefundRunnerThrottle(ctx context.Context, arg RefundRunnerThrottleParams) error
 	RefundThrottle(ctx context.Context, arg RefundThrottleParams) error
@@ -479,6 +520,7 @@ type Querier interface {
 	ReleaseBlobSweepLock(ctx context.Context, lockKey int64) (bool, error)
 	ReleaseEnvironments(ctx context.Context, arg ReleaseEnvironmentsParams) error
 	ReleaseExists(ctx context.Context, arg ReleaseExistsParams) (bool, error)
+	ReleaseOutboxLock(ctx context.Context, lockKey int64) (bool, error)
 	ReleaseRetentionLock(ctx context.Context, lockKey int64) (bool, error)
 	ReleaseRunClaim(ctx context.Context, id uuid.UUID) error
 	ReleaseStaleEnvironments(ctx context.Context) (int64, error)
@@ -495,6 +537,8 @@ type Querier interface {
 	RemoveEnvironmentVariables(ctx context.Context, arg RemoveEnvironmentVariablesParams) (int64, error)
 	RemoveMemberTeams(ctx context.Context, arg RemoveMemberTeamsParams) error
 	RemoveMembership(ctx context.Context, arg RemoveMembershipParams) (int64, error)
+	RemoveNotificationChannel(ctx context.Context, arg RemoveNotificationChannelParams) (NotificationChannel, error)
+	RemoveNotificationRulesOfChannel(ctx context.Context, channelID uuid.UUID) error
 	RemoveOidcProvider(ctx context.Context, arg RemoveOidcProviderParams) (int64, error)
 	RemovePasskey(ctx context.Context, arg RemovePasskeyParams) (int64, error)
 	RemoveRegistryCredential(ctx context.Context, arg RemoveRegistryCredentialParams) (RemoveRegistryCredentialRow, error)
@@ -508,6 +552,8 @@ type Querier interface {
 	RepairReleaseHost(ctx context.Context, arg RepairReleaseHostParams) error
 	ReplaceInstanceSettingSecrets(ctx context.Context, arg ReplaceInstanceSettingSecretsParams) (int64, error)
 	ReplaceKeyEncryptionKeyCheck(ctx context.Context, arg ReplaceKeyEncryptionKeyCheckParams) (int64, error)
+	ReplaceNotificationChannelConfig(ctx context.Context, arg ReplaceNotificationChannelConfigParams) (NotificationChannel, error)
+	ReplaceNotificationConfigs(ctx context.Context, arg ReplaceNotificationConfigsParams) (int64, error)
 	ReplaceOidcProviderSecrets(ctx context.Context, arg ReplaceOidcProviderSecretsParams) (int64, error)
 	ReplaceRegistryPassword(ctx context.Context, arg ReplaceRegistryPasswordParams) (int64, error)
 	ReplaceRepositoryDeployKeys(ctx context.Context, arg ReplaceRepositoryDeployKeysParams) (int64, error)
@@ -518,11 +564,14 @@ type Querier interface {
 	RequestJobCancel(ctx context.Context, arg RequestJobCancelParams) (Job, error)
 	RequestRunCancel(ctx context.Context, arg RequestRunCancelParams) error
 	RequeueJob(ctx context.Context, arg RequeueJobParams) (Job, error)
+	RequeueOutbox(ctx context.Context, arg RequeueOutboxParams) (int64, error)
+	RescheduleOutbox(ctx context.Context, arg RescheduleOutboxParams) (int64, error)
 	ResetReleaseHosts(ctx context.Context, arg ResetReleaseHostsParams) error
 	ResetRunJob(ctx context.Context, id uuid.UUID) error
 	ResetThrottle(ctx context.Context, arg ResetThrottleParams) error
 	ResolveApiToken(ctx context.Context, arg ResolveApiTokenParams) (ResolveApiTokenRow, error)
 	ResolveRegistryCredential(ctx context.Context, arg ResolveRegistryCredentialParams) (ResolveRegistryCredentialRow, error)
+	ResolveRunnerOutages(ctx context.Context, arg ResolveRunnerOutagesParams) (int64, error)
 	ResolveRunnerSession(ctx context.Context, tokenHash []byte) (ResolveRunnerSessionRow, error)
 	ResolveSecrets(ctx context.Context, arg ResolveSecretsParams) ([]ResolveSecretsRow, error)
 	ResolveSession(ctx context.Context, arg ResolveSessionParams) (ResolveSessionRow, error)
@@ -563,6 +612,7 @@ type Querier interface {
 	RunVisible(ctx context.Context, arg RunVisibleParams) (bool, error)
 	RunnerSlots(ctx context.Context, runnerID uuid.UUID) (RunnerSlotsRow, error)
 	ScanInstanceSettingSecrets(ctx context.Context, arg ScanInstanceSettingSecretsParams) ([]ScanInstanceSettingSecretsRow, error)
+	ScanNotificationConfigs(ctx context.Context, arg ScanNotificationConfigsParams) ([]ScanNotificationConfigsRow, error)
 	ScanOidcProviderSecrets(ctx context.Context, arg ScanOidcProviderSecretsParams) ([]ScanOidcProviderSecretsRow, error)
 	ScanRegistryPasswords(ctx context.Context, arg ScanRegistryPasswordsParams) ([]ScanRegistryPasswordsRow, error)
 	ScanRepositoryDeployKeys(ctx context.Context, arg ScanRepositoryDeployKeysParams) ([]ScanRepositoryDeployKeysRow, error)
@@ -613,6 +663,7 @@ type Querier interface {
 	TouchIdentity(ctx context.Context, arg TouchIdentityParams) error
 	TouchIngestToken(ctx context.Context, arg TouchIngestTokenParams) error
 	TouchMembership(ctx context.Context, arg TouchMembershipParams) error
+	TouchNotificationDevice(ctx context.Context, arg TouchNotificationDeviceParams) (bool, error)
 	TouchRepositoryDelivery(ctx context.Context, arg TouchRepositoryDeliveryParams) error
 	TouchRun(ctx context.Context, id uuid.UUID) error
 	TouchRunner(ctx context.Context, arg TouchRunnerParams) error
@@ -626,6 +677,7 @@ type Querier interface {
 	TryLockKeyRewrap(ctx context.Context) (bool, error)
 	TryLockLogPartitions(ctx context.Context) (bool, error)
 	TryLockWebhookPartitions(ctx context.Context) (bool, error)
+	TryOutboxLock(ctx context.Context, lockKey int64) (bool, error)
 	TryRetentionLock(ctx context.Context, lockKey int64) (bool, error)
 	UnlinkRepository(ctx context.Context, arg UnlinkRepositoryParams) (Repository, error)
 	UnlockKeyRekey(ctx context.Context) (bool, error)
@@ -634,6 +686,8 @@ type Querier interface {
 	UpdateDeployTargetHostAddress(ctx context.Context, arg UpdateDeployTargetHostAddressParams) (DeployTargetHost, error)
 	UpdateEnvironmentRules(ctx context.Context, arg UpdateEnvironmentRulesParams) (Environment, error)
 	UpdateInstanceSetting(ctx context.Context, arg UpdateInstanceSettingParams) (int64, error)
+	UpdateNotificationChannel(ctx context.Context, arg UpdateNotificationChannelParams) (NotificationChannel, error)
+	UpdateNotificationRule(ctx context.Context, arg UpdateNotificationRuleParams) (NotificationRule, error)
 	UpdateOidcProvider(ctx context.Context, arg UpdateOidcProviderParams) (int64, error)
 	UpdateOrganizationName(ctx context.Context, arg UpdateOrganizationNameParams) (UpdateOrganizationNameRow, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
@@ -650,6 +704,7 @@ type Querier interface {
 	UpsertBlobOwner(ctx context.Context, arg UpsertBlobOwnerParams) error
 	UpsertCommitStatus(ctx context.Context, arg UpsertCommitStatusParams) (CommitStatusReport, error)
 	UpsertHostCheck(ctx context.Context, arg UpsertHostCheckParams) (uuid.UUID, error)
+	UpsertNotificationMute(ctx context.Context, arg UpsertNotificationMuteParams) error
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (time.Time, error)
 	UseMfaChallenge(ctx context.Context, arg UseMfaChallengeParams) (int64, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)

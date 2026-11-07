@@ -27,6 +27,8 @@ sql:
       - internal/Core/ServerInstances/Queries
       - internal/Core/Keys/Queries
       - internal/Core/Backfill/Queries
+      - internal/Core/Outbox/Queries
+      - internal/Modules/Notifications/Queries
     gen:
       go:
         package: sqlc

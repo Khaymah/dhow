@@ -9,6 +9,7 @@ import { useToastStore } from '@/Core/Store/useToastStore';
 import { Avatar } from '@/Core/Ui/Avatar';
 import { Button } from '@/Core/Ui/Button';
 import { EmptyState } from '@/Core/Ui/EmptyState';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Skeleton } from '@/Core/Ui/Skeleton';
 import { useT } from '@/I18n/useT';
@@ -63,7 +64,7 @@ export const MemberRemoveBody = ({ userId, onDone, onCancel }: IMemberRemoveBody
       </div>
       <p className="m-0 text-body text-secondary">{t('member.remove.question', { organization: membership.OrganizationName })}</p>
       <p className="m-0 text-body-sm text-tertiary">{t('member.remove.about', { name: member.Name })}</p>
-      {remove.error ? <InlineAlert accent="failed" title={errorText(remove.error)} /> : null}
+      {remove.error ? <ErrorAlert error={remove.error} /> : null}
       <div className="flex flex-wrap gap-2">
         <Button
           variant="danger"

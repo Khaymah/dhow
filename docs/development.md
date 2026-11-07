@@ -367,6 +367,21 @@ pnpm -C apps/web size
 - **البيئة المعزولة.** التشغيلات تعمل في Podman بلا root. يحتاج إلى Linux مع Podman 5.4 أو أحدث، و`crun`، و`uidmap`، وcgroup v2 مع تفويض المتحكمات `cpu` و`io` و`memory` و`pids` إلى جهاز التشغيل (شغّله تحت systemd مع `Delegate=yes`)، و65536 sub-id على الأقل لكل تشغيل في `/etc/subuid` و`/etc/subgid`، وuser namespaces (على Ubuntu 24.04 وأحدث، `kernel.apparmor_restrict_unprivileged_userns=0`). راجع [تثبيت جهاز تشغيل](runner/install.md). على macOS وWindows، تشغّل [حزمة Docker](#التشغيلات-داخل-الحزمة) تشغيلات حقيقية بلا أي تثبيت آخر. ولتشغيل جهاز التشغيل مباشرة هناك، استخدم آلة Linux افتراضية مع systemd، مثل [Lima](https://lima-vm.io/) أو Multipass على macOS، أو WSL2 مع تفعيل systemd، وشغّل جهاز التشغيل هناك مع السيرفر الذي على جهازك.
 - **مجموعات اختبار العزل.** `make runner-isolation` يبني جهاز التشغيل وأداة فحص للهروب، ويشغّلهما في حاويات حقيقية بلا root، ويفشل إذا نجحت أي طريقة هروب أو لم يُفرض حد. يحتاج إلى متطلبات البيئة المعزولة السابقة و`busybox-static`. يشغّله CI على `ubuntu-26.04` كمستخدم مخصص تحت `systemd-run -p Delegate=yes` (راجع الـ job المسمى `isolation` في `.github/workflows/ci.yml`). كرّر هذا الإعداد على جهازك بـ `make runner-isolation ISOLATION_RUN="sudo systemd-run --uid=$USER --pipe --wait --collect -p Delegate=yes --"`.
 
+## إضافة رمز خطأ جديد
+
+كل رمز خطأ يحتاج جملة حل بالعربية والإنجليزية. وإذا لم يكن له حل مفيد لشخص، تُكتب أسبابه في القائمة المسموحة.
+
+1. أضف الرمز في `apps/server/internal/Core/Errors` ورسالته في `I18n.Ar.go` و`I18n.En.go`.
+2. أضف جملة الحل في `I18n.Fix.Ar.go` و`I18n.Fix.En.go` باسم الرمز. الجملة قصيرة وثابتة، ولا تحمل قيمًا من الطلب.
+3. إذا كانت هناك صفحة تشرح المشكلة، أضف مسارها في `I18n.Docs.go` مع العنوان بالعربية وبالإنجليزية.
+4. إذا لم يكن للرمز حل مفيد، اكتب السبب في `fixAllowlist` داخل `Fix_test.go`.
+
+يرجع السيرفر الحقلين `Fix` و`DocsPath` داخل `Error` بلغة `Accept-Language`. وتعرضهما الواجهة تحت الرسالة، مع رابط «اعرف أكثر» إلى مجلد اللغة المختارة. شغّل الاختبار بهذا الأمر:
+
+```sh
+go test ./apps/server/internal/Core/Errors/...
+```
+
 ## مشكلات شائعة
 
 | العَرَض | السبب والإصلاح |

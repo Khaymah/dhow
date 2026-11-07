@@ -26,12 +26,16 @@ import (
 	instancesettings "github.com/Khaymah/dhow/apps/server/internal/Core/Settings"
 	migrations "github.com/Khaymah/dhow/apps/server/internal/Database/Migrations"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
+	notifications "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications"
 )
 
 const (
 	smtpPassword = "relay-credential-planted-for-m52"
 	oidcSecret   = "Zq3vT8wLp2Rk9sXy4Nb7Hc1Jd6Fg0Ma5"
+	channelURL   = "https://hooks.example.com/services/T0/B0/PLANTEDCHANNELTOKEN72"
 )
+
+var channelSecret = notifications.SecretPrefix + strings.Repeat("Q", 43)
 
 type sealedWorld struct {
 	env      *apptest.Env
@@ -43,6 +47,7 @@ type sealedWorld struct {
 	ssh      apptest.SSHRepository
 	hookPath string
 	hookKey  string
+	channel  uuid.UUID
 }
 
 func newSealedWorld(t *testing.T) sealedWorld {
@@ -72,7 +77,21 @@ func newSealedWorld(t *testing.T) sealedWorld {
 		"PreviousDeployKeySealed" = "DeployKeySealed", "PreviousDeployKeyExpiresAt" = now() + interval '1 day' WHERE "Id" = $1`, w.ssh.ID)
 	require.NoError(t, err)
 	w.seedSettings(t)
+	w.seedChannel(t, user)
 	return w
+}
+
+func (w *sealedWorld) seedChannel(t *testing.T, creator uuid.UUID) {
+	t.Helper()
+	w.channel = uuid.New()
+	column, err := w.env.Wired.Values.Column(notifications.ConfigSpec())
+	require.NoError(t, err)
+	sealed, err := column.SealIn(t.Context(), sqlc.New(w.env.Pool), keys.ProjectOwner(w.project), notifications.ChannelSealContext(w.channel),
+		[]byte(`{"Url":"`+channelURL+`","Secret":"`+channelSecret+`"}`))
+	require.NoError(t, err)
+	_, err = w.env.Pool.Exec(t.Context(), `INSERT INTO "NotificationChannels" ("Id", "OrganizationId", "ProjectId", "Kind", "Name", "Host", "ConfigSealed", "CreatedByUserId")
+		VALUES ($1, $2, $3, 'webhook', 'sealed-world', 'hooks.example.com', $4, $5)`, w.channel, w.org, w.project, sealed, creator)
+	require.NoError(t, err)
 }
 
 func (w sealedWorld) seedSettings(t *testing.T) {
@@ -128,6 +147,14 @@ func (w sealedWorld) everyValueWorks(t *testing.T, env *apptest.Env) {
 	hook := env.Webhook(http.MethodPost, w.hookPath, signed(w.hookKey, body), body)
 	require.Equal(t, http.StatusAccepted, hook.Status, "the webhook signature still verifies: %s", hook.Raw)
 
+	var sealedConfig []byte
+	require.NoError(t, env.Pool.QueryRow(t.Context(), `SELECT "ConfigSealed" FROM "NotificationChannels" WHERE "Id" = $1`, w.channel).Scan(&sealedConfig))
+	column, err := env.Wired.Values.Column(notifications.ConfigSpec())
+	require.NoError(t, err)
+	plain, err := column.Open(t.Context(), keys.ProjectOwner(w.project), notifications.ChannelSealContext(w.channel), sealedConfig)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"Url":"`+channelURL+`","Secret":"`+channelSecret+`"}`, string(plain), "the channel still opens with its data key")
+
 	require.NoError(t, env.Wired.Settings.Load(t.Context()))
 	assert.Equal(t, smtpPassword, env.Wired.Settings.Current().Values.Mail.Password)
 	p, ok := env.Wired.Settings.Current().Oidc.Find("corp")
@@ -137,7 +164,7 @@ func (w sealedWorld) everyValueWorks(t *testing.T, env *apptest.Env) {
 
 func TestEveryValueWorksAfterTheServerSecretKeyChanges(t *testing.T) {
 	w := newSealedWorld(t)
-	assert.Equal(t, map[byte]int{keys.FormatVersion: 7}, formats(t, w.env), "every value uses the envelope format")
+	assert.Equal(t, map[byte]int{keys.FormatVersion: 8}, formats(t, w.env), "every value uses the envelope format")
 	w.everyValueWorks(t, w.env)
 
 	moved := apptest.NewWithOptions(t, apptest.Options{Pool: w.env.Pool, Triggers: &apptest.FakeTriggers{}})
@@ -154,7 +181,7 @@ var notSealed = map[string]string{
 	"Artifacts.Digest": "digest", "BlobOwners.Digest": "digest", "BlobUploads.Digest": "digest", "Blobs.Digest": "digest",
 	"CacheEntries.Digest": "digest", "JobAttempts.CompletionDigest": "digest", "Jobs.SpecDigest": "digest", "Leases.GrantDigest": "digest",
 	"PipelineRuns.DefinitionDigest": "digest", "WebhookDeliveries.PayloadDigest": "digest", "DeploymentReleases.ArtifactDigest": "digest",
-	"IngestTokens.TokenHash": "hash", "IngestedArtifacts.Digest": "digest",
+	"IngestTokens.TokenHash": "hash", "IngestedArtifacts.Digest": "digest", "NotificationDevices.Fingerprint": "hash of a user and a browser",
 	"Passkeys.Aaguid": "public", "Passkeys.CredentialId": "public", "Passkeys.PublicKey": "public key", "Users.WebauthnHandle": "public",
 	"Runners.EncryptionPublicKey": "public key", "Runners.SigningPublicKey": "public key", "RunnerSessions.ChallengeNonce": "public nonce",
 	"LogChunks.Data":   "job logs, masked by the runner",
@@ -190,7 +217,7 @@ func TestEverySealedColumnIsARegisteredLocationThatFitsItsCheck(t *testing.T) {
 	for name := range notSealed {
 		assert.Contains(t, found, name, "notSealed lists a column that does not exist")
 	}
-	assert.Len(t, registered, 8)
+	assert.Len(t, registered, 9)
 
 	for name, spec := range registered {
 		require.NoError(t, spec.Valid())
@@ -272,8 +299,15 @@ func TestTheSealedFormatContractCoversEveryRegisteredColumn(t *testing.T) {
 	require.NoError(t, err)
 	reg, err := app.ValueRegistry()
 	require.NoError(t, err)
+	born, err := fs.ReadFile(migrations.FS, "00079_notifications.sql")
+	require.NoError(t, err)
+	bornSealed := map[string]bool{"NotificationChannels.ConfigSealed": true}
 	for _, l := range reg.Locations() {
 		spec := l.Spec()
+		if bornSealed[spec.Name()] {
+			assert.Contains(t, string(born), `get_byte("`+spec.Column+`", 0) = 3`, "%s: a table born after the contract accepts only the envelope format from the start", spec.Name())
+			continue
+		}
 		constraint := `"CK_` + spec.Table + "_" + spec.Column + `_Envelope"`
 		assert.Contains(t, string(contract), "'"+keys.BackfillName(spec)+"'", "%s: the contract waits for its backfill", spec.Name())
 		assert.Contains(t, string(contract), "ADD CONSTRAINT "+constraint, "%s: the contract adds the CHECK", spec.Name())
@@ -281,7 +315,7 @@ func TestTheSealedFormatContractCoversEveryRegisteredColumn(t *testing.T) {
 	}
 	assert.Contains(t, string(contract), `ADD CONSTRAINT "CK_GitConnections_TokenSealed_Envelope"`, "the column M4.6 will write already accepts only 0x03")
 	assert.Contains(t, string(validate), `VALIDATE CONSTRAINT "CK_GitConnections_TokenSealed_Envelope"`)
-	assert.Equal(t, len(reg.Locations())+1, strings.Count(string(contract), "ADD CONSTRAINT"))
+	assert.Equal(t, len(reg.Locations())-len(bornSealed)+1, strings.Count(string(contract), "ADD CONSTRAINT"))
 }
 
 func (w sealedWorld) userID(t *testing.T) string {

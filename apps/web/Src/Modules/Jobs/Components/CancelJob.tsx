@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Button } from '@/Core/Ui/Button';
-import { InlineAlert } from '@/Core/Ui/InlineAlert';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { useT } from '@/I18n/useT';
 import type { TJob } from '@/Modules/Jobs/Api/JobsApi';
 import { useCancelJob } from '@/Modules/Jobs/Hooks/useJobs';
@@ -15,7 +14,6 @@ export interface ICancelJobProps {
 
 export const CancelJob = ({ organizationId, job }: ICancelJobProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const Push = useToastStore((state) => state.Push);
   const [Confirming, setConfirming] = useState(false);
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -37,7 +35,7 @@ export const CancelJob = ({ organizationId, job }: ICancelJobProps) => {
   return (
     <div className="grid gap-2.5 border-t border-line pt-3">
       {Confirming ? <p className="m-0 text-body-sm text-secondary">{t('jobs.cancel.about')}</p> : null}
-      {cancel.error ? <InlineAlert accent="failed" title={errorText(cancel.error)} /> : null}
+      {cancel.error ? <ErrorAlert error={cancel.error} /> : null}
       <div className="flex flex-wrap gap-2">
         {Confirming ? (
           <>

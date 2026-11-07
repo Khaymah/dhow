@@ -407,6 +407,9 @@ func (s *Service) settle(ctx context.Context, q *sqlc.Queries, st *step) error {
 	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: st.run.Id, State: state, FailureReason: reason}); err != nil {
 		return err
 	}
+	if err := s.runFinished(ctx, q, st.run, state, reason); err != nil {
+		return err
+	}
 	st.run.State = state
 	return s.recordStatus(ctx, q, st.run, status)
 }

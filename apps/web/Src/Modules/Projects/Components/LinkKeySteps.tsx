@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { Button } from '@/Core/Ui/Button';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { useT } from '@/I18n/useT';
 import type { TRepository } from '@/Modules/Projects/Api/ProjectsApi';
@@ -53,7 +53,6 @@ export interface IHostKeyStepProps {
 
 export const HostKeyStep = ({ organizationId, projectId, repository, onPinned, onBack }: IHostKeyStepProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const confirm = useConfirmHostKey(organizationId, projectId);
   const [Checked, setChecked] = useState(false);
   const pending = repository.PendingHostKeyFingerprint;
@@ -100,7 +99,7 @@ export const HostKeyStep = ({ organizationId, projectId, repository, onPinned, o
           {t('repository.hostKey.changed.body', { old: repository.HostKeyFingerprint })}
         </InlineAlert>
       )}
-      {confirm.error ? <InlineAlert accent="failed" title={errorText(confirm.error)} /> : null}
+      {confirm.error ? <ErrorAlert error={confirm.error} /> : null}
       <label className="flex items-start gap-2.5 text-body-sm text-primary">
         <input
           type="checkbox"

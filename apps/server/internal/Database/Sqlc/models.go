@@ -626,6 +626,92 @@ type Membership struct {
 	LastSeenAt     *time.Time
 }
 
+type NotificationChannel struct {
+	Id                  uuid.UUID
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	IsDeleted           bool
+	OrganizationId      uuid.UUID
+	ProjectId           *uuid.UUID
+	Kind                string
+	Name                string
+	Locale              string
+	Enabled             bool
+	DisabledReason      pgtype.Text
+	ConsecutiveFailures int32
+	Host                string
+	ConfigSealed        []byte
+	Version             int64
+	CreatedByUserId     uuid.UUID
+}
+
+type NotificationDevice struct {
+	Id          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	IsDeleted   bool
+	UserId      uuid.UUID
+	Fingerprint []byte
+	LastSeenAt  time.Time
+}
+
+type NotificationMute struct {
+	Id        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	IsDeleted bool
+	UserId    uuid.UUID
+	Muted     bool
+}
+
+type NotificationOutbox struct {
+	Id              uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	IsDeleted       bool
+	OrganizationId  *uuid.UUID
+	ProjectId       *uuid.UUID
+	ChannelId       *uuid.UUID
+	RecipientUserId *uuid.UUID
+	Kind            string
+	EventId         uuid.UUID
+	EventName       string
+	Payload         []byte
+	State           string
+	Attempts        int32
+	NextAttemptAt   time.Time
+	ClaimedUntil    *time.Time
+	LastAttemptAt   *time.Time
+	LastError       string
+	LastStatus      pgtype.Int4
+	SentAt          *time.Time
+}
+
+type NotificationRule struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	ProjectId      *uuid.UUID
+	ChannelId      uuid.UUID
+	Events         []string
+	Environments   []string
+	Statuses       []string
+	Roles          []string
+	Version        int64
+}
+
+type NotificationRunnerOutage struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	OrganizationId uuid.UUID
+	RunnerId       uuid.UUID
+	ResolvedAt     *time.Time
+}
+
 type OidcFlow struct {
 	Id         uuid.UUID
 	CreatedAt  time.Time

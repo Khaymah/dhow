@@ -68,8 +68,10 @@ func TestPendingAlertsAreCapped(t *testing.T) {
 	for range limit + 5 {
 		require.NoError(t, env.Wired.Alerts.Handle(context.Background(), passwordChanged(user)))
 	}
-	held.started.Wait()
 	assert.Contains(t, env.Logs.String(), "credential alert not sent: too many pending")
+	var queued int
+	require.NoError(t, env.Pool.QueryRow(context.Background(), `SELECT count(*) FROM "NotificationOutbox" WHERE "Kind" = 'internal-email'`).Scan(&queued))
+	assert.Equal(t, limit, queued, "the queue holds no more than the cap, and nothing was sent yet")
 	close(held.release)
 	env.Wired.Alerts.Wait()
 	assert.Equal(t, int32(limit), held.sent.Load())

@@ -2,9 +2,9 @@ import { useState } from 'react';
 
 import { isApiError } from '@/Core/Api/ApiError';
 import type { TRole } from '@/Core/Auth/AuthTypes';
-import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Button } from '@/Core/Ui/Button';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { useT } from '@/I18n/useT';
 import type { TRun } from '@/Modules/Projects/Api/RunsApi';
@@ -25,7 +25,6 @@ const SECOND_FACTOR_REQUIRED = 'SECOND_FACTOR_REQUIRED';
 
 const ActionError = ({ error, onSecondFactor }: { error: unknown; onSecondFactor: () => void }) => {
   const t = useT();
-  const errorText = useApiErrorText();
   if (isApiError(error) && error.Code === SECOND_FACTOR_REQUIRED) {
     return (
       <InlineAlert accent="awaiting" title={t('runs.actions.secondFactor.title')}>
@@ -38,7 +37,7 @@ const ActionError = ({ error, onSecondFactor }: { error: unknown; onSecondFactor
       </InlineAlert>
     );
   }
-  return <InlineAlert accent="failed" title={errorText(error)} />;
+  return <ErrorAlert error={error} />;
 };
 
 export const RunActions = ({ organizationId, projectId, run, role, linked, onSecondFactor }: IRunActionsProps) => {

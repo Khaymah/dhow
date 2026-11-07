@@ -104,6 +104,29 @@ func (q *Queries) PurgeLoginThrottles(ctx context.Context, arg PurgeLoginThrottl
 	return result.RowsAffected(), nil
 }
 
+const purgeNotificationOutbox = `-- name: PurgeNotificationOutbox :execrows
+DELETE FROM "NotificationOutbox"
+WHERE "Id" IN (
+    SELECT o."Id" FROM "NotificationOutbox" o
+    WHERE o."State" IN ('sent', 'dead') AND o."UpdatedAt" < $1
+    LIMIT $2
+    FOR UPDATE SKIP LOCKED
+)
+`
+
+type PurgeNotificationOutboxParams struct {
+	Before time.Time
+	Batch  int32
+}
+
+func (q *Queries) PurgeNotificationOutbox(ctx context.Context, arg PurgeNotificationOutboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeNotificationOutbox, arg.Before, arg.Batch)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const purgeOidcFlows = `-- name: PurgeOidcFlows :execrows
 DELETE FROM "OidcFlows"
 WHERE "Id" IN (

@@ -233,6 +233,7 @@ Rules for every provider:
 - **Interactive approvals:** Slack and Teams support approve/reject buttons with signed callbacks.
 - Notifications are delivered from **their own queue** with timeouts and retries, so they never block deployments.
 - **SSRF guard:** destination URLs are resolved and private, loopback and link-local ranges are rejected after DNS resolution. Admins can configure an allowlist.
+- **Queue and worker (ADR-0108):** every event writes a row to the `NotificationOutbox` table inside the same transaction as the event and its audit entry, so a restart loses no notification. An advisory lock gives one worker at a time. It claims rows with `FOR UPDATE SKIP LOCKED` and a lease, retries after 1, 5, 30 minutes and 2 hours, and after 5 attempts the row is `dead`. The account security emails (`Alerts`) go through the same queue. Details are in the [notifications guide](guides/notifications.md).
 
 ## 13. Installation (ADR-0024)
 
