@@ -232,9 +232,24 @@ func (sc *reportScope) batchPassed(ev *runnerv1.DeployEvent) error {
 func (sc *reportScope) audit(ctx context.Context, name string, data map[string]string) error {
 	data["TargetId"], data["ReleaseId"] = sc.target.GetTargetId(), sc.target.GetReleaseId()
 	data["DeploymentId"], data["Step"] = sc.lease.DeploymentId.String(), strconv.Itoa(int(sc.step))
+	data["RunnerId"] = sc.lease.RunnerId.String()
+	if digest := sc.auditDigest(); digest != "" {
+		data["Digest"] = digest
+	}
+	if sc.lease.RunActor.Valid {
+		data["Actor"] = sc.lease.RunActor.String
+	}
 	return sc.s.bus.Publish(ctx, eventbus.Event{Name: name, Payload: eventbus.Audited{
-		OrganizationIDs: []uuid.UUID{sc.lease.OrganizationId}, TargetType: targetRelease, TargetID: sc.rel.Id.String(), Data: data, Tx: sc.q,
+		OrganizationIDs: []uuid.UUID{sc.lease.OrganizationId}, ActorUserID: sc.lease.TriggeredByUserId,
+		TargetType: targetRelease, TargetID: sc.rel.Id.String(), Data: data, Tx: sc.q,
 	}})
+}
+
+func (sc *reportScope) auditDigest() string {
+	if len(sc.rel.ArtifactDigest) > 0 {
+		return hex.EncodeToString(sc.rel.ArtifactDigest)
+	}
+	return hex.EncodeToString(sc.digest)
 }
 
 func text(v string) pgtype.Text { return pgtype.Text{String: v, Valid: v != ""} }

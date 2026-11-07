@@ -565,10 +565,12 @@ func (q *Queries) ListTargetReleases(ctx context.Context, arg ListTargetReleases
 }
 
 const lockReleaseLease = `-- name: LockReleaseLease :one
-SELECT l."Id" AS "LeaseId", l."JobId", l."OrganizationId", j."Spec", rj."Id" AS "RunJobId", d."Id" AS "DeploymentId"
+SELECT l."Id" AS "LeaseId", l."JobId", l."OrganizationId", j."Spec", rj."Id" AS "RunJobId", d."Id" AS "DeploymentId",
+       l."RunnerId", pr."TriggeredByUserId", pr."Actor" AS "RunActor"
 FROM "Leases" l
 JOIN "Jobs" j ON j."Id" = l."JobId"
 LEFT JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId" AND j."OriginKind" = 'pipeline'
+LEFT JOIN "PipelineRuns" pr ON pr."Id" = rj."RunId" AND pr."OrganizationId" = j."OrganizationId"
 LEFT JOIN "Deployments" d ON d."RunJobId" = rj."Id" AND d."JobId" = j."Id" AND d."OrganizationId" = j."OrganizationId"
 WHERE l."Id" = $1 AND l."FencingToken" = $2 AND l."RunnerId" = $3
   AND l."State" = 'active' AND l."ExpiresAt" > now() AND NOT l."IsDeleted"
@@ -582,12 +584,15 @@ type LockReleaseLeaseParams struct {
 }
 
 type LockReleaseLeaseRow struct {
-	LeaseId        uuid.UUID
-	JobId          uuid.UUID
-	OrganizationId uuid.UUID
-	Spec           []byte
-	RunJobId       *uuid.UUID
-	DeploymentId   *uuid.UUID
+	LeaseId           uuid.UUID
+	JobId             uuid.UUID
+	OrganizationId    uuid.UUID
+	Spec              []byte
+	RunJobId          *uuid.UUID
+	DeploymentId      *uuid.UUID
+	RunnerId          uuid.UUID
+	TriggeredByUserId *uuid.UUID
+	RunActor          pgtype.Text
 }
 
 func (q *Queries) LockReleaseLease(ctx context.Context, arg LockReleaseLeaseParams) (LockReleaseLeaseRow, error) {
@@ -600,6 +605,9 @@ func (q *Queries) LockReleaseLease(ctx context.Context, arg LockReleaseLeasePara
 		&i.Spec,
 		&i.RunJobId,
 		&i.DeploymentId,
+		&i.RunnerId,
+		&i.TriggeredByUserId,
+		&i.RunActor,
 	)
 	return i, err
 }

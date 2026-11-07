@@ -1,8 +1,10 @@
 -- name: LockReleaseLease :one
-SELECT l."Id" AS "LeaseId", l."JobId", l."OrganizationId", j."Spec", rj."Id" AS "RunJobId", d."Id" AS "DeploymentId"
+SELECT l."Id" AS "LeaseId", l."JobId", l."OrganizationId", j."Spec", rj."Id" AS "RunJobId", d."Id" AS "DeploymentId",
+       l."RunnerId", pr."TriggeredByUserId", pr."Actor" AS "RunActor"
 FROM "Leases" l
 JOIN "Jobs" j ON j."Id" = l."JobId"
 LEFT JOIN "RunJobs" rj ON rj."Id" = j."OriginId" AND rj."OrganizationId" = j."OrganizationId" AND j."OriginKind" = 'pipeline'
+LEFT JOIN "PipelineRuns" pr ON pr."Id" = rj."RunId" AND pr."OrganizationId" = j."OrganizationId"
 LEFT JOIN "Deployments" d ON d."RunJobId" = rj."Id" AND d."JobId" = j."Id" AND d."OrganizationId" = j."OrganizationId"
 WHERE l."Id" = @lease_id AND l."FencingToken" = @fencing_token AND l."RunnerId" = @runner_id
   AND l."State" = 'active' AND l."ExpiresAt" > now() AND NOT l."IsDeleted"

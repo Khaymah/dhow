@@ -21,6 +21,7 @@ jobs:
     outputs:
       code: ${{ steps.scope.outputs.code }}
       web: ${{ steps.scope.outputs.web }}
+      proxy: ${{ steps.scope.outputs.proxy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -291,6 +292,22 @@ jobs:
         run: pnpm build
       - name: Check the bundle size budget
         run: pnpm size
+
+  proxy:
+    needs: changes
+    if: needs.changes.outputs.proxy == 'true'
+    name: Reverse proxy guides (nginx, Caddy, Traefik)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      IMAGE: dhow:ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Test the documented proxy configs against the built image
+        run: make proxy-check
 
   image:
     needs: changes
