@@ -97,6 +97,7 @@ func organizationPath(env *apptest.Env, fx fixture, rule policy.Rule) string {
 	path = secretsPath(env, path, uuid.MustParse(fx.orgA), project)
 	path = targetsPath(env, path, project)
 	path = ingestPath(env, path, project, uuid.MustParse(fx.byRole[policy.RoleOwner]))
+	path = notificationsPath(env, path, uuid.MustParse(fx.orgA), project)
 	if strings.Contains(path, "{invitationId}") {
 		path = strings.ReplaceAll(path, "{invitationId}", seedInvitation(env, fx.orgA, fx.byRole[policy.RoleOwner], string(policy.RoleViewer)))
 	}

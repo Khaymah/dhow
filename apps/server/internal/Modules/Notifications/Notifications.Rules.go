@@ -113,7 +113,7 @@ func (s *Service) PutRules(ctx context.Context, scope models.Scope, in []models.
 func (s *Service) putRule(ctx context.Context, q *sqlc.Queries, scope models.Scope, actor uuid.UUID, r models.Rule) (models.Rule, error) {
 	ch, err := q.GetNotificationChannelForUpdate(ctx, sqlc.GetNotificationChannelForUpdateParams{ID: r.ChannelID, OrganizationID: scope.OrganizationID, ProjectID: scope.ProjectID})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return models.Rule{}, apperrors.NotFound()
+		return models.Rule{}, apperrors.ValidationFailed(invalid(fieldRules))
 	}
 	if err != nil {
 		return models.Rule{}, err

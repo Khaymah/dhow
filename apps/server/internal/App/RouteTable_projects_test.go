@@ -55,6 +55,7 @@ func projectRequest(rule policy.Rule, org, project uuid.UUID, env *apptest.Env) 
 	path = secretsPath(env, path, org, seeded)
 	path = targetsPath(env, path, seeded)
 	path = ingestPath(env, path, seeded, uuid.Nil)
+	path = notificationsPath(env, path, org, seeded)
 	req := apptest.Request{Method: rule.Method, Path: path}
 	switch {
 	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/projects/{projectId}/runs":
