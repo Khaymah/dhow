@@ -48,6 +48,8 @@ type Config struct {
 
 	Artifacts Artifacts
 
+	Notify Notify
+
 	Settings settingspec.Raw
 
 	OIDCProviders []OIDCProvider
@@ -103,6 +105,10 @@ func Load(getenv func(string) string) (Config, error) {
 	var artifactErrs []error
 	if cfg.Artifacts, artifactErrs = loadArtifacts(getenv, dev); len(artifactErrs) > 0 {
 		errs = append(errs, artifactErrs...)
+	}
+	var notifyErrs []error
+	if cfg.Notify, notifyErrs = loadNotify(getenv); len(notifyErrs) > 0 {
+		errs = append(errs, notifyErrs...)
 	}
 	if cfg.TrustedProxies, err = parseTrustedProxies(getenv(EnvTrustedProxies)); err != nil {
 		errs = append(errs, fmt.Errorf("%s: %w", EnvTrustedProxies, err))
