@@ -56,6 +56,9 @@ func TestTheDatabaseDumpHoldsNoSealedValueNoDataKeyAndNoKeyringKey(t *testing.T)
 		needle(t, "sign-in provider secret", []byte(oidcSecret)),
 		needle(t, "webhook secret", []byte(w.hookKey)),
 		needle(t, "seeded webhook secret", []byte("seeded-webhook-secret")),
+		needle(t, "notification channel address", []byte(channelURL)),
+		needle(t, "notification channel path token", []byte("PLANTEDCHANNELTOKEN72")),
+		needle(t, "notification channel signing secret", []byte(channelSecret)),
 	}
 	deploy, err := leaksweep.PEMKey("deploy key", w.ssh.PrivateKey)
 	require.NoError(t, err)

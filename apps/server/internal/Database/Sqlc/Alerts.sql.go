@@ -11,6 +11,18 @@ import (
 	"github.com/google/uuid"
 )
 
+const countPendingInternalEmails = `-- name: CountPendingInternalEmails :one
+SELECT count(*)::bigint FROM "NotificationOutbox"
+WHERE "Kind" = 'internal-email' AND "State" IN ('pending', 'sending') AND NOT "IsDeleted"
+`
+
+func (q *Queries) CountPendingInternalEmails(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingInternalEmails)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getAlertRecipient = `-- name: GetAlertRecipient :one
 SELECT "Email", "Name", "Locale"
 FROM "Users"

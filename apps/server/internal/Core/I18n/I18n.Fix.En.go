@@ -121,4 +121,12 @@ var enFixes = map[string]string{ //nolint:gosec // This is a message catalog, no
 	"ROLLBACK_SETTINGS_INVALID":            "Deploy a new release. Do not roll back to this one.",
 	"ENVIRONMENT_PAUSED":                   "Ask an admin to resume the environment, then try again.",
 	"TARGET_KEY_NEEDS_FACTOR":              "Enter your password or a code from your app when Dhow asks, then save again.",
+	"CHANNEL_EXISTS":                       "Choose another name for the channel, or open the existing channel and edit it.",
+	"CHANNEL_HOST_NOT_ALLOWED":             "Use an https address without a user name or a password, and write the server as a name or a plain IP address.",
+	"CHANNEL_HOST_BLOCKED":                 "Ask your server admin to add the network range to DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS, or use a public address.",
+	"CHANNEL_SECRET_INVALID":               "Enter the webhook address again, then save the channel.",
+	"CHANNEL_VERSION_CONFLICT":             "Reload the page, check the change someone else made, then save again.",
+	"CHANNEL_DISABLED":                     "Check why the channel stopped on its page, fix it, then turn the channel on again.",
+	"DELIVERY_NOT_RETRYABLE":               "Wait until the delivery fails for good (state dead), then press retry.",
+	"TEST_RATE_LIMITED":                    "Wait a minute, then send the test message again.",
 }

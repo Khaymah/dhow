@@ -23,6 +23,7 @@ import (
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
 	ingest "github.com/Khaymah/dhow/apps/server/internal/Modules/Ingest"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
+	notifications "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications"
 	overview "github.com/Khaymah/dhow/apps/server/internal/Modules/Overview"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
 	preferences "github.com/Khaymah/dhow/apps/server/internal/Modules/Preferences"
@@ -37,33 +38,34 @@ import (
 )
 
 type Options struct {
-	Config    config.Config
-	Log       *slog.Logger
-	System    system.Deps
-	Identity  *identity.Service
-	Session   *session.Service
-	Audit     *audit.Service
-	Runners   *runners.Service
-	Jobs      *jobs.Service
-	Projects  *projects.Service
-	Envs      *environments.Service
-	Secrets   *secrets.Service
-	Sources   *sources.Service
-	Pipelines *pipelines.Service
-	Artifacts *artifacts.Service
-	Ingest    *ingest.Service
-	Overview  *overview.Service
-	Tokens    *tokens.Service
-	Prefs     *preferences.Service
-	Gate      *runnerauth.Gate
-	CSRF      *auth.CSRF
-	APITokens *auth.APITokens
-	Limits    *ratelimit.PerClient
-	Webhooks  ratelimit.Limiter
-	Settings  *settings.Service
-	Instance  func() policy.InstanceSettings
-	Now       func() time.Time
-	Web       http.Handler
+	Config        config.Config
+	Log           *slog.Logger
+	System        system.Deps
+	Identity      *identity.Service
+	Session       *session.Service
+	Audit         *audit.Service
+	Runners       *runners.Service
+	Jobs          *jobs.Service
+	Projects      *projects.Service
+	Envs          *environments.Service
+	Secrets       *secrets.Service
+	Sources       *sources.Service
+	Pipelines     *pipelines.Service
+	Artifacts     *artifacts.Service
+	Ingest        *ingest.Service
+	Notifications *notifications.Service
+	Overview      *overview.Service
+	Tokens        *tokens.Service
+	Prefs         *preferences.Service
+	Gate          *runnerauth.Gate
+	CSRF          *auth.CSRF
+	APITokens     *auth.APITokens
+	Limits        *ratelimit.PerClient
+	Webhooks      ratelimit.Limiter
+	Settings      *settings.Service
+	Instance      func() policy.InstanceSettings
+	Now           func() time.Time
+	Web           http.Handler
 }
 
 func Policies() []policy.Rule {
@@ -81,6 +83,7 @@ func Policies() []policy.Rule {
 	rules = append(rules, pipelines.Policies()...)
 	rules = append(rules, artifacts.Policies()...)
 	rules = append(rules, ingest.Policies()...)
+	rules = append(rules, notifications.Policies()...)
 	rules = append(rules, overview.Policies()...)
 	rules = append(rules, tokens.Policies()...)
 	rules = append(rules, preferences.Policies()...)
@@ -193,6 +196,9 @@ func publicRouter(o Options) chi.Router {
 			}
 			if o.Ingest != nil {
 				ingest.Routes(timed, ingest.Deps{Service: o.Ingest, Guard: guard, Log: o.Log})
+			}
+			if o.Notifications != nil {
+				notifications.Routes(timed, notifications.Deps{Service: o.Notifications, Guard: guard, Log: o.Log})
 			}
 			if o.Pipelines != nil {
 				pipelines.Routes(timed, pipelines.Deps{Service: o.Pipelines, Guard: guard, Log: o.Log})

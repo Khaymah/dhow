@@ -145,6 +145,9 @@ func (s *Service) abandon(ctx context.Context, q *sqlc.Queries, run sqlc.Pipelin
 	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: run.Id, State: models.RunFailed, FailureReason: reason}); err != nil {
 		return err
 	}
+	if err := s.runFinished(ctx, q, run, models.RunFailed, reason); err != nil {
+		return err
+	}
 	if err := s.releaseRun(ctx, q, run); err != nil {
 		return err
 	}
@@ -185,6 +188,9 @@ func (s *Service) discovered(ctx context.Context, q *sqlc.Queries, run sqlc.Pipe
 
 func (s *Service) endPending(ctx context.Context, q *sqlc.Queries, run sqlc.PipelineRun, state, reason string) error {
 	if err := q.FinishRun(ctx, sqlc.FinishRunParams{ID: run.Id, State: state, FailureReason: reason}); err != nil {
+		return err
+	}
+	if err := s.runFinished(ctx, q, run, state, reason); err != nil {
 		return err
 	}
 	if state == models.RunFailed {

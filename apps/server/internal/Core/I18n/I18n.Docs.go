@@ -21,6 +21,7 @@ const (
 	pageJobs            = "guides/jobs.md"
 	pageProjects        = "guides/projects.md"
 	pageRunnerRegister  = "runner/register.md"
+	pageNotifications   = "guides/notifications.md"
 )
 
 var (
@@ -62,9 +63,21 @@ var (
 	refOrgAccount     = docsRef{pageOrganization, "حسابك", "your-account"}
 	refJobPage        = docsRef{pageJobs, "صفحة-التشغيل", "a-job"}
 	refJobCreate      = docsRef{pageJobs, "إنشاء-تشغيل-عبر-api", "create-a-job-through-the-api"}
+	refChannels       = docsRef{pageNotifications, "القنوات", "channels"}
+	refRefused        = docsRef{pageNotifications, "ما-يرفض-داو-الوصول-إليه", "what-dhow-refuses-to-reach"}
+	refDelivery       = docsRef{pageNotifications, "التسليم-وإعادة-المحاولة", "delivery-and-retries"}
+	refNotifyTrouble  = docsRef{pageNotifications, "استكشاف-الأخطاء", "troubleshooting"}
 )
 
 var docsRefs = map[string]docsRef{
+	"CHANNEL_EXISTS":                       refChannels,
+	"CHANNEL_HOST_NOT_ALLOWED":             refRefused,
+	"CHANNEL_HOST_BLOCKED":                 refRefused,
+	"CHANNEL_SECRET_INVALID":               refChannels,
+	"CHANNEL_VERSION_CONFLICT":             refChannels,
+	"CHANNEL_DISABLED":                     refChannels,
+	"DELIVERY_NOT_RETRYABLE":               refDelivery,
+	"TEST_RATE_LIMITED":                    refNotifyTrouble,
 	"SERVICE_UNAVAILABLE":                  refNotStarting,
 	"FORBIDDEN":                            refOrgRoles,
 	"CSRF_FAILED":                          refCsrf,

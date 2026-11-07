@@ -121,4 +121,12 @@ var arFixes = map[string]string{ //nolint:gosec // This is a message catalog, no
 	"ROLLBACK_SETTINGS_INVALID":            "انشر إصدارًا جديدًا. لا ترجع إلى هذا الإصدار.",
 	"ENVIRONMENT_PAUSED":                   "اطلب من مدير استئناف البيئة، ثم حاول مرة أخرى.",
 	"TARGET_KEY_NEEDS_FACTOR":              "أدخل كلمة السر أو رمزًا من تطبيقك عندما يطلب داو، ثم احفظ من جديد.",
+	"CHANNEL_EXISTS":                       "اختر اسمًا آخر للقناة، أو افتح القناة الموجودة وعدّلها.",
+	"CHANNEL_HOST_NOT_ALLOWED":             "اكتب عنوان https بدون اسم مستخدم ولا كلمة سر، واكتب الخادم باسمه أو بعنوان IP عادي.",
+	"CHANNEL_HOST_BLOCKED":                 "اطلب من مسؤول السيرفر إضافة نطاق الشبكة إلى DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS، أو استخدم عنوانًا عامًا.",
+	"CHANNEL_SECRET_INVALID":               "أدخل عنوان الـ webhook من جديد، ثم احفظ القناة.",
+	"CHANNEL_VERSION_CONFLICT":             "أعد تحميل الصفحة وراجع التغيير الذي أجراه غيرك، ثم احفظ من جديد.",
+	"CHANNEL_DISABLED":                     "راجع سبب التوقف في صفحة القناة وأصلحه، ثم شغّل القناة من جديد.",
+	"DELIVERY_NOT_RETRYABLE":               "انتظر حتى يفشل الإرسال نهائيًا (الحالة dead)، ثم اضغط إعادة المحاولة.",
+	"TEST_RATE_LIMITED":                    "انتظر دقيقة، ثم أرسل رسالة الاختبار مرة أخرى.",
 }
