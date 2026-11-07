@@ -314,6 +314,10 @@ check_scenario() {
     --header "Cookie: $cookie" --header 'Accept: text/event-stream')
   expect "the log stream path reaches Dhow with the session (404 for a missing job, got $status)" test "$status" = 404
   expect "the log stream answer comes from Dhow" grep -q '"Code":"NOT_FOUND"' "$out/stream.body"
+  status=$(request events GET "/api/v1/organizations/$org_id/events" \
+    --header "Cookie: $cookie" --header 'Accept: text/event-stream' --header 'Last-Event-ID: refused-before-it-streams')
+  expect "the organization stream path reaches Dhow with the session (422 for a malformed Last-Event-ID, got $status)" test "$status" = 422
+  expect "the organization stream answer comes from Dhow" grep -q '"Code":"VALIDATION_FAILED"' "$out/events.body"
 
   printf 'Request size through %s\n' "$name"
   head -c $((3 << 20)) /dev/zero | tr '\0' a >"$out/big.body.in"

@@ -19,7 +19,7 @@ dhow.example.com {
 			max_size 2MB
 		}
 
-		@logstream path_regexp ^/api/v1/organizations/[^/]+/jobs/[^/]+/logs/stream$
+		@logstream path_regexp ^/api/v1/organizations/[^/]+/(jobs/[^/]+/logs/stream|events)$
 		reverse_proxy @logstream 127.0.0.1:8080 {
 			flush_interval -1
 			transport http {

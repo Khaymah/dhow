@@ -11,9 +11,11 @@ import (
 )
 
 const (
-	streamPattern = `^/api/v1/organizations/[^/]+/jobs/[^/]+/logs/stream$`
+	streamPattern = `^/api/v1/organizations/[^/]+/(jobs/[^/]+/logs/stream|events)$`
 	streamPath    = "/api/v1/organizations/01a1806c-0d24-7b1e-a5d9-8cae4bbd8563/jobs/01a1806c-0d3f-7378-9416-e36ec6297cc0/logs/stream"
 )
+
+const eventsPath = "/api/v1/organizations/01a1806c-0d24-7b1e-a5d9-8cae4bbd8563/events"
 
 func fixture(t *testing.T, name string) string {
 	t.Helper()
@@ -43,14 +45,18 @@ func braced(t *testing.T, config, start string) string {
 	return ""
 }
 
-func TestTheStreamPatternMatchesOnlyTheLogStream(t *testing.T) {
+func TestTheStreamPatternMatchesOnlyTheLiveStreams(t *testing.T) {
 	re := regexp.MustCompile(streamPattern)
 	assert.True(t, re.MatchString(streamPath))
+	assert.True(t, re.MatchString(eventsPath))
 	for _, other := range []string{
 		strings.TrimSuffix(streamPath, "/stream"),
 		streamPath + "/x",
 		"/api/v1/organizations/a/b/jobs/c/logs/stream",
 		"/runner-api/dhow.runner.v1.LogService/Append",
+		eventsPath + "/x",
+		"/api/v1/organizations/a/b/events",
+		"/api/v1/organizations/01a1806c-0d24-7b1e-a5d9-8cae4bbd8563/events-feed",
 	} {
 		assert.False(t, re.MatchString(other), other)
 	}
