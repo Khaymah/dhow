@@ -19,6 +19,7 @@ type Controller struct {
 	health *HealthService
 	meta   *MetaService
 	keys   KeyringReader
+	doctor *DoctorService
 }
 
 var _ gen.StrictServerInterface = (*Controller)(nil)
@@ -50,7 +51,8 @@ func (c *Controller) GetMeta(ctx context.Context, _ gen.GetMetaRequestObject) (g
 	if err != nil {
 		return nil, err
 	}
-	data := gen.Meta{Version: meta.Version, Commit: meta.Commit, SetupRequired: meta.SetupRequired}
+	build := buildToGen(meta.Build)
+	data := gen.Meta{Version: meta.Version, Commit: meta.Commit, ServerBuild: &build, SetupRequired: meta.SetupRequired}
 	return gen.GetMeta200JSONResponse{Success: true, Message: ptr(messageMeta), Data: &data}, nil
 }
 

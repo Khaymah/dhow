@@ -7,7 +7,19 @@ package sqlc
 
 import (
 	"context"
+	"time"
 )
+
+const getDatabaseTime = `-- name: GetDatabaseTime :one
+SELECT now()::timestamptz AS "Now"
+`
+
+func (q *Queries) GetDatabaseTime(ctx context.Context) (time.Time, error) {
+	row := q.db.QueryRow(ctx, getDatabaseTime)
+	var Now time.Time
+	err := row.Scan(&Now)
+	return Now, err
+}
 
 const getInstance = `-- name: GetInstance :one
 SELECT "Id", "CreatedAt", "UpdatedAt", "SetupCompletedAt", "SchemaFloor"

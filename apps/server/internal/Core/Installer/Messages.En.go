@@ -2,6 +2,7 @@ package installer
 
 var enMessages = map[Key]string{ //nolint:gosec // User-facing text that names settings, not credentials.
 	KeyAborted:                 "Stopped at your request. Nothing was changed.",
+	KeyAdviceClock:             "The clock of the server and the clock of the database differ by more than a few seconds. That breaks one-time codes and expiry times. Turn on time sync on both hosts: timedatectl set-ntp true",
 	KeyAdviceDisk:              "Free some space: old journal entries (journalctl --vacuum-size=200M), package caches, or grow the disk.",
 	KeyAdviceForwarded:         "The proxy must set X-Forwarded-For, and DHOW_TRUSTED_PROXIES must include the proxy's address as Dhow sees it.",
 	KeyAdviceKeyring:           "Restore the keyring file from your backup or from its age export. doctor never makes a new one: a new keyring cannot open the secrets stored with the old one. Only if the keyring is lost for good, dhow-server keys init --discard-unreadable lets the server start again and erases those secrets.",
@@ -45,6 +46,8 @@ var enMessages = map[Key]string{ //nolint:gosec // User-facing text that names s
 	KeyCertDays:                "expires in %d days",
 	KeyCheckCPUs:               "CPU cores",
 	KeyCheckCertificate:        "TLS certificate",
+	KeyCheckClock:              "Server clock against the database clock",
+	KeyCheckStateDisk:          "Free disk space for the server data",
 	KeyCheckDisk:               "Free disk space in %s",
 	KeyCheckForwarded:          "The proxy forwards the client address (X-Forwarded-For)",
 	KeyCheckHealth:             "Readiness endpoint",
