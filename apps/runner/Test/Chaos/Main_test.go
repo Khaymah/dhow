@@ -22,6 +22,7 @@ type suite struct {
 	image     string
 	slowImage string
 	slowPull  *faultyProxy
+	hook      *hook
 }
 
 var shared suite
@@ -110,6 +111,9 @@ func setUpServices(s *stack, work, certs, caPath string, cleanups *[]func()) err
 	if err := trustRegistry(s.runnerDir, caPath); err != nil {
 		return err
 	}
+	if err := setUpNotify(s, work, cleanups); err != nil {
+		return err
+	}
 	slow, err := newFaultyProxy("127.0.0.1:"+slowPort, "127.0.0.1:"+registryPort)
 	if err != nil {
 		return err
@@ -177,5 +181,24 @@ func setUpStack(s *stack, cleanups *[]func()) error {
 	}
 	*cleanups = append(*cleanups, func() { s.killRunner(); _, _ = s.runnerPodman("rm", "--all", "--force") })
 	shared.stack, shared.api = s, a
+	return nil
+}
+
+func setUpNotify(s *stack, work string, cleanups *[]func()) error {
+	ip, ok := lanAddress()
+	if !ok {
+		return nil
+	}
+	caPath, cert, err := newNotifyPKI(work, ip)
+	if err != nil {
+		return err
+	}
+	h, closeHook, err := newHook(ip, cert)
+	if err != nil {
+		return err
+	}
+	*cleanups = append(*cleanups, closeHook)
+	s.notifyCA, s.notifyAllow = caPath, ip.String()+"/32"
+	shared.hook = h
 	return nil
 }
