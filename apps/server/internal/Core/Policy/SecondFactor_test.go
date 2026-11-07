@@ -106,7 +106,7 @@ func TestSecondFactorBlocksOnlySensitiveActionsAfterTheDueDate(t *testing.T) {
 	want := []policy.Action{
 		policy.OrgUpdate, policy.OrgTransfer, policy.OrgSecurity, policy.MemberManage, policy.RunnerManage, policy.JobCreate, policy.TokenCreate,
 		policy.ProjectManage, policy.RunApprove, policy.EnvironmentManage, policy.EnvironmentBypass, policy.DeploymentApprove,
-		policy.DeploymentRollback, policy.SecretManage, policy.OrgSecretManage, policy.IngestManage,
+		policy.DeploymentRollback, policy.SecretManage, policy.OrgSecretManage, policy.IngestManage, policy.NotificationManage, policy.OrgNotificationManage,
 	}
 	assert.ElementsMatch(t, want, policy.SensitiveActions())
 	for _, read := range []policy.Action{policy.OrgRead, policy.MemberRead, policy.AuditRead, policy.RunnerRead, policy.JobRead, policy.LogRead} {
