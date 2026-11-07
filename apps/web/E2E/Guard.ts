@@ -13,24 +13,30 @@ export interface IView {
   T: TMessages;
   Lang: TLang;
   Problems: string[];
+  Violations: string[];
 }
 
 export const MESSAGES: Record<TLang, TMessages> = { ar: Ar, en: En };
 export const DESKTOP = { width: 1440, height: 900 };
 export const PHONE = { width: 390, height: 844 };
-const CSP_MARK = 'data-e2e-csp';
+const VIOLATION_BINDING = 'dhowViolation';
 
 export const open = async (browser: Browser, lang: TLang, viewport: { width: number; height: number }): Promise<IView> => {
   const phone = viewport.width < 600;
   const context = await browser.newContext({ viewport, isMobile: phone, hasTouch: phone });
+  const violations: string[] = [];
+  await context.exposeFunction(VIOLATION_BINDING, (detail: string) => {
+    violations.push(detail);
+  });
   await context.addInitScript(
-    ({ value, mark }) => {
+    ({ value, binding }) => {
       window.localStorage.setItem('dhow.lang', value);
       document.addEventListener('securitypolicyviolation', (event) => {
-        document.documentElement.setAttribute(mark, `${event.violatedDirective} ${event.blockedURI}`);
+        const send = Reflect.get(window, binding) as (detail: string) => void;
+        send(`${event.disposition} ${event.violatedDirective} ${event.blockedURI} ${event.sample}`);
       });
     },
-    { value: lang, mark: CSP_MARK },
+    { value: lang, binding: VIOLATION_BINDING },
   );
   const page = await context.newPage();
   const problems: string[] = [];
@@ -38,12 +44,12 @@ export const open = async (browser: Browser, lang: TLang, viewport: { width: num
     if (message.type() === 'error') problems.push(`console: ${message.text()}`);
   });
   page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
-  return { Context: context, Page: page, T: MESSAGES[lang], Lang: lang, Problems: problems };
+  return { Context: context, Page: page, T: MESSAGES[lang], Lang: lang, Problems: problems, Violations: violations };
 };
 
 export const expectClean = async (view: IView): Promise<void> => {
   await expect(view.Page.locator('style')).toHaveCount(0);
-  expect(await view.Page.locator('html').getAttribute(CSP_MARK)).toBeNull();
+  expect(view.Violations).toEqual([]);
   expect(view.Problems).toEqual([]);
   expect(await view.Page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 };
