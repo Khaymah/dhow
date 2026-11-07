@@ -2,6 +2,7 @@ package system
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
@@ -12,6 +13,8 @@ import (
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/System/Models"
 	"github.com/Khaymah/dhow/internal/buildinfo"
 )
+
+const DoctorCacheTTL = 2 * time.Second
 
 const (
 	doctorPath    = "/system/doctor"
@@ -29,17 +32,29 @@ type DoctorOptions struct {
 	Now      func() time.Time
 }
 
+type doctorKey struct {
+	checks bool
+	lang   string
+}
+
+type doctorEntry struct {
+	at     time.Time
+	report models.DoctorReport
+}
+
 type DoctorService struct {
 	health *HealthService
 	build  buildinfo.Info
 	opts   DoctorOptions
+	mu     sync.Mutex
+	cache  map[doctorKey]doctorEntry
 }
 
 func NewDoctorService(health *HealthService, build buildinfo.Info, opts DoctorOptions) *DoctorService {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
-	return &DoctorService{health: health, build: build, opts: opts}
+	return &DoctorService{health: health, build: build, opts: opts, cache: map[doctorKey]doctorEntry{}}
 }
 
 func buildOf(info buildinfo.Info) models.Build {
@@ -47,6 +62,19 @@ func buildOf(info buildinfo.Info) models.Build {
 }
 
 func (s *DoctorService) Report(ctx context.Context, withChecks bool) models.DoctorReport {
+	key := doctorKey{checks: withChecks, lang: installerLang(i18n.LocaleFrom(ctx))}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.opts.Now()
+	if e, ok := s.cache[key]; ok && now.Sub(e.at) < DoctorCacheTTL && now.Sub(e.at) >= 0 {
+		return e.report
+	}
+	report := s.compute(ctx, withChecks)
+	s.cache[key] = doctorEntry{at: now, report: report}
+	return report
+}
+
+func (s *DoctorService) compute(ctx context.Context, withChecks bool) models.DoctorReport {
 	health := s.health.Readiness(ctx)
 	report := models.DoctorReport{Build: buildOf(s.build), Health: health}
 	if withChecks {

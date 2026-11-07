@@ -6,7 +6,7 @@ The **About Dhow** page (`/about`, under **Monitoring** in the side menu) shows 
 
 ## Who sees what
 
-Every signed-in user sees **Version and build**: the version number, the commit, the build date, and whether the server is ready. The **Server checks** card is for the instance owner only, the account created in the first setup. The server sends no check to an ordinary member, neither in the page nor in the API. An API key cannot read this page with the instance owner's rights.
+Every signed-in user sees **Version and build**: the version number, the commit, the build date, and whether the server is ready. The **Server checks** card is for the instance owner only, the account created in the first setup. The server sends no check to an ordinary member, neither in the page nor in the API. The readiness a member sees is the same as the public `/api/v1/health/ready` probe returns. The server keeps the result of the checks for two seconds, so opening the page again and again does not multiply the requests to the database. An API key cannot read this page with the instance owner's rights.
 
 ## Server checks
 
