@@ -1,3 +1,4 @@
+import { AboutEn } from '@/I18n/Locales/Workspace/AboutEn';
 import { ApprovalsEn } from '@/I18n/Locales/Workspace/ApprovalsEn';
 import { AuditEn } from '@/I18n/Locales/Workspace/AuditEn';
 import { EnvironmentsEn } from '@/I18n/Locales/Workspace/EnvironmentsEn';
@@ -420,4 +421,5 @@ export const WorkspaceEn: TWorkspaceMessages = {
   ...TargetsManageEn,
   ...ApprovalsEn,
   ...ShellEn,
+  ...AboutEn,
 };

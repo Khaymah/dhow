@@ -72,6 +72,7 @@ A host needs at least 1 CPU core, 2 GiB of memory and 5 GiB of free disk (2 core
 | [Secrets and variables](docs/en/guides/secrets.md) | Write-only secrets, their places and order, versions, variables, and registry credentials |
 | [Your organization and your account](docs/en/guides/organization.md) | Members and teams beside their details, invitations, API keys, organization settings, and your profile and security |
 | [Server settings](docs/en/guides/instance-settings.md) | Mail, organization creation, the breached-password check, rate limits and log limits from the dashboard, and how the environment locks them |
+| [About Dhow and the server checks](docs/en/guides/about-and-doctor.md) | The version, build and license, the server checks for the instance owner, and the reload bar after an update |
 | [Roadmap](docs/en/roadmap.md) | Milestones toward v1.0 |
 | [ADRs](Plan/ADR/) | Every architectural and product decision, with alternatives |
 
