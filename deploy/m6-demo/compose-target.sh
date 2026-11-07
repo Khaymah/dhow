@@ -62,8 +62,17 @@ YAML
   readable_repo
 }
 
+compose_inspect() {
+  docker compose exec -T compose-host docker "$@" </dev/null | tr -d '\r'
+}
+
 compose_runs() {
-  docker compose exec -T compose-host docker ps --filter "label=com.docker.compose.project=$compose_project" --format '{{.Image}} {{.Status}}' </dev/null
+  local id image
+  for id in $(compose_inspect ps -q --filter "label=com.docker.compose.project=$compose_project"); do
+    image=$(compose_inspect inspect --format '{{.Image}}' -- "$id") || return 1
+    printf '%s %s\n' "$(compose_inspect inspect --format '{{.Config.Image}} ({{.State.Health.Status}})' -- "$id")" \
+      "$(compose_inspect image inspect --format '{{join .RepoDigests " "}}' -- "$image")"
+  done
 }
 
 compose_serves() {
