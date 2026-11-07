@@ -261,7 +261,7 @@ FUZZ_TARGETS := \
 	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName \
 	Core/Keys:FuzzKeyring Core/Keys:FuzzOpen Modules/Environments/Test/Edge:FuzzAllowedRefs Modules/Environments/Test/Edge:FuzzDeployPath \
 	Modules/Environments/Test/Edge:FuzzKeySecretName Modules/Secrets/Test/Edge:FuzzSecretName Modules/Ingest/Test/Edge:FuzzIngestHeaders \
-	Modules/Ingest/Test/Edge:FuzzIngestArchive Modules/Environments/Test/Edge:FuzzDeployReport Modules/Notifications/Test/Edge:FuzzNotifyURL) \
+	Modules/Ingest/Test/Edge:FuzzIngestArchive Modules/Environments/Test/Edge:FuzzDeployReport Modules/Notifications/Test/Edge:FuzzNotifyURL Modules/Notifications/Test/Edge:FuzzChatURL) \
 	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare internal/jobspec:FuzzHealthEndpoints internal/jobspec:FuzzParseEndpoint \
 	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
 	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern internal/archive:FuzzUnpack internal/archive:FuzzWalk \
