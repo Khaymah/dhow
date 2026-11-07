@@ -11,7 +11,7 @@ export const BootAr = {
   'ui.loading': 'جارٍ التحميل',
 
   'toast.dismiss': 'أغلق',
-  'i18n.switchFailed': 'تعذّر تغيير اللغة. حاول مرة أخرى.',
+  'i18n.switchFailed': 'لم نتمكن من تغيير اللغة. حاول مرة أخرى.',
 
   'notFound.text': 'هذه الصفحة غير موجودة.',
   'notFound.action': 'ارجع إلى الرئيسية',
