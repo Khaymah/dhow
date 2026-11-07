@@ -48,7 +48,7 @@ export const getJobLogPage = (organizationId: string, jobId: string, attempt: nu
 export const jobLogRawUrl = (organizationId: string, jobId: string, attempt: number): string =>
   `${API_BASE_PATH}/organizations/${encodeURIComponent(organizationId)}/jobs/${encodeURIComponent(jobId)}/logs/raw?Attempt=${String(attempt)}`;
 
-export const jobLogStreamUrl =(organizationId: string, jobId: string, attempt: number, fromSeq: number): string => {
+export const jobLogStreamUrl = (organizationId: string, jobId: string, attempt: number, fromSeq: number): string => {
   const path = `${API_BASE_PATH}/organizations/${encodeURIComponent(organizationId)}/jobs/${encodeURIComponent(jobId)}/logs/stream`;
   const query = new URLSearchParams({ Attempt: String(attempt) });
   if (fromSeq > 1) query.set('FromSeq', String(fromSeq));

@@ -94,7 +94,7 @@ func (c *Controller) DownloadJobLog(ctx context.Context, req gen.DownloadJobLogR
 	if err != nil {
 		return nil, err
 	}
-	raw, err := c.service.OpenRawLog(ctx, req.Id, req.JobId, attempt)
+	raw, err := c.service.OpenRawLog(ctx, p.UserID, req.Id, req.JobId, attempt)
 	if err != nil {
 		return nil, err
 	}
