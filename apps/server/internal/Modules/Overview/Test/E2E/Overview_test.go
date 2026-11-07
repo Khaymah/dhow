@@ -22,11 +22,17 @@ type invitations struct{ Pending int }
 
 type approvals struct{ Pending int }
 
+type deployments struct{ Running, FailedLast24h, RollbackFailed, Pending int }
+
+type notifications struct{ Dead int }
+
 type overview struct {
-	Jobs        *jobs
-	Runners     *runners
-	Invitations *invitations
-	Approvals   *approvals
+	Jobs          *jobs
+	Runners       *runners
+	Invitations   *invitations
+	Approvals     *approvals
+	Deployments   *deployments
+	Notifications *notifications
 }
 
 type world struct {
@@ -74,10 +80,12 @@ func TestEveryRoleSeesTheBlocksItsListsAllow(t *testing.T) {
 	w := newWorld(t)
 	w.seed()
 	full := overview{
-		Jobs:        &jobs{Running: 1, Queued: 4, QueuedNoRunner: 2, FailedLast24h: 1},
-		Runners:     &runners{Online: 1, Offline: 1, Paused: 1},
-		Invitations: &invitations{Pending: 1},
-		Approvals:   &approvals{Pending: 0},
+		Jobs:          &jobs{Running: 1, Queued: 4, QueuedNoRunner: 2, FailedLast24h: 1},
+		Runners:       &runners{Online: 1, Offline: 1, Paused: 1},
+		Invitations:   &invitations{Pending: 1},
+		Approvals:     &approvals{Pending: 0},
+		Deployments:   &deployments{},
+		Notifications: &notifications{},
 	}
 	for _, role := range policy.Roles() {
 		t.Run(string(role), func(t *testing.T) {
@@ -88,9 +96,10 @@ func TestEveryRoleSeesTheBlocksItsListsAllow(t *testing.T) {
 
 			var raw map[string]json.RawMessage
 			res.Decode(t, &raw)
-			assert.Len(t, raw, 4)
+			assert.Len(t, raw, 6)
 			blocks := map[string]policy.Action{
 				"Jobs": policy.JobRead, "Runners": policy.RunnerRead, "Invitations": policy.MemberManage, "Approvals": policy.RunRead,
+				"Deployments": policy.RunRead, "Notifications": policy.OrgNotificationManage,
 			}
 			for name, action := range blocks {
 				require.Contains(t, raw, name)
@@ -108,6 +117,9 @@ func TestEveryRoleSeesTheBlocksItsListsAllow(t *testing.T) {
 			if !policy.Allows(role, policy.MemberManage) {
 				want.Invitations = nil
 			}
+			if !policy.Allows(role, policy.OrgNotificationManage) {
+				want.Notifications = nil
+			}
 			assert.Equal(t, want, got)
 		})
 	}
@@ -118,7 +130,8 @@ func TestAFreshOrganizationCountsZeroNotNull(t *testing.T) {
 	res := w.get(w.owner)
 	require.Equal(t, http.StatusOK, res.Status, string(res.Raw))
 	assert.JSONEq(t, `{"Jobs":{"Running":0,"Queued":0,"QueuedNoRunner":0,"FailedLast24h":0},
-		"Runners":{"Online":0,"Offline":0,"Paused":0},"Invitations":{"Pending":0},"Approvals":{"Pending":0}}`, string(res.Data))
+		"Runners":{"Online":0,"Offline":0,"Paused":0},"Invitations":{"Pending":0},"Approvals":{"Pending":0},
+		"Deployments":{"Running":0,"FailedLast24h":0,"RollbackFailed":0,"Pending":0},"Notifications":{"Dead":0}}`, string(res.Data))
 }
 
 func TestQueuedNoRunnerMatchesTheReasonTheJobListShows(t *testing.T) {
@@ -191,7 +204,7 @@ func TestATokenSeesOnlyTheBlocksOfItsScopes(t *testing.T) {
 	require.Equal(t, http.StatusOK, bare.Status, string(bare.Raw))
 	var none map[string]json.RawMessage
 	bare.Decode(t, &none)
-	for _, block := range []string{"Jobs", "Runners", "Invitations", "Approvals"} {
+	for _, block := range []string{"Jobs", "Runners", "Invitations", "Approvals", "Deployments", "Notifications"} {
 		assert.JSONEq(t, "null", string(none[block]), block)
 	}
 
