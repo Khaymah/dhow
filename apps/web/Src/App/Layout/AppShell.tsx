@@ -49,7 +49,7 @@ export const AppShell = () => {
         <ShellMenu />
         <div className="flex min-w-0 flex-1 flex-col">
           <ShellTopBar />
-          <main id="main" tabIndex={-1} className="flex-1 overflow-auto px-gutter pt-4 pb-24 md:pt-7 md:pb-12">
+          <main id="main" tabIndex={-1} className="flex-1 scroll-pb-24 overflow-auto px-gutter pt-4 pb-24 md:pt-7 md:pb-12">
             <SystemBanners />
             <AccountBanners />
             <Outlet />

@@ -37,7 +37,7 @@ describe('the organization in the shell', () => {
     const user = userEvent.setup();
     render(<App router={router} queryClient={createQueryClient({ retry: false })} />);
     expect(backend.state.orgName).toBe('Future Solution');
-    const chips = await screen.findAllByRole('button', { name: Ar['shell.organization.switch'].replace('{name}', isolate('Future Solution')) });
+    const chips = await screen.findAllByRole('button', { name: `${Ar['shell.organization.switch']} Future Solution` });
     expect(chips.length).toBeGreaterThan(0);
     const [chip] = chips;
     if (!chip) throw new Error('the organization chip is missing');
@@ -69,7 +69,7 @@ describe('renaming the organization', () => {
     await save(user);
     await waitFor(() => {
       expect(
-        screen.getAllByRole('button', { name: Ar['shell.organization.switch'].replace('{name}', isolate('Future Labs')), hidden: true }).length,
+        screen.getAllByRole('button', { name: `${Ar['shell.organization.switch']} Future Labs`, hidden: true }).length,
       ).toBeGreaterThan(0);
     });
     const patch = calls.find((call) => call.method === 'PATCH');
