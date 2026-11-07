@@ -18,6 +18,7 @@ The chaos suite (`apps/runner/Test/Chaos`) runs the real `dhow-server` and `dhow
 | The network between the runner and the server is a blackhole for 60 seconds | Same as the 90-second outage. |
 | PostgreSQL restarts during a job | The job succeeds without a retry. |
 | The job is canceled while its image is still being pulled | The job ends `canceled`, and no sandbox starts. |
+| `kill -9` of the server after a notification was queued and before the receiver answered | The server comes back, the lease of the row ends and the notification is sent again with the same `Dhow-Delivery` and a valid signature, then becomes `sent`. No notification is lost. The scenario needs a private IPv4 address on the machine, otherwise it is skipped. |
 
 To detect two attempts running at the same time, each job calls a small HTTP sink on the host once a second through its egress proxy. Every call carries `DHOW_ATTEMPT_ID` and `DHOW_FENCING_TOKEN`. If an older attempt makes a call after a newer one has started, that is an overlap, and the test fails.
 
