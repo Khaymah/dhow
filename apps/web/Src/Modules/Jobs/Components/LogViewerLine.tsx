@@ -21,7 +21,9 @@ export interface ILogViewerLineProps {
   onToggle: (step: number) => void;
 }
 
-const StepHeader = ({ line, stepName, collapsed, onToggle }: Pick<ILogViewerLineProps, 'line' | 'stepName' | 'collapsed' | 'onToggle'>) => {
+type TStepHeaderProps = Pick<ILogViewerLineProps, 'line' | 'stepName' | 'collapsed' | 'onToggle'>;
+
+const StepHeader = ({ line, stepName, collapsed, onToggle }: TStepHeaderProps) => {
   const t = useT();
   const index = line.Step ?? 0;
   return (

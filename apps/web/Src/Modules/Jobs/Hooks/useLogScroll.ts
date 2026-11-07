@@ -5,7 +5,7 @@ import type { ILogLine } from '@/Modules/Jobs/Types/LogBuffer';
 import { indexOfId, lowerBound } from '@/Modules/Jobs/Types/LogRows';
 
 export const ROW_ESTIMATE_PX = 22;
-export const ROW_OVERSCAN = 20;
+export const ROW_OVERSCAN = 10;
 export const BOTTOM_SLACK_PX = 32;
 
 export interface ILogScroll {

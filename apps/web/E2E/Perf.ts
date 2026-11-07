@@ -24,6 +24,16 @@ export const LOOSE_LIMITS: IPerfLimits = {
   MaxHeapBytes: 1_500_000_000,
 };
 
+export interface IViewerLimits {
+  MaxRows: number;
+  MaxScrollLongTaskMs: number;
+}
+
+export const VIEWER_LIMITS: IViewerLimits = {
+  MaxRows: 300,
+  MaxScrollLongTaskMs: 100,
+};
+
 export const CPU_THROTTLE = 4;
 const TASKS_KEY = '__dhowLongTasks';
 
@@ -84,6 +94,15 @@ export const withinLimits = (sample: IPerfSample, limits: IPerfLimits): string[]
   if (sample.DomNodes > limits.MaxDomNodes) failures.push(`DOM nodes ${sample.DomNodes} > ${limits.MaxDomNodes}`);
   if (sample.LongTasks.MaxMs > limits.MaxLongTaskMs) failures.push(`longest task ${sample.LongTasks.MaxMs}ms > ${limits.MaxLongTaskMs}ms`);
   if (sample.HeapUsedBytes > limits.MaxHeapBytes) failures.push(`heap ${sample.HeapUsedBytes} > ${limits.MaxHeapBytes}`);
+  return failures;
+};
+
+export const viewerFailures = (rows: number, scrolled: IPerfSample, limits: IViewerLimits): string[] => {
+  const failures: string[] = [];
+  if (rows >= limits.MaxRows) failures.push(`log rows in the DOM ${rows} >= ${limits.MaxRows}`);
+  if (scrolled.LongTasks.MaxMs > limits.MaxScrollLongTaskMs) {
+    failures.push(`longest task while scrolling ${scrolled.LongTasks.MaxMs}ms > ${limits.MaxScrollLongTaskMs}ms`);
+  }
   return failures;
 };
 
