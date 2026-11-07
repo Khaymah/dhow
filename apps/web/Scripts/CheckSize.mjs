@@ -1,10 +1,14 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
-const KB = 1024;
-const BUDGETS = { js: 128 * KB, css: 30 * KB };
+import { evaluate, KB, parseOverrides, withOverrides } from './SizeBudget.mjs';
+
+const config = withOverrides(
+  JSON.parse(readFileSync(fileURLToPath(new URL('./SizeBudgets.json', import.meta.url)), 'utf8')),
+  parseOverrides(process.argv.slice(2)),
+);
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 
@@ -70,27 +74,46 @@ const gzipSize = (ref) => gzipSync(readFileSync(fileOf(ref)), { level: 9 }).leng
 
 const kb = (bytes) => (bytes / KB).toFixed(1);
 
+const sized = (refs) => [...refs].map((ref) => [ref, gzipSize(ref)]).sort((a, b) => b[1] - a[1]);
+
+const allScripts = () =>
+  readdirSync(join(dist, 'assets'))
+    .filter((file) => file.endsWith('.js'))
+    .map((file) => `/assets/${file}`);
+
+const printRows = (title, rows) => {
+  process.stdout.write(`${title}\n`);
+  for (const [ref, bytes] of rows) process.stdout.write(`${kb(bytes).padStart(7)} KB  ${ref}\n`);
+};
+
 checkInline();
 const roots = entries();
-const initial = { js: followGraph(roots.js), css: roots.css };
-let failed = false;
+const initialJs = followGraph(roots.js);
+if (initialJs.size === 0) fail('no initial js found from dist/index.html');
+if (roots.css.size === 0) fail('no initial css found from dist/index.html');
+const report = evaluate(
+  {
+    InitialJs: sized(initialJs),
+    InitialCss: sized(roots.css),
+    Lazy: sized(allScripts().filter((ref) => !initialJs.has(ref))),
+  },
+  config,
+);
 
-for (const kind of ['js', 'css']) {
-  const refs = initial[kind];
-  if (refs.size === 0) fail(`no initial ${kind} found from dist/index.html`);
-  const sizes = [...refs].map((ref) => [ref, gzipSize(ref)]).sort((a, b) => b[1] - a[1]);
-  let total = 0;
-  for (const [ref, bytes] of sizes) {
-    total += bytes;
-    process.stdout.write(`${kb(bytes).padStart(7)} KB  ${ref}\n`);
-  }
-  const budget = BUDGETS[kind];
-  const over = total > budget;
-  failed ||= over;
-  const verdict = over ? 'OVER' : 'ok';
-  process.stdout.write(
-    `size: initial ${kind} is ${kb(total)} KB gzip in ${refs.size} files, budget ${kb(budget)} KB: ${verdict}\n`,
-  );
+printRows('initial js', sized(initialJs));
+printRows('initial css', sized(roots.css));
+process.stdout.write('lazy js (2 KB and over, and any over budget)\n');
+for (const chunk of report.Lazy.filter((entry) => entry.Over || entry.Bytes >= 2 * KB)) {
+  const verdict = chunk.Over ? ` OVER ${kb(chunk.Budget)} KB` : '';
+  process.stdout.write(`${kb(chunk.Bytes).padStart(7)} KB  ${chunk.Ref}${verdict}\n`);
 }
+for (const row of report.Initial) {
+  const verdict = row.Over ? 'OVER' : 'ok';
+  process.stdout.write(`size: initial ${row.Kind} is ${kb(row.Bytes)} KB gzip, budget ${kb(row.Budget)} KB: ${verdict}\n`);
+}
+const lazyOver = report.Lazy.filter((chunk) => chunk.Over);
+process.stdout.write(
+  `size: ${report.Lazy.length} lazy chunks, ${lazyOver.length} over their budget (default ${config.LazyJsKb} KB): ${lazyOver.length === 0 ? 'ok' : 'OVER'}\n`,
+);
 
-if (failed) process.exit(1);
+if (report.Failed) process.exit(1);
