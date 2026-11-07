@@ -261,7 +261,7 @@ make_ingest_token() {
 
 build_cli() {
   docker compose exec -T tools go build -trimpath -o "$work/server/dhow" ./apps/cli/cmd/dhow </dev/null || return 1
-  chmod 0755 "$work/server/dhow"
+  docker compose exec -T tools chmod 0755 -- "$work/server/dhow" </dev/null
 }
 
 push_artifact() {
