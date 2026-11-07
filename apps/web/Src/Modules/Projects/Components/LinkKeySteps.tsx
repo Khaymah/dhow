@@ -104,7 +104,7 @@ export const HostKeyStep = ({ organizationId, projectId, repository, onPinned, o
         <input
           type="checkbox"
           checked={Checked}
-          className="mt-0.5 size-4 accent-accent"
+          className="size-6 flex-none accent-accent"
           onChange={(event) => {
             setChecked(event.target.checked);
           }}

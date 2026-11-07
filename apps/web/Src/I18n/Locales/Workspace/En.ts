@@ -279,7 +279,7 @@ export const WorkspaceEn: TWorkspaceMessages = {
   'sessions.device.unknown': 'Unknown device',
   'sessions.lastSeen': 'Last active {when}',
   'sessions.revoke': 'Sign it out',
-  'sessions.revoke.aria': 'Sign out {device}',
+  'sessions.revoke.aria': 'Sign it out: {device}',
   'sessions.revoke.question': 'This device is signed out at once and has to sign in again. Continue?',
   'sessions.revoke.confirm': 'Yes, sign it out',
   'sessions.revoke.cancel': 'Cancel',

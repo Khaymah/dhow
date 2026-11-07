@@ -69,7 +69,7 @@ const Trail = ({ trail, index, onCrumb }: TTrailProps) => {
                   onCrumb(position);
                 }}
                 className={
-                  'cursor-pointer rounded-xs border-0 bg-transparent px-1 py-0.5 text-body-sm text-secondary ' +
+                  'min-h-6 min-w-6 cursor-pointer rounded-xs border-0 bg-transparent px-1 py-0.5 text-body-sm text-secondary ' +
                   'hover:bg-hover hover:text-primary'
                 }
               >
