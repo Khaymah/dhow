@@ -120,7 +120,7 @@ func (d internalMailDeliverer) Deliver(ctx context.Context, item outbox.Item) ou
 		return outbox.Result{Code: CodeConfig, Permanent: true}
 	}
 	if err := s.mailer.Send(ctx, mailer.Message{To: user.Email, Subject: m.Subject, Body: m.Body}); err != nil {
-		s.log.WarnContext(ctx, "account email not sent", "delivery_id", item.ID.String(), "user_id", user.Id.String())
+		s.log.WarnContext(ctx, "credential alert not sent", "delivery_id", item.ID.String(), "user_id", user.Id.String())
 		return outbox.Result{Code: CodeMailSend}
 	}
 	return outbox.Result{}

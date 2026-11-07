@@ -36,6 +36,7 @@ import (
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
 	ingest "github.com/Khaymah/dhow/apps/server/internal/Modules/Ingest"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
+	notifications "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications"
 	overview "github.com/Khaymah/dhow/apps/server/internal/Modules/Overview"
 	pipelines "github.com/Khaymah/dhow/apps/server/internal/Modules/Pipelines"
 	preferences "github.com/Khaymah/dhow/apps/server/internal/Modules/Preferences"
@@ -72,6 +73,8 @@ type Infra struct {
 	Triggers           triggers.Sink
 	GitLookup          netguard.Lookup
 	GitDial            netguard.DialFunc
+	NotifyLookup       netguard.Lookup
+	NotifyDial         netguard.DialFunc
 	Definitions        pipelines.Definitions
 	Images             pipelines.ImageResolver
 	CheckoutImage      string
@@ -94,6 +97,7 @@ type Wired struct {
 	Pipelines     *pipelines.Service
 	Artifacts     *artifacts.Service
 	Ingest        *ingest.Service
+	Notifications *notifications.Service
 	LogPool       *pgxpool.Pool
 	Retention     *retention.Runner
 	Alerts        *alerts.Service
@@ -169,6 +173,11 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
+	notificationsService, err := notificationsFor(in, values, bus, sessionService, mail)
+	if err != nil {
+		return nil, err
+	}
+	alertsService.UseFlush(notificationsService.Drain)
 
 	opts := Options{
 		Config: in.Config,
@@ -177,34 +186,35 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 			DB: in.Pool, Migrations: in.Migrations, Queries: sqlc.New(in.Pool), Build: in.Build, Log: in.Log,
 			Checks: readinessChecks(jobsService, store, in.Keys), Keys: keyringReader(in.Keys),
 		},
-		Identity:  identityService,
-		Session:   sessionService,
-		Audit:     auditService,
-		Runners:   runnersService,
-		Jobs:      jobsService,
-		Projects:  projects.NewService(projects.Options{DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now}),
-		Envs:      runs.envs,
-		Secrets:   runs.secrets,
-		Sources:   runs.sources,
-		Pipelines: runs.pipelines,
-		Artifacts: runs.artifacts,
-		Ingest:    ingestService,
-		Overview:  overview.NewService(overview.Options{Counter: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
-		Tokens:    tokensService,
-		Prefs:     preferences.NewService(in.Pool, in.Log, in.Now),
-		Gate:      gate,
-		CSRF:      csrf,
-		APITokens: external.apiTokens,
-		Limits:    ratelimit.NewLivePerClient(limiter, func() int { return limits().Public }, config.RateLimitPublicWindow, in.Log),
-		Webhooks:  limiter,
-		Settings:  settingsFor(in, store, sessionService, bus, mail, limiter, external.providers),
-		Instance:  store.Instance,
-		Now:       in.Now,
-		Web:       in.Web,
+		Identity:      identityService,
+		Session:       sessionService,
+		Audit:         auditService,
+		Runners:       runnersService,
+		Jobs:          jobsService,
+		Projects:      projects.NewService(projects.Options{DB: in.Pool, Bus: bus, Log: in.Log, Now: in.Now}),
+		Envs:          runs.envs,
+		Secrets:       runs.secrets,
+		Sources:       runs.sources,
+		Pipelines:     runs.pipelines,
+		Artifacts:     runs.artifacts,
+		Ingest:        ingestService,
+		Notifications: notificationsService,
+		Overview:      overview.NewService(overview.Options{Counter: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
+		Tokens:        tokensService,
+		Prefs:         preferences.NewService(in.Pool, in.Log, in.Now),
+		Gate:          gate,
+		CSRF:          csrf,
+		APITokens:     external.apiTokens,
+		Limits:        ratelimit.NewLivePerClient(limiter, func() int { return limits().Public }, config.RateLimitPublicWindow, in.Log),
+		Webhooks:      limiter,
+		Settings:      settingsFor(in, store, sessionService, bus, mail, limiter, external.providers),
+		Instance:      store.Instance,
+		Now:           in.Now,
+		Web:           in.Web,
 	}
 	wired := &Wired{
 		Options: opts, Handler: NewRouter(opts), Identity: identityService, Jobs: jobsService, JobQueue: jobsService.Queue(),
-		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, Ingest: ingestService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
+		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, Ingest: ingestService, Notifications: notificationsService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
 		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now}),
 	}
 	if in.Config.RunnerPlaneSeparate() {
