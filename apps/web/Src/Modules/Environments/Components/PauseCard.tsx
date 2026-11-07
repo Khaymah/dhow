@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { isApiError } from '@/Core/Api/ApiError';
 import type { TFactorMethod } from '@/Core/Auth/Factor';
 import { useAction } from '@/Core/Hooks/useAction';
-import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useFactorAction } from '@/Core/Hooks/useFactorAction';
 import { useRelativeTime } from '@/Core/Hooks/useRelativeTime';
 import { useToastStore } from '@/Core/Store/useToastStore';
@@ -11,6 +10,7 @@ import { Button } from '@/Core/Ui/Button';
 import { Card } from '@/Core/Ui/Card';
 import { ConfirmPanel } from '@/Core/Ui/ConfirmPanel';
 import { Field } from '@/Core/Ui/Field';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Textarea } from '@/Core/Ui/Textarea';
 import { useT } from '@/I18n/useT';
@@ -33,7 +33,6 @@ interface IPanelProps extends IPauseCardProps {
 
 const PauseForm = ({ organizationId, projectId, environment }: IPauseCardProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const refresh = useEnvironmentRefresh(organizationId, projectId);
   const Push = useToastStore((state) => state.Push);
   const [Reason, setReason] = useState('');
@@ -65,7 +64,7 @@ const PauseForm = ({ organizationId, projectId, environment }: IPauseCardProps) 
     >
       <p className="m-0 text-body-sm text-secondary">{t('environments.pause.about')}</p>
       {Problem ? <InlineAlert accent="failed" title={Problem} /> : null}
-      {pause.Failure ? <InlineAlert accent="failed" title={errorText(pause.Failure)} /> : null}
+      {pause.Failure ? <ErrorAlert error={pause.Failure} /> : null}
       <Field label={t('environments.pause.reason')}>
         <Textarea
           rows={2}

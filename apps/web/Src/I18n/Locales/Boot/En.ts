@@ -25,6 +25,8 @@ export const BootEn: TBootMessages = {
   'api.error.network': 'We cannot reach the server. Check your network and try again.',
   'api.error.invalid': 'The server sent a reply we do not understand. Try again.',
   'api.error.unknown': 'Something went wrong. Try again.',
+  'api.error.fix': 'Fix:',
+  'api.error.help': 'Learn more',
 
   'password.show': 'Show password',
   'password.hide': 'Hide password',

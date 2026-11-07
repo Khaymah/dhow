@@ -6,6 +6,7 @@ import { useToastStore } from '@/Core/Store/useToastStore';
 import { Badge } from '@/Core/Ui/Badge';
 import { Button } from '@/Core/Ui/Button';
 import { Card } from '@/Core/Ui/Card';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Pager } from '@/Core/Ui/Pager';
 import { Row, Rows } from '@/Core/Ui/Row';
@@ -79,7 +80,7 @@ export const RegistrationTokensCard = ({ organizationId }: IRegistrationTokensCa
   return (
     <Card title={t('runners.tokens.title')} icon="key" end={Meta.Total > 0 ? String(Meta.Total) : undefined}>
       <p className="m-0 px-4 pb-2 text-body-sm text-secondary">{t('runners.tokens.lead')}</p>
-      {revoke.error ? <InlineAlert accent="failed" title={errorText(revoke.error)} className="mx-4 mb-2 w-auto" /> : null}
+      {revoke.error ? <ErrorAlert error={revoke.error} className="mx-4 mb-2 w-auto" /> : null}
       {Items.length === 0 ? <p className="m-0 px-4 pb-3 text-body-sm text-tertiary">{t('runners.tokens.empty')}</p> : null}
       <Rows label={t('runners.tokens.title')}>
         {Items.map((token) => [

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Skeleton } from '@/Core/Ui/Skeleton';
-import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useT } from '@/I18n/useT';
 import type { ISecretScope } from '@/Modules/Secrets/Api/SecretsApi';
 import { useSecretScope } from '@/Modules/Secrets/Hooks/useSecretScope';
@@ -30,8 +30,7 @@ export interface IFormLookupProps<TItem> {
 
 export const FormLookup = <TItem,>({ query, find, missing, children }: IFormLookupProps<TItem>) => {
   const t = useT();
-  const errorText = useApiErrorText();
-  if (query.isError) return <InlineAlert accent="failed" title={errorText(query.error)} />;
+  if (query.isError) return <ErrorAlert error={query.error} />;
   if (query.data === undefined) return <Skeleton label={t('ui.loading')} lines={5} />;
   const item = find(query.data);
   if (item === undefined) return <InlineAlert accent="awaiting" title={missing} />;

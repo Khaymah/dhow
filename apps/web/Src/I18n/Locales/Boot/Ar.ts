@@ -23,6 +23,8 @@ export const BootAr = {
   'api.error.network': 'لا يمكننا الوصول إلى السيرفر. تأكد من اتصال الشبكة وحاول مرة أخرى.',
   'api.error.invalid': 'أرسل السيرفر ردًا لا نفهمه. حاول مرة أخرى.',
   'api.error.unknown': 'حدثت مشكلة. حاول مرة أخرى.',
+  'api.error.fix': 'الحل:',
+  'api.error.help': 'اعرف أكثر',
 
   'password.show': 'أظهر كلمة السر',
   'password.hide': 'أخفِ كلمة السر',

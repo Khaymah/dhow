@@ -7,6 +7,8 @@ export interface IToast {
   Accent: TAccent;
   Title: string;
   Detail?: string;
+  Fix?: string;
+  HelpHref?: string | null;
 }
 
 interface IToastState {
