@@ -1,10 +1,11 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FakeEventSource, installFakeEventSource } from '@/Core/Testing/FakeEventSource';
-import { ORG_ID } from '@/Core/Testing/Fetch';
+import { envelope, ORG_ID, stubFetch } from '@/Core/Testing/Fetch';
 import { JOB_ID } from '@/Core/Testing/JobsBackend';
 import { renderWithProviders } from '@/Core/Testing/Render';
+import { installLayout } from '@/Core/Testing/Layout';
 import { Ar } from '@/I18n/Locales/Ar';
 import { JobLog } from '@/Modules/Jobs/Components/JobLog';
 import { FLUSH_MS } from '@/Modules/Jobs/Hooks/useJobLog';
@@ -38,8 +39,16 @@ const deliver = async (source: FakeEventSource, events: [string, unknown][]) => 
 
 const log = () => screen.getByRole('log', { name: Ar['jobs.log.label'].replace('{n}', isolate('2')) });
 
-beforeEach(() => {
+let restoreLayout: () => void = () => undefined;
+
+beforeEach(async () => {
   installFakeEventSource();
+  restoreLayout = installLayout();
+  await import('@/Modules/Jobs/Components/LogViewer');
+});
+
+afterEach(() => {
+  restoreLayout();
 });
 
 describe('the job log', () => {
@@ -66,7 +75,7 @@ describe('the job log', () => {
     expect(screen.getByText(Ar['jobs.log.stepHeader'].replace('{n}', isolate('1')).replace('{name}', isolate('install')))).toBeInTheDocument();
     expect(screen.getByText(Ar['jobs.log.stepHeader'].replace('{n}', isolate('2')).replace('{name}', isolate('test')))).toBeInTheDocument();
     expect(screen.getByText('oops').closest('[data-stream]')).toHaveAttribute('data-stream', 'stderr');
-    expect(log().querySelector('[style]')).toBeNull();
+    expect(document.querySelector('style')).toBeNull();
   });
 
   it('renders text as text, never as HTML', async () => {
@@ -161,5 +170,65 @@ describe('the job log connection', () => {
     await user.click(jump);
     expect(box.scrollTop).toBe(1000);
     expect(screen.queryByRole('button', { name: Ar['jobs.log.jump'] })).not.toBeInTheDocument();
+  });
+});
+
+const pageOf = (chunks: unknown[], extra: Record<string, unknown> = {}) =>
+  envelope({
+    Success: true,
+    Data: { Attempt: 2, AttemptId: '0198a000-0000-7000-8000-0000000000d1', State: 'running', LastSeq: 9, Truncated: false, Chunks: chunks, ...extra },
+  });
+
+describe('the fallback connection', () => {
+  it('offers a polling connection while the stream is not open and reads pages from the last line', async () => {
+    const { calls } = stubFetch(() => pageOf([chunk(1, 'polled line\n')]));
+    const { source, user } = mountLog();
+    await user.click(screen.getByRole('button', { name: Ar['jobs.log.fallback'] }));
+    expect(source.readyState).toBe(FakeEventSource.CLOSED);
+    expect(await screen.findByText('polled line')).toBeInTheDocument();
+    expect(screen.getByText(Ar['jobs.log.polling'])).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: Ar['jobs.log.fallback'] })).not.toBeInTheDocument();
+    const url = new URL(calls[0]?.url ?? '');
+    expect(url.pathname).toBe(`/api/v1/organizations/${ORG_ID}/jobs/${JOB_ID}/logs`);
+    expect(url.searchParams.get('Attempt')).toBe('2');
+    expect(url.searchParams.get('FromSeq')).toBe('1');
+  });
+
+  it('does not offer it while the stream is live', async () => {
+    const { source } = mountLog();
+    await deliver(source, [['status', { Attempt: 2, State: 'running', Truncated: false }]]);
+    expect(screen.queryByRole('button', { name: Ar['jobs.log.fallback'] })).not.toBeInTheDocument();
+  });
+
+  it('ends when the polled attempt is finished', async () => {
+    stubFetch(() => pageOf([chunk(1, 'last\n')], { State: 'succeeded' }));
+    const onEnded = vi.fn();
+    const { user } = mountLog(onEnded);
+    await user.click(screen.getByRole('button', { name: Ar['jobs.log.fallback'] }));
+    expect(await screen.findByText(Ar['jobs.log.ended'])).toBeInTheDocument();
+    expect(onEnded).toHaveBeenCalledOnce();
+  });
+});
+
+describe('older lines', () => {
+  it('loads the lines before the first one we hold, by Seq, on demand', async () => {
+    const { calls } = stubFetch(() => pageOf([chunk(1, 'earlier one\n'), chunk(2, 'earlier two\n'), chunk(3, 'earlier three\n'), chunk(4, 'earlier four\n')]));
+    const { source, user } = mountLog();
+    await deliver(source, [['chunk', chunk(5, 'current\n')]]);
+    expect(screen.queryByText('earlier one')).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: Ar['jobs.log.older.load'] }));
+    expect(await screen.findByText('earlier one')).toBeInTheDocument();
+    expect(screen.getByText('current')).toBeInTheDocument();
+    expect(new URL(calls[0]?.url ?? '').searchParams.get('FromSeq')).toBe('1');
+    expect(screen.queryByRole('button', { name: Ar['jobs.log.older.load'] })).not.toBeInTheDocument();
+  });
+
+  it('says so when the older lines cannot be loaded and lets the reader try again', async () => {
+    stubFetch(() => envelope({ Success: false, Error: { Code: 'INTERNAL', Message: 'x' } }, 500));
+    const { source, user } = mountLog();
+    await deliver(source, [['chunk', chunk(5, 'current\n')]]);
+    await user.click(await screen.findByRole('button', { name: Ar['jobs.log.older.load'] }));
+    expect(await screen.findByText(Ar['jobs.log.older.failed'])).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: Ar['jobs.log.older.load'] })).toBeEnabled();
   });
 });

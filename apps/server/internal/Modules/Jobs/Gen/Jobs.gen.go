@@ -554,6 +554,12 @@ type GetJobLogsParams struct {
 	Limit   *LogLimit   `form:"Limit,omitempty" json:"Limit,omitempty"`
 }
 
+// DownloadJobLogParams defines parameters for DownloadJobLog.
+type DownloadJobLogParams struct {
+	// Attempt The attempt number. Without it, the latest attempt.
+	Attempt *LogAttempt `form:"Attempt,omitempty" json:"Attempt,omitempty"`
+}
+
 // StreamJobLogsParams defines parameters for StreamJobLogs.
 type StreamJobLogsParams struct {
 	// Attempt The attempt number. Without it, the latest attempt.
@@ -586,6 +592,9 @@ type ServerInterface interface {
 	// GetJobLogs Read a page of the log of a job attempt
 	// (GET /organizations/{id}/jobs/{jobId}/logs)
 	GetJobLogs(w http.ResponseWriter, r *http.Request, id Id, jobId JobId, params GetJobLogsParams)
+	// DownloadJobLog Download the whole log of a job attempt as plain text
+	// (GET /organizations/{id}/jobs/{jobId}/logs/raw)
+	DownloadJobLog(w http.ResponseWriter, r *http.Request, id Id, jobId JobId, params DownloadJobLogParams)
 	// StreamJobLogs Follow the log of a job attempt as server-sent events
 	// (GET /organizations/{id}/jobs/{jobId}/logs/stream)
 	StreamJobLogs(w http.ResponseWriter, r *http.Request, id Id, jobId JobId, params StreamJobLogsParams)
@@ -622,6 +631,12 @@ func (_ Unimplemented) CancelJob(w http.ResponseWriter, r *http.Request, id Id, 
 // GetJobLogs Read a page of the log of a job attempt
 // (GET /organizations/{id}/jobs/{jobId}/logs)
 func (_ Unimplemented) GetJobLogs(w http.ResponseWriter, r *http.Request, id Id, jobId JobId, params GetJobLogsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DownloadJobLog Download the whole log of a job attempt as plain text
+// (GET /organizations/{id}/jobs/{jobId}/logs/raw)
+func (_ Unimplemented) DownloadJobLog(w http.ResponseWriter, r *http.Request, id Id, jobId JobId, params DownloadJobLogParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -881,6 +896,57 @@ func (siw *ServerInterfaceWrapper) GetJobLogs(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// DownloadJobLog operation middleware
+func (siw *ServerInterfaceWrapper) DownloadJobLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "jobId" -------------
+	var jobId JobId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "jobId", chi.URLParam(r, "jobId"), &jobId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jobId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DownloadJobLogParams
+
+	// ------------- Optional query parameter "Attempt" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "Attempt", r.URL.Query(), &params.Attempt, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "Attempt"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Attempt", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadJobLog(w, r, id, jobId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StreamJobLogs operation middleware
 func (siw *ServerInterfaceWrapper) StreamJobLogs(w http.ResponseWriter, r *http.Request) {
 
@@ -1095,6 +1161,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/organizations/{id}/jobs/{jobId}/logs", wrapper.GetJobLogs)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/organizations/{id}/jobs/{jobId}/logs/raw", wrapper.DownloadJobLog)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/organizations/{id}/jobs/{jobId}/logs/stream", wrapper.StreamJobLogs)
 	})
 
@@ -1304,6 +1373,58 @@ func (response GetJobLogsdefaultJSONResponse) VisitGetJobLogsResponse(w http.Res
 	return err
 }
 
+type DownloadJobLogRequestObject struct {
+	Id     Id    `json:"id"`
+	JobId  JobId `json:"jobId"`
+	Params DownloadJobLogParams
+}
+
+type DownloadJobLogResponseObject interface {
+	VisitDownloadJobLogResponse(w http.ResponseWriter) error
+}
+
+type DownloadJobLog200ResponseHeaders struct {
+	ContentDisposition  *string
+	XContentTypeOptions *string
+}
+
+type DownloadJobLog200TextResponse struct {
+	Body    openapi_types.File
+	Headers DownloadJobLog200ResponseHeaders
+}
+
+func (response DownloadJobLog200TextResponse) VisitDownloadJobLogResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "text/plain")
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	if response.Headers.XContentTypeOptions != nil {
+		w.Header().Set("X-Content-Type-Options", fmt.Sprint(*response.Headers.XContentTypeOptions))
+	}
+	w.WriteHeader(200)
+
+	_, err := w.Write([]byte(fmt.Sprint(response.Body)))
+	return err
+}
+
+type DownloadJobLogdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response DownloadJobLogdefaultJSONResponse) VisitDownloadJobLogResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type StreamJobLogsRequestObject struct {
 	Id     Id    `json:"id"`
 	JobId  JobId `json:"jobId"`
@@ -1391,6 +1512,9 @@ type StrictServerInterface interface {
 	// GetJobLogs Read a page of the log of a job attempt
 	// (GET /organizations/{id}/jobs/{jobId}/logs)
 	GetJobLogs(ctx context.Context, request GetJobLogsRequestObject) (GetJobLogsResponseObject, error)
+	// DownloadJobLog Download the whole log of a job attempt as plain text
+	// (GET /organizations/{id}/jobs/{jobId}/logs/raw)
+	DownloadJobLog(ctx context.Context, request DownloadJobLogRequestObject) (DownloadJobLogResponseObject, error)
 	// StreamJobLogs Follow the log of a job attempt as server-sent events
 	// (GET /organizations/{id}/jobs/{jobId}/logs/stream)
 	StreamJobLogs(ctx context.Context, request StreamJobLogsRequestObject) (StreamJobLogsResponseObject, error)
@@ -1570,6 +1694,34 @@ func (sh *strictHandler) GetJobLogs(w http.ResponseWriter, r *http.Request, id I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetJobLogsResponseObject); ok {
 		if err := validResponse.VisitGetJobLogsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DownloadJobLog operation middleware
+func (sh *strictHandler) DownloadJobLog(w http.ResponseWriter, r *http.Request, id Id, jobId JobId, params DownloadJobLogParams) {
+	var request DownloadJobLogRequestObject
+
+	request.Id = id
+	request.JobId = jobId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DownloadJobLog(ctx, request.(DownloadJobLogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DownloadJobLog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DownloadJobLogResponseObject); ok {
+		if err := validResponse.VisitDownloadJobLogResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

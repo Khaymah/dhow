@@ -1460,6 +1460,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{id}/jobs/{jobId}/logs/raw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download the whole log of a job attempt as plain text
+         * @description Needs `log.read`, with the caller's role on the run's project for a job that a pipeline run made, the same as reading a page of the log. Streams the text of every chunk of one attempt (the latest without `Attempt`) in order, as `text/plain; charset=utf-8` with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`. Every invalid byte is replaced by U+FFFD, as in a page. The answer has no `Content-Length`, because the log may still grow while it is sent; it ends at the last chunk that existed when the download began. A job without that attempt answers 404 `ATTEMPT_NOT_FOUND`, and a job of another organization 404 `NOT_FOUND`. More than about 5 downloads a second from one user answers 429 `RATE_LIMITED` with `Retry-After`.
+         */
+        get: operations["downloadJobLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}/jobs/{jobId}/logs/stream": {
         parameters: {
             query?: never;
@@ -8229,6 +8249,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobLogPageResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    downloadJobLog: {
+        parameters: {
+            query?: {
+                /** @description The attempt number. Without it, the latest attempt. */
+                Attempt?: components["parameters"]["LogAttempt"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The log as a file. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    "X-Content-Type-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
             default: components["responses"]["Error"];

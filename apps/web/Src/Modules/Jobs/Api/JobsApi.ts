@@ -34,6 +34,20 @@ export const getJob = (organizationId: string, jobId: string): Promise<TJobDetai
 export const cancelJob = (organizationId: string, jobId: string): Promise<TJob> =>
   request(() => ApiClient.POST('/organizations/{id}/jobs/{jobId}/cancel', { params: { path: { id: organizationId, jobId } } }));
 
+export type TJobLogPage = TSchemas['JobLogPage'];
+
+export const LOG_PAGE_LIMIT = 500;
+
+export const getJobLogPage = (organizationId: string, jobId: string, attempt: number, fromSeq: number): Promise<TJobLogPage> =>
+  request(() =>
+    ApiClient.GET('/organizations/{id}/jobs/{jobId}/logs', {
+      params: { path: { id: organizationId, jobId }, query: { Attempt: attempt, FromSeq: fromSeq, Limit: LOG_PAGE_LIMIT } },
+    }),
+  );
+
+export const jobLogRawUrl = (organizationId: string, jobId: string, attempt: number): string =>
+  `${API_BASE_PATH}/organizations/${encodeURIComponent(organizationId)}/jobs/${encodeURIComponent(jobId)}/logs/raw?Attempt=${String(attempt)}`;
+
 export const jobLogStreamUrl = (organizationId: string, jobId: string, attempt: number, fromSeq: number): string => {
   const path = `${API_BASE_PATH}/organizations/${encodeURIComponent(organizationId)}/jobs/${encodeURIComponent(jobId)}/logs/stream`;
   const query = new URLSearchParams({ Attempt: String(attempt) });

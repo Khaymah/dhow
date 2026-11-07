@@ -2250,6 +2250,42 @@ paths:
                 $ref: "#/components/schemas/JobLogPageResponse"
         default:
           $ref: "#/components/responses/Error"
+  /organizations/{id}/jobs/{jobId}/logs/raw:
+    get:
+      operationId: downloadJobLog
+      tags: [jobs]
+      summary: Download the whole log of a job attempt as plain text
+      description: >-
+        Needs `log.read`, with the caller's role on the run's project for a job that a pipeline run made, the same as
+        reading a page of the log. Streams the text of every chunk of one attempt (the latest without `Attempt`) in
+        order, as `text/plain; charset=utf-8` with `Content-Disposition: attachment` and `X-Content-Type-Options:
+        nosniff`. Every invalid byte is replaced by U+FFFD, as in a page. The answer has no `Content-Length`, because
+        the log may still grow while it is sent; it ends at the last chunk that existed when the download began. A job
+        without that attempt answers 404 `ATTEMPT_NOT_FOUND`, and a job of another organization 404 `NOT_FOUND`. More
+        than about 5 downloads a second from one user answers 429 `RATE_LIMITED` with `Retry-After`.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/LogAttempt"
+      responses:
+        "200":
+          description: The log as a file.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+            X-Content-Type-Options:
+              schema:
+                type: string
+          content:
+            text/plain:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: "#/components/responses/Error"
   /organizations/{id}/jobs/{jobId}/logs/stream:
     get:
       operationId: streamJobLogs
