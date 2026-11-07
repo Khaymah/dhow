@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { I18nContext, type II18nValue } from '@/I18n/I18nContext';
 import { DIRECTION, readStoredLocale, storeLocale, type TLocale } from '@/I18n/Locale';
+import { BootAr } from '@/I18n/Locales/Boot/Ar';
 import { loadBootMessages } from '@/I18n/BootCatalog';
 import { translate } from '@/I18n/Translate';
 import { useCatalogStore } from '@/I18n/useCatalogStore';
@@ -14,7 +15,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
   const Requested = useRef<TLocale>(Locale);
 
   const t = useCallback<II18nValue['t']>(
-    (key, params) => translate(Locale, key, params, Workspace),
+    (key, params) => translate(Locale, key, params, Workspace, Boot ?? BootAr),
     [Locale, Boot, Workspace],
   );
 

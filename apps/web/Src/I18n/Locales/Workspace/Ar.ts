@@ -15,6 +15,7 @@ import { SecretsAr } from '@/I18n/Locales/Workspace/SecretsAr';
 import { TargetsAr } from '@/I18n/Locales/Workspace/TargetsAr';
 import { TargetsManageAr } from '@/I18n/Locales/Workspace/TargetsManageAr';
 import { SettingsAr } from '@/I18n/Locales/Workspace/SettingsAr';
+import { ShellAr } from '@/I18n/Locales/Workspace/ShellAr';
 
 export const WorkspaceAr = {
   'palette.label': 'الأوامر',
@@ -415,4 +416,5 @@ export const WorkspaceAr = {
   ...IngestAr,
   ...TargetsManageAr,
   ...ApprovalsAr,
+  ...ShellAr,
 } as const;

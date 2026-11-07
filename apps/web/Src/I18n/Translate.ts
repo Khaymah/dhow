@@ -21,8 +21,9 @@ export const translate = (
   key: TMessageKey,
   params?: TMessageParams,
   workspace: TCatalog | undefined = loadedWorkspace(locale),
+  boot: TCatalog = bootOf(locale),
 ): string => {
-  const template = selectPlurals(locale, bootOf(locale)[key] ?? workspace?.[key] ?? key, params);
+  const template = selectPlurals(locale, boot[key] ?? workspace?.[key] ?? key, params);
   if (!params) return template;
   return template.replace(/\{(\w+)\}/g, (placeholder, name: string) => {
     const value = params[name];
