@@ -20,7 +20,10 @@ WITH picked AS (
     WHERE NOT o."IsDeleted"
       AND ((o."State" = 'pending' AND o."NextAttemptAt" <= $2::timestamptz)
            OR (o."State" = 'sending' AND o."ClaimedUntil" <= $2::timestamptz))
-      AND (o."ChannelId" IS NULL OR o."ChannelId" <> ALL ($3::uuid[]))
+      AND (($3::boolean AND o."Kind" = 'internal-email')
+           OR (NOT $3::boolean AND o."Kind" <> 'internal-email'
+               AND (o."ChannelId" IS NULL OR o."ChannelId" <> ALL ($4::uuid[]))
+               AND (o."OrganizationId" IS NULL OR o."OrganizationId" <> ALL ($5::uuid[]))))
     ORDER BY o."NextAttemptAt", o."Id"
     LIMIT 1
     FOR UPDATE SKIP LOCKED
@@ -36,11 +39,19 @@ RETURNING o."Id", o."CreatedAt", o."UpdatedAt", o."IsDeleted", o."OrganizationId
 type ClaimOutboxParams struct {
 	LeaseUntil time.Time
 	Now        time.Time
+	Internal   bool
 	Busy       []uuid.UUID
+	BusyOrgs   []uuid.UUID
 }
 
 func (q *Queries) ClaimOutbox(ctx context.Context, arg ClaimOutboxParams) (NotificationOutbox, error) {
-	row := q.db.QueryRow(ctx, claimOutbox, arg.LeaseUntil, arg.Now, arg.Busy)
+	row := q.db.QueryRow(ctx, claimOutbox,
+		arg.LeaseUntil,
+		arg.Now,
+		arg.Internal,
+		arg.Busy,
+		arg.BusyOrgs,
+	)
 	var i NotificationOutbox
 	err := row.Scan(
 		&i.Id,
@@ -71,17 +82,23 @@ const completeOutbox = `-- name: CompleteOutbox :execrows
 UPDATE "NotificationOutbox"
 SET "State" = 'sent', "SentAt" = $1::timestamptz, "ClaimedUntil" = NULL, "LastError" = '',
     "LastStatus" = $2::integer, "UpdatedAt" = $1::timestamptz
-WHERE "Id" = $3 AND "State" = 'sending'
+WHERE "Id" = $3 AND "State" = 'sending' AND "Attempts" = $4::integer
 `
 
 type CompleteOutboxParams struct {
-	Now    time.Time
-	Status pgtype.Int4
-	ID     uuid.UUID
+	Now      time.Time
+	Status   pgtype.Int4
+	ID       uuid.UUID
+	Attempts int32
 }
 
 func (q *Queries) CompleteOutbox(ctx context.Context, arg CompleteOutboxParams) (int64, error) {
-	result, err := q.db.Exec(ctx, completeOutbox, arg.Now, arg.Status, arg.ID)
+	result, err := q.db.Exec(ctx, completeOutbox,
+		arg.Now,
+		arg.Status,
+		arg.ID,
+		arg.Attempts,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -132,7 +149,7 @@ const killOutbox = `-- name: KillOutbox :execrows
 UPDATE "NotificationOutbox"
 SET "State" = 'dead', "ClaimedUntil" = NULL, "LastError" = $1::text,
     "LastStatus" = $2::integer, "UpdatedAt" = $3::timestamptz
-WHERE "Id" = $4 AND "State" = 'sending'
+WHERE "Id" = $4 AND "State" = 'sending' AND "Attempts" = $5::integer
 `
 
 type KillOutboxParams struct {
@@ -140,6 +157,7 @@ type KillOutboxParams struct {
 	Status    pgtype.Int4
 	Now       time.Time
 	ID        uuid.UUID
+	Attempts  int32
 }
 
 func (q *Queries) KillOutbox(ctx context.Context, arg KillOutboxParams) (int64, error) {
@@ -148,6 +166,7 @@ func (q *Queries) KillOutbox(ctx context.Context, arg KillOutboxParams) (int64, 
 		arg.Status,
 		arg.Now,
 		arg.ID,
+		arg.Attempts,
 	)
 	if err != nil {
 		return 0, err
@@ -191,7 +210,7 @@ const rescheduleOutbox = `-- name: RescheduleOutbox :execrows
 UPDATE "NotificationOutbox"
 SET "State" = 'pending', "NextAttemptAt" = $1::timestamptz, "ClaimedUntil" = NULL, "LastError" = $2::text,
     "LastStatus" = $3::integer, "UpdatedAt" = $4::timestamptz
-WHERE "Id" = $5 AND "State" = 'sending'
+WHERE "Id" = $5 AND "State" = 'sending' AND "Attempts" = $6::integer
 `
 
 type RescheduleOutboxParams struct {
@@ -200,6 +219,7 @@ type RescheduleOutboxParams struct {
 	Status        pgtype.Int4
 	Now           time.Time
 	ID            uuid.UUID
+	Attempts      int32
 }
 
 func (q *Queries) RescheduleOutbox(ctx context.Context, arg RescheduleOutboxParams) (int64, error) {
@@ -209,6 +229,7 @@ func (q *Queries) RescheduleOutbox(ctx context.Context, arg RescheduleOutboxPara
 		arg.Status,
 		arg.Now,
 		arg.ID,
+		arg.Attempts,
 	)
 	if err != nil {
 		return 0, err

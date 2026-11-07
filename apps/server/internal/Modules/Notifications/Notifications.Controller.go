@@ -62,8 +62,14 @@ func factorOf(f gen.CurrentFactor) auth.Factor {
 func channelView(c models.Channel) gen.NotificationChannel {
 	out := gen.NotificationChannel{
 		Id: c.ID, ProjectId: c.ProjectID, Kind: gen.NotificationChannelKind(c.Kind), Name: c.Name, Locale: gen.NotificationChannelLocale(c.Locale),
-		Enabled: c.Enabled, Host: c.Host, HasSecret: c.HasSecret, Version: c.Version, ConsecutiveFailures: c.ConsecutiveFailures,
-		CreatedByUserId: c.CreatedByUserID, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
+		Enabled: c.Enabled, HasSecret: c.HasSecret, Version: c.Version, ConsecutiveFailures: c.ConsecutiveFailures,
+		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
+	}
+	if c.Host != "" {
+		out.Host = &c.Host
+	}
+	if c.CreatedByUserID != uuid.Nil {
+		out.CreatedByUserId = &c.CreatedByUserID
 	}
 	if c.DisabledReason != "" {
 		out.DisabledReason = ptrOf(gen.NotificationChannelDisabledReason(c.DisabledReason))

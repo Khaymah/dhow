@@ -284,9 +284,10 @@ func (s *Service) ListChannels(ctx context.Context, scope models.Scope, page, li
 	if err != nil {
 		return models.ChannelPage{}, err
 	}
+	manage := s.canManage(ctx, scope)
 	items := make([]models.Channel, 0, len(rows))
 	for _, r := range rows {
-		items = append(items, channelOf(r))
+		items = append(items, hideFromReaders(channelOf(r), manage))
 	}
 	return models.ChannelPage{Items: items, Total: total}, nil
 }
@@ -299,5 +300,24 @@ func (s *Service) GetChannel(ctx context.Context, scope models.Scope, id uuid.UU
 	if err != nil {
 		return models.Channel{}, err
 	}
-	return channelOf(row), nil
+	return hideFromReaders(channelOf(row), s.canManage(ctx, scope)), nil
+}
+
+func (s *Service) canManage(ctx context.Context, scope models.Scope) bool {
+	p, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return false
+	}
+	if scope.ProjectID != nil {
+		return policy.Allows(p.ProjectRole, policy.NotificationManage)
+	}
+	role, member := p.RoleIn(scope.OrganizationID)
+	return member && policy.Allows(role, policy.OrgNotificationManage)
+}
+
+func hideFromReaders(c models.Channel, manage bool) models.Channel {
+	if !manage {
+		c.Host, c.CreatedByUserID = "", uuid.Nil
+	}
+	return c
 }

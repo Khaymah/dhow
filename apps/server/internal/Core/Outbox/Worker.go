@@ -20,37 +20,45 @@ import (
 var ErrNoPool = errors.New("the outbox worker needs a database pool")
 
 type Options struct {
-	Pool        *pgxpool.Pool
-	Log         *slog.Logger
-	Now         func() time.Time
-	Deliverers  map[Kind]Deliverer
-	Observer    Observer
-	Global      int
-	PerChannel  int
-	Lease       time.Duration
-	Poll        time.Duration
-	Schedule    []time.Duration
-	MaxAttempts int
-	LockKey     int64
+	Pool         *pgxpool.Pool
+	Log          *slog.Logger
+	Now          func() time.Time
+	Deliverers   map[Kind]Deliverer
+	Observer     Observer
+	Global       int
+	PerChannel   int
+	PerOrg       int
+	MailSlots    int
+	ShutdownWait time.Duration
+	Lease        time.Duration
+	Poll         time.Duration
+	Schedule     []time.Duration
+	MaxAttempts  int
+	LockKey      int64
 }
 
 type Worker struct {
-	pool        *pgxpool.Pool
-	log         *slog.Logger
-	now         func() time.Time
-	deliverers  map[Kind]Deliverer
-	observer    Observer
-	global      int
-	perChannel  int
-	lease       time.Duration
-	poll        time.Duration
-	schedule    []time.Duration
-	maxAttempts int
-	lockKey     int64
+	pool         *pgxpool.Pool
+	log          *slog.Logger
+	now          func() time.Time
+	deliverers   map[Kind]Deliverer
+	observer     Observer
+	global       int
+	perChannel   int
+	perOrg       int
+	mailSlots    int
+	shutdownWait time.Duration
+	lease        time.Duration
+	poll         time.Duration
+	schedule     []time.Duration
+	maxAttempts  int
+	lockKey      int64
 
 	mu      sync.Mutex
 	running int
+	mail    int
 	byChan  map[uuid.UUID]int
+	byOrg   map[uuid.UUID]int
 	wg      sync.WaitGroup
 	wake    chan struct{}
 	lock    *pgxpool.Conn
@@ -61,9 +69,9 @@ func NewWorker(o Options) (*Worker, error) {
 		return nil, ErrNoPool
 	}
 	w := &Worker{
-		pool: o.Pool, log: o.Log, now: o.Now, deliverers: o.Deliverers, observer: o.Observer, global: o.Global, perChannel: o.PerChannel,
+		pool: o.Pool, log: o.Log, now: o.Now, deliverers: o.Deliverers, observer: o.Observer, global: o.Global, perChannel: o.PerChannel, perOrg: o.PerOrg, mailSlots: o.MailSlots, shutdownWait: o.ShutdownWait,
 		lease: o.Lease, poll: o.Poll, schedule: o.Schedule, maxAttempts: o.MaxAttempts, lockKey: o.LockKey,
-		byChan: map[uuid.UUID]int{}, wake: make(chan struct{}, 1),
+		byChan: map[uuid.UUID]int{}, byOrg: map[uuid.UUID]int{}, wake: make(chan struct{}, 1),
 	}
 	if w.now == nil {
 		w.now = time.Now
@@ -73,6 +81,15 @@ func NewWorker(o Options) (*Worker, error) {
 	}
 	if w.perChannel <= 0 {
 		w.perChannel = config.NotifyChannelConcurrency
+	}
+	if w.perOrg <= 0 {
+		w.perOrg = config.NotifyOrgConcurrency
+	}
+	if w.mailSlots <= 0 {
+		w.mailSlots = config.NotifyMailSlots
+	}
+	if w.shutdownWait <= 0 {
+		w.shutdownWait = config.NotifyShutdownWait
 	}
 	if w.lease <= 0 {
 		w.lease = config.NotifyClaimLease
@@ -105,8 +122,7 @@ func (w *Worker) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			w.wg.Wait()
-			w.release(ctx)
+			w.shutdown(ctx)
 			return
 		case <-timer.C:
 		case <-w.wake:
@@ -163,28 +179,58 @@ func (w *Worker) release(ctx context.Context) {
 	w.lock = nil
 }
 
-func (w *Worker) busy() ([]uuid.UUID, bool) {
+func (w *Worker) shutdown(ctx context.Context) {
+	done := make(chan struct{})
+	go func() {
+		w.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(w.shutdownWait):
+		w.log.Warn("notification worker stopped while deliveries were still running; their leases expire and they are tried again")
+	}
+	if w.lock != nil {
+		flush, cancel := context.WithTimeout(context.WithoutCancel(ctx), w.shutdownWait)
+		if _, err := w.drain(flush, true); err != nil {
+			w.log.Warn("notification worker could not send the account emails that were waiting", "error", err)
+		}
+		cancel()
+	}
+	w.release(ctx)
+}
+
+type limits struct {
+	channels []uuid.UUID
+	orgs     []uuid.UUID
+}
+
+func (w *Worker) limits(internal bool) (limits, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.running >= w.global {
-		return nil, false
+	if internal {
+		return limits{channels: []uuid.UUID{}, orgs: []uuid.UUID{}}, w.mail < w.mailSlots
 	}
-	out := make([]uuid.UUID, 0, len(w.byChan))
+	if w.running >= w.global {
+		return limits{}, false
+	}
+	l := limits{channels: []uuid.UUID{}, orgs: []uuid.UUID{}}
 	for id, n := range w.byChan {
 		if n >= w.perChannel {
-			out = append(out, id)
+			l.channels = append(l.channels, id)
 		}
 	}
-	return out, true
+	for id, n := range w.byOrg {
+		if n >= w.perOrg {
+			l.orgs = append(l.orgs, id)
+		}
+	}
+	return l, true
 }
 
 func (w *Worker) fill(ctx context.Context) {
 	for ctx.Err() == nil {
-		busy, free := w.busy()
-		if !free {
-			return
-		}
-		item, ok, err := w.claim(ctx, busy)
+		item, ok, err := w.next(ctx)
 		if err != nil {
 			w.log.ErrorContext(ctx, "notification worker cannot claim a delivery", "error", err)
 			return
@@ -196,35 +242,74 @@ func (w *Worker) fill(ctx context.Context) {
 	}
 }
 
+func (w *Worker) next(ctx context.Context) (Item, bool, error) {
+	for _, internal := range []bool{true, false} {
+		l, free := w.limits(internal)
+		if !free {
+			continue
+		}
+		item, ok, err := w.claim(ctx, internal, l)
+		if err != nil || ok {
+			return item, ok, err
+		}
+	}
+	return Item{}, false, nil
+}
+
 func (w *Worker) start(ctx context.Context, item Item) {
 	w.mu.Lock()
-	w.running++
+	if item.Kind == KindInternalEmail {
+		w.mail++
+	} else {
+		w.running++
+	}
 	if item.ChannelID != nil {
 		w.byChan[*item.ChannelID]++
+	}
+	if item.OrganizationID != nil && item.Kind != KindInternalEmail {
+		w.byOrg[*item.OrganizationID]++
 	}
 	w.mu.Unlock()
 	w.wg.Go(func() {
 		defer func() {
-			w.mu.Lock()
-			w.running--
-			if item.ChannelID != nil {
-				if w.byChan[*item.ChannelID]--; w.byChan[*item.ChannelID] <= 0 {
-					delete(w.byChan, *item.ChannelID)
-				}
-			}
-			w.mu.Unlock()
+			w.finish(item)
 			w.Wake()
 		}()
 		w.process(ctx, item)
 	})
 }
 
-func (w *Worker) claim(ctx context.Context, busy []uuid.UUID) (Item, bool, error) {
-	now := w.now()
-	if busy == nil {
-		busy = []uuid.UUID{}
+func (w *Worker) finish(item Item) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if item.Kind == KindInternalEmail {
+		w.mail--
+	} else {
+		w.running--
 	}
-	row, err := sqlc.New(w.pool).ClaimOutbox(ctx, sqlc.ClaimOutboxParams{Now: now, LeaseUntil: now.Add(w.lease), Busy: busy})
+	if item.ChannelID != nil {
+		if w.byChan[*item.ChannelID]--; w.byChan[*item.ChannelID] <= 0 {
+			delete(w.byChan, *item.ChannelID)
+		}
+	}
+	if item.OrganizationID != nil && item.Kind != KindInternalEmail {
+		if w.byOrg[*item.OrganizationID]--; w.byOrg[*item.OrganizationID] <= 0 {
+			delete(w.byOrg, *item.OrganizationID)
+		}
+	}
+}
+
+func (w *Worker) claim(ctx context.Context, internal bool, l limits) (Item, bool, error) {
+	now := w.now()
+	if l.channels == nil {
+		l.channels = []uuid.UUID{}
+	}
+	if l.orgs == nil {
+		l.orgs = []uuid.UUID{}
+	}
+	row, err := sqlc.New(w.pool).ClaimOutbox(ctx, sqlc.ClaimOutboxParams{
+		Now: now, LeaseUntil: now.Add(w.lease), Internal: internal, Busy: l.channels, BusyOrgs: l.orgs,
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Item{}, false, nil
 	}
@@ -234,10 +319,17 @@ func (w *Worker) claim(ctx context.Context, busy []uuid.UUID) (Item, bool, error
 	return itemOf(row), true, nil
 }
 
-func (w *Worker) Drain(ctx context.Context) (int, error) {
+func (w *Worker) Drain(ctx context.Context) (int, error) { return w.drain(ctx, false) }
+
+func (w *Worker) DrainInternal(ctx context.Context) (int, error) { return w.drain(ctx, true) }
+
+func (w *Worker) drain(ctx context.Context, onlyInternal bool) (int, error) {
 	n := 0
 	for ctx.Err() == nil {
-		item, ok, err := w.claim(ctx, nil)
+		item, ok, err := w.claim(ctx, true, limits{})
+		if err == nil && !ok && !onlyInternal {
+			item, ok, err = w.claim(ctx, false, limits{})
+		}
 		if err != nil || !ok {
 			return n, err
 		}
@@ -259,11 +351,21 @@ func (w *Worker) process(ctx context.Context, item Item) {
 		w.settle(ctx, item, Result{Code: ErrNoAdapter, Permanent: true})
 		return
 	}
-	res := d.Deliver(ctx, item)
+	res := w.deliver(ctx, d, item)
 	if ctx.Err() != nil && !res.OK() {
 		return
 	}
 	w.settle(ctx, item, res)
+}
+
+func (w *Worker) deliver(ctx context.Context, d Deliverer, item Item) (res Result) {
+	defer func() {
+		if recover() != nil {
+			w.log.ErrorContext(ctx, "a notification adapter failed unexpectedly", "delivery_id", item.ID.String(), "kind", string(item.Kind))
+			res = Result{Code: ErrAdapterFailed}
+		}
+	}()
+	return d.Deliver(ctx, item)
 }
 
 func statusOf(n int) pgtype.Int4 {
@@ -277,21 +379,27 @@ func (w *Worker) settle(ctx context.Context, item Item, res Result) {
 	ctx = context.WithoutCancel(ctx)
 	now := w.now()
 	q := sqlc.New(w.pool)
+	attempts := int32(item.Attempts) //nolint:gosec // Bounded by the attempt limit.
 	final := false
+	var n int64
 	var err error
 	switch {
 	case res.OK():
-		_, err = q.CompleteOutbox(ctx, sqlc.CompleteOutboxParams{ID: item.ID, Now: now, Status: statusOf(res.Status)})
+		n, err = q.CompleteOutbox(ctx, sqlc.CompleteOutboxParams{ID: item.ID, Now: now, Attempts: attempts, Status: statusOf(res.Status)})
 	case Final(item.Attempts, w.maxAttempts, res):
 		final = true
-		_, err = q.KillOutbox(ctx, sqlc.KillOutboxParams{ID: item.ID, Now: now, LastError: res.Code, Status: statusOf(res.Status)})
+		n, err = q.KillOutbox(ctx, sqlc.KillOutboxParams{ID: item.ID, Now: now, Attempts: attempts, LastError: res.Code, Status: statusOf(res.Status)})
 	default:
-		_, err = q.RescheduleOutbox(ctx, sqlc.RescheduleOutboxParams{
-			ID: item.ID, Now: now, NextAttemptAt: now.Add(NextDelay(w.schedule, item.Attempts)), LastError: res.Code, Status: statusOf(res.Status),
+		n, err = q.RescheduleOutbox(ctx, sqlc.RescheduleOutboxParams{
+			ID: item.ID, Now: now, Attempts: attempts, NextAttemptAt: now.Add(NextDelay(w.schedule, item.Attempts)), LastError: res.Code, Status: statusOf(res.Status),
 		})
 	}
 	if err != nil {
 		w.log.ErrorContext(ctx, "notification worker cannot record an attempt", "delivery_id", item.ID.String(), "error", err)
+		return
+	}
+	if n == 0 {
+		w.log.WarnContext(ctx, "notification attempt ignored: the delivery was claimed again meanwhile", "delivery_id", item.ID.String())
 		return
 	}
 	if w.observer != nil {

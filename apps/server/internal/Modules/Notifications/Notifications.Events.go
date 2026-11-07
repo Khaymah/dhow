@@ -4,19 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	outbox "github.com/Khaymah/dhow/apps/server/internal/Core/Outbox"
+	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications/Models"
 )
-
-const maxEmailRecipients = 200
 
 func HandledEvents() []string {
 	return []string{
@@ -265,6 +266,7 @@ func (s *Service) fanOut(ctx context.Context, q *sqlc.Queries, org uuid.UUID, pr
 	if err != nil {
 		return err
 	}
+	budget := config.NotifyRecipientsPerEvent
 	for _, r := range rules {
 		if !(RuleSpec{Events: r.Events, Environments: r.Environments, Statuses: r.Statuses}).Matches(n) {
 			continue
@@ -274,31 +276,75 @@ func (s *Service) fanOut(ctx context.Context, q *sqlc.Queries, org uuid.UUID, pr
 			OrganizationID: org, ProjectID: r.ChannelProjectId, ChannelID: &channel, Kind: outbox.Kind(r.Kind),
 			EventID: n.EventID, EventName: n.Event, Payload: raw, NextAttemptAt: s.now(),
 		}
-		if err := s.enqueueRule(ctx, q, base, r.Kind, r.Roles); err != nil {
+		if r.Kind != models.KindEmail {
+			if _, err := outbox.Enqueue(ctx, q, base); err != nil {
+				return err
+			}
+			continue
+		}
+		used, err := s.enqueueMail(ctx, q, base, project, r.Roles, budget)
+		if err != nil {
 			return err
 		}
+		budget -= used
 	}
 	return nil
 }
 
-func (s *Service) enqueueRule(ctx context.Context, q *sqlc.Queries, base outbox.Entry, kind string, roles []string) error {
-	if kind != models.KindEmail {
-		_, err := outbox.Enqueue(ctx, q, base)
-		return err
-	}
-	recipients, err := q.ListEmailRecipients(ctx, sqlc.ListEmailRecipientsParams{OrganizationID: base.OrganizationID, Roles: roles})
+func (s *Service) mailRecipients(ctx context.Context, q *sqlc.Queries, org uuid.UUID, project *uuid.UUID, roles []string) ([]uuid.UUID, error) {
+	rows, err := q.ListEmailCandidates(ctx, sqlc.ListEmailCandidatesParams{OrganizationID: org, ProjectID: project})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if len(recipients) > maxEmailRecipients {
-		recipients = recipients[:maxEmailRecipients]
-	}
-	for _, rcpt := range recipients {
-		entry, user := base, rcpt.UserId
-		entry.RecipientUserID = &user
-		if _, err := outbox.Enqueue(ctx, q, entry); err != nil {
-			return err
+	var out []uuid.UUID
+	for _, r := range rows {
+		role, ok := policy.EffectiveOf(r.Role, r.TeamRoles)
+		if !ok {
+			continue
+		}
+		if project != nil {
+			role = policy.ProjectRole(role, rolesOf(r.Bindings))
+			if !policy.Allows(role, policy.ProjectRead) {
+				continue
+			}
+		}
+		if slices.Contains(roles, string(role)) {
+			out = append(out, r.UserId)
 		}
 	}
-	return nil
+	return out, nil
+}
+
+func (s *Service) enqueueMail(
+	ctx context.Context, q *sqlc.Queries, base outbox.Entry, project *uuid.UUID, roles []string, budget int,
+) (int, error) {
+	recipients, err := s.mailRecipients(ctx, q, base.OrganizationID, project, roles)
+	if err != nil {
+		return 0, err
+	}
+	since := s.now().Add(-config.NotifyEmailWindow)
+	used := 0
+	for _, user := range recipients {
+		if used >= budget {
+			s.log.WarnContext(ctx, "notification email recipients capped for one event", "event", base.EventName)
+			break
+		}
+		recent, err := q.CountRecentChannelEmails(ctx, sqlc.CountRecentChannelEmailsParams{UserID: &user, Since: since})
+		if err != nil {
+			return used, err
+		}
+		if recent >= config.NotifyEmailPerUserHour {
+			continue
+		}
+		entry := base
+		entry.RecipientUserID = &user
+		queued, err := outbox.Enqueue(ctx, q, entry)
+		if err != nil {
+			return used, err
+		}
+		if queued {
+			used++
+		}
+	}
+	return used, nil
 }

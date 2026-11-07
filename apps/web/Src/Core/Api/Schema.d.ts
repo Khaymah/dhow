@@ -5621,15 +5621,18 @@ export interface components {
              * @enum {string}
              */
             DisabledReason?: "creator-removed" | "failures";
-            /** @description The host of the webhook address, with its port when it is not the default. Never the path or the query. */
-            Host: string;
+            /** @description The host of the webhook address, with its port when it is not the default. Never the path or the query. Only a caller who manages channels sees it; a reader gets name, kind and state only. */
+            Host?: string;
             /** @description True when the channel keeps an address and a signing secret. Neither is ever shown. */
             HasSecret: boolean;
             /** Format: int64 */
             Version: number;
             ConsecutiveFailures: number;
-            /** Format: uuid */
-            CreatedByUserId: string;
+            /**
+             * Format: uuid
+             * @description Only a caller who manages channels sees who made the channel.
+             */
+            CreatedByUserId?: string;
             /** Format: date-time */
             CreatedAt: string;
             /** Format: date-time */

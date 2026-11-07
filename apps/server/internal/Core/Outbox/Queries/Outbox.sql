@@ -14,7 +14,10 @@ WITH picked AS (
     WHERE NOT o."IsDeleted"
       AND ((o."State" = 'pending' AND o."NextAttemptAt" <= @now::timestamptz)
            OR (o."State" = 'sending' AND o."ClaimedUntil" <= @now::timestamptz))
-      AND (o."ChannelId" IS NULL OR o."ChannelId" <> ALL (@busy::uuid[]))
+      AND ((@internal::boolean AND o."Kind" = 'internal-email')
+           OR (NOT @internal::boolean AND o."Kind" <> 'internal-email'
+               AND (o."ChannelId" IS NULL OR o."ChannelId" <> ALL (@busy::uuid[]))
+               AND (o."OrganizationId" IS NULL OR o."OrganizationId" <> ALL (@busy_orgs::uuid[]))))
     ORDER BY o."NextAttemptAt", o."Id"
     LIMIT 1
     FOR UPDATE SKIP LOCKED
@@ -30,19 +33,19 @@ RETURNING o.*;
 UPDATE "NotificationOutbox"
 SET "State" = 'sent', "SentAt" = @now::timestamptz, "ClaimedUntil" = NULL, "LastError" = '',
     "LastStatus" = sqlc.narg('status')::integer, "UpdatedAt" = @now::timestamptz
-WHERE "Id" = @id AND "State" = 'sending';
+WHERE "Id" = @id AND "State" = 'sending' AND "Attempts" = @attempts::integer;
 
 -- name: RescheduleOutbox :execrows
 UPDATE "NotificationOutbox"
 SET "State" = 'pending', "NextAttemptAt" = @next_attempt_at::timestamptz, "ClaimedUntil" = NULL, "LastError" = @last_error::text,
     "LastStatus" = sqlc.narg('status')::integer, "UpdatedAt" = @now::timestamptz
-WHERE "Id" = @id AND "State" = 'sending';
+WHERE "Id" = @id AND "State" = 'sending' AND "Attempts" = @attempts::integer;
 
 -- name: KillOutbox :execrows
 UPDATE "NotificationOutbox"
 SET "State" = 'dead', "ClaimedUntil" = NULL, "LastError" = @last_error::text,
     "LastStatus" = sqlc.narg('status')::integer, "UpdatedAt" = @now::timestamptz
-WHERE "Id" = @id AND "State" = 'sending';
+WHERE "Id" = @id AND "State" = 'sending' AND "Attempts" = @attempts::integer;
 
 -- name: RequeueOutbox :execrows
 UPDATE "NotificationOutbox"

@@ -31,6 +31,7 @@ A channel belongs to a project, or to the organization. A channel of the organiz
 | `email` | Nothing. The rule chooses the member roles that get the email | The email, in the language of the channel |
 | `webhook` | An https address that Dhow may reach | `Host` and `HasSecret`, never the address |
 
+- **Who sees what.** Everyone who can read the project (or the organization) sees the name, the kind and the state of a channel. Only those who manage channels see its `Host` and who made it.
 - **Who can manage them.** For a project, a Maintainer, an Admin or an Owner (the action `notification.manage`). For the organization, an Admin or an Owner. Every change asks for a fresh second factor (`CurrentFactor`). An API token cannot manage channels.
 - **The address is a secret.** The address of a webhook often holds a token. Dhow keeps it sealed with the instance keys, shows only the host (`hooks.example.com`), and never writes it to a log, an audit entry or an event. To replace it, send a new address with `CurrentFactor`.
 - **The signing secret** is made by Dhow when you create the webhook and is shown **once**, in the answer of the create call. Copy it then. To make a new one, update the channel with `RotateSecret: true`.
@@ -95,6 +96,10 @@ Dhow writes the message to a queue in the same database transaction as the event
 - At most 2 deliveries to one channel and 16 in all run at the same time. One slow receiver does not hold the others.
 - The delivery log of a project or of the organization shows each delivery with its state: `pending`, `sending`, `sent` or `dead`. A `dead` delivery can be tried again by hand.
 - Dhow keeps the log for 30 days (`DHOW_NOTIFY_RETENTION_DAYS`).
+- **Fairness between organizations.** One organization takes at most 4 of the 16 deliveries at the same time. The account security emails have 2 slots of their own, so they go out even when every webhook slot is busy.
+- **Email limits.** One event reaches at most 100 members, and no member gets more than 30 channel emails an hour, across all channels. A message reaches only those who really can read the project: their role in the project (with the roles given through teams) must be one of the roles the rule chose.
+- **A failing mail server does not stop the channel.** A failed email to a member does not count toward the 10 failures. The failure shows in the delivery log with the code `mail_send` and is tried again on the same schedule.
+- When the server stops, Dhow sends the account security emails that are still waiting, for 5 seconds at most, and never waits for a webhook.
 
 ## What Dhow refuses to reach
 
@@ -112,7 +117,7 @@ Dhow checks the address of a webhook when you save it **and again at every send*
 | `422 CHANNEL_HOST_NOT_ALLOWED` | The address is not `https`, has a user name, or writes the host as a number |
 | `409 CHANNEL_VERSION_CONFLICT` | Someone changed the channel after you opened it. Reload and try again |
 | `409 CHANNEL_DISABLED` | The channel stopped. Check `DisabledReason`, fix the cause and turn it on again |
-| `429 TEST_RATE_LIMITED` | More than 5 test messages in a minute for one channel |
+| `429 TEST_RATE_LIMITED` | More than 5 test messages in a minute for one channel, 10 for one user, or 20 for the organization |
 | A delivery `dead` with `blocked` | The address was refused at send time. The name now points to a private address |
 | A delivery `dead` with `http_status` | The receiver answered with an error. `LastStatus` shows which one |
 | A delivery `dead` with `mail_disabled` | The server has no SMTP settings, so it cannot send email |

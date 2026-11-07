@@ -5,7 +5,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"log/slog"
+	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +20,7 @@ import (
 	keys "github.com/Khaymah/dhow/apps/server/internal/Core/Keys"
 	mailer "github.com/Khaymah/dhow/apps/server/internal/Core/Mail"
 	outbox "github.com/Khaymah/dhow/apps/server/internal/Core/Outbox"
+	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	"github.com/Khaymah/dhow/internal/netguard"
@@ -54,6 +57,7 @@ type Options struct {
 	Values    *keys.Values
 	Factors   auth.FactorConfirmer
 	Bus       Publisher
+	Limiter   ratelimit.Limiter
 	Mailer    mailer.Sender
 	Config    config.Notify
 	PublicURL string
@@ -65,20 +69,23 @@ type Options struct {
 }
 
 type Service struct {
-	db        DB
-	pool      *pgxpool.Pool
-	column    *keys.Column
-	factors   auth.FactorConfirmer
-	bus       Publisher
-	mailer    mailer.Sender
-	cfg       config.Notify
-	publicURL string
-	tls       *tls.Config
-	lookup    netguard.Lookup
-	dial      netguard.DialFunc
-	log       *slog.Logger
-	now       func() time.Time
-	worker    *outbox.Worker
+	db         DB
+	pool       *pgxpool.Pool
+	column     *keys.Column
+	factors    auth.FactorConfirmer
+	bus        Publisher
+	limiter    ratelimit.Limiter
+	clientOnce sync.Once
+	client     *http.Client
+	mailer     mailer.Sender
+	cfg        config.Notify
+	publicURL  string
+	tls        *tls.Config
+	lookup     netguard.Lookup
+	dial       netguard.DialFunc
+	log        *slog.Logger
+	now        func() time.Time
+	worker     *outbox.Worker
 }
 
 func NewService(o Options) (*Service, error) {
@@ -108,7 +115,7 @@ func NewService(o Options) (*Service, error) {
 		m = mailer.Disabled{}
 	}
 	s := &Service{
-		db: o.DB, pool: o.Pool, column: column, factors: o.Factors, bus: o.Bus, mailer: m, cfg: cfg,
+		db: o.DB, pool: o.Pool, column: column, factors: o.Factors, bus: o.Bus, limiter: o.Limiter, mailer: m, cfg: cfg,
 		publicURL: strings.TrimSuffix(o.PublicURL, "/"), tls: o.TLS, lookup: o.Lookup, dial: o.Dial, log: o.Log, now: now,
 	}
 	return s, nil

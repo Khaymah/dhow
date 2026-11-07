@@ -31,8 +31,9 @@ const (
 	StateSent    = "sent"
 	StateDead    = "dead"
 
-	ErrLeaseExpired = "lease_expired"
-	ErrNoAdapter    = "no_adapter"
+	ErrLeaseExpired  = "lease_expired"
+	ErrNoAdapter     = "no_adapter"
+	ErrAdapterFailed = "adapter_failed"
 )
 
 var (

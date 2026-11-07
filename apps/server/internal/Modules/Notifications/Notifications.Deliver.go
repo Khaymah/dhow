@@ -109,7 +109,8 @@ func (s *Service) Settled(ctx context.Context, item outbox.Item, res outbox.Resu
 		}
 		return
 	}
-	if res.Code == CodeChannelOff || res.Code == CodeChannelGone || res.Code == CodeMailOff {
+	if res.Code == CodeChannelOff || res.Code == CodeChannelGone || res.Code == CodeMailOff || res.Code == CodeMailSend ||
+		res.Code == CodeNoRecipient {
 		return
 	}
 	row, err := q.RecordNotificationFailure(ctx, *item.ChannelID)
@@ -148,7 +149,8 @@ func (s *Service) Worker() (*outbox.Worker, error) {
 	}
 	w, err := outbox.NewWorker(outbox.Options{
 		Pool: s.pool, Log: s.log, Now: s.now, Deliverers: s.Deliverers(), Observer: s,
-		Global: config.NotifyGlobalConcurrency, PerChannel: config.NotifyChannelConcurrency,
+		Global: config.NotifyGlobalConcurrency, PerChannel: config.NotifyChannelConcurrency, PerOrg: config.NotifyOrgConcurrency,
+		MailSlots: config.NotifyMailSlots, ShutdownWait: config.NotifyShutdownWait,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build the notification worker: %w", err)

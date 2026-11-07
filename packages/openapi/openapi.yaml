@@ -10151,7 +10151,7 @@ components:
     NotificationChannel:
       type: object
       additionalProperties: false
-      required: [Id, Kind, Name, Locale, Enabled, Host, HasSecret, Version, ConsecutiveFailures, CreatedByUserId, CreatedAt, UpdatedAt]
+      required: [Id, Kind, Name, Locale, Enabled, HasSecret, Version, ConsecutiveFailures, CreatedAt, UpdatedAt]
       properties:
         Id:
           type: string
@@ -10176,7 +10176,9 @@ components:
           description: Why a stopped channel stopped. `creator-removed` means the member who made it left or lost the role to manage it.
         Host:
           type: string
-          description: The host of the webhook address, with its port when it is not the default. Never the path or the query.
+          description: >-
+            The host of the webhook address, with its port when it is not the default. Never the path or the query. Only a
+            caller who manages channels sees it; a reader gets name, kind and state only.
         HasSecret:
           type: boolean
           description: True when the channel keeps an address and a signing secret. Neither is ever shown.
@@ -10188,6 +10190,7 @@ components:
         CreatedByUserId:
           type: string
           format: uuid
+          description: Only a caller who manages channels sees who made the channel.
         CreatedAt:
           type: string
           format: date-time

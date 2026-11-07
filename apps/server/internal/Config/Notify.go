@@ -40,6 +40,14 @@ const (
 	NotifyDeliveriesMax      = 100
 	NotifyDeviceMemory       = 50
 	NotifyUserAgentMax       = 512
+	NotifyOrgConcurrency     = 4
+	NotifyMailSlots          = 2
+	NotifyShutdownWait       = 5 * time.Second
+	NotifyRecipientsPerEvent = 100
+	NotifyEmailPerUserHour   = 30
+	NotifyEmailWindow        = time.Hour
+	NotifyTestPerUser        = 10
+	NotifyTestPerOrg         = 20
 )
 
 func NotifyRetrySchedule() []time.Duration {

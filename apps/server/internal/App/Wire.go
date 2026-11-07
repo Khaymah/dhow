@@ -177,7 +177,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	if err != nil {
 		return nil, err
 	}
-	notificationsService, err := notificationsFor(in, values, bus, sessionService, mail, alertsService)
+	notificationsService, err := notificationsFor(in, values, bus, sessionService, limiter, mail, alertsService)
 	if err != nil {
 		return nil, err
 	}

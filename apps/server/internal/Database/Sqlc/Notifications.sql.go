@@ -79,6 +79,23 @@ func (q *Queries) CountNotificationTestsSince(ctx context.Context, arg CountNoti
 	return count, err
 }
 
+const countRecentChannelEmails = `-- name: CountRecentChannelEmails :one
+SELECT count(*)::bigint FROM "NotificationOutbox"
+WHERE "RecipientUserId" = $1 AND "Kind" = 'email' AND "EventName" <> 'notification.test' AND "NextAttemptAt" > $2::timestamptz
+`
+
+type CountRecentChannelEmailsParams struct {
+	UserID *uuid.UUID
+	Since  time.Time
+}
+
+func (q *Queries) CountRecentChannelEmails(ctx context.Context, arg CountRecentChannelEmailsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countRecentChannelEmails, arg.UserID, arg.Since)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const disableNotificationChannel = `-- name: DisableNotificationChannel :one
 UPDATE "NotificationChannels"
 SET "Enabled" = false, "DisabledReason" = $1::text, "Version" = "Version" + 1, "UpdatedAt" = now()
@@ -527,42 +544,54 @@ func (q *Queries) InsertNotificationRule(ctx context.Context, arg InsertNotifica
 	return i, err
 }
 
-const listEmailRecipients = `-- name: ListEmailRecipients :many
-SELECT u."Id" AS "UserId", u."Email", u."Name", u."Locale"
+const listEmailCandidates = `-- name: ListEmailCandidates :many
+SELECT u."Id" AS "UserId", m."Role",
+       ARRAY(SELECT r."Role" FROM "OrganizationTeamRoles" r
+             WHERE r."UserId" = u."Id" AND r."OrganizationId" = m."OrganizationId")::text[] AS "TeamRoles",
+       ARRAY(SELECT rb."Role"
+             FROM "RoleBindings" rb
+             WHERE rb."OrganizationId" = m."OrganizationId" AND rb."Scope" = 'project' AND rb."ProjectId" = $1::uuid
+               AND NOT rb."IsDeleted"
+               AND (rb."UserId" = u."Id"
+                    OR EXISTS (SELECT 1
+                               FROM "TeamMembers" tm
+                               JOIN "Teams" t ON t."Id" = tm."TeamId" AND t."OrganizationId" = tm."OrganizationId" AND NOT t."IsDeleted"
+                               WHERE tm."TeamId" = rb."TeamId" AND tm."OrganizationId" = rb."OrganizationId"
+                                 AND tm."UserId" = u."Id" AND NOT tm."IsDeleted")))::text[] AS "Bindings"
 FROM "Users" u
-JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = $1 AND NOT m."IsDeleted"
+JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = $2 AND NOT m."IsDeleted"
+JOIN "Organizations" o ON o."Id" = m."OrganizationId" AND NOT o."IsDeleted"
 LEFT JOIN "NotificationMutes" mu ON mu."UserId" = u."Id" AND NOT mu."IsDeleted"
-WHERE m."Role" = ANY ($2::text[]) AND NOT u."IsDeleted" AND NOT u."Disabled" AND u."Email" <> ''
-  AND COALESCE(NOT mu."Muted", true)
+WHERE NOT u."IsDeleted" AND NOT u."Disabled" AND u."Email" <> '' AND COALESCE(NOT mu."Muted", true)
 ORDER BY u."Id"
 `
 
-type ListEmailRecipientsParams struct {
+type ListEmailCandidatesParams struct {
+	ProjectID      *uuid.UUID
 	OrganizationID uuid.UUID
-	Roles          []string
 }
 
-type ListEmailRecipientsRow struct {
-	UserId uuid.UUID
-	Email  string
-	Name   string
-	Locale string
+type ListEmailCandidatesRow struct {
+	UserId    uuid.UUID
+	Role      string
+	TeamRoles []string
+	Bindings  []string
 }
 
-func (q *Queries) ListEmailRecipients(ctx context.Context, arg ListEmailRecipientsParams) ([]ListEmailRecipientsRow, error) {
-	rows, err := q.db.Query(ctx, listEmailRecipients, arg.OrganizationID, arg.Roles)
+func (q *Queries) ListEmailCandidates(ctx context.Context, arg ListEmailCandidatesParams) ([]ListEmailCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listEmailCandidates, arg.ProjectID, arg.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListEmailRecipientsRow{}
+	items := []ListEmailCandidatesRow{}
 	for rows.Next() {
-		var i ListEmailRecipientsRow
+		var i ListEmailCandidatesRow
 		if err := rows.Scan(
 			&i.UserId,
-			&i.Email,
-			&i.Name,
-			&i.Locale,
+			&i.Role,
+			&i.TeamRoles,
+			&i.Bindings,
 		); err != nil {
 			return nil, err
 		}

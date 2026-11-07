@@ -14,6 +14,7 @@ import (
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	outbox "github.com/Khaymah/dhow/apps/server/internal/Core/Outbox"
+	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications/Models"
@@ -103,6 +104,9 @@ func (s *Service) TestChannel(ctx context.Context, scope models.Scope, id uuid.U
 	if p.ViaToken() {
 		return uuid.Nil, apperrors.SessionRequired()
 	}
+	if err := s.takeTest(ctx, scope, p.UserID); err != nil {
+		return uuid.Nil, err
+	}
 	event := uuid.New()
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		ch, err := q.GetNotificationChannelForUpdate(ctx, sqlc.GetNotificationChannelForUpdateParams{ID: id, OrganizationID: scope.OrganizationID, ProjectID: scope.ProjectID})
@@ -178,4 +182,26 @@ func (s *Service) Muted(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	return muted, err
+}
+
+func (s *Service) takeTest(ctx context.Context, scope models.Scope, user uuid.UUID) error {
+	if s.limiter == nil {
+		return nil
+	}
+	for _, l := range []struct {
+		limit   ratelimit.Limit
+		subject string
+	}{
+		{ratelimit.Limit{Name: "notify-test-user", Max: config.NotifyTestPerUser, Window: config.NotifyTestWindow}, user.String()},
+		{ratelimit.Limit{Name: "notify-test-org", Max: config.NotifyTestPerOrg, Window: config.NotifyTestWindow}, scope.OrganizationID.String()},
+	} {
+		d, err := s.limiter.Take(ctx, l.limit, l.subject)
+		if err != nil {
+			return err
+		}
+		if !d.Allowed {
+			return apperrors.TestRateLimited(d.RetryAfter)
+		}
+	}
+	return nil
 }

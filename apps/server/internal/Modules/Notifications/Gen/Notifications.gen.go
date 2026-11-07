@@ -432,9 +432,11 @@ type NotificationAckResponse struct {
 
 // NotificationChannel defines model for NotificationChannel.
 type NotificationChannel struct {
-	ConsecutiveFailures int                `json:"ConsecutiveFailures"`
-	CreatedAt           time.Time          `json:"CreatedAt"`
-	CreatedByUserId     openapi_types.UUID `json:"CreatedByUserId"`
+	ConsecutiveFailures int       `json:"ConsecutiveFailures"`
+	CreatedAt           time.Time `json:"CreatedAt"`
+
+	// CreatedByUserId Only a caller who manages channels sees who made the channel.
+	CreatedByUserId *openapi_types.UUID `json:"CreatedByUserId,omitempty"`
 
 	// DisabledReason Why a stopped channel stopped. `creator-removed` means the member who made it left or lost the role to manage it.
 	DisabledReason *NotificationChannelDisabledReason `json:"DisabledReason,omitempty"`
@@ -443,8 +445,8 @@ type NotificationChannel struct {
 	// HasSecret True when the channel keeps an address and a signing secret. Neither is ever shown.
 	HasSecret bool `json:"HasSecret"`
 
-	// Host The host of the webhook address, with its port when it is not the default. Never the path or the query.
-	Host string                  `json:"Host"`
+	// Host The host of the webhook address, with its port when it is not the default. Never the path or the query. Only a caller who manages channels sees it; a reader gets name, kind and state only.
+	Host *string                 `json:"Host,omitempty"`
 	Id   openapi_types.UUID      `json:"Id"`
 	Kind NotificationChannelKind `json:"Kind"`
 

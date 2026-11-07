@@ -138,14 +138,30 @@ WHERE r."OrganizationId" = @organization_id AND NOT r."IsDeleted" AND NOT c."IsD
   AND (c."ProjectId" IS NULL OR c."ProjectId" = sqlc.narg('project_id')::uuid)
 ORDER BY r."CreatedAt", r."Id";
 
--- name: ListEmailRecipients :many
-SELECT u."Id" AS "UserId", u."Email", u."Name", u."Locale"
+-- name: ListEmailCandidates :many
+SELECT u."Id" AS "UserId", m."Role",
+       ARRAY(SELECT r."Role" FROM "OrganizationTeamRoles" r
+             WHERE r."UserId" = u."Id" AND r."OrganizationId" = m."OrganizationId")::text[] AS "TeamRoles",
+       ARRAY(SELECT rb."Role"
+             FROM "RoleBindings" rb
+             WHERE rb."OrganizationId" = m."OrganizationId" AND rb."Scope" = 'project' AND rb."ProjectId" = sqlc.narg('project_id')::uuid
+               AND NOT rb."IsDeleted"
+               AND (rb."UserId" = u."Id"
+                    OR EXISTS (SELECT 1
+                               FROM "TeamMembers" tm
+                               JOIN "Teams" t ON t."Id" = tm."TeamId" AND t."OrganizationId" = tm."OrganizationId" AND NOT t."IsDeleted"
+                               WHERE tm."TeamId" = rb."TeamId" AND tm."OrganizationId" = rb."OrganizationId"
+                                 AND tm."UserId" = u."Id" AND NOT tm."IsDeleted")))::text[] AS "Bindings"
 FROM "Users" u
 JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = @organization_id AND NOT m."IsDeleted"
+JOIN "Organizations" o ON o."Id" = m."OrganizationId" AND NOT o."IsDeleted"
 LEFT JOIN "NotificationMutes" mu ON mu."UserId" = u."Id" AND NOT mu."IsDeleted"
-WHERE m."Role" = ANY (@roles::text[]) AND NOT u."IsDeleted" AND NOT u."Disabled" AND u."Email" <> ''
-  AND COALESCE(NOT mu."Muted", true)
+WHERE NOT u."IsDeleted" AND NOT u."Disabled" AND u."Email" <> '' AND COALESCE(NOT mu."Muted", true)
 ORDER BY u."Id";
+
+-- name: CountRecentChannelEmails :one
+SELECT count(*)::bigint FROM "NotificationOutbox"
+WHERE "RecipientUserId" = @user_id AND "Kind" = 'email' AND "EventName" <> 'notification.test' AND "NextAttemptAt" > @since::timestamptz;
 
 -- name: GetNotificationUser :one
 SELECT "Id", "Email", "Name", "Locale" FROM "Users" WHERE "Id" = @id AND NOT "IsDeleted" AND NOT "Disabled";

@@ -37,6 +37,11 @@ const (
 type webhookDeliverer struct{ s *Service }
 
 func (s *Service) httpClient() *http.Client {
+	s.clientOnce.Do(func() { s.client = s.newHTTPClient() })
+	return s.client
+}
+
+func (s *Service) newHTTPClient() *http.Client {
 	d := s.dialer()
 	if s.dial != nil {
 		d.Dial = s.dial
