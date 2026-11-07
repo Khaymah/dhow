@@ -79,6 +79,36 @@ func (c *Controller) GetJobLogs(ctx context.Context, req gen.GetJobLogsRequestOb
 	return gen.GetJobLogs200JSONResponse{Success: true, Message: ptrOf(messageLogsLoaded), Data: &data}, nil
 }
 
+func (c *Controller) DownloadJobLog(ctx context.Context, req gen.DownloadJobLogRequestObject) (gen.DownloadJobLogResponseObject, error) {
+	p, err := principalOf(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.service.AllowLogRead(p.UserID); err != nil {
+		return nil, err
+	}
+	if err := c.authorizeJob(ctx, policy.LogRead, req.Id, req.JobId); err != nil {
+		return nil, err
+	}
+	attempt, err := attemptParam(req.Params.Attempt)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := c.service.OpenRawLog(ctx, req.Id, req.JobId, attempt)
+	if err != nil {
+		return nil, err
+	}
+	return rawLogResponse{raw: raw}, nil
+}
+
+type rawLogResponse struct {
+	raw *RawLog
+}
+
+func (r rawLogResponse) VisitDownloadJobLogResponse(w http.ResponseWriter) error {
+	return r.raw.Serve(w)
+}
+
 func (c *Controller) StreamJobLogs(ctx context.Context, req gen.StreamJobLogsRequestObject) (gen.StreamJobLogsResponseObject, error) {
 	p, err := principalOf(ctx)
 	if err != nil {
