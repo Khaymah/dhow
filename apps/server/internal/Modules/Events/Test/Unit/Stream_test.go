@@ -148,7 +148,7 @@ func (r *rig) handle(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	_ = st.Serve(w)
+	_ = st.Serve(w) //nolint:contextcheck // The stream keeps the request context it was opened with.
 }
 
 func (r *rig) open(lastID string) *client {
@@ -159,7 +159,7 @@ func (r *rig) open(lastID string) *client {
 	if lastID != "" {
 		req.Header.Set("Last-Event-ID", lastID)
 	}
-	res, err := r.srv.Client().Do(req)
+	res, err := r.srv.Client().Do(req) //nolint:bodyclose // The reader goroutine below, or the early branch, closes it.
 	require.NoError(r.t, err)
 	c := &client{frames: make(chan frame, 256), closed: make(chan struct{}), status: res.StatusCode, header: res.Header, cancel: cancel}
 	r.t.Cleanup(cancel)

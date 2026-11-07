@@ -77,7 +77,7 @@ func startListener(t *testing.T, wired *app.Wired) {
 		wired.Jobs.RunListener(ctx)
 	}()
 	stopSettings := app.StartSettings(ctx, wired.Settings)
-	stopEvents := app.StartEvents(ctx, wired.Events)
+	stopEvents := app.StartEvents(ctx, wired.Options.Events)
 	t.Cleanup(func() {
 		cancel()
 		stopSettings()

@@ -235,16 +235,33 @@ func TestOneBoardIsTheSameForTheSameData(t *testing.T) {
 	assert.Equal(t, a.Header.Get("ETag"), b.Header.Get("ETag"))
 }
 
+func (w world) seedManyTargets(t *testing.T, environments int) {
+	t.Helper()
+	w.exec(t, `
+		WITH envs AS (
+		    INSERT INTO "Environments" ("OrganizationId", "ProjectId", "Name", "AllowedRefs", "CreatedByUserId")
+		    SELECT p."OrganizationId", p."Id", 'env-' || lpad(g::text, 3, '0'), '[{"Kind":"branch","Pattern":"main"}]', p."CreatedByUserId"
+		    FROM "Projects" p, generate_series(1, $2::int) g WHERE p."Id" = $1
+		    RETURNING "Id", "Name"
+		), targets AS (
+		    INSERT INTO "DeployTargets" ("OrganizationId", "ProjectId", "EnvironmentId", "Name", "Kind", "Username", "DeployPath", "CreatedByUserId")
+		    SELECT p."OrganizationId", p."Id", e."Id", 'app', 'ssh', 'deploy', '/srv/' || e."Name", p."CreatedByUserId"
+		    FROM envs e, "Projects" p WHERE p."Id" = $1
+		    RETURNING "Id", "OrganizationId", "DeployPath"
+		)
+		INSERT INTO "DeployTargetHosts" ("OrganizationId", "TargetId", "Position", "Host", "Port", "DeployPath")
+		SELECT t."OrganizationId", t."Id", 1, 'host-' || substr(t."Id"::text, 25) || '.example.test', 22, t."DeployPath" FROM targets t`, w.project, environments)
+}
+
 func TestABoardOfTwoHundredEnvironmentsComesInOneRequest(t *testing.T) {
 	w := newWorld(t)
-	for i := range 200 {
-		name := "env-" + string(rune('a'+i/26)) + string(rune('a'+i%26))
-		w.env.SeedDeployTarget(w.project, name, "app-"+name)
-	}
+	w.seedManyTargets(t, 200)
 	start := time.Now()
 	res, b := w.get(t, nil)
 	took := time.Since(start)
 	require.Equal(t, http.StatusOK, res.Status, string(res.Raw))
-	assert.Len(t, b.Environments, 200)
+	require.Len(t, b.Environments, 200)
+	assert.Equal(t, "app", b.Environments[0].Targets[0].Name)
+	assert.Equal(t, 1, b.Environments[199].Targets[0].Hosts)
 	assert.Less(t, took, 2*time.Second, "one request builds the whole board")
 }

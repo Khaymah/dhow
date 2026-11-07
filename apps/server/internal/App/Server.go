@@ -98,7 +98,7 @@ func Run(ctx context.Context) error {
 	defer stopMaintenance()
 	stopNotifications := StartNotifications(ctx, wired.Notifications)
 	defer stopNotifications()
-	stopEvents := StartEvents(ctx, wired.Events)
+	stopEvents := StartEvents(ctx, wired.Options.Events)
 	defer stopEvents()
 	servers := []served{{srv: NewHTTPServer(cfg, wired.Handler, log), attrs: []any{"public_url", cfg.PublicURL.String()}}}
 	if wired.RunnerHandler != nil {
@@ -111,7 +111,7 @@ func Run(ctx context.Context) error {
 	}
 	for _, s := range servers {
 		s.srv.RegisterOnShutdown(wired.Jobs.Drain)
-		s.srv.RegisterOnShutdown(wired.Events.Drain)
+		s.srv.RegisterOnShutdown(wired.Options.Events.Drain)
 	}
 	return serveAll(ctx, servers, log)
 }

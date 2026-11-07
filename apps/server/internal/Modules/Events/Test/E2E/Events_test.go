@@ -31,7 +31,7 @@ func newWorld(t *testing.T) world {
 	env := apptest.New(t)
 	owner, d := env.SetupAndLogin()
 	org := env.OrganizationID(d.OrgSlug)
-	require.Eventually(t, env.Wired.Events.Hub().Healthy, wait, 10*time.Millisecond, "the listener starts with the app")
+	require.Eventually(t, env.Wired.Options.Events.Hub().Healthy, wait, 10*time.Millisecond, "the listener starts with the app")
 	return world{env: env, org: org, owner: owner, project: env.SeedProject(org, uuid.MustParse(owner.UserID))}
 }
 
@@ -87,7 +87,7 @@ func TestAReleaseEventCarriesTheProjectAndEnvironmentOfItsTarget(t *testing.T) {
 	s := w.owner.OpenStream(t, srv, w.path(), nil)
 	require.Equal(t, http.StatusOK, s.Status, s.Body)
 
-	require.NoError(t, w.env.Wired.Events.Handle(context.Background(), eventbus.Event{
+	require.NoError(t, w.env.Wired.Options.Events.Handle(context.Background(), eventbus.Event{
 		Name: eventbus.DeploymentReleaseRollbackFailed,
 		Payload: eventbus.Audited{
 			OrganizationIDs: []uuid.UUID{w.org}, TargetType: "deployment_release", TargetID: uuid.NewString(),
