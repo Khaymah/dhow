@@ -228,6 +228,7 @@ export const RunsEn: Record<keyof typeof RunsAr, string> = {
   'runs.reason.DEPLOY_FAILED': 'The deployment failed. Open the log of the step to see why.',
   'runs.reason.DEPLOY_ROLLED_BACK': 'The new release failed, so Dhow put every server back on its previous release.',
   'runs.reason.DEPLOY_HEALTH_FAILED': 'The health check failed on the first deployment to the target. There is no earlier release to go back to, so the new release stays on the server.',
+  'runs.reason.DEPLOY_INTERRUPTED': 'The runner was lost after the deploy switched a server, so the release is unknown. Check the target, then deploy again.',
   'runs.reason.DEPLOY_ROLLBACK_FAILED': 'The deployment failed and so did the rollback. At least one server is not on a release we know. Check the target, then deploy again.',
   'runs.reason.TARGET_LOCKED': 'Another deployment holds the lock of the target on the server, so nothing was changed. Wait until it ends or the lock expires.',
   'runs.reason.CURRENT_NOT_A_SYMLINK': 'The path current on the server is not a link to a release, so it was not touched. Convert it as the deploy guide explains, then try again.',

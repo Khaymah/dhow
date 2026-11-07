@@ -113,7 +113,7 @@
 
 | الشغل | الـ branch | الـ PR | اللي فاضل |
 |---|---|---|---|
-| M6.9أ: ثلاث fuzz targets (`FuzzReleaseID` و`FuzzIngestArchive` و`FuzzDeployReport`)، وتوسيع فحص التسريب لمفتاح الهدف وسطر known_hosts المعلّق وتوكنات الاستقبال، والخطوة الثانية لسر المفتاح، وبوابات الـ slides (ADR-0100) | `feat/hardening-m69a` | #122 | المراجعة الأمنية والـ CI والـ merge، وبعدها M6.9ج (مراجعة التهديدات والـ roadmap) |
+| M6.9ب: `deploy/m6-demo/run.sh` (sshd حقيقي، تثبيت البصمة، نشر ناجح، فشل فحص الصحة ورجوع تلقائي، رجوع يدوي، `dhow artifact push`، تغيّر مفتاح السيرفر، Compose، فحص التسريب) واختبار قتل الـ runner بعد التبديل | `feat/m6-demo-m69b` | #121 | الـ CI (أول تشغيل للـ demo) والـ merge |
 | صفحات `secret-edit-*` و`variable-edit-*` و`registry-edit-*` مالهاش بوابة دور في `Panels.ts`، والسيرفر بس اللي بيرفض | — | — | نفس بوابات `*-new` |
 | `make proxy-check` مابيشتغلش في الـ CI، وبناء الصورة بيفشل جوه بيئة الجلسة، فإعدادات nginx وCaddy لـ `/ingest/` اتجرّبت بإيد بس | — | — | تشغيله على جهاز فيه Docker بيبني الصورة، أو إضافته للـ CI |
 | `runner.revoked` (إلغاء اللوحة وإلغاء الـ runner لنفسه) بيتنشر على الـ event bus بعد الـ commit، فلو الـ process وقع بينهم الـ audit بيضيع. الـ bus مافيهوش outbox | — | — | outbox للأحداث اللي بتتسجّل، أو نشرها جوه نفس الـ transaction |
