@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 
 import {
   ACCENT_ICON,
@@ -7,6 +7,7 @@ import {
   type TAccent,
 } from "@/Core/Ui/Accent";
 import { cx } from "@/Core/Ui/ClassNames";
+import { ErrorHelp } from "@/Core/Ui/ErrorHelp";
 import { Icon } from "@/Core/Ui/Icon";
 
 export interface IInlineAlertProps {
@@ -15,6 +16,8 @@ export interface IInlineAlertProps {
   children?: ReactNode;
   className?: string;
   focus?: boolean;
+  fix?: string;
+  helpHref?: string | null;
 }
 
 export const InlineAlert = ({
@@ -23,7 +26,11 @@ export const InlineAlert = ({
   children,
   className,
   focus = false,
+  fix = "",
+  helpHref = null,
 }: IInlineAlertProps) => {
+  const fixId = useId();
+  const hasHelp = fix !== "" || helpHref !== null;
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (focus) ref.current?.focus();
@@ -50,6 +57,9 @@ export const InlineAlert = ({
         {title}
         {children ? (
           <span className="text-body-sm text-secondary">{children}</span>
+        ) : null}
+        {hasHelp ? (
+          <ErrorHelp fix={fix} helpHref={helpHref} fixId={fixId} />
         ) : null}
       </span>
     </div>

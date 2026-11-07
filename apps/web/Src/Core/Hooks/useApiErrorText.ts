@@ -1,12 +1,10 @@
-import { API_ERROR_INVALID_RESPONSE, API_ERROR_NETWORK, isApiError } from '@/Core/Api/ApiError';
-import { useT } from '@/I18n/useT';
+import { isApiError } from '@/Core/Api/ApiError';
+import { useApiErrorMessage } from '@/Core/Hooks/useApiErrorMessage';
 
 export const useApiErrorText = (): ((error: unknown) => string) => {
-  const t = useT();
+  const message = useApiErrorMessage();
   return (error) => {
-    if (!isApiError(error)) return t('api.error.unknown');
-    if (error.Code === API_ERROR_NETWORK) return t('api.error.network');
-    if (error.Code === API_ERROR_INVALID_RESPONSE) return t('api.error.invalid');
-    return error.Message === '' ? t('api.error.unknown') : error.Message;
+    const text = message(error);
+    return isApiError(error) && error.Fix !== '' ? `${text} ${error.Fix}` : text;
   };
 };

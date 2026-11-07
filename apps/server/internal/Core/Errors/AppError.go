@@ -12,11 +12,13 @@ type IErrorDetail struct {
 }
 
 type AppError struct {
-	Status  int            `json:"-"`
-	Code    string         `json:"Code"`
-	Message string         `json:"Message"`
-	Details []IErrorDetail `json:"Details,omitempty"`
-	Err     error          `json:"-"`
+	Status   int            `json:"-"`
+	Code     string         `json:"Code"`
+	Message  string         `json:"Message"`
+	Fix      string         `json:"Fix,omitempty"`
+	DocsPath string         `json:"DocsPath,omitempty"`
+	Details  []IErrorDetail `json:"Details,omitempty"`
+	Err      error          `json:"-"`
 
 	RetryAfter time.Duration `json:"-"`
 }

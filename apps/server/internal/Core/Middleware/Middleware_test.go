@@ -24,8 +24,10 @@ type errorBody struct {
 	Success bool            `json:"Success"`
 	Data    json.RawMessage `json:"Data"`
 	Error   *struct {
-		Code    string `json:"Code"`
-		Message string `json:"Message"`
+		Code     string `json:"Code"`
+		Message  string `json:"Message"`
+		Fix      string `json:"Fix"`
+		DocsPath string `json:"DocsPath"`
 	} `json:"Error"`
 }
 

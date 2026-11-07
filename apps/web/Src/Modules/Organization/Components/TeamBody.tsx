@@ -16,6 +16,7 @@ import { Card } from '@/Core/Ui/Card';
 import { CardStates, cardStateOf } from '@/Core/Ui/CardStates';
 import { EmptyState } from '@/Core/Ui/EmptyState';
 import { Field } from '@/Core/Ui/Field';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Input } from '@/Core/Ui/Input';
 import { useT } from '@/I18n/useT';
@@ -91,7 +92,6 @@ type TDeleteCardProps = ITeamPartProps & Pick<ITeamBodyProps, 'onDeleted'>;
 
 const DeleteCard = ({ organizationId, team, onDeleted }: TDeleteCardProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const refresh = useRefreshOrganization(organizationId);
   const Push = useToastStore((state) => state.Push);
   const [Confirming, setConfirming] = useState(false);
@@ -108,7 +108,7 @@ const DeleteCard = ({ organizationId, team, onDeleted }: TDeleteCardProps) => {
     <Card title={t('team.delete')} icon="trash" padded>
       <div className="grid gap-3">
         <p className="m-0 text-body-sm text-secondary">{t('team.delete.about')}</p>
-        {remove.error ? <InlineAlert accent="failed" title={errorText(remove.error)} /> : null}
+        {remove.error ? <ErrorAlert error={remove.error} /> : null}
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"

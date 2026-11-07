@@ -1,10 +1,10 @@
 import { useState } from 'react';
 
 import { z } from '@/Core/Forms/Zod';
-import { useApiErrorText } from '@/Core/Hooks/useApiErrorText';
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { Button } from '@/Core/Ui/Button';
 import { Card } from '@/Core/Ui/Card';
+import { ErrorAlert } from '@/Core/Ui/ErrorAlert';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Input } from '@/Core/Ui/Input';
 import { useT } from '@/I18n/useT';
@@ -39,7 +39,6 @@ const changesOf = (project: TProject, next: { Name: string; PipelinePath: string
 
 export const ProjectSettingsCard = ({ organizationId, project, manager, allowAutomatic }: IProjectSettingsCardProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const issueText = useIssueText();
   const Push = useToastStore((state) => state.Push);
   const save = useUpdateProject(organizationId, project.Id);
@@ -81,7 +80,7 @@ export const ProjectSettingsCard = ({ organizationId, project, manager, allowAut
       >
         {archived ? <InlineAlert accent="queued" title={t('projects.settings.archived')} /> : null}
         {!manager && !archived ? <p className="m-0 text-body-sm text-tertiary">{t('projects.settings.readOnly')}</p> : null}
-        {save.error ? <InlineAlert accent="failed" title={errorText(save.error)} /> : null}
+        {save.error ? <ErrorAlert error={save.error} /> : null}
         <HintedField label={t('projects.form.name')} hint={t('projects.form.name.hint')} error={Problems.Name}>
           <Input maxLength={PROJECT_NAME_MAX} autoComplete="off" value={Name} disabled={locked} onChange={(event) => { setName(event.target.value); }} />
         </HintedField>
@@ -114,14 +113,13 @@ export interface IProjectArchiveProps {
 
 export const ProjectArchive = ({ organizationId, project }: IProjectArchiveProps) => {
   const t = useT();
-  const errorText = useApiErrorText();
   const Push = useToastStore((state) => state.Push);
   const archive = useArchiveProject(organizationId, project.Id);
   const [Confirming, setConfirming] = useState(false);
   return (
     <div className="grid gap-3">
       {Confirming ? <p className="m-0 text-body-sm text-secondary">{t('projects.archive.question', { name: project.Name })}</p> : null}
-      {archive.error ? <InlineAlert accent="failed" title={errorText(archive.error)} /> : null}
+      {archive.error ? <ErrorAlert error={archive.error} /> : null}
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"

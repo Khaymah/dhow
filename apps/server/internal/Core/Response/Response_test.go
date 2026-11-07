@@ -66,16 +66,18 @@ func TestError(t *testing.T) {
 		wantStatus int
 		want       string
 	}{
-		{"arabic by default", "", apperrors.NotFound(), http.StatusNotFound, `{"Success":false,"Error":{"Code":"NOT_FOUND","Message":"المورد المطلوب غير موجود."}}`},
-		{"english", "en", apperrors.NotFound(), http.StatusNotFound, `{"Success":false,"Error":{"Code":"NOT_FOUND","Message":"The requested resource does not exist."}}`},
+		{"arabic by default", "", apperrors.NotFound(), http.StatusNotFound, `{"Success":false,"Error":{"Code":"NOT_FOUND","Message":"المورد المطلوب غير موجود.","Fix":"تأكد من العنوان، أو ارجع إلى القائمة وافتح العنصر من جديد. ربما حُذف."}}`},
+		{"english", "en", apperrors.NotFound(), http.StatusNotFound, `{"Success":false,"Error":{"Code":"NOT_FOUND","Message":"The requested resource does not exist.","Fix":"Check the address, or go back to the list and open the item again. It may have been removed."}}`},
+		{"fix and docs path", "en", apperrors.CSRFFailed(), http.StatusForbidden, `{"Success":false,"Error":{"Code":"CSRF_FAILED","Message":"The request could not be verified. Reload the page and try again.","Fix":"Reload the page and try again. If it repeats, ask your server admin to check the public address and the reverse proxy.","DocsPath":"install/troubleshooting.md#setup-or-sign-in-fails-with-csrf_failed"}}`},
+		{"no fix for an allowlisted code", "en", apperrors.MethodNotAllowed(), http.StatusMethodNotAllowed, `{"Success":false,"Error":{"Code":"METHOD_NOT_ALLOWED","Message":"This method is not allowed here."}}`},
 		{
 			"details are translated", "en",
 			apperrors.ValidationFailed(apperrors.IErrorDetail{Field: "Name", Message: "errors.badRequest"}),
 			http.StatusUnprocessableEntity,
-			`{"Success":false,"Error":{"Code":"VALIDATION_FAILED","Message":"Some of the data is not valid. Check it and try again.","Details":[{"Field":"Name","Message":"The request is not valid. Check the data and try again."}]}}`,
+			`{"Success":false,"Error":{"Code":"VALIDATION_FAILED","Message":"Some of the data is not valid. Check it and try again.","Fix":"Fix the fields marked in red, then send the form again.","Details":[{"Field":"Name","Message":"The request is not valid. Check the data and try again."}]}}`,
 		},
-		{"internal text never leaks", "en", apperrors.Internal(assert.AnError), http.StatusInternalServerError, `{"Success":false,"Error":{"Code":"INTERNAL","Message":"Something went wrong. Try again later."}}`},
-		{"nil error is internal", "en", nil, http.StatusInternalServerError, `{"Success":false,"Error":{"Code":"INTERNAL","Message":"Something went wrong. Try again later."}}`},
+		{"internal text never leaks", "en", apperrors.Internal(assert.AnError), http.StatusInternalServerError, `{"Success":false,"Error":{"Code":"INTERNAL","Message":"Something went wrong. Try again later.","Fix":"Try again in a minute. If it keeps happening, tell your server admin the time of the error so they can check the server log."}}`},
+		{"nil error is internal", "en", nil, http.StatusInternalServerError, `{"Success":false,"Error":{"Code":"INTERNAL","Message":"Something went wrong. Try again later.","Fix":"Try again in a minute. If it keeps happening, tell your server admin the time of the error so they can check the server log."}}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

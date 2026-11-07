@@ -80,7 +80,7 @@ const retryAfterOf = (response: Response): number | null => {
 };
 
 const failure = (body: unknown, response: Response): ApiError => {
-  if (isEnvelope(body) && body.Error) return new ApiError(body.Error, response.status, retryAfterOf(response));
+  if (isEnvelope(body) && body.Error) return new ApiError(body.Error, response.status, retryAfterOf(response), response.headers.get('Content-Language') ?? '');
   return new ApiError({ Code: API_ERROR_INVALID_RESPONSE, Message: '' }, response.status);
 };
 
