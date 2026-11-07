@@ -132,11 +132,17 @@ type world struct {
 func newWorld(t *testing.T, statuses ...int) *world {
 	t.Helper()
 	w := &world{t: t, recv: newReceiver(t, statuses...), dns: &resolver{hosts: map[string][]netip.Addr{}}, mail: &apptest.FakeMailer{}}
-	w.dns.set(hookHost, allowedIP)
 	pool := x509.NewCertPool()
 	pool.AddCert(w.recv.srv.Certificate())
-	target := w.recv.srv.Listener.Addr().String()
-	w.env = apptest.NewWithOptions(t, apptest.Options{
+	w.start(pool, w.recv.srv.Listener.Addr().String(), hookHost)
+	return w
+}
+
+func (w *world) start(pool *x509.CertPool, target string, hosts ...string) {
+	for _, h := range hosts {
+		w.dns.set(h, allowedIP)
+	}
+	w.boot(apptest.Options{
 		Mailer:       w.mail,
 		NotifyLookup: w.dns.lookup,
 		NotifyTLS:    &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12},
@@ -150,6 +156,11 @@ func newWorld(t *testing.T, statuses ...int) *world {
 			c.Notify.AllowPrivate = []netip.Prefix{netip.MustParsePrefix(allowedNet)}
 		},
 	})
+}
+
+func (w *world) boot(o apptest.Options) {
+	t := w.t
+	w.env = apptest.NewWithOptions(t, o)
 	var d apptest.SetupDetails
 	w.owner, d = w.env.SetupAndLogin()
 	w.password, w.email = d.Password, strings.ToLower(d.Email)
@@ -158,7 +169,6 @@ func newWorld(t *testing.T, statuses ...int) *world {
 	w.project = w.env.SeedProject(w.org, w.ownerID)
 	w.envID = w.env.SeedEnvironment(w.project, "production")
 	w.run = w.env.SeedRun(w.project, "pending")
-	return w
 }
 
 func (w *world) relogin() {

@@ -2,9 +2,7 @@
 
 # Notifications
 
-Dhow tells you when something needs you: a deployment failed, a deployment waits for approval, a pipeline run failed, a runner stopped answering, or something changed in the security of an account. It sends the message by email or to a signed webhook of your own.
-
-This page covers the first version: **email** and the **generic webhook**. Slack, Telegram and Discord come next.
+Dhow tells you when something needs you: a deployment failed, a deployment waits for approval, a pipeline run failed, a runner stopped answering, or something changed in the security of an account. It sends the message by email, to a signed webhook of your own, or to a chat in Slack, Discord or Telegram.
 
 ## What is sent, and when
 
@@ -30,6 +28,9 @@ A channel belongs to a project, or to the organization. A channel of the organiz
 |---|---|---|
 | `email` | Nothing. The rule chooses the member roles that get the email | The email, in the language of the channel |
 | `webhook` | An https address that Dhow may reach | `Host` and `HasSecret`, never the address |
+| `slack` | `Url`: the address of an Incoming Webhook | `Host` and `HasSecret`, never the address |
+| `discord` | `Url`: the address of a Webhook | `Host` and `HasSecret`, never the address |
+| `telegram` | `BotToken` and `ChatId` | `Host` and `HasSecret`, never the token |
 
 - **Who sees what.** Everyone who can read the project (or the organization) sees the name, the kind and the state of a channel. Only those who manage channels see its `Host` and who made it.
 - **Who can manage them.** For a project, a Maintainer, an Admin or an Owner (the action `notification.manage`). For the organization, an Admin or an Owner. Every change asks for a fresh second factor (`CurrentFactor`). An API token cannot manage channels.
@@ -38,11 +39,32 @@ A channel belongs to a project, or to the organization. A channel of the organiz
 - **The language** of a channel (`ar` or `en`) is the language of its messages, not the language of the person who pressed the button.
 - **A channel stops** when its creator leaves the organization or no longer holds a role that manages channels, and after 10 failed attempts in a row. A stopped channel shows `DisabledReason`: `creator-removed` or `failures`. After 10 failures Dhow also emails the creator. A manager turns the channel on again by updating it with `Enable: true`, and becomes its owner.
 
+## Slack, Discord and Telegram channels
+
+The message goes to a chat in the service itself. Each service has a fixed host and Dhow accepts no other, and the sending passes the same protection as the generic webhook.
+
+| Kind | What it needs | Accepted host | Shape of the address |
+|---|---|---|---|
+| `slack` | `Url` | `hooks.slack.com` | `/services/T…/B…/…` |
+| `discord` | `Url` | `discord.com` and `discordapp.com` | `/api/webhooks/<id>/<token>` |
+| `telegram` | `BotToken` from BotFather and `ChatId` (the number of the chat, or `@channelname`) | `api.telegram.org` | Dhow builds it |
+
+- An address on another host, on a port other than 443, with a path that is not the path of the service, or with a `?`: Dhow answers `422 CHANNEL_HOST_NOT_ALLOWED`. Look-alike hosts such as `hooks.slack.com.example.org` are refused too.
+- These channels have no signing secret, so no `Secret` is shown in the answer. The webhook address, the bot token and the chat id are secrets that Dhow keeps sealed, and they appear in no answer, log, audit entry or event. To replace one, send the new value with `CurrentFactor`. For Telegram you can send `BotToken` alone or `ChatId` alone.
+- The message is one text in the language of the channel: the title, then the status, project, environment, branch, run number, time and link.
+- **Text that someone else writes** (such as a branch name) shows as text and never acts as a command:
+  - Slack: Dhow escapes `&`, `<` and `>`, so `<!channel>`, `<!here>` and `<@…>` never arrive alive.
+  - Discord: Dhow sends an empty `allowed_mentions` (`"parse": []`), so `@everyone` and `@here` show as text and notify nobody. Dhow also escapes the formatting characters.
+  - Telegram: Dhow sends HTML after it escapes `&`, `<` and `>`. It does not use Markdown.
+  - In all three, Dhow removes control characters and text-direction override characters from the text.
+- **A token error does not leave.** The Telegram token is part of the request path. When the connection fails, Dhow logs the failure code and the error text after it removes the address and the token from it.
+- Answers of the service: `429` and `5xx` are tried again on the schedule below. `401`, `403` and `404` (a revoked token or a deleted webhook) are final at once, and the channel stops after 10 failures.
+
 ## Rules and mute
 
 A channel has one rule: the events, the environments (empty means all) and the statuses it wants. A new channel starts with `deployment.finished`, `deployment.approval.requested` and `run.finished` for the statuses `failed`, `rolled_back`, `rollback_failed` and `awaiting_approval`. A successful deployment is **not** in the default, because it is noise. Add `succeeded` to the rule if you want it. The account events are in no default rule.
 
-An email channel also lists the member roles that get the email. A member who muted the notifications in their preferences gets none of the channel emails. The security emails of the account are never muted.
+An email channel also lists the member roles that get the email. A member who muted the notifications in their preferences gets none of the channel emails. The security emails of the account are never muted. The mute is personal and concerns email only: a Slack, Discord or Telegram message goes to a shared chat, not to a person, so nobody mutes it.
 
 ## The signed webhook
 
@@ -106,6 +128,7 @@ Dhow writes the message to a queue in the same database transaction as the event
 Dhow checks the address of a webhook when you save it **and again at every send**, because a name can point somewhere else later.
 
 - Only `https`. No user name or password in the address. No redirects: an answer `3xx` is a failure.
+- Slack, Discord and Telegram channels accept the host of their own service only (the table above). The host is checked when you save and at every send.
 - No loopback, private, link-local or reserved addresses, and no cloud metadata address, also when they are written as a decimal or hexadecimal number, as an IPv4-mapped IPv6 address, or hidden behind a DNS name. Dhow connects to the address it checked, so a name cannot change between the check and the connection.
 - If the receiver is inside your network, the operator lists its range in `DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS`, for example `10.20.0.0/16`. Loopback and cloud metadata addresses stay refused.
 
@@ -114,10 +137,10 @@ Dhow checks the address of a webhook when you save it **and again at every send*
 | Sign | Likely cause |
 |---|---|
 | `422 CHANNEL_HOST_BLOCKED` | The address points to a private network. Ask the operator to add its range to `DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` |
-| `422 CHANNEL_HOST_NOT_ALLOWED` | The address is not `https`, has a user name, or writes the host as a number |
+| `422 CHANNEL_HOST_NOT_ALLOWED` | The address is not `https`, has a user name, or writes the host as a number. For Slack and Discord: the address is not an address of the service itself |
 | `409 CHANNEL_VERSION_CONFLICT` | Someone changed the channel after you opened it. Reload and try again |
 | `409 CHANNEL_DISABLED` | The channel stopped. Check `DisabledReason`, fix the cause and turn it on again |
 | `429 TEST_RATE_LIMITED` | More than 5 test messages in a minute for one channel, 10 for one user, or 20 for the organization |
 | A delivery `dead` with `blocked` | The address was refused at send time. The name now points to a private address |
-| A delivery `dead` with `http_status` | The receiver answered with an error. `LastStatus` shows which one |
+| A delivery `dead` with `http_status` | The receiver answered with an error. `LastStatus` shows which one. For chat channels: `404` means a deleted webhook or a wrong token, and `401` a revoked bot token |
 | A delivery `dead` with `mail_disabled` | The server has no SMTP settings, so it cannot send email |
