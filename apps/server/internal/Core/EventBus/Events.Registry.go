@@ -141,9 +141,9 @@ const (
 	IngestTokenCreated = "ingest_token.created" //nolint:gosec // An audit action name, not a credential.
 	IngestTokenRevoked = "ingest_token.revoked" //nolint:gosec // An audit action name, not a credential.
 
+	ArtifactIngested        = "artifact.ingested"
+	IngestRejected          = "ingest.rejected"
 	IngestReachAcknowledged = "ingest_token.reach_acknowledged"
-	ArtifactIngested             = "artifact.ingested"
-	IngestRejected               = "ingest.rejected"
 )
 
 //nolint:funlen // A flat list of event names.
