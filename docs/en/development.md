@@ -328,7 +328,7 @@ pnpm -C apps/web build
 pnpm -C apps/web size
 ```
 
-`size` reads its limits from `apps/web/Scripts/SizeBudgets.json`: 128 KB gzip for the initial JS, 60 KB for every lazy chunk (35 KB for the log viewer) and 30 KB for the CSS. To see it fail with a smaller limit, run `node Scripts/CheckSize.mjs --lazy-kb=5` from `apps/web`. `E2E/LogPerf.spec.ts` measures the job log page (DOM nodes, long tasks, JS heap) with the CPU throttled 4 times; it only runs with the `make e2e` stack. In development mode the server sends the Trusted Types header in report-only mode, and the browser tests fail on any CSP violation.
+`size` reads its limits from `apps/web/Scripts/SizeBudgets.json`: 128 KB gzip for the initial JS, 60 KB for every lazy chunk (35 KB for the log viewer) and 30 KB for the CSS. To see it fail with a smaller limit, run `node Scripts/CheckSize.mjs --lazy-kb=5` from `apps/web`. `E2E/LogPerf.spec.ts` measures the job log page (DOM nodes, long tasks, JS heap) with the CPU throttled 4 times; it only runs with the `make e2e` stack. In development mode the server sends the Trusted Types header in report-only mode, and the browser tests fail on any CSP violation. `E2E/Accessibility.spec.ts` checks accessibility with the axe library on the core pages in Arabic and English and in the four system themes, fails on any serious or critical violation, and only runs with the `make e2e` stack. See [Accessibility](guides/accessibility.md).
 
 ### The M3 and M4 demos
 

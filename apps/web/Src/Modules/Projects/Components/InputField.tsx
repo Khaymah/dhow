@@ -26,7 +26,7 @@ export const InputField = ({ input, value, error, disabled, onChange }: IInputFi
     return (
       <div className="grid gap-1">
         <label className="flex items-center gap-2.5 text-body-sm text-primary">
-          <input type="checkbox" className="size-4 accent-accent" checked={value === true} disabled={disabled} onChange={(event) => { onChange(event.target.checked); }} />
+          <input type="checkbox" className="size-6 flex-none accent-accent" checked={value === true} disabled={disabled} onChange={(event) => { onChange(event.target.checked); }} />
           <bdi dir="ltr" className="font-mono">
             {input.Name}
           </bdi>

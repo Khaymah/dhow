@@ -328,7 +328,7 @@ pnpm -C apps/web build
 pnpm -C apps/web size
 ```
 
-يقرأ `size` الحدود من `apps/web/Scripts/SizeBudgets.json`: الـ JS الأولاني 128 KB بعد gzip، وكل chunk كسول 60 KB (و35 KB لعارض السجل)، والـ CSS 30 KB. لتجربة الفشل بحدّ أصغر شغّل `node Scripts/CheckSize.mjs --lazy-kb=5` من `apps/web`. ويقيس `E2E/LogPerf.spec.ts` أداء صفحة سجل التشغيل (عقد DOM والمهام الطويلة وذاكرة JS) على معالج مبطّأ 4 مرات، ولا يعمل إلا مع حزمة `make e2e`. وفي وضع التطوير يرسل السيرفر ترويسة Trusted Types في وضع التقرير فقط، وتفشل اختبارات المتصفح عند أي مخالفة CSP.
+يقرأ `size` الحدود من `apps/web/Scripts/SizeBudgets.json`: الـ JS الأولاني 128 KB بعد gzip، وكل chunk كسول 60 KB (و35 KB لعارض السجل)، والـ CSS 30 KB. لتجربة الفشل بحدّ أصغر شغّل `node Scripts/CheckSize.mjs --lazy-kb=5` من `apps/web`. ويقيس `E2E/LogPerf.spec.ts` أداء صفحة سجل التشغيل (عقد DOM والمهام الطويلة وذاكرة JS) على معالج مبطّأ 4 مرات، ولا يعمل إلا مع حزمة `make e2e`. وفي وضع التطوير يرسل السيرفر ترويسة Trusted Types في وضع التقرير فقط، وتفشل اختبارات المتصفح عند أي مخالفة CSP. ويفحص `E2E/Accessibility.spec.ts` سهولة الوصول بمكتبة axe على الصفحات الأساسية بالعربية والإنجليزية وثيمات النظام الأربعة، ويفشل عند أي مخالفة خطيرة أو حرجة، ولا يعمل إلا مع حزمة `make e2e`. راجع [سهولة الوصول](guides/accessibility.md).
 
 ### عرض M3 وعرض M4
 

@@ -151,6 +151,16 @@ export const setLanguage = async (session: ISession, lang: string): Promise<void
   );
 };
 
+export const setTheme = async (session: ISession, themeId: string): Promise<void> => {
+  const current = (await call('GET', '/me/preferences', undefined, session)).Data;
+  await call(
+    'PUT',
+    '/me/preferences',
+    { Locale: field(current, 'Locale'), ThemeId: themeId, CustomThemes: field(current, 'CustomThemes') ?? [], OrganizationId: field(current, 'OrganizationId') ?? null },
+    session,
+  );
+};
+
 export const push = async (branch: string): Promise<void> => {
   await run(setting('DHOW_E2E_PUSH'), [branch], { env: process.env, timeout: 120_000 });
 };

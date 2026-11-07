@@ -12,12 +12,12 @@ export const PullRequestsToggle = ({ checked, disabled, onChange }: IPullRequest
   const t = useT();
   const id = useId();
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-start gap-2">
       <input
         id={id}
         type="checkbox"
         aria-describedby={`${id}-about`}
-        className="mt-1 size-4 flex-none cursor-pointer accent-accent"
+        className="size-6 flex-none cursor-pointer accent-accent"
         checked={checked}
         disabled={disabled}
         onChange={(event) => {
