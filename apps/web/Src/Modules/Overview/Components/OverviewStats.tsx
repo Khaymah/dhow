@@ -11,11 +11,17 @@ export interface IOverviewStatsProps {
 
 type TStat = Omit<IStatTileProps, 'href' | 'onSelect'> & { target: TOverviewTarget };
 
-const COLUMNS: Record<number, string> = { 1: 'lg:grid-cols-1', 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4' };
+const COLUMNS: Record<number, string> = {
+  1: 'lg:grid-cols-1',
+  2: 'lg:grid-cols-2',
+  3: 'lg:grid-cols-3',
+  4: 'lg:grid-cols-4',
+  5: 'lg:grid-cols-5',
+};
 
 export const OverviewStats = ({ overview, links }: IOverviewStatsProps) => {
   const t = useT();
-  const { Jobs: jobs, Runners: runners } = overview;
+  const { Jobs: jobs, Runners: runners, Deployments: deployments } = overview;
   const stats: TStat[] = [];
   if (jobs) {
     stats.push(
@@ -39,6 +45,16 @@ export const OverviewStats = ({ overview, links }: IOverviewStatsProps) => {
       icon: 'server',
       tone: 'ok',
       sub: runners.Offline > 0 ? t('home.stat.online.offline', { count: runners.Offline }) : undefined,
+    });
+  }
+  if (deployments) {
+    stats.push({
+      target: 'deploys',
+      value: deployments.Running,
+      label: t('home.stat.deploys'),
+      icon: 'layers',
+      tone: 'info',
+      sub: deployments.FailedLast24h > 0 ? t('home.stat.deploys.failed', { count: deployments.FailedLast24h }) : undefined,
     });
   }
   if (stats.length === 0) return null;

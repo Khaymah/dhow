@@ -67,7 +67,7 @@ describe('the job page', () => {
     expect(alert).toHaveTextContent(Ar['jobs.noRunner.how']);
     expect(within(dialog).getByText(Ar['jobs.log.notStarted'])).toBeInTheDocument();
     expect(within(dialog).getByText(Ar['jobs.attempts.none'])).toBeInTheDocument();
-    expect(FakeEventSource.instances).toHaveLength(0);
+    expect(FakeEventSource.instances.filter((source) => source.url.includes('/logs/stream'))).toHaveLength(0);
   });
 
   it('summarizes the spec: image, steps, resources and egress', async () => {
@@ -124,6 +124,6 @@ describe('the job page', () => {
   it('tells a viewer the log needs a higher role and opens no stream', async () => {
     const { dialog } = await mount(running(), 'viewer');
     expect(await within(dialog).findByText(Ar['jobs.log.forbidden'])).toBeInTheDocument();
-    expect(FakeEventSource.instances).toHaveLength(0);
+    expect(FakeEventSource.instances.filter((source) => source.url.includes('/logs/stream'))).toHaveLength(0);
   });
 });

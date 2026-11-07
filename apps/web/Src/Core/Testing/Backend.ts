@@ -101,18 +101,31 @@ export interface IOverviewFixture {
   Runners: { Online: number; Offline: number; Paused: number } | null;
   Invitations: { Pending: number } | null;
   Approvals: { Pending: number } | null;
+  Deployments: { Running: number; FailedLast24h: number; RollbackFailed: number; Pending: number } | null;
+  Notifications: { Dead: number } | null;
 }
 
 const RUNNER_READERS = ['owner', 'admin', 'maintainer', 'developer'];
 const MEMBER_MANAGERS = ['owner', 'admin'];
 
 export const overviewFixture =
-  (counts: { Jobs?: Partial<NonNullable<IOverviewFixture['Jobs']>>; Runners?: Partial<NonNullable<IOverviewFixture['Runners']>>; Pending?: number; Approvals?: number } = {}) =>
+  (
+    counts: {
+      Jobs?: Partial<NonNullable<IOverviewFixture['Jobs']>>;
+      Runners?: Partial<NonNullable<IOverviewFixture['Runners']>>;
+      Deployments?: Partial<NonNullable<IOverviewFixture['Deployments']>>;
+      Pending?: number;
+      Approvals?: number;
+      Dead?: number;
+    } = {},
+  ) =>
   (role: string): IOverviewFixture => ({
     Jobs: { Running: 0, Queued: 0, QueuedNoRunner: 0, FailedLast24h: 0, ...counts.Jobs },
     Runners: RUNNER_READERS.includes(role) ? { Online: 0, Offline: 0, Paused: 0, ...counts.Runners } : null,
     Invitations: MEMBER_MANAGERS.includes(role) ? { Pending: counts.Pending ?? 0 } : null,
     Approvals: RUNNER_READERS.includes(role) ? { Pending: counts.Approvals ?? 0 } : null,
+    Deployments: { Running: 0, FailedLast24h: 0, RollbackFailed: 0, Pending: 0, ...counts.Deployments },
+    Notifications: MEMBER_MANAGERS.includes(role) ? { Dead: counts.Dead ?? 0 } : null,
   });
 
 export type TRouteHandler = (request: Request, url: URL) => Response | Promise<Response> | undefined;
