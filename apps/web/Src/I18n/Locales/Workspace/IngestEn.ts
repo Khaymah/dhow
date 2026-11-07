@@ -42,6 +42,8 @@ export const IngestEn = {
   'ingest.token.creatorGone': '{name} is no longer a member who can manage uploads, so Dhow refuses this token. Make a new token.',
   'ingest.token.unconfirmed': 'Reaches protected environments nobody confirmed:',
   'ingest.ack': 'Confirm',
+  'ingest.ack.needAdmin': 'Only a project admin confirms this reach.',
+  'ingest.reach.needAdmin': 'Only a project admin confirms a reach to a protected environment. Ask one to do it, or narrow the ref patterns so the token does not reach a protected environment.',
   'ingest.ack.aria': 'Confirm the protected environments of the token {name}',
   'ingest.ack.question': 'Dhow refuses uploads with the token {name} until you confirm that it reaches these protected environments: {environments}. Confirm?',
   'ingest.ack.confirm': 'Yes, confirm',

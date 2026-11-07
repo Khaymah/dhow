@@ -80,6 +80,15 @@ func (e IngestTokenStatus) Valid() bool {
 	}
 }
 
+// AcknowledgeIngestReachRequest defines model for AcknowledgeIngestReachRequest.
+type AcknowledgeIngestReachRequest struct {
+	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
+	CurrentFactor CurrentFactor `json:"CurrentFactor"`
+
+	// Environments The names of the unconfirmed protected environments of the token (`UnacknowledgedReach`), as the page showed them. If the set the server computes now differs, the answer is 409 `INGEST_REACH_CHANGED` and nothing is confirmed.
+	Environments []string `json:"Environments"`
+}
+
 // CreateIngestTokenRequest defines model for CreateIngestTokenRequest.
 type CreateIngestTokenRequest struct {
 	// AcknowledgeProtectedReach Must be `true` when the token reaches an environment that has deploy targets or reviewers. Otherwise the answer is 422 `INGEST_TOKEN_REACH_UNCONFIRMED`.
@@ -211,7 +220,7 @@ type IngestToken struct {
 	RevokedAt   *time.Time         `json:"RevokedAt,omitempty"`
 	Status      IngestTokenStatus  `json:"Status"`
 
-	// UnacknowledgedReach The protected environments (with deploy targets or reviewers) the token reaches now but nobody confirmed. An upload with such a token is 403 `INGEST_REACH_NOT_ACKNOWLEDGED` until `acknowledgeIngestTokenReach` confirms them.
+	// UnacknowledgedReach The protected environments (with deploy targets or reviewers) the token reaches now but nobody confirmed. An upload with such a token is 403 `INGEST_REACH_NOT_ACKNOWLEDGED` (it does not name the environments) until `acknowledgeIngestTokenReach` confirms them.
 	UnacknowledgedReach *[]string `json:"UnacknowledgedReach,omitempty"`
 }
 
@@ -331,7 +340,7 @@ type ListIngestedArtifactsParams struct {
 type CreateIngestTokenJSONRequestBody = CreateIngestTokenRequest
 
 // AcknowledgeIngestTokenReachJSONRequestBody defines body for AcknowledgeIngestTokenReach for application/json ContentType.
-type AcknowledgeIngestTokenReachJSONRequestBody = CurrentFactorRequest
+type AcknowledgeIngestTokenReachJSONRequestBody = AcknowledgeIngestReachRequest
 
 // RevokeIngestTokenJSONRequestBody defines body for RevokeIngestToken for application/json ContentType.
 type RevokeIngestTokenJSONRequestBody = CurrentFactorRequest

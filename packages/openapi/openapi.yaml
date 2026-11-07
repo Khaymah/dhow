@@ -4542,7 +4542,7 @@ paths:
         Needs `ingest.manage` on the project and a fresh `CurrentFactor`. The token lets an outside CI upload artifacts
         to this project, only on the refs its patterns allow, for 1 to 365 days (90 by default). `Value` is in this answer
         only: Dhow keeps a hash. A bad field is 422 `VALIDATION_FAILED`, a name used by an active token is 409
-        `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true`, otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`, whose `Details` carry one `ProtectedReach` entry for each such environment, with its name as `Message`.
+        `INGEST_TOKEN_NAME_TAKEN`, and a project that already has the most active tokens it may have is 409 `INGEST_TOKEN_LIMIT`. A token that reaches an environment with deploy targets or reviewers needs `AcknowledgeProtectedReach: true` from a caller who holds `environment.manage` on the project (403 `INGEST_REACH_NEEDS_ENVIRONMENT_ADMIN` otherwise; a Maintainer can still make a token that reaches only unprotected environments), otherwise 422 `INGEST_TOKEN_REACH_UNCONFIRMED`, whose `Details` carry one `ProtectedReach` entry for each such environment, with its name as `Message`.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -4602,8 +4602,10 @@ paths:
       description: >-
         Needs `ingest.manage` on the project and a fresh `CurrentFactor`. Use it after an environment became protected
         (it got a deploy target or a reviewer, or its allowed refs changed) and the list shows the environment in
-        `UnacknowledgedReach`. It records every protected environment the token reaches now. A revoked or expired token is
-        409 `CONFLICT`.
+        `UnacknowledgedReach`. It needs `environment.manage` on the project (Owner and Admin, or a project Admin binding),
+        otherwise 403 `INGEST_REACH_NEEDS_ENVIRONMENT_ADMIN`. It records every protected environment the token reaches
+        now, by id. The body carries the names the page showed in `Environments`: if they differ from the server's set it is
+        409 `INGEST_REACH_CHANGED`. A revoked or expired token is 409 `CONFLICT`.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -4616,7 +4618,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CurrentFactorRequest"
+              $ref: "#/components/schemas/AcknowledgeIngestReachRequest"
       responses:
         "200":
           description: The token with its reach confirmed.
@@ -6525,6 +6527,21 @@ components:
       additionalProperties: false
       required: [CurrentFactor]
       properties:
+        CurrentFactor:
+          $ref: "#/components/schemas/CurrentFactor"
+    AcknowledgeIngestReachRequest:
+      type: object
+      additionalProperties: false
+      required: [CurrentFactor, Environments]
+      properties:
+        Environments:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+          description: >-
+            The names of the unconfirmed protected environments of the token (`UnacknowledgedReach`), as the page showed
+            them. If the set the server computes now differs, the answer is 409 `INGEST_REACH_CHANGED` and nothing is confirmed.
         CurrentFactor:
           $ref: "#/components/schemas/CurrentFactor"
     MfaStatus:
@@ -9494,7 +9511,7 @@ components:
             type: string
           description: >-
             The protected environments (with deploy targets or reviewers) the token reaches now but nobody confirmed. An
-            upload with such a token is 403 `INGEST_REACH_NOT_ACKNOWLEDGED` until `acknowledgeIngestTokenReach` confirms them.
+            upload with such a token is 403 `INGEST_REACH_NOT_ACKNOWLEDGED` (it does not name the environments) until `acknowledgeIngestTokenReach` confirms them.
     CreateIngestTokenRequest:
       type: object
       additionalProperties: false

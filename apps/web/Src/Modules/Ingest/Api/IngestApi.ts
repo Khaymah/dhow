@@ -55,12 +55,13 @@ export const acknowledgeIngestTokenReach = (
   organizationId: string,
   projectId: string,
   tokenId: string,
+  environments: readonly string[],
   factor: TCurrentFactor,
 ): Promise<TIngestToken> =>
   request(() =>
     ApiClient.POST('/organizations/{id}/projects/{projectId}/ingest-tokens/{ingestTokenId}/acknowledge-reach', {
       params: { path: { id: organizationId, projectId, ingestTokenId: tokenId } },
-      body: { CurrentFactor: factor },
+      body: { CurrentFactor: factor, Environments: [...environments] },
     }),
   );
 

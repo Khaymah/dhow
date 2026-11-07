@@ -18,10 +18,11 @@ export interface IIngestTokensCardProps {
   organizationId: string;
   projectId: string;
   writable: boolean;
+  canConfirm: boolean;
   onNew: () => void;
 }
 
-export const IngestTokensCard = ({ organizationId, projectId, writable, onNew }: IIngestTokensCardProps) => {
+export const IngestTokensCard = ({ organizationId, projectId, writable, canConfirm, onNew }: IIngestTokensCardProps) => {
   const t = useT();
   const errorText = useApiErrorText();
   const [Page, setPage] = useState(1);
@@ -67,8 +68,9 @@ export const IngestTokensCard = ({ organizationId, projectId, writable, onNew }:
                   }
                 : undefined
             }
+            confirmNeedsAdmin={!canConfirm}
             onAskAcknowledge={
-              writable
+              writable && canConfirm
                 ? () => {
                     setAcknowledging(token.Id);
                   }

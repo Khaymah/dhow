@@ -192,7 +192,8 @@ func (s *Service) CreateToken(
 	}
 	now := s.now()
 	var row sqlc.IngestToken
-	var reaches, protected []string
+	var reaches []string
+	var protected []reachEnv
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
 		if err := q.LockIngestTokens(ctx, project.String()); err != nil {
 			return err
@@ -209,11 +210,14 @@ func (s *Service) CreateToken(
 		}
 		reaches, protected = reachOf(patterns, envs)
 		if len(protected) > 0 && !in.AcknowledgeProtectedReach {
-			return apperrors.IngestReachUnconfirmed(reachDetails(protected)...)
+			return apperrors.IngestReachUnconfirmed(reachDetails(namesOf(protected))...)
+		}
+		if len(protected) > 0 && !canAcknowledge(p) {
+			return apperrors.IngestReachNeedsAdmin()
 		}
 		row, err = q.InsertIngestToken(ctx, sqlc.InsertIngestTokenParams{
 			OrganizationID: org, ProjectID: project, Name: in.Name, TokenHash: hash, Prefix: prefix, RefPatterns: raw,
-			ExpiresAt: now.Add(time.Duration(days) * day), CreatedByUserID: p.UserID, AcknowledgedEnvironments: protected,
+			ExpiresAt: now.Add(time.Duration(days) * day), CreatedByUserID: p.UserID, AcknowledgedEnvironmentIds: idsOf(protected),
 		})
 		if isUnique(err) {
 			return apperrors.IngestTokenNameTaken()

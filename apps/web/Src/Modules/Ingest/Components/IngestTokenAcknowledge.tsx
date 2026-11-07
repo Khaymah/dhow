@@ -25,7 +25,7 @@ const AcknowledgePanel = ({
   const refresh = useIngestRefresh(organizationId, projectId);
   const Push = useToastStore((state) => state.Push);
   const action = useFactorAction<TIngestToken>(methods, async (proof) =>
-    acknowledgeIngestTokenReach(organizationId, projectId, token.Id, await proof()),
+    acknowledgeIngestTokenReach(organizationId, projectId, token.Id, token.UnacknowledgedReach ?? [], await proof()),
   );
 
   return (

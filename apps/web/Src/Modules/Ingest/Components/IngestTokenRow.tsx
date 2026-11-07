@@ -14,9 +14,10 @@ export interface IIngestTokenRowProps {
   creator: string;
   onAskRevoke?: (() => void) | undefined;
   onAskAcknowledge?: (() => void) | undefined;
+  confirmNeedsAdmin?: boolean;
 }
 
-export const IngestTokenRow = ({ token, creator, onAskRevoke, onAskAcknowledge }: IIngestTokenRowProps) => {
+export const IngestTokenRow = ({ token, creator, onAskRevoke, onAskAcknowledge, confirmNeedsAdmin = false }: IIngestTokenRowProps) => {
   const t = useT();
   const time = useRelativeTime();
   const live = token.Status === 'active';
@@ -77,6 +78,7 @@ export const IngestTokenRow = ({ token, creator, onAskRevoke, onAskAcknowledge }
               {t('ingest.ack')}
             </Button>
           ) : null}
+          {confirmNeedsAdmin ? <small className="text-body-sm text-tertiary">{t('ingest.ack.needAdmin')}</small> : null}
         </div>
       ) : null}
       <small className="min-w-0 text-body-sm break-words text-tertiary">{facts.join(' · ')}</small>

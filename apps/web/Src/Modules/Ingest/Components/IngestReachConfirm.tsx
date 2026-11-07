@@ -7,12 +7,13 @@ export interface IIngestReachConfirmProps {
   names: readonly string[];
   acknowledged: boolean;
   disabled: boolean;
+  needsAdmin?: boolean;
   onChange: (acknowledged: boolean) => void;
 }
 
 const ACKNOWLEDGE = 'acknowledge';
 
-export const IngestReachConfirm = ({ names, acknowledged, disabled, onChange }: IIngestReachConfirmProps) => {
+export const IngestReachConfirm = ({ names, acknowledged, disabled, needsAdmin = false, onChange }: IIngestReachConfirmProps) => {
   const t = useT();
 
   return (
@@ -30,7 +31,7 @@ export const IngestReachConfirm = ({ names, acknowledged, disabled, onChange }: 
           onChange(values.includes(ACKNOWLEDGE));
         }}
       />
-      <small className="text-body-sm text-secondary">{t('ingest.reach.again')}</small>
+      <small className="text-body-sm text-secondary">{needsAdmin ? t('ingest.reach.needAdmin') : t('ingest.reach.again')}</small>
     </section>
   );
 };

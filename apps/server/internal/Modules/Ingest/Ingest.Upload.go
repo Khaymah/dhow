@@ -152,7 +152,7 @@ func (s *Service) put(w http.ResponseWriter, r *http.Request, got **tokenAuth) (
 	if !allows(tok.patterns, meta) {
 		return models.Received{}, apperrors.RefNotAllowedForToken()
 	}
-	if err := s.checkAcknowledged(ctx, tok); err != nil {
+	if err := s.checkAcknowledged(ctx, s.queries(), tok, tok.row.AcknowledgedEnvironmentIds); err != nil {
 		return models.Received{}, err
 	}
 	switch {

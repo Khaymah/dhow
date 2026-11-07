@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { useToastStore } from '@/Core/Store/useToastStore';
 import { ingestTokenFixture, newIngestState, TOKEN_ID } from '@/Core/Testing/IngestBackend';
-import { API, mount, PASSWORD, PROJECT_NAME } from '@/Core/Testing/IngestHarness';
+import { API, fillForm, mount, openNew, PAGE_URL, PASSWORD, PROJECT_NAME, submit, typePassword } from '@/Core/Testing/IngestHarness';
 import { findPage } from '@/Core/Testing/Pages';
 import { arText } from '@/Core/Testing/Text';
 import { Ar } from '@/I18n/Locales/Ar';
@@ -43,11 +43,20 @@ describe('a token that reaches a protected environment nobody confirmed', () => 
     return state;
   };
 
-  it('names the environment and offers the confirmation to a maintainer', async () => {
-    mount(undefined, 'maintainer', unconfirmed());
+  it('names the environment and offers the confirmation to an admin', async () => {
+    mount(undefined, 'admin', unconfirmed());
     const main = await findPage(PROJECT_NAME);
     expect(await within(main).findByText(Ar['ingest.token.unconfirmed'])).toBeInTheDocument();
     expect(within(main).getByRole('button', { name: arText('ingest.ack.aria', { name: 'github-main' }) })).toBeInTheDocument();
+    expect(within(main).queryByText(Ar['ingest.ack.needAdmin'])).not.toBeInTheDocument();
+  });
+
+  it('explains to a maintainer that only a project admin confirms, and offers no button', async () => {
+    mount(undefined, 'maintainer', unconfirmed());
+    const main = await findPage(PROJECT_NAME);
+    expect(await within(main).findByText(Ar['ingest.token.unconfirmed'])).toBeInTheDocument();
+    expect(within(main).getByText(Ar['ingest.ack.needAdmin'])).toBeInTheDocument();
+    expect(within(main).queryByRole('button', { name: arText('ingest.ack.aria', { name: 'github-main' }) })).not.toBeInTheDocument();
   });
 
   it('sends the confirmation with the second step and clears the warning', async () => {
@@ -67,11 +76,27 @@ describe('a token that reaches a protected environment nobody confirmed', () => 
     expect(view.state.writes[0]).toEqual({
       Method: 'POST',
       Path: `${API}/ingest-tokens/${TOKEN_ID}/acknowledge-reach`,
-      Body: { CurrentFactor: { Method: 'password', Password: PASSWORD } },
+      Body: { CurrentFactor: { Method: 'password', Password: PASSWORD }, Environments: ['production'] },
     });
     expect(await screen.findByText(arText('ingest.ack.done', { name: 'github-main' }))).toBeInTheDocument();
     await waitFor(() => {
       expect(within(main).queryByText(Ar['ingest.token.unconfirmed'])).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('a maintainer making a token that reaches a protected environment', () => {
+  it('sees the reach, cannot tick the confirmation, and is told who can', async () => {
+    const state = newIngestState();
+    state.protectedReach = ['production'];
+    const view = mount(PAGE_URL, 'maintainer', state);
+    const dialog = await openNew(view);
+    await fillForm(view, dialog, 'wide', '**');
+    await typePassword(view, dialog);
+    await submit(view, dialog);
+    await within(dialog).findByText(Ar['ingest.reach.title']);
+    expect(within(dialog).getByRole('checkbox', { name: new RegExp(Ar['ingest.reach.acknowledge']) })).toBeDisabled();
+    expect(within(dialog).getByText(Ar['ingest.reach.needAdmin'])).toBeInTheDocument();
+    expect(view.state.writes.every((write) => write.Body?.AcknowledgeProtectedReach !== true)).toBe(true);
   });
 });

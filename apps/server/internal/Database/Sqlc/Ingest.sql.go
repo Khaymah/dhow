@@ -14,14 +14,14 @@ import (
 
 const acknowledgeIngestTokenReach = `-- name: AcknowledgeIngestTokenReach :one
 UPDATE "IngestTokens"
-SET "AcknowledgedEnvironments" = $1::text[], "UpdatedAt" = $2
+SET "AcknowledgedEnvironmentIds" = $1::uuid[], "UpdatedAt" = $2
 WHERE "Id" = $3 AND "OrganizationId" = $4 AND "ProjectId" = $5 AND NOT "IsDeleted" AND "RevokedAt" IS NULL
   AND "ExpiresAt" > $2
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironmentIds"
 `
 
 type AcknowledgeIngestTokenReachParams struct {
-	Environments   []string
+	EnvironmentIds []uuid.UUID
 	Now            time.Time
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
@@ -30,7 +30,7 @@ type AcknowledgeIngestTokenReachParams struct {
 
 func (q *Queries) AcknowledgeIngestTokenReach(ctx context.Context, arg AcknowledgeIngestTokenReachParams) (IngestToken, error) {
 	row := q.db.QueryRow(ctx, acknowledgeIngestTokenReach,
-		arg.Environments,
+		arg.EnvironmentIds,
 		arg.Now,
 		arg.ID,
 		arg.OrganizationID,
@@ -53,7 +53,7 @@ func (q *Queries) AcknowledgeIngestTokenReach(ctx context.Context, arg Acknowled
 		&i.RevokedAt,
 		&i.RevokedByUserId,
 		&i.CreatedByUserId,
-		&i.AcknowledgedEnvironments,
+		&i.AcknowledgedEnvironmentIds,
 	)
 	return i, err
 }
@@ -115,30 +115,30 @@ func (q *Queries) CountIngestedArtifacts(ctx context.Context, arg CountIngestedA
 }
 
 const findIngestTokenByHash = `-- name: FindIngestTokenByHash :one
-SELECT t."Id", t."CreatedAt", t."UpdatedAt", t."IsDeleted", t."OrganizationId", t."ProjectId", t."Name", t."TokenHash", t."Prefix", t."RefPatterns", t."ExpiresAt", t."LastUsedAt", t."RevokedAt", t."RevokedByUserId", t."CreatedByUserId", t."AcknowledgedEnvironments", p."State" AS "ProjectState"
+SELECT t."Id", t."CreatedAt", t."UpdatedAt", t."IsDeleted", t."OrganizationId", t."ProjectId", t."Name", t."TokenHash", t."Prefix", t."RefPatterns", t."ExpiresAt", t."LastUsedAt", t."RevokedAt", t."RevokedByUserId", t."CreatedByUserId", t."AcknowledgedEnvironmentIds", p."State" AS "ProjectState"
 FROM "IngestTokens" t
 JOIN "Projects" p ON p."Id" = t."ProjectId" AND p."OrganizationId" = t."OrganizationId" AND NOT p."IsDeleted"
 WHERE t."TokenHash" = $1 AND NOT t."IsDeleted"
 `
 
 type FindIngestTokenByHashRow struct {
-	Id                       uuid.UUID
-	CreatedAt                time.Time
-	UpdatedAt                time.Time
-	IsDeleted                bool
-	OrganizationId           uuid.UUID
-	ProjectId                uuid.UUID
-	Name                     string
-	TokenHash                []byte
-	Prefix                   string
-	RefPatterns              []byte
-	ExpiresAt                time.Time
-	LastUsedAt               *time.Time
-	RevokedAt                *time.Time
-	RevokedByUserId          *uuid.UUID
-	CreatedByUserId          uuid.UUID
-	AcknowledgedEnvironments []string
-	ProjectState             string
+	Id                         uuid.UUID
+	CreatedAt                  time.Time
+	UpdatedAt                  time.Time
+	IsDeleted                  bool
+	OrganizationId             uuid.UUID
+	ProjectId                  uuid.UUID
+	Name                       string
+	TokenHash                  []byte
+	Prefix                     string
+	RefPatterns                []byte
+	ExpiresAt                  time.Time
+	LastUsedAt                 *time.Time
+	RevokedAt                  *time.Time
+	RevokedByUserId            *uuid.UUID
+	CreatedByUserId            uuid.UUID
+	AcknowledgedEnvironmentIds []uuid.UUID
+	ProjectState               string
 }
 
 func (q *Queries) FindIngestTokenByHash(ctx context.Context, tokenHash []byte) (FindIngestTokenByHashRow, error) {
@@ -160,7 +160,7 @@ func (q *Queries) FindIngestTokenByHash(ctx context.Context, tokenHash []byte) (
 		&i.RevokedAt,
 		&i.RevokedByUserId,
 		&i.CreatedByUserId,
-		&i.AcknowledgedEnvironments,
+		&i.AcknowledgedEnvironmentIds,
 		&i.ProjectState,
 	)
 	return i, err
@@ -215,7 +215,7 @@ func (q *Queries) FindIngestedArtifact(ctx context.Context, arg FindIngestedArti
 }
 
 const getIngestToken = `-- name: GetIngestToken :one
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironmentIds"
 FROM "IngestTokens"
 WHERE "Id" = $1 AND "OrganizationId" = $2 AND "ProjectId" = $3 AND NOT "IsDeleted"
 `
@@ -245,7 +245,7 @@ func (q *Queries) GetIngestToken(ctx context.Context, arg GetIngestTokenParams) 
 		&i.RevokedAt,
 		&i.RevokedByUserId,
 		&i.CreatedByUserId,
-		&i.AcknowledgedEnvironments,
+		&i.AcknowledgedEnvironmentIds,
 	)
 	return i, err
 }
@@ -337,22 +337,22 @@ func (q *Queries) IngestedArtifactRun(ctx context.Context, arg IngestedArtifactR
 
 const insertIngestToken = `-- name: InsertIngestToken :one
 INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId",
-                            "AcknowledgedEnvironments")
+                            "AcknowledgedEnvironmentIds")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-        $9::text[])
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
+        $9::uuid[])
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironmentIds"
 `
 
 type InsertIngestTokenParams struct {
-	OrganizationID           uuid.UUID
-	ProjectID                uuid.UUID
-	Name                     string
-	TokenHash                []byte
-	Prefix                   string
-	RefPatterns              []byte
-	ExpiresAt                time.Time
-	CreatedByUserID          uuid.UUID
-	AcknowledgedEnvironments []string
+	OrganizationID             uuid.UUID
+	ProjectID                  uuid.UUID
+	Name                       string
+	TokenHash                  []byte
+	Prefix                     string
+	RefPatterns                []byte
+	ExpiresAt                  time.Time
+	CreatedByUserID            uuid.UUID
+	AcknowledgedEnvironmentIds []uuid.UUID
 }
 
 func (q *Queries) InsertIngestToken(ctx context.Context, arg InsertIngestTokenParams) (IngestToken, error) {
@@ -365,7 +365,7 @@ func (q *Queries) InsertIngestToken(ctx context.Context, arg InsertIngestTokenPa
 		arg.RefPatterns,
 		arg.ExpiresAt,
 		arg.CreatedByUserID,
-		arg.AcknowledgedEnvironments,
+		arg.AcknowledgedEnvironmentIds,
 	)
 	var i IngestToken
 	err := row.Scan(
@@ -384,7 +384,7 @@ func (q *Queries) InsertIngestToken(ctx context.Context, arg InsertIngestTokenPa
 		&i.RevokedAt,
 		&i.RevokedByUserId,
 		&i.CreatedByUserId,
-		&i.AcknowledgedEnvironments,
+		&i.AcknowledgedEnvironmentIds,
 	)
 	return i, err
 }
@@ -448,7 +448,7 @@ func (q *Queries) InsertIngestedArtifact(ctx context.Context, arg InsertIngested
 }
 
 const listEnvironmentReach = `-- name: ListEnvironmentReach :many
-SELECT e."Name", e."AllowedRefs",
+SELECT e."Id", e."Name", e."AllowedRefs",
        EXISTS (SELECT 1 FROM "DeployTargets" d WHERE d."EnvironmentId" = e."Id" AND NOT d."IsDeleted")::boolean AS "HasTargets",
        EXISTS (SELECT 1 FROM "EnvironmentReviewers" r WHERE r."EnvironmentId" = e."Id" AND NOT r."IsDeleted")::boolean AS "HasReviewers"
 FROM "Environments" e
@@ -462,6 +462,7 @@ type ListEnvironmentReachParams struct {
 }
 
 type ListEnvironmentReachRow struct {
+	Id           uuid.UUID
 	Name         string
 	AllowedRefs  []byte
 	HasTargets   bool
@@ -478,6 +479,7 @@ func (q *Queries) ListEnvironmentReach(ctx context.Context, arg ListEnvironmentR
 	for rows.Next() {
 		var i ListEnvironmentReachRow
 		if err := rows.Scan(
+			&i.Id,
 			&i.Name,
 			&i.AllowedRefs,
 			&i.HasTargets,
@@ -509,6 +511,7 @@ SELECT u."Id" AS "UserId", m."Role",
                                  AND tm."UserId" = u."Id" AND NOT tm."IsDeleted")))::text[] AS "Bindings"
 FROM "Users" u
 JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = $2 AND NOT m."IsDeleted"
+JOIN "Organizations" o ON o."Id" = m."OrganizationId" AND NOT o."IsDeleted"
 WHERE u."Id" = ANY ($3::uuid[]) AND NOT u."IsDeleted" AND NOT u."Disabled"
 `
 
@@ -551,7 +554,7 @@ func (q *Queries) ListIngestCreatorAccess(ctx context.Context, arg ListIngestCre
 }
 
 const listIngestTokens = `-- name: ListIngestTokens :many
-SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
+SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironmentIds"
 FROM "IngestTokens"
 WHERE "OrganizationId" = $1 AND "ProjectId" = $2 AND NOT "IsDeleted"
 ORDER BY "CreatedAt" DESC, "Id" DESC
@@ -595,7 +598,7 @@ func (q *Queries) ListIngestTokens(ctx context.Context, arg ListIngestTokensPara
 			&i.RevokedAt,
 			&i.RevokedByUserId,
 			&i.CreatedByUserId,
-			&i.AcknowledgedEnvironments,
+			&i.AcknowledgedEnvironmentIds,
 		); err != nil {
 			return nil, err
 		}
@@ -810,7 +813,7 @@ func (q *Queries) LockIngestTokens(ctx context.Context, projectID string) error 
 }
 
 const recheckIngestToken = `-- name: RecheckIngestToken :one
-SELECT t."Id", t."RevokedAt", t."ExpiresAt", p."State" AS "ProjectState"
+SELECT t."Id", t."RevokedAt", t."ExpiresAt", t."AcknowledgedEnvironmentIds", p."State" AS "ProjectState"
 FROM "IngestTokens" t
 JOIN "Projects" p ON p."Id" = t."ProjectId" AND p."OrganizationId" = t."OrganizationId" AND NOT p."IsDeleted"
 WHERE t."Id" = $1 AND NOT t."IsDeleted"
@@ -818,10 +821,11 @@ FOR SHARE OF t
 `
 
 type RecheckIngestTokenRow struct {
-	Id           uuid.UUID
-	RevokedAt    *time.Time
-	ExpiresAt    time.Time
-	ProjectState string
+	Id                         uuid.UUID
+	RevokedAt                  *time.Time
+	ExpiresAt                  time.Time
+	AcknowledgedEnvironmentIds []uuid.UUID
+	ProjectState               string
 }
 
 func (q *Queries) RecheckIngestToken(ctx context.Context, id uuid.UUID) (RecheckIngestTokenRow, error) {
@@ -831,6 +835,7 @@ func (q *Queries) RecheckIngestToken(ctx context.Context, id uuid.UUID) (Recheck
 		&i.Id,
 		&i.RevokedAt,
 		&i.ExpiresAt,
+		&i.AcknowledgedEnvironmentIds,
 		&i.ProjectState,
 	)
 	return i, err
@@ -840,7 +845,7 @@ const revokeIngestToken = `-- name: RevokeIngestToken :one
 UPDATE "IngestTokens"
 SET "RevokedAt" = $1, "RevokedByUserId" = $2, "UpdatedAt" = $1
 WHERE "Id" = $3 AND "OrganizationId" = $4 AND "ProjectId" = $5 AND NOT "IsDeleted" AND "RevokedAt" IS NULL
-RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironments"
+RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "LastUsedAt", "RevokedAt", "RevokedByUserId", "CreatedByUserId", "AcknowledgedEnvironmentIds"
 `
 
 type RevokeIngestTokenParams struct {
@@ -876,7 +881,7 @@ func (q *Queries) RevokeIngestToken(ctx context.Context, arg RevokeIngestTokenPa
 		&i.RevokedAt,
 		&i.RevokedByUserId,
 		&i.CreatedByUserId,
-		&i.AcknowledgedEnvironments,
+		&i.AcknowledgedEnvironmentIds,
 	)
 	return i, err
 }

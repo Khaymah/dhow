@@ -9,6 +9,7 @@ import (
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
 	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
+	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 )
 
 const reasonCreatorRemoved = "creator-removed"
@@ -73,20 +74,26 @@ func (s *Service) memberGone(ctx context.Context, event eventbus.Event) error {
 }
 
 func (s *Service) RevokeCreatorTokens(ctx context.Context, org, user, actor uuid.UUID, ip string) error {
-	revoked, err := s.queries().RevokeIngestTokensOfCreator(ctx, sqlc.RevokeIngestTokensOfCreatorParams{
-		OrganizationID: org, UserID: user, ActorID: actor, Now: s.now(),
-	})
-	if err != nil {
-		return fmt.Errorf("revoke the ingest tokens of a removed member: %w", err)
-	}
-	for _, t := range revoked {
-		err := s.audit(ctx, auditEntry{
-			name: eventbus.IngestTokenRevoked, org: org, actor: &actor, ip: ip, target: targetIngestToken, targetID: t.Id,
-			data: map[string]string{"Name": t.Name, "ProjectId": t.ProjectId.String(), "Reason": reasonCreatorRemoved},
+	err := dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
+		revoked, err := q.RevokeIngestTokensOfCreator(ctx, sqlc.RevokeIngestTokensOfCreatorParams{
+			OrganizationID: org, UserID: user, ActorID: actor, Now: s.now(),
 		})
 		if err != nil {
 			return err
 		}
+		for _, t := range revoked {
+			err := s.audit(ctx, auditEntry{
+				name: eventbus.IngestTokenRevoked, org: org, actor: &actor, ip: ip, target: targetIngestToken, targetID: t.Id, tx: q,
+				data: map[string]string{"Name": t.Name, "ProjectId": t.ProjectId.String(), "Reason": reasonCreatorRemoved},
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("revoke the ingest tokens of a removed member: %w", err)
 	}
 	return nil
 }

@@ -23,6 +23,8 @@ const (
 	CodeReachUnconfirmed   = "INGEST_TOKEN_REACH_UNCONFIRMED" //nolint:gosec // A public error code, not a credential.
 	CodeCreatorNotAllowed  = "INGEST_CREATOR_NOT_ALLOWED"
 	CodeReachNotAcked      = "INGEST_REACH_NOT_ACKNOWLEDGED"
+	CodeReachNeedsAdmin    = "INGEST_REACH_NEEDS_ENVIRONMENT_ADMIN"
+	CodeReachChanged       = "INGEST_REACH_CHANGED"
 
 	KeyIngestTokenInvalid = "errors.ingestTokenInvalid"
 	KeyIngestTokenRevoked = "errors.ingestTokenRevoked"
@@ -42,6 +44,8 @@ const (
 	KeyReachUnconfirmed   = "errors.ingestReachUnconfirmed"
 	KeyCreatorNotAllowed  = "errors.ingestCreatorNotAllowed"
 	KeyReachNotAcked      = "errors.ingestReachNotAcknowledged"
+	KeyReachNeedsAdmin    = "errors.ingestReachNeedsAdmin"
+	KeyReachChanged       = "errors.ingestReachChanged"
 )
 
 func IngestTokenInvalid() *AppError {
@@ -118,8 +122,14 @@ func IngestCreatorNotAllowed() *AppError {
 	return New(http.StatusForbidden, CodeCreatorNotAllowed, KeyCreatorNotAllowed)
 }
 
-func IngestReachNotAcknowledged(details ...IErrorDetail) *AppError {
-	e := New(http.StatusForbidden, CodeReachNotAcked, KeyReachNotAcked)
-	e.Details = details
-	return e
+func IngestReachNotAcknowledged() *AppError {
+	return New(http.StatusForbidden, CodeReachNotAcked, KeyReachNotAcked)
+}
+
+func IngestReachNeedsAdmin() *AppError {
+	return New(http.StatusForbidden, CodeReachNeedsAdmin, KeyReachNeedsAdmin)
+}
+
+func IngestReachChanged() *AppError {
+	return New(http.StatusConflict, CodeReachChanged, KeyReachChanged)
 }

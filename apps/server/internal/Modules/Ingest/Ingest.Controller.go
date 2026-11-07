@@ -133,7 +133,7 @@ func (c *Controller) AcknowledgeIngestTokenReach(
 	if req.Body == nil {
 		return nil, apperrors.BadRequest()
 	}
-	t, err := c.service.AcknowledgeReach(ctx, req.Id, req.ProjectId, req.IngestTokenId, factorOf(req.Body.CurrentFactor))
+	t, err := c.service.AcknowledgeReach(ctx, req.Id, req.ProjectId, req.IngestTokenId, req.Body.Environments, factorOf(req.Body.CurrentFactor))
 	if err != nil {
 		return nil, err
 	}

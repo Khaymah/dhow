@@ -32,7 +32,7 @@ type IngestSeed struct {
 	ExpiresIn time.Duration
 	Revoked   bool
 
-	Acknowledged []string
+	Acknowledged []uuid.UUID
 }
 
 func (e *Env) SeedIngestToken(project, creator uuid.UUID, seed IngestSeed) IngestToken {
@@ -61,10 +61,10 @@ func (e *Env) SeedIngestToken(project, creator uuid.UUID, seed IngestSeed) Inges
 	now := e.Clock.Now()
 	require.NoError(e.T, e.Pool.QueryRow(context.Background(),
 		`INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId",
-		 "AcknowledgedEnvironments")
-		 VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9::text[]) RETURNING "Id"`,
+		 "AcknowledgedEnvironmentIds")
+		 VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9::uuid[]) RETURNING "Id"`,
 		org, project, seed.Name, sum[:], IngestTokenPrefix+body[:8], seed.Patterns, now.Add(seed.ExpiresIn), creator,
-		append([]string{}, seed.Acknowledged...)).Scan(&id))
+		append([]uuid.UUID{}, seed.Acknowledged...)).Scan(&id))
 	if seed.Revoked {
 		_, err := e.Pool.Exec(context.Background(), `UPDATE "IngestTokens" SET "RevokedAt" = now(), "RevokedByUserId" = $2 WHERE "Id" = $1`, id, creator)
 		require.NoError(e.T, err)

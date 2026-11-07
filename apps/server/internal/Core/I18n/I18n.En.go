@@ -361,4 +361,6 @@ var enMessages = map[string]string{ //nolint:gosec // This is a message catalog,
 	"errors.ingestReachUnconfirmed":                "This token reaches an environment that has deploy targets or reviewers. Confirm it explicitly, or narrow the ref patterns.",
 	"errors.ingestCreatorNotAllowed":               "The person who made this token is no longer a member with the right to manage uploads in this project. Make a new token with an account that has it.",
 	"errors.ingestReachNotAcknowledged":            "This token reaches a protected environment that nobody confirmed. Ask a project admin to confirm it from the token list.",
+	"errors.ingestReachNeedsAdmin":                 "Confirming that a token reaches a protected environment needs the permission to manage environments in the project. Ask a project admin to confirm it, or narrow the ref patterns.",
+	"errors.ingestReachChanged":                    "The protected environments that the token reaches changed since you looked at them. Reload the page, review them and confirm again.",
 }

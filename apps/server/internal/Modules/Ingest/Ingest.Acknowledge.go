@@ -12,16 +12,37 @@ import (
 	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
+	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtx "github.com/Khaymah/dhow/apps/server/internal/Database/Tx"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Ingest/Models"
 )
 
-func unacknowledged(protected, acknowledged []string) []string {
-	out := []string{}
-	for _, name := range protected {
-		if !slices.Contains(acknowledged, name) {
-			out = append(out, name)
+func canAcknowledge(p auth.Principal) bool {
+	return !p.ViaToken() && policy.Allows(p.ProjectRole, policy.EnvironmentManage)
+}
+
+func namesOf(envs []reachEnv) []string {
+	out := make([]string, 0, len(envs))
+	for _, e := range envs {
+		out = append(out, e.name)
+	}
+	return out
+}
+
+func idsOf(envs []reachEnv) []uuid.UUID {
+	out := make([]uuid.UUID, 0, len(envs))
+	for _, e := range envs {
+		out = append(out, e.id)
+	}
+	return out
+}
+
+func unacknowledged(protected []reachEnv, acknowledged []uuid.UUID) []reachEnv {
+	out := []reachEnv{}
+	for _, e := range protected {
+		if !slices.Contains(acknowledged, e.id) {
+			out = append(out, e)
 		}
 	}
 	return out
@@ -46,39 +67,46 @@ func (s *Service) viewsOf(ctx context.Context, q *sqlc.Queries, org, project uui
 		if err != nil {
 			return nil, err
 		}
-		var protected []string
+		var protected []reachEnv
 		t.Reaches, protected = reachOf(t.RefPatterns, envs)
-		t.UnacknowledgedReach = unacknowledged(protected, row.AcknowledgedEnvironments)
+		t.UnacknowledgedReach = namesOf(unacknowledged(protected, row.AcknowledgedEnvironmentIds))
 		t.CreatorAllowed = allowed[row.CreatedByUserId]
 		out = append(out, t)
 	}
 	return out, nil
 }
 
-func (s *Service) checkAcknowledged(ctx context.Context, tok tokenAuth) error {
-	envs, err := s.environmentsOf(ctx, s.queries(), tok.row.OrganizationId, tok.row.ProjectId)
+func (s *Service) checkAcknowledged(ctx context.Context, q *sqlc.Queries, tok tokenAuth, acknowledged []uuid.UUID) error {
+	envs, err := s.environmentsOf(ctx, q, tok.row.OrganizationId, tok.row.ProjectId)
 	if err != nil {
 		return err
 	}
 	_, protected := reachOf(tok.patterns, envs)
-	missing := unacknowledged(protected, tok.row.AcknowledgedEnvironments)
-	if len(missing) == 0 {
+	if len(unacknowledged(protected, acknowledged)) == 0 {
 		return nil
 	}
-	details := make([]apperrors.IErrorDetail, 0, len(missing))
-	for _, name := range missing {
-		details = append(details, apperrors.IErrorDetail{Field: apperrors.DetailProtectedReach, Message: name})
-	}
-	return apperrors.IngestReachNotAcknowledged(details...)
+	return apperrors.IngestReachNotAcknowledged()
 }
 
-func (s *Service) AcknowledgeReach(ctx context.Context, org, project, id uuid.UUID, factor auth.Factor) (models.Token, error) {
+func sameNames(a, b []string) bool {
+	x, y := slices.Clone(a), slices.Clone(b)
+	slices.Sort(x)
+	slices.Sort(y)
+	return slices.Equal(x, y)
+}
+
+func (s *Service) AcknowledgeReach(
+	ctx context.Context, org, project, id uuid.UUID, expected []string, factor auth.Factor,
+) (models.Token, error) {
 	p, err := principalOf(ctx)
 	if err != nil {
 		return models.Token{}, err
 	}
 	if p.ViaToken() {
 		return models.Token{}, apperrors.SessionRequired()
+	}
+	if !canAcknowledge(p) {
+		return models.Token{}, apperrors.IngestReachNeedsAdmin()
 	}
 	if err := s.factors.ConfirmFactor(ctx, p, factor); err != nil {
 		return models.Token{}, err
@@ -104,8 +132,11 @@ func (s *Service) AcknowledgeReach(ctx context.Context, org, project, id uuid.UU
 			return err
 		}
 		_, protected := reachOf(patterns, envs)
+		if !sameNames(expected, namesOf(unacknowledged(protected, row.AcknowledgedEnvironmentIds))) {
+			return apperrors.IngestReachChanged()
+		}
 		row, err = q.AcknowledgeIngestTokenReach(ctx, sqlc.AcknowledgeIngestTokenReachParams{
-			ID: id, OrganizationID: org, ProjectID: project, Environments: protected, Now: s.now(),
+			ID: id, OrganizationID: org, ProjectID: project, EnvironmentIds: idsOf(protected), Now: s.now(),
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.Conflict()
@@ -122,7 +153,7 @@ func (s *Service) AcknowledgeReach(ctx context.Context, org, project, id uuid.UU
 		return s.audit(ctx, auditEntry{
 			name: eventbus.IngestReachAcknowledged, org: org, actor: &actor, ip: auth.RequestMetaFrom(ctx).IPString(),
 			target: targetIngestToken, targetID: row.Id, tx: q, data: map[string]string{
-				"Name": row.Name, "ProjectId": project.String(), "Environments": cut(strings.Join(protected, " ")),
+				"Name": row.Name, "ProjectId": project.String(), "Environments": cut(strings.Join(namesOf(protected), " ")),
 			},
 		})
 	})

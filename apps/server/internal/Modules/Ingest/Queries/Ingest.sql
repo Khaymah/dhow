@@ -1,8 +1,8 @@
 -- name: InsertIngestToken :one
 INSERT INTO "IngestTokens" ("OrganizationId", "ProjectId", "Name", "TokenHash", "Prefix", "RefPatterns", "ExpiresAt", "CreatedByUserId",
-                            "AcknowledgedEnvironments")
+                            "AcknowledgedEnvironmentIds")
 VALUES (@organization_id, @project_id, @name, @token_hash, @prefix, @ref_patterns, @expires_at, @created_by_user_id,
-        @acknowledged_environments::text[])
+        @acknowledged_environment_ids::uuid[])
 RETURNING *;
 
 -- name: ListIngestTokens :many
@@ -105,14 +105,14 @@ FROM (SELECT DISTINCT ON ("Digest") "SizeBytes"
       ORDER BY "Digest") u;
 
 -- name: RecheckIngestToken :one
-SELECT t."Id", t."RevokedAt", t."ExpiresAt", p."State" AS "ProjectState"
+SELECT t."Id", t."RevokedAt", t."ExpiresAt", t."AcknowledgedEnvironmentIds", p."State" AS "ProjectState"
 FROM "IngestTokens" t
 JOIN "Projects" p ON p."Id" = t."ProjectId" AND p."OrganizationId" = t."OrganizationId" AND NOT p."IsDeleted"
 WHERE t."Id" = @id AND NOT t."IsDeleted"
 FOR SHARE OF t;
 
 -- name: ListEnvironmentReach :many
-SELECT e."Name", e."AllowedRefs",
+SELECT e."Id", e."Name", e."AllowedRefs",
        EXISTS (SELECT 1 FROM "DeployTargets" d WHERE d."EnvironmentId" = e."Id" AND NOT d."IsDeleted")::boolean AS "HasTargets",
        EXISTS (SELECT 1 FROM "EnvironmentReviewers" r WHERE r."EnvironmentId" = e."Id" AND NOT r."IsDeleted")::boolean AS "HasReviewers"
 FROM "Environments" e
@@ -147,6 +147,7 @@ SELECT u."Id" AS "UserId", m."Role",
                                  AND tm."UserId" = u."Id" AND NOT tm."IsDeleted")))::text[] AS "Bindings"
 FROM "Users" u
 JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = @organization_id AND NOT m."IsDeleted"
+JOIN "Organizations" o ON o."Id" = m."OrganizationId" AND NOT o."IsDeleted"
 WHERE u."Id" = ANY (@user_ids::uuid[]) AND NOT u."IsDeleted" AND NOT u."Disabled";
 
 -- name: RevokeIngestTokensOfCreator :many
@@ -157,7 +158,7 @@ RETURNING "Id", "ProjectId", "Name";
 
 -- name: AcknowledgeIngestTokenReach :one
 UPDATE "IngestTokens"
-SET "AcknowledgedEnvironments" = @environments::text[], "UpdatedAt" = @now
+SET "AcknowledgedEnvironmentIds" = @environment_ids::uuid[], "UpdatedAt" = @now
 WHERE "Id" = @id AND "OrganizationId" = @organization_id AND "ProjectId" = @project_id AND NOT "IsDeleted" AND "RevokedAt" IS NULL
   AND "ExpiresAt" > @now
 RETURNING *;
