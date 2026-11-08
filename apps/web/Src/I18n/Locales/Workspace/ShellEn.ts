@@ -46,7 +46,7 @@ export const ShellEn: Record<keyof typeof ShellAr, string> = {
   'shell.status.ok': 'Server healthy',
   'shell.status.down': 'Server has a problem',
   'shell.status.checking': 'Checking the server',
-  'shell.status.short.ok': 'Up',
+  'shell.status.short.ok': 'Healthy',
   'shell.status.short.down': 'Problem',
   'shell.status.short.checking': 'Checking',
   'shell.status.open': '{state}. Open server status',

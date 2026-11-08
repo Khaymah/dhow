@@ -3353,9 +3353,49 @@ export interface paths {
         };
         /**
          * Counts of what needs attention in an organization
-         * @description Needs `org.read`. One request for the home page and the sidebar counters, so the client does not page through every list to count. Each block needs the same permission as its list: `Jobs` needs `job.read`, `Runners` needs `runner.read` and `Invitations` needs `member.manage`. A block the caller may not read is `null`, never zero, so the client can tell "none" from "not yours to see". `Jobs.Running` counts the `leased` and `running` states. `Jobs.QueuedNoRunner` counts queued jobs whose `QueuedReason` is `NO_MATCHING_RUNNER`. `Jobs.FailedLast24h` counts the `failed` and `timed_out` states that finished in the last 24 hours. `Runners.Online` and `Runners.Offline` follow the `Status` rule of the runners list (seen in the last two minutes) for active runners, and `Runners.Paused` counts disabled runners. Revoked runners are not counted. `Invitations.Pending` counts invitations that are not accepted, revoked or expired. A caller who is not a member gets 404.
+         * @description Needs `org.read`. One request for the home page and the sidebar counters, so the client does not page through every list to count. Each block needs the same permission as its list: `Jobs` needs `job.read`, `Runners` needs `runner.read` and `Invitations` needs `member.manage`. A block the caller may not read is `null`, never zero, so the client can tell "none" from "not yours to see". `Jobs.Running` counts the `leased` and `running` states. `Jobs.QueuedNoRunner` counts queued jobs whose `QueuedReason` is `NO_MATCHING_RUNNER`. `Jobs.FailedLast24h` counts the `failed` and `timed_out` states that finished in the last 24 hours. `Runners.Online` and `Runners.Offline` follow the `Status` rule of the runners list (seen in the last two minutes) for active runners, and `Runners.Paused` counts disabled runners. Revoked runners are not counted. `Invitations.Pending` counts invitations that are not accepted, revoked or expired. `Deployments` needs `run.read`: `Running` counts running deployments, `FailedLast24h` the ones that failed in the last 24 hours, `RollbackFailed` the targets whose last finished release could not be rolled back and `Pending` the approval requests nobody has decided. `Notifications.Dead` needs `org.notification.manage` (Owner and Admin) and counts the notifications given up after every try. The answer carries an `ETag`; `If-None-Match` of the same value answers 304. A caller who is not a member gets 404.
          */
         get: operations["getOrganizationOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Follow what changes in an organization as server-sent events
+         * @description Needs `org.read` and a session; an API token is refused. One stream for every screen of the organization. Each `change` event carries a `Seq`, a `Type`, a `Status` and the ids it is about, never the data: the client fetches again through the normal endpoints. The `id` of an event is `<epoch>-<seq>`. Every event is checked against the caller's role when it is sent, not when the stream opens: an event about a project is sent only to a caller who may read that project's runs (an approval request, only to a caller who may decide it), and the stream ends when the caller stops being a member or the session ends. A comment arrives every 15 seconds and checks the session again. After `Last-Event-ID` the stream resumes from the bounded in-memory ring of the server instance (4096 events); when the id is older than the ring, belongs to another server start or another instance, the stream sends one `reset` event and the client fetches everything again. One user may hold 5 streams, one organization a tenth of `DHOW_SSE_MAX_STREAMS` (at least 10) and one server instance `DHOW_SSE_MAX_STREAMS`; more answer 429 `TOO_MANY_STREAMS` with `Retry-After`. The stream has no request timeout, and a proxy in front must not buffer it (`docs/install/reverse-proxy.md`).
+         */
+        get: operations["streamOrganizationEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}/projects/{projectId}/deploy-board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The deploy board of a project
+         * @description Needs `project.read`. One row for each environment (by name) with its targets: what is deployed now, the last release and how it ended, the progress of a running deploy by batch, and whether the target rolled back by itself, failed to roll back, or runs different releases on its hosts. At most 500 targets are listed. The answer carries an `ETag`; a request with `If-None-Match` of the same value answers 304 with no body.
+         */
+        get: operations["getProjectDeployBoard"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5997,11 +6037,87 @@ export interface components {
             /** @description Deploy approval requests waiting on an environment where you are a reviewer, directly or through a team. The exact list of the ones you may decide is `GET /organizations/{id}/deployment-approvals?Mine=true`. */
             Pending: number;
         } | null;
+        DeployBoardRelease: {
+            /** Format: uuid */
+            Id: string;
+            ReleaseId: string;
+            /** @enum {string} */
+            Kind: "deploy" | "rollback";
+            /** @enum {string} */
+            State: "running" | "succeeded" | "failed" | "rolled_back" | "rollback_failed" | "unknown";
+            RollbackReason?: string;
+            /** Format: date-time */
+            StartedAt: string;
+            /** Format: date-time */
+            FinishedAt?: string;
+        };
+        DeployBoardProgress: {
+            ReleaseId: string;
+            Hosts: number;
+            /** @description Hosts that switched, were verified or are already final. */
+            HostsDone: number;
+            BatchSize: number;
+            /** @description The batch the deploy is in now, from 1; 0 before the first host starts. */
+            Batch: number;
+            Batches: number;
+        };
+        DeployBoardTarget: {
+            /** Format: uuid */
+            Id: string;
+            Name: string;
+            /** @enum {string} */
+            Kind: "ssh" | "compose";
+            Hosts: number;
+            /** @description The release the target was last deployed or rolled back to successfully. */
+            CurrentReleaseId?: string;
+            /** @description The SHA-256 of the artifact of that release, in lowercase hex, when it is known. */
+            CurrentDigest?: string;
+            Last?: components["schemas"]["DeployBoardRelease"];
+            Running?: components["schemas"]["DeployBoardProgress"];
+            /** @description The hosts run different releases, or the last release left the target in a state that needs a check. */
+            Partial: boolean;
+            /** @description The last finished release was rolled back by itself. */
+            AutoRolledBack: boolean;
+            /** @description The last finished release could not be rolled back. It stays true until a release finishes after it. */
+            RollbackFailed: boolean;
+        };
+        DeployBoardEnvironment: {
+            /** Format: uuid */
+            Id: string;
+            Name: string;
+            Paused: boolean;
+            PendingApprovals: number;
+            Targets: components["schemas"]["DeployBoardTarget"][];
+        };
+        DeployBoard: {
+            Environments: components["schemas"]["DeployBoardEnvironment"][];
+            /** @description True when the project has more than 500 targets and the list stops there. */
+            Truncated: boolean;
+        };
+        DeployBoardResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DeployBoard"];
+        };
+        OverviewDeployments: {
+            /** @description Deployments that are running now. */
+            Running: number;
+            /** @description Deployments that failed in the last 24 hours. */
+            FailedLast24h: number;
+            /** @description Targets whose last finished release could not be rolled back. */
+            RollbackFailed: number;
+            /** @description Deploy approval requests that nobody has decided yet, in the whole organization. */
+            Pending: number;
+        } | null;
+        OverviewNotifications: {
+            /** @description Notifications that failed every try and were given up. Needs `org.notification.manage`. */
+            Dead: number;
+        } | null;
         OrganizationOverview: {
             Jobs: components["schemas"]["OverviewJobs"];
             Runners: components["schemas"]["OverviewRunners"];
             Invitations: components["schemas"]["OverviewInvitations"];
             Approvals: components["schemas"]["OverviewApprovals"];
+            Deployments: components["schemas"]["OverviewDeployments"];
+            Notifications: components["schemas"]["OverviewNotifications"];
         };
         OrganizationOverviewResponse: components["schemas"]["Envelope"] & {
             Data?: components["schemas"]["OrganizationOverview"];
@@ -6141,6 +6257,10 @@ export interface components {
         LogLimit: number;
         /** @description The `id` of the last chunk event the client received, `<attempt>:<seq>`. When it names the attempt the stream follows, the stream resumes after that seq and ignores `FromSeq`. An id of another attempt (the job was retried while the client was away) is ignored, so the new attempt starts from `FromSeq` or the beginning. */
         LastEventId: string;
+        /** @description The `id` of the last event the client received, `<epoch>-<seq>`. The browser sends it by itself when it reconnects. */
+        OrganizationEventsLastEventId: string;
+        /** @description The `ETag` of the answer the client already has. */
+        IfNoneMatch: string;
         /** @description Keep only jobs in these states. Repeat the parameter (`State=failed&State=timed_out`) or separate the states with commas (`State=failed,timed_out`). An unknown state is refused with 422 `VALIDATION_FAILED`. */
         JobStateFilter: string[];
         UserId: string;
@@ -6165,7 +6285,10 @@ export interface components {
         Limit: number;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description A strong validator of the answer. Send it back in `If-None-Match` to learn that nothing changed. */
+        ETag: string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -9403,7 +9526,10 @@ export interface operations {
             query?: {
                 Mine?: boolean;
             };
-            header?: never;
+            header?: {
+                /** @description The `ETag` of the answer the client already has. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
+            };
             path: {
                 id: components["parameters"]["Id"];
             };
@@ -9414,11 +9540,19 @@ export interface operations {
             /** @description The pending requests. */
             200: {
                 headers: {
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["DeploymentApprovalListResponse"];
                 };
+            };
+            /** @description The list is the one the `ETag` names. */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Error"];
         };
@@ -11302,7 +11436,10 @@ export interface operations {
     getOrganizationOverview: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `ETag` of the answer the client already has. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
+            };
             path: {
                 id: components["parameters"]["Id"];
             };
@@ -11313,11 +11450,80 @@ export interface operations {
             /** @description The counts the caller may read. */
             200: {
                 headers: {
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationOverviewResponse"];
                 };
+            };
+            /** @description The counts are the ones the `ETag` names. */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    streamOrganizationEvents: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `id` of the last event the client received, `<epoch>-<seq>`. The browser sends it by itself when it reconnects. */
+                "Last-Event-ID"?: components["parameters"]["OrganizationEventsLastEventId"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An event stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getProjectDeployBoard: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `ETag` of the answer the client already has. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The board. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployBoardResponse"];
+                };
+            };
+            /** @description The board is the one the `ETag` names. */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Error"];
         };

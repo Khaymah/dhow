@@ -21,6 +21,10 @@ type Counter interface {
 	CountOverviewRunners(ctx context.Context, arg sqlc.CountOverviewRunnersParams) (sqlc.CountOverviewRunnersRow, error)
 	CountOverviewInvitations(ctx context.Context, arg sqlc.CountOverviewInvitationsParams) (int64, error)
 	CountOverviewApprovals(ctx context.Context, arg sqlc.CountOverviewApprovalsParams) (int64, error)
+	CountOverviewDeployments(ctx context.Context, arg sqlc.CountOverviewDeploymentsParams) (sqlc.CountOverviewDeploymentsRow, error)
+	CountOverviewRollbackFailed(ctx context.Context, organizationID uuid.UUID) (int64, error)
+	CountOverviewPendingApprovals(ctx context.Context, arg sqlc.CountOverviewPendingApprovalsParams) (int64, error)
+	CountOverviewDeadNotifications(ctx context.Context, organizationID *uuid.UUID) (int64, error)
 }
 
 type Options struct {
@@ -81,8 +85,38 @@ func (s *Service) Get(ctx context.Context, org uuid.UUID) (models.Overview, erro
 			return models.Overview{}, fmt.Errorf("count pending approvals: %w", err)
 		}
 		out.Approvals = &models.Approvals{Pending: int(pending)}
+		deployments, err := s.deployments(ctx, org, now)
+		if err != nil {
+			return models.Overview{}, err
+		}
+		out.Deployments = &deployments
+	}
+	if allowed(policy.OrgNotificationManage) {
+		dead, err := s.counter.CountOverviewDeadNotifications(ctx, &org)
+		if err != nil {
+			return models.Overview{}, fmt.Errorf("count dead notifications: %w", err)
+		}
+		out.Notifications = &models.Notifications{Dead: int(dead)}
 	}
 	return out, nil
+}
+
+func (s *Service) deployments(ctx context.Context, org uuid.UUID, now time.Time) (models.Deployments, error) {
+	row, err := s.counter.CountOverviewDeployments(ctx, sqlc.CountOverviewDeploymentsParams{
+		OrganizationID: org, FailedSince: now.Add(-config.JobRecentFailureWindow),
+	})
+	if err != nil {
+		return models.Deployments{}, fmt.Errorf("count deployments: %w", err)
+	}
+	failed, err := s.counter.CountOverviewRollbackFailed(ctx, org)
+	if err != nil {
+		return models.Deployments{}, fmt.Errorf("count targets that failed to roll back: %w", err)
+	}
+	pending, err := s.counter.CountOverviewPendingApprovals(ctx, sqlc.CountOverviewPendingApprovalsParams{OrganizationID: org, Now: now})
+	if err != nil {
+		return models.Deployments{}, fmt.Errorf("count pending deploy approvals: %w", err)
+	}
+	return models.Deployments{Running: int(row.Running), FailedLast24h: int(row.FailedLast24h), RollbackFailed: int(failed), Pending: int(pending)}, nil
 }
 
 func (s *Service) jobs(ctx context.Context, org uuid.UUID, now time.Time) (models.Jobs, error) {

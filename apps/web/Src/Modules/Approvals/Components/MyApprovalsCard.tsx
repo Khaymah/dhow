@@ -10,22 +10,25 @@ import { useMyApprovals } from '@/Modules/Approvals/Hooks/useApprovals';
 
 export interface IMyApprovalsCardProps {
   organizationId: string;
+  projectId?: string;
+  hideWhenEmpty?: boolean;
   hrefFor: (approval: TApproval) => string;
   onOpen: (approval: TApproval) => void;
 }
 
 const shortRef = (ref: string): string => ref.replace(/^refs\/(heads|tags)\//, '');
 
-export const MyApprovalsCard = ({ organizationId, hrefFor, onOpen }: IMyApprovalsCardProps) => {
+export const MyApprovalsCard = ({ organizationId, projectId, hideWhenEmpty = false, hrefFor, onOpen }: IMyApprovalsCardProps) => {
   const t = useT();
   const time = useRelativeTime();
   const errorText = useApiErrorText();
   const approvals = useMyApprovals(organizationId);
-  const items = approvals.data ?? [];
+  const items = (approvals.data ?? []).filter((approval) => projectId === undefined || approval.ProjectId === projectId);
+  if (hideWhenEmpty && approvals.data !== undefined && items.length === 0) return null;
 
   return (
     <Card
-      title={t('approvals.page.list')}
+      title={projectId === undefined ? t('approvals.page.list') : t('boards.approvals.title')}
       icon="shield"
       end={approvals.data === undefined ? null : t('approvals.page.count', { count: items.length })}
     >
@@ -39,9 +42,9 @@ export const MyApprovalsCard = ({ organizationId, hrefFor, onOpen }: IMyApproval
           void approvals.refetch();
         }}
         emptyIcon="check"
-        emptyText={t('approvals.page.empty')}
+        emptyText={projectId === undefined ? t('approvals.page.empty') : t('boards.approvals.empty')}
       >
-        <Rows label={t('approvals.page.list')}>
+        <Rows label={projectId === undefined ? t('approvals.page.list') : t('boards.approvals.title')}>
           {items.map((approval) => (
             <LinkRow
               key={approval.Id}

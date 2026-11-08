@@ -37,6 +37,32 @@ WHERE a."OrganizationId" = @organization_id AND a."State" = 'pending' AND a."Exp
                                 WHERE tm."TeamId" = r."TeamId" AND tm."OrganizationId" = r."OrganizationId"
                                   AND tm."UserId" = @user_id AND NOT tm."IsDeleted")));
 
+-- name: CountOverviewDeployments :one
+SELECT count(*) FILTER (WHERE d."State" = 'running')::bigint AS running,
+       count(*) FILTER (WHERE d."State" = 'failed' AND d."FinishedAt" > @failed_since::timestamptz)::bigint AS failed_last_24h
+FROM "Deployments" d
+WHERE d."OrganizationId" = @organization_id AND NOT d."IsDeleted"
+  AND (d."State" = 'running' OR (d."State" = 'failed' AND d."FinishedAt" > @failed_since::timestamptz));
+
+-- name: CountOverviewRollbackFailed :one
+SELECT count(*)::bigint
+FROM "DeployTargets" t
+WHERE t."OrganizationId" = @organization_id AND NOT t."IsDeleted"
+  AND (SELECT r."State"
+       FROM "DeploymentReleases" r
+       WHERE r."TargetId" = t."Id" AND r."OrganizationId" = t."OrganizationId" AND r."State" <> 'running' AND NOT r."IsDeleted"
+       ORDER BY r."StartedAt" DESC, r."Id" DESC LIMIT 1) = 'rollback_failed';
+
+-- name: CountOverviewPendingApprovals :one
+SELECT count(*)::bigint
+FROM "DeploymentApprovals" a
+WHERE a."OrganizationId" = @organization_id AND a."State" = 'pending' AND a."ExpiresAt" > @now::timestamptz AND NOT a."IsDeleted";
+
+-- name: CountOverviewDeadNotifications :one
+SELECT count(*)::bigint
+FROM "NotificationOutbox" o
+WHERE o."OrganizationId" = @organization_id AND o."State" = 'dead' AND NOT o."IsDeleted";
+
 -- name: CountOverviewInvitations :one
 SELECT count(*) FILTER (WHERE "ExpiresAt" > @now::timestamptz)::bigint AS pending
 FROM "Invitations"

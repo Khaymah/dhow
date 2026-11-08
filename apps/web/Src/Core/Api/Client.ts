@@ -129,6 +129,27 @@ export const request = <TData>(call: () => Promise<IFetchResult<TData>>, options
     }
   });
 
+export interface IConditional<TData> {
+  Data: TData;
+  ETag: string | null;
+}
+
+export const NOT_MODIFIED = 304;
+
+export const requestConditional = <TData>(
+  call: (etag: string | undefined) => Promise<IFetchResult<TData>>,
+  previous: IConditional<TData> | undefined,
+): Promise<IConditional<TData>> =>
+  withCsrfRetry(async () => {
+    try {
+      const result = await call(previous?.ETag ?? undefined);
+      if (result.response.status === NOT_MODIFIED && previous !== undefined) return previous;
+      return { Data: unwrap(result), ETag: result.response.headers.get('ETag') };
+    } catch (error) {
+      throw toApiError(error);
+    }
+  });
+
 export const requestPage = <TItem>(call: () => Promise<IFetchResult<TItem[]>>): Promise<IPage<TItem>> =>
   withCsrfRetry(async () => {
     try {

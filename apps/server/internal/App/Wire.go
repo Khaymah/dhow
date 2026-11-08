@@ -32,6 +32,7 @@ import (
 	alerts "github.com/Khaymah/dhow/apps/server/internal/Modules/Alerts"
 	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
 	audit "github.com/Khaymah/dhow/apps/server/internal/Modules/Audit"
+	boards "github.com/Khaymah/dhow/apps/server/internal/Modules/Boards"
 	environments "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments"
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
 	ingest "github.com/Khaymah/dhow/apps/server/internal/Modules/Ingest"
@@ -173,11 +174,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	}
 	runs.secrets.UseTargetKeyGuard(runs.envs.Targets(), sessionService)
 
-	ingestService, err := ingestFor(in, runs, bus, limiter, sessionService)
-	if err != nil {
-		return nil, err
-	}
-	notificationsService, err := notificationsFor(in, values, bus, sessionService, limiter, mail, alertsService)
+	ingestService, notificationsService, err := deliveryFor(in, values, bus, sessionService, limiter, mail, alertsService, runs)
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +200,8 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Ingest:        ingestService,
 		Notifications: notificationsService,
 		Overview:      overview.NewService(overview.Options{Counter: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
+		Boards:        boards.NewService(boards.Options{Store: sqlc.New(in.Pool), Limiter: limiter, Log: in.Log, Now: in.Now}),
+		Events:        eventsFor(in, bus),
 		Tokens:        tokensService,
 		Prefs:         preferences.NewService(in.Pool, in.Log, in.Now),
 		Gate:          gate,

@@ -10,6 +10,7 @@ import (
 	mailer "github.com/Khaymah/dhow/apps/server/internal/Core/Mail"
 	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	alerts "github.com/Khaymah/dhow/apps/server/internal/Modules/Alerts"
+	ingest "github.com/Khaymah/dhow/apps/server/internal/Modules/Ingest"
 	notifications "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications"
 )
 
@@ -26,6 +27,20 @@ func notificationsFor(in Infra, values *keys.Values, bus *eventbus.Bus, factors 
 	notifications.Subscribe(bus, service)
 	alertsService.UseFlush(service.Drain)
 	return service, nil
+}
+
+func deliveryFor(in Infra, values *keys.Values, bus *eventbus.Bus, factors auth.FactorConfirmer, limiter ratelimit.Limiter, mail mailer.Sender,
+	alertsService *alerts.Service, runs runServices,
+) (*ingest.Service, *notifications.Service, error) {
+	ingestService, err := ingestFor(in, runs, bus, limiter, factors)
+	if err != nil {
+		return nil, nil, err
+	}
+	notificationsService, err := notificationsFor(in, values, bus, factors, limiter, mail, alertsService)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ingestService, notificationsService, nil
 }
 
 func StartNotifications(ctx context.Context, s *notifications.Service) func() {

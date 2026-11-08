@@ -40,6 +40,44 @@ func (q *Queries) CountOverviewApprovals(ctx context.Context, arg CountOverviewA
 	return column_1, err
 }
 
+const countOverviewDeadNotifications = `-- name: CountOverviewDeadNotifications :one
+SELECT count(*)::bigint
+FROM "NotificationOutbox" o
+WHERE o."OrganizationId" = $1 AND o."State" = 'dead' AND NOT o."IsDeleted"
+`
+
+func (q *Queries) CountOverviewDeadNotifications(ctx context.Context, organizationID *uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOverviewDeadNotifications, organizationID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const countOverviewDeployments = `-- name: CountOverviewDeployments :one
+SELECT count(*) FILTER (WHERE d."State" = 'running')::bigint AS running,
+       count(*) FILTER (WHERE d."State" = 'failed' AND d."FinishedAt" > $1::timestamptz)::bigint AS failed_last_24h
+FROM "Deployments" d
+WHERE d."OrganizationId" = $2 AND NOT d."IsDeleted"
+  AND (d."State" = 'running' OR (d."State" = 'failed' AND d."FinishedAt" > $1::timestamptz))
+`
+
+type CountOverviewDeploymentsParams struct {
+	FailedSince    time.Time
+	OrganizationID uuid.UUID
+}
+
+type CountOverviewDeploymentsRow struct {
+	Running       int64
+	FailedLast24h int64
+}
+
+func (q *Queries) CountOverviewDeployments(ctx context.Context, arg CountOverviewDeploymentsParams) (CountOverviewDeploymentsRow, error) {
+	row := q.db.QueryRow(ctx, countOverviewDeployments, arg.FailedSince, arg.OrganizationID)
+	var i CountOverviewDeploymentsRow
+	err := row.Scan(&i.Running, &i.FailedLast24h)
+	return i, err
+}
+
 const countOverviewInvitations = `-- name: CountOverviewInvitations :one
 SELECT count(*) FILTER (WHERE "ExpiresAt" > $1::timestamptz)::bigint AS pending
 FROM "Invitations"
@@ -98,6 +136,41 @@ func (q *Queries) CountOverviewJobs(ctx context.Context, arg CountOverviewJobsPa
 		&i.FailedLast24h,
 	)
 	return i, err
+}
+
+const countOverviewPendingApprovals = `-- name: CountOverviewPendingApprovals :one
+SELECT count(*)::bigint
+FROM "DeploymentApprovals" a
+WHERE a."OrganizationId" = $1 AND a."State" = 'pending' AND a."ExpiresAt" > $2::timestamptz AND NOT a."IsDeleted"
+`
+
+type CountOverviewPendingApprovalsParams struct {
+	OrganizationID uuid.UUID
+	Now            time.Time
+}
+
+func (q *Queries) CountOverviewPendingApprovals(ctx context.Context, arg CountOverviewPendingApprovalsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countOverviewPendingApprovals, arg.OrganizationID, arg.Now)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const countOverviewRollbackFailed = `-- name: CountOverviewRollbackFailed :one
+SELECT count(*)::bigint
+FROM "DeployTargets" t
+WHERE t."OrganizationId" = $1 AND NOT t."IsDeleted"
+  AND (SELECT r."State"
+       FROM "DeploymentReleases" r
+       WHERE r."TargetId" = t."Id" AND r."OrganizationId" = t."OrganizationId" AND r."State" <> 'running' AND NOT r."IsDeleted"
+       ORDER BY r."StartedAt" DESC, r."Id" DESC LIMIT 1) = 'rollback_failed'
+`
+
+func (q *Queries) CountOverviewRollbackFailed(ctx context.Context, organizationID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOverviewRollbackFailed, organizationID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const countOverviewRunners = `-- name: CountOverviewRunners :one

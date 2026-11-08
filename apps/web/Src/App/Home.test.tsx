@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { App } from '@/App/App';
 import { createAppRouter } from '@/App/Router';
 import { createQueryClient } from '@/Core/Api/QueryClient';
+import { approvalFixture, approvalsRoute, newApprovalsState } from '@/Core/Testing/ApprovalsBackend';
 import { overviewFixture, startBackend, type IOverviewFixture } from '@/Core/Testing/Backend';
 import { gate, type TGateMode } from '@/Core/Testing/Gate';
 import { jobFixture, jobsRoute } from '@/Core/Testing/JobsBackend';
@@ -125,6 +126,9 @@ describe('the home page', () => {
     });
   });
 
+});
+
+describe('the home page numbers', () => {
   it('opens the jobs page filtered from a number', async () => {
     const { user, router } = await mount({ overview: BUSY });
     await user.click(await within(main()).findByRole('link', { name: new RegExp(Ar['home.stat.queued']) }));
@@ -136,5 +140,35 @@ describe('the home page', () => {
     await waitFor(() => {
       expect(router.state.location.href).toBe('/jobs');
     });
+  });
+
+});
+
+describe('the approvals and deploys on the home page', () => {
+  it('shows the deploys that wait for the reader right on the home page, and opens the run', async () => {
+    const approvals = newApprovalsState();
+    approvals.mine = [approvalFixture()];
+    const backend = startBackend({
+      overview: overviewFixture({ Approvals: 1, Deployments: { Running: 1, RollbackFailed: 1 } }),
+      routes: [approvalsRoute(approvals), jobsRoute({ jobs: [jobFixture()] })],
+    });
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }));
+    const user = userEvent.setup();
+    render(<App router={router} queryClient={createQueryClient({ retry: false })} />);
+    await screen.findByRole('heading', { level: 1, name: Ar['home.title'] });
+    const card = (await within(main()).findByRole('list', { name: Ar['approvals.page.list'] })).closest('section');
+    if (card === null) throw new Error('the approvals are not in a card');
+    expect(within(main()).getByText(Ar['home.attention.rollbackFailed.title'])).toBeInTheDocument();
+    expect(within(main()).getByText(Ar['home.stat.deploys'])).toBeInTheDocument();
+    await user.click(within(card).getByRole('link'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(router.state.location.pathname).toMatch(/\/projects\/.+\/runs\/.+/);
+    expect(backend.calls.length).toBeGreaterThan(0);
+  });
+
+  it('asks for no approvals when the overview says there are none', async () => {
+    const { calls } = await mount();
+    await screen.findByText(Ar['home.attention.calm']);
+    expect(calls.some((call) => call.url.includes('/deployment-approvals'))).toBe(false);
   });
 });

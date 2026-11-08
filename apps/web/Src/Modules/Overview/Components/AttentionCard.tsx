@@ -40,6 +40,18 @@ const attentionOf = (overview: TOverview | undefined, failingChecks: number): IA
       title: 'home.attention.stuck.title', sub: 'home.attention.stuck.sub',
     },
     {
+      target: 'rollbackFailed', icon: 'alert', tone: 'bad', count: overview?.Deployments?.RollbackFailed ?? 0,
+      title: 'home.attention.rollbackFailed.title', sub: 'home.attention.rollbackFailed.sub',
+    },
+    {
+      target: 'failedDeploys', icon: 'close', tone: 'bad', count: overview?.Deployments?.FailedLast24h ?? 0,
+      title: 'home.attention.failedDeploys.title', sub: 'home.attention.failedDeploys.sub',
+    },
+    {
+      target: 'deadNotifications', icon: 'bell', tone: 'warn', count: overview?.Notifications?.Dead ?? 0,
+      title: 'home.attention.deadNotifications.title', sub: 'home.attention.deadNotifications.sub',
+    },
+    {
       target: 'checks', icon: 'shield', tone: 'bad', count: failingChecks,
       title: 'home.attention.checks.title', sub: 'home.attention.checks.sub',
     },
