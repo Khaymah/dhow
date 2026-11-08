@@ -31,6 +31,7 @@ export type TSectionId =
   | 'audit'
   | 'system'
   | 'systemSettings'
+  | 'about'
   | 'profile'
   | 'security'
   | 'preferences'
@@ -53,6 +54,7 @@ export type TSectionPath =
   | '/audit'
   | '/system'
   | '/system/settings'
+  | '/about'
   | '/account/profile'
   | '/account/security'
   | '/account/preferences'
@@ -182,6 +184,7 @@ export const SECTIONS: readonly ISection[] = [
     menu: true,
     allow: instanceOwner,
   },
+  { id: 'about', path: '/about', label: 'shell.nav.about', icon: 'info', group: 'watch', menu: true, allow: anyone },
   { id: 'profile', path: '/account/profile', label: 'shell.nav.profile', icon: 'user', group: 'account', menu: false, allow: anyone },
   { id: 'security', path: '/account/security', label: 'shell.nav.security', icon: 'shield', group: 'account', menu: false, allow: anyone },
   { id: 'preferences', path: '/account/preferences', label: 'shell.nav.preferences', icon: 'settings', group: 'account', menu: false, allow: anyone },

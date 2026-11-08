@@ -33,6 +33,7 @@ const PAGE_COMMANDS: Record<TSectionId, TMessageKey> = {
   audit: 'palette.command.audit',
   system: 'palette.command.systemStatus',
   systemSettings: 'palette.command.systemSettings',
+  about: 'palette.command.about',
   profile: 'palette.command.account',
   security: 'palette.command.security',
   preferences: 'palette.command.preferences',

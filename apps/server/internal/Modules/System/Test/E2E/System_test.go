@@ -105,7 +105,7 @@ func TestMeta(t *testing.T) {
 			assert.True(t, body.Success)
 			assert.Nil(t, body.Error)
 			require.NotNil(t, body.Data)
-			assert.Equal(t, gen.Meta{Version: "v0.1.0", Commit: "abc123", SetupRequired: tt.wantSetupNeed}, *body.Data)
+			assert.Equal(t, gen.Meta{Version: "v0.1.0", Commit: "abc123", ServerBuild: &gen.ServerBuild{Version: "v0.1.0", Commit: "abc123"}, SetupRequired: tt.wantSetupNeed}, *body.Data)
 			require.NotNil(t, body.Message)
 			assert.Equal(t, "system.meta.loaded", *body.Message)
 		})

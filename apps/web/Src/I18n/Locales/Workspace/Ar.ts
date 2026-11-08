@@ -1,3 +1,4 @@
+import { AboutAr } from '@/I18n/Locales/Workspace/AboutAr';
 import { ApprovalsAr } from '@/I18n/Locales/Workspace/ApprovalsAr';
 import { AuditAr } from '@/I18n/Locales/Workspace/AuditAr';
 import { EnvironmentsAr } from '@/I18n/Locales/Workspace/EnvironmentsAr';
@@ -419,4 +420,5 @@ export const WorkspaceAr = {
   ...TargetsManageAr,
   ...ApprovalsAr,
   ...ShellAr,
+  ...AboutAr,
 } as const;

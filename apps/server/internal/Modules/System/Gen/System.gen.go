@@ -14,6 +14,30 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Defines values for DoctorStatus.
+const (
+	DoctorStatusFail DoctorStatus = "fail"
+	DoctorStatusInfo DoctorStatus = "info"
+	DoctorStatusOk   DoctorStatus = "ok"
+	DoctorStatusWarn DoctorStatus = "warn"
+)
+
+// Valid indicates whether the value is a known member of the DoctorStatus enum.
+func (e DoctorStatus) Valid() bool {
+	switch e {
+	case DoctorStatusFail:
+		return true
+	case DoctorStatusInfo:
+		return true
+	case DoctorStatusOk:
+		return true
+	case DoctorStatusWarn:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthCheckName.
 const (
 	Database      HealthCheckName = "database"
@@ -43,16 +67,16 @@ func (e HealthCheckName) Valid() bool {
 
 // Defines values for HealthStatusStatus.
 const (
-	Ok          HealthStatusStatus = "ok"
-	Unavailable HealthStatusStatus = "unavailable"
+	HealthStatusStatusOk          HealthStatusStatus = "ok"
+	HealthStatusStatusUnavailable HealthStatusStatus = "unavailable"
 )
 
 // Valid indicates whether the value is a known member of the HealthStatusStatus enum.
 func (e HealthStatusStatus) Valid() bool {
 	switch e {
-	case Ok:
+	case HealthStatusStatusOk:
 		return true
-	case Unavailable:
+	case HealthStatusStatusUnavailable:
 		return true
 	default:
 		return false
@@ -82,6 +106,42 @@ func (e KekVersionStatusState) Valid() bool {
 		return false
 	}
 }
+
+// DoctorCheck defines model for DoctorCheck.
+type DoctorCheck struct {
+	// Code A stable name such as `database`, `disk` or `mptcp`.
+	Code string `json:"Code"`
+
+	// Fix What to do, the same sentence as `dhow-server doctor`. Absent when the status is `ok` or `info`.
+	Fix    *string      `json:"Fix,omitempty"`
+	Status DoctorStatus `json:"Status"`
+
+	// Title What was checked, in the language of `Accept-Language`.
+	Title string `json:"Title"`
+}
+
+// DoctorReport defines model for DoctorReport.
+type DoctorReport struct {
+	Checks      *[]DoctorCheck `json:"Checks,omitempty"`
+	Health      HealthStatus   `json:"Health"`
+	ServerBuild ServerBuild    `json:"ServerBuild"`
+}
+
+// DoctorResponse defines model for DoctorResponse.
+type DoctorResponse struct {
+	Data  *DoctorReport `json:"Data,omitempty"`
+	Error *ErrorDetail  `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// DoctorStatus defines model for DoctorStatus.
+type DoctorStatus string
 
 // Envelope defines model for Envelope.
 type Envelope struct {
@@ -222,7 +282,8 @@ type KeyringStatusResponse struct {
 // Meta defines model for Meta.
 type Meta struct {
 	// Commit Example: 2e39188
-	Commit string `json:"Commit"`
+	Commit      string       `json:"Commit"`
+	ServerBuild *ServerBuild `json:"ServerBuild,omitempty"`
 
 	// SetupRequired True until the first owner completes setup.
 	SetupRequired bool `json:"SetupRequired"`
@@ -251,6 +312,18 @@ type PageMeta struct {
 	Total int `json:"Total"`
 }
 
+// ServerBuild defines model for ServerBuild.
+type ServerBuild struct {
+	// BuiltAt The time of the commit the binary was built from. Absent when the binary carries no version control data.
+	BuiltAt *time.Time `json:"BuiltAt,omitempty"`
+
+	// Commit Example: 2e39188
+	Commit string `json:"Commit"`
+
+	// Version Example: v0.1.0
+	Version string `json:"Version"`
+}
+
 // Error defines model for Error.
 type Error = ErrorResponse
 
@@ -265,6 +338,9 @@ type ServerInterface interface {
 	// GetMeta Instance metadata
 	// (GET /meta)
 	GetMeta(w http.ResponseWriter, r *http.Request)
+	// GetDoctor Server version, health and the checks that run inside the server
+	// (GET /system/doctor)
+	GetDoctor(w http.ResponseWriter, r *http.Request)
 	// GetKeyringStatus State of the keyring, never a key
 	// (GET /system/keys)
 	GetKeyringStatus(w http.ResponseWriter, r *http.Request)
@@ -289,6 +365,12 @@ func (_ Unimplemented) GetReadiness(w http.ResponseWriter, r *http.Request) {
 // GetMeta Instance metadata
 // (GET /meta)
 func (_ Unimplemented) GetMeta(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetDoctor Server version, health and the checks that run inside the server
+// (GET /system/doctor)
+func (_ Unimplemented) GetDoctor(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -340,6 +422,20 @@ func (siw *ServerInterfaceWrapper) GetMeta(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMeta(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDoctor operation middleware
+func (siw *ServerInterfaceWrapper) GetDoctor(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDoctor(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -488,6 +584,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/system/keys", wrapper.GetKeyringStatus)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/system/doctor", wrapper.GetDoctor)
+	})
 
 	return r
 }
@@ -622,6 +721,44 @@ func (response GetMetadefaultJSONResponse) VisitGetMetaResponse(w http.ResponseW
 	return err
 }
 
+type GetDoctorRequestObject struct {
+}
+
+type GetDoctorResponseObject interface {
+	VisitGetDoctorResponse(w http.ResponseWriter) error
+}
+
+type GetDoctor200JSONResponse DoctorResponse
+
+func (response GetDoctor200JSONResponse) VisitGetDoctorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDoctordefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response GetDoctordefaultJSONResponse) VisitGetDoctorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetKeyringStatusRequestObject struct {
 }
 
@@ -671,6 +808,9 @@ type StrictServerInterface interface {
 	// GetMeta Instance metadata
 	// (GET /meta)
 	GetMeta(ctx context.Context, request GetMetaRequestObject) (GetMetaResponseObject, error)
+	// GetDoctor Server version, health and the checks that run inside the server
+	// (GET /system/doctor)
+	GetDoctor(ctx context.Context, request GetDoctorRequestObject) (GetDoctorResponseObject, error)
 	// GetKeyringStatus State of the keyring, never a key
 	// (GET /system/keys)
 	GetKeyringStatus(ctx context.Context, request GetKeyringStatusRequestObject) (GetKeyringStatusResponseObject, error)
@@ -780,6 +920,30 @@ func (sh *strictHandler) GetMeta(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMetaResponseObject); ok {
 		if err := validResponse.VisitGetMetaResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDoctor operation middleware
+func (sh *strictHandler) GetDoctor(w http.ResponseWriter, r *http.Request) {
+	var request GetDoctorRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDoctor(ctx, request.(GetDoctorRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDoctor")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDoctorResponseObject); ok {
+		if err := validResponse.VisitGetDoctorResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

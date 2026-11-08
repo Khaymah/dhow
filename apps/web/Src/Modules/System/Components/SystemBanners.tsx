@@ -1,9 +1,10 @@
 import { Banner } from '@/Core/Ui/Banner';
 import { Button } from '@/Core/Ui/Button';
 import { useT } from '@/I18n/useT';
+import { ReloadBanner } from '@/Modules/System/Components/ReloadBanner';
 import { useMeta } from '@/Modules/System/Hooks/useMeta';
 
-export const SystemBanners = () => {
+const StatusBanner = () => {
   const t = useT();
   const meta = useMeta();
 
@@ -35,3 +36,10 @@ export const SystemBanners = () => {
 
   return null;
 };
+
+export const SystemBanners = () => (
+  <>
+    <ReloadBanner />
+    <StatusBanner />
+  </>
+);

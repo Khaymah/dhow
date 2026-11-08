@@ -22,6 +22,7 @@ type Deps struct {
 	Guard      *auth.Guard
 	Checks     []ReadinessCheck
 	Keys       KeyringReader
+	Doctor     DoctorOptions
 }
 
 func Policies() []policy.Rule {
@@ -30,14 +31,15 @@ func Policies() []policy.Rule {
 		policy.Public(http.MethodGet, "/health/ready"),
 		policy.Public(http.MethodGet, "/meta"),
 		policy.Instance(http.MethodGet, keysPath, policy.InstanceSettingsManage),
+		policy.Authenticated(http.MethodGet, doctorPath, policy.SessionManageSelf),
 	}
 }
 
 func Routes(r chi.Router, d Deps) {
-	controller := NewController(
-		NewHealthService(d.DB, d.Migrations, d.Log, d.Checks...),
-		NewMetaService(d.Queries, d.Build),
-	).WithKeys(d.Keys)
+	health := NewHealthService(d.DB, d.Migrations, d.Log, d.Checks...)
+	controller := NewController(health, NewMetaService(d.Queries, d.Build)).
+		WithKeys(d.Keys).
+		WithDoctor(NewDoctorService(health, d.Build, d.Doctor))
 	strict := gen.NewStrictHandlerWithOptions(controller, nil, gen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  middleware.StrictRequestError,
 		ResponseErrorHandlerFunc: middleware.StrictResponseError(d.Log),

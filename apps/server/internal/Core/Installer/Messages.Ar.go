@@ -2,6 +2,7 @@ package installer
 
 var arMessages = map[Key]string{ //nolint:gosec // User-facing text that names settings, not credentials.
 	KeyAborted:                 "توقفنا كما طلبت، ولم يتغير شيء.",
+	KeyAdviceClock:             "بين ساعة السيرفر وساعة قاعدة البيانات فرق أكبر من بضع ثوانٍ. هذا يفسد الرموز المؤقتة ومواعيد الانتهاء. فعّل مزامنة الوقت على الجهازين: timedatectl set-ntp true",
 	KeyAdviceDisk:              "وفّر بعض المساحة: احذف سجلات journal القديمة (journalctl --vacuum-size=200M) أو ذاكرة packages المؤقتة، أو كبّر القرص.",
 	KeyAdviceForwarded:         "يجب أن يرسل الـ proxy الترويسة X-Forwarded-For، وأن يشمل DHOW_TRUSTED_PROXIES عنوان الـ proxy كما يراه داو.",
 	KeyAdviceKeyring:           "استرجع ملف سلسلة المفاتيح من النسخة الاحتياطية أو من نسخته المصدّرة بـ age. لا يصنع doctor سلسلة جديدة أبدًا، لأن السلسلة الجديدة لا تفتح الأسرار المحفوظة بالقديمة. إذا ضاعت السلسلة نهائيًا، فالأمر dhow-server keys init --discard-unreadable يشغّل السيرفر من جديد ويمسح هذه الأسرار.",
@@ -45,6 +46,8 @@ var arMessages = map[Key]string{ //nolint:gosec // User-facing text that names s
 	KeyCertDays:                "تنتهي بعد %d يوم",
 	KeyCheckCPUs:               "أنوية المعالج",
 	KeyCheckCertificate:        "شهادة TLS",
+	KeyCheckClock:              "ساعة السيرفر مقارنة بساعة قاعدة البيانات",
+	KeyCheckStateDisk:          "المساحة الفارغة لبيانات السيرفر",
 	KeyCheckDisk:               "المساحة الفارغة في %s",
 	KeyCheckForwarded:          "الـ proxy يرسل عنوان العميل (X-Forwarded-For)",
 	KeyCheckHealth:             "نقطة الجاهزية",
