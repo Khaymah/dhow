@@ -518,6 +518,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/release-notes-seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark the release notes of a version as seen by the signed-in user
+         * @description Stores the newest version whose "What's new" card the user has dismissed, so the card shows once per user. It returns the preferences, with `ReleaseNotesSeen` set. Saving does not mark the other preferences as saved.
+         */
+        put: operations["saveReleaseNotesSeen"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/notification-mute": {
         parameters: {
             query?: never;
@@ -4723,6 +4743,9 @@ export interface components {
             /** Format: uuid */
             OrganizationId: string | null;
         };
+        SaveReleaseNotesSeenRequest: {
+            Version: string;
+        };
         Preferences: {
             Locale: components["schemas"]["Locale"];
             ThemeId: string;
@@ -4731,6 +4754,8 @@ export interface components {
             OrganizationId: string | null;
             /** @description False until the first save. */
             Saved: boolean;
+            /** @description The newest release version whose "What's new" card the user dismissed, or null. */
+            ReleaseNotesSeen?: string | null;
             /** Format: date-time */
             UpdatedAt?: string | null;
         };
@@ -6821,6 +6846,31 @@ export interface operations {
         };
         responses: {
             /** @description The saved preferences. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    saveReleaseNotesSeen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveReleaseNotesSeenRequest"];
+            };
+        };
+        responses: {
+            /** @description The preferences with the seen version. */
             200: {
                 headers: {
                     [name: string]: unknown;

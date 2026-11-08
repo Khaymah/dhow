@@ -22,6 +22,7 @@ export type TIconName =
   | 'check'
   | 'alert'
   | 'info'
+  | 'help'
   | 'queue'
   | 'back'
   | 'next'
@@ -150,6 +151,12 @@ export const ICONS: Record<TIconName, ReactElement> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.8M12 16.5h.01" />
     </>
   ),
   queue: (

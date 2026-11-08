@@ -112,6 +112,9 @@ type Preferences struct {
 	Locale         Locale              `json:"Locale"`
 	OrganizationId *openapi_types.UUID `json:"OrganizationId"`
 
+	// ReleaseNotesSeen The newest release version whose "What's new" card the user dismissed, or null.
+	ReleaseNotesSeen *string `json:"ReleaseNotesSeen,omitempty"`
+
 	// Saved False until the first save.
 	Saved     bool       `json:"Saved"`
 	ThemeId   string     `json:"ThemeId"`
@@ -139,6 +142,11 @@ type SavePreferencesRequest struct {
 	ThemeId        string              `json:"ThemeId"`
 }
 
+// SaveReleaseNotesSeenRequest defines model for SaveReleaseNotesSeenRequest.
+type SaveReleaseNotesSeenRequest struct {
+	Version string `json:"Version"`
+}
+
 // ThemeColors One `#rrggbb` color for every theme token, keyed by the token name (`canvas`, `t1`, `a1`, ...).
 type ThemeColors map[string]string
 
@@ -148,6 +156,9 @@ type Error = ErrorResponse
 // SavePreferencesJSONRequestBody defines body for SavePreferences for application/json ContentType.
 type SavePreferencesJSONRequestBody = SavePreferencesRequest
 
+// SaveReleaseNotesSeenJSONRequestBody defines body for SaveReleaseNotesSeen for application/json ContentType.
+type SaveReleaseNotesSeenJSONRequestBody = SaveReleaseNotesSeenRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetPreferences The signed-in user's display preferences
@@ -156,6 +167,9 @@ type ServerInterface interface {
 	// SavePreferences Replace the signed-in user's display preferences
 	// (PUT /me/preferences)
 	SavePreferences(w http.ResponseWriter, r *http.Request)
+	// SaveReleaseNotesSeen Mark the release notes of a version as seen by the signed-in user
+	// (PUT /me/release-notes-seen)
+	SaveReleaseNotesSeen(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -171,6 +185,12 @@ func (_ Unimplemented) GetPreferences(w http.ResponseWriter, r *http.Request) {
 // SavePreferences Replace the signed-in user's display preferences
 // (PUT /me/preferences)
 func (_ Unimplemented) SavePreferences(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SaveReleaseNotesSeen Mark the release notes of a version as seen by the signed-in user
+// (PUT /me/release-notes-seen)
+func (_ Unimplemented) SaveReleaseNotesSeen(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -202,6 +222,20 @@ func (siw *ServerInterfaceWrapper) SavePreferences(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SavePreferences(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SaveReleaseNotesSeen operation middleware
+func (siw *ServerInterfaceWrapper) SaveReleaseNotesSeen(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveReleaseNotesSeen(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -330,6 +364,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/me/preferences", wrapper.SavePreferences)
 	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/me/release-notes-seen", wrapper.SaveReleaseNotesSeen)
+	})
 
 	return r
 }
@@ -413,6 +450,45 @@ func (response SavePreferencesdefaultJSONResponse) VisitSavePreferencesResponse(
 	return err
 }
 
+type SaveReleaseNotesSeenRequestObject struct {
+	Body *SaveReleaseNotesSeenJSONRequestBody
+}
+
+type SaveReleaseNotesSeenResponseObject interface {
+	VisitSaveReleaseNotesSeenResponse(w http.ResponseWriter) error
+}
+
+type SaveReleaseNotesSeen200JSONResponse PreferencesResponse
+
+func (response SaveReleaseNotesSeen200JSONResponse) VisitSaveReleaseNotesSeenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveReleaseNotesSeendefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response SaveReleaseNotesSeendefaultJSONResponse) VisitSaveReleaseNotesSeenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// GetPreferences The signed-in user's display preferences
@@ -421,6 +497,9 @@ type StrictServerInterface interface {
 	// SavePreferences Replace the signed-in user's display preferences
 	// (PUT /me/preferences)
 	SavePreferences(ctx context.Context, request SavePreferencesRequestObject) (SavePreferencesResponseObject, error)
+	// SaveReleaseNotesSeen Mark the release notes of a version as seen by the signed-in user
+	// (PUT /me/release-notes-seen)
+	SaveReleaseNotesSeen(ctx context.Context, request SaveReleaseNotesSeenRequestObject) (SaveReleaseNotesSeenResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -510,6 +589,37 @@ func (sh *strictHandler) SavePreferences(w http.ResponseWriter, r *http.Request)
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SavePreferencesResponseObject); ok {
 		if err := validResponse.VisitSavePreferencesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SaveReleaseNotesSeen operation middleware
+func (sh *strictHandler) SaveReleaseNotesSeen(w http.ResponseWriter, r *http.Request) {
+	var request SaveReleaseNotesSeenRequestObject
+
+	var body SaveReleaseNotesSeenJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SaveReleaseNotesSeen(ctx, request.(SaveReleaseNotesSeenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SaveReleaseNotesSeen")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SaveReleaseNotesSeenResponseObject); ok {
+		if err := validResponse.VisitSaveReleaseNotesSeenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

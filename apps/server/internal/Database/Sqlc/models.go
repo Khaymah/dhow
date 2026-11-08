@@ -1202,6 +1202,15 @@ type UserPreference struct {
 	OrganizationId *uuid.UUID
 }
 
+type UserReleaseNote struct {
+	Id          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	IsDeleted   bool
+	UserId      uuid.UUID
+	SeenVersion string
+}
+
 type Variable struct {
 	Id              uuid.UUID
 	CreatedAt       time.Time

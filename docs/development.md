@@ -343,7 +343,7 @@ pnpm -C apps/web size
 1. في الفروع المسموح لها بالنشر، اسمح بـ `main` فقط.
 2. اطلب مراجِعًا، حتى ينتظر كل تشغيل الموافقة قبل أن يحصل على الأسرار.
 
-`make gen` يعيد توليد الكود من `packages/openapi/openapi.yaml` واستعلامات SQL، و`pnpm -C apps/web gen:api` يعيد توليد أنواع الـ API في الواجهة. لا تعدّل الملفات المولَّدة يدويًا أبدًا.
+`make gen` يعيد توليد الكود من `packages/openapi/openapi.yaml` واستعلامات SQL، و`pnpm -C apps/web gen:api` يعيد توليد أنواع الـ API في الواجهة، و`pnpm -C apps/web gen:help` يعيد توليد محتوى المساعدة من `docs/faq.md` و`docs/releases/` وأقسام من حل المشكلات. لا تعدّل الملفات المولَّدة يدويًا أبدًا.
 
 ### اختبار قنوات الإشعارات
 

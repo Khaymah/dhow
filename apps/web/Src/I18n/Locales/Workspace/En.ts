@@ -2,6 +2,7 @@ import { AboutEn } from '@/I18n/Locales/Workspace/AboutEn';
 import { ApprovalsEn } from '@/I18n/Locales/Workspace/ApprovalsEn';
 import { AuditEn } from '@/I18n/Locales/Workspace/AuditEn';
 import { EnvironmentsEn } from '@/I18n/Locales/Workspace/EnvironmentsEn';
+import { HelpEn } from '@/I18n/Locales/Workspace/HelpEn';
 import { HomeEn } from '@/I18n/Locales/Workspace/HomeEn';
 import { IngestEn } from '@/I18n/Locales/Workspace/IngestEn';
 import { JobsEn } from '@/I18n/Locales/Workspace/JobsEn';
@@ -422,4 +423,5 @@ export const WorkspaceEn: TWorkspaceMessages = {
   ...ApprovalsEn,
   ...ShellEn,
   ...AboutEn,
+  ...HelpEn,
 };

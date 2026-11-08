@@ -62,7 +62,7 @@
 - ممنوع أي نص مكتوب في الـ JSX أو في `aria-label` و`title` و`placeholder`: كل نص مفتاح بنفس المفاتيح في العربي والإنجليزي، ويتعرض بـ `t('key')`. نصوص الدخول والتنصيب وإطار الـ shell في `I18n/Locales/Boot/{Ar,En}.ts`، والباقي في `I18n/Locales/Workspace/{Ar,En}.ts` (ADR-0049).
 - الألوان من الـ tokens بس (`bg-canvas` و`text-secondary`)، ومفيش hex في الكود. الزرار الأساسي `bg-accent text-on-accent`، والخطوط الرفيعة `border-line` و`border-line-2`. ممنوع أي gradient أو edge-light في المكوّنات (بيفضل في اللوجو بس، ومختبر)، وممنوع drop shadow على الكروت، وممنوع نص أصغر من 13px ([ADR-0034](Plan/ADR/0034-ui-direction-calm-and-organized.md)).
 - الـ CSP هي `'self'`: ممنوع inline scripts أو styles، وممنوع `Dialog.Overlay` من Radix لأنه بيحقن `<style>` (استخدم الـ backdrop اللي في `SlideStack`، واختبارات `SlideStack` و`CommandPalette` بتتأكد إن مفيش `<style>` اتحقن). وzod لازم يشتغل بـ `z.config({ jitless: true })` (في `ThemeForm.ts`) لأن الـ JIT بيجرّب `new Function` وده بيطلّع violation.
-- `Schema.d.ts` بيتولّد بـ `pnpm gen:api` من `packages/openapi/openapi.yaml`، و`Tokens.css` بـ `pnpm gen:tokens`، وممنوع تعديلهم بإيدك.
+- `Schema.d.ts` بيتولّد بـ `pnpm gen:api` من `packages/openapi/openapi.yaml`، و`Tokens.css` بـ `pnpm gen:tokens`، وممنوع تعديلهم بإيدك. ومحتوى المساعدة في `Core/Help/Generated/` بيتولّد بـ `pnpm gen:help` من `docs/faq.md` و`docs/releases/` وأقسام من `docs/install/troubleshooting.md` (النسختين)، وبيرفض HTML خام وأي رابط بره `docs/` ومستودع داو، وـCI بيتأكد إنه محدّث.
 
 ممنوع ملفات Markdown بره `docs/` و`Plan/` و`.github/` و`.claude/`. الاستثناء: README وCONTRIBUTING وSECURITY (بالعربي) وجنبهم README.en وCONTRIBUTING.en وSECURITY.en، وCLAUDE وLICENSE في الـ root. ومفيش README.ar، لأن README نفسه بقى العربي.
 
