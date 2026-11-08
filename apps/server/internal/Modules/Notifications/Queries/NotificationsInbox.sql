@@ -51,3 +51,9 @@ RETURNING "Id", "CreatedAt", "OrganizationId", "EventId", "EventName", "TitleKey
 -- name: MarkAllNotificationInboxRead :execrows
 UPDATE "NotificationInbox" SET "IsRead" = true, "ReadAt" = @now::timestamptz, "UpdatedAt" = now()
 WHERE "UserId" = @user_id AND NOT "IsDeleted" AND NOT "IsRead";
+
+-- name: ListNotificationUserOrganizations :many
+SELECT m."OrganizationId" FROM "Memberships" m
+WHERE m."UserId" = @user_id AND NOT m."IsDeleted"
+ORDER BY m."CreatedAt", m."OrganizationId"
+LIMIT @max_organizations::integer;

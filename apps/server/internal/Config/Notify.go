@@ -52,6 +52,7 @@ const (
 	NotifyInboxAccountPerUser = 50
 	NotifyInboxPurgeBatch     = 1000
 	NotifyInboxLinkMax        = 512
+	NotifyInboxLiveOrgs       = 50
 	NotifyInboxPurgeEvery     = time.Hour
 )
 

@@ -123,8 +123,11 @@ func (s *Service) addInbox(ctx context.Context, q *sqlc.Queries, e inboxEntry) e
 	if e.self {
 		keep = config.NotifyInboxAccountPerUser
 	}
-	_, err = q.TrimNotificationInbox(ctx, sqlc.TrimNotificationInboxParams{UserID: e.user, IsAccount: e.self, Keep: keep})
-	return err
+	if _, err = q.TrimNotificationInbox(ctx, sqlc.TrimNotificationInboxParams{UserID: e.user, IsAccount: e.self, Keep: keep}); err != nil {
+		return err
+	}
+	s.inboxChanged(ctx, q, e.user)
+	return nil
 }
 
 func encodeInboxParams(values inboxValues) ([]byte, error) {
@@ -241,6 +244,7 @@ func (s *Service) MarkInboxRead(ctx context.Context, id uuid.UUID) (models.Inbox
 	if err != nil {
 		return models.InboxItem{}, err
 	}
+	s.inboxChanged(ctx, s.queries(), p.UserID)
 	return inboxItemOf(r.Id, r.CreatedAt, r.OrganizationId, r.EventId, r.EventName, r.TitleKey, r.Params, r.Link, r.IsRead, r.ReadAt), nil
 }
 
@@ -249,7 +253,11 @@ func (s *Service) MarkAllInboxRead(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return s.queries().MarkAllNotificationInboxRead(ctx, sqlc.MarkAllNotificationInboxReadParams{Now: s.now(), UserID: p.UserID})
+	n, err := s.queries().MarkAllNotificationInboxRead(ctx, sqlc.MarkAllNotificationInboxReadParams{Now: s.now(), UserID: p.UserID})
+	if err == nil && n > 0 {
+		s.inboxChanged(ctx, s.queries(), p.UserID)
+	}
+	return n, err
 }
 
 func (s *Service) PurgeInbox(ctx context.Context) error {

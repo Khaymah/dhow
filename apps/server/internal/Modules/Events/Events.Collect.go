@@ -22,6 +22,7 @@ const (
 	scopeNone scope = iota
 	scopeData
 	scopeTarget
+	scopeUser
 )
 
 type rule struct {
@@ -60,6 +61,7 @@ func rules() map[string]rule {
 		eventbus.IdentityInvitationAccepted:      {typ: models.TypeOverviewChanged},
 		eventbus.IdentityInvitationRevoked:       {typ: models.TypeOverviewChanged},
 		eventbus.NotificationChannelDisabled:     {typ: models.TypeOverviewChanged},
+		eventbus.NotificationInboxChanged:        {typ: models.TypeInboxChanged, scope: scopeUser},
 	}
 }
 
@@ -75,7 +77,7 @@ func ActionOf(typ string) policy.Action {
 	switch typ {
 	case models.TypeApprovalRequested:
 		return policy.DeploymentApprove
-	case models.TypeOverviewChanged:
+	case models.TypeOverviewChanged, models.TypeInboxChanged:
 		return policy.OrgRead
 	case models.TypeTargetChecked, models.TypeTargetCheckRequested, models.TypeTargetRollbackAsked:
 		return policy.ProjectRead
@@ -144,6 +146,12 @@ func (s *Service) noticeOf(ctx context.Context, q *sqlc.Queries, r rule, a event
 		}
 		n.TargetID, n.ProjectID, n.EnvironmentID = target, &row.ProjectId, &row.EnvironmentId
 		n.SubjectID = idOf(a.TargetID)
+	case scopeUser:
+		user := idOf(a.TargetID)
+		if user == nil {
+			return models.Notice{}, errors.New("the event names no user")
+		}
+		n.User = user
 	case scopeNone:
 	}
 	return n, nil

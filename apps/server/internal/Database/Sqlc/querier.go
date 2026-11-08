@@ -365,6 +365,7 @@ type Querier interface {
 	ListNotificationInbox(ctx context.Context, arg ListNotificationInboxParams) ([]ListNotificationInboxRow, error)
 	ListNotificationRecipients(ctx context.Context, arg ListNotificationRecipientsParams) ([]ListNotificationRecipientsRow, error)
 	ListNotificationRules(ctx context.Context, arg ListNotificationRulesParams) ([]NotificationRule, error)
+	ListNotificationUserOrganizations(ctx context.Context, arg ListNotificationUserOrganizationsParams) ([]uuid.UUID, error)
 	ListOfflineRunners(ctx context.Context, before time.Time) ([]ListOfflineRunnersRow, error)
 	ListOidcProviders(ctx context.Context) ([]ListOidcProvidersRow, error)
 	ListOidcProvidersForUpdate(ctx context.Context) ([]ListOidcProvidersForUpdateRow, error)

@@ -28,6 +28,7 @@ import (
 
 const (
 	targetChannel = "notification_channel"
+	targetInbox   = "notification_inbox"
 	targetRule    = "notification_rules"
 	targetTest    = "notification_test"
 )

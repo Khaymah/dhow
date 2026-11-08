@@ -191,6 +191,9 @@ func (st *Stream) send(out *streams.Writer, entries []entry) error {
 		return errEnded
 	}
 	for _, e := range entries {
+		if e.user != uuid.Nil && e.user != st.req.User {
+			continue
+		}
 		project := uuid.Nil
 		if e.event.ProjectID != nil {
 			project = *e.event.ProjectID
