@@ -57,6 +57,10 @@ func TestReleaseNotesSeenRejectsAnythingButAVersion(t *testing.T) {
 	for _, v := range []any{"", "latest", "1.2", "1.2.3; DROP TABLE", "1.2.3\n", "v1.2.3"} {
 		res := markSeen(owner, v)
 		assert.Equal(t, http.StatusUnprocessableEntity, res.Status, "%v: %s", v, string(res.Raw))
+		require.NotNil(t, res.Error)
+		require.NotEmpty(t, res.Error.Details)
+		assert.Equal(t, "Version", res.Error.Details[0].Field)
+		assert.Contains(t, res.Error.Details[0].Message, "رقم النسخة غير صالح")
 	}
 	assert.Equal(t, http.StatusBadRequest, markSeen(owner, 7).Status)
 }

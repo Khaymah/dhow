@@ -283,6 +283,7 @@ jobs:
           pnpm gen:tokens
           pnpm gen:help
           git diff --exit-code -- Src/Core/Api/Schema.d.ts Src/Styles/Tokens.css Src/Core/Help/Generated
+          test -z "$(git status --porcelain -- Src/Core/Help/Generated)"
       - name: Lint
         run: pnpm lint
       - name: Typecheck

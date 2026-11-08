@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -24,6 +24,12 @@ describe('the committed help files', () => {
     for (const [name, text] of Object.entries(generate())) {
       expect(readFileSync(join(OUTPUT, name), 'utf8'), name).toBe(text);
     }
+  });
+});
+
+describe('the generated folder', () => {
+  it('holds exactly the files the generator writes, so a file added by hand fails the tests', () => {
+    expect(readdirSync(OUTPUT).sort()).toEqual(Object.keys(generate()).sort());
   });
 });
 

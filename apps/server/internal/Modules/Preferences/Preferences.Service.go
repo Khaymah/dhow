@@ -148,7 +148,7 @@ func (s *Service) SaveReleaseNotesSeen(ctx context.Context, version string) (mod
 		return models.Preferences{}, err
 	}
 	if !versionPattern.MatchString(version) {
-		return models.Preferences{}, apperrors.ValidationFailed(apperrors.IErrorDetail{Field: fieldVersion, Message: messageLocale})
+		return models.Preferences{}, apperrors.ValidationFailed(apperrors.IErrorDetail{Field: fieldVersion, Message: messageVersion})
 	}
 	var out models.Preferences
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {

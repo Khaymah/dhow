@@ -22,6 +22,7 @@ const (
 	messageThemes       = "errors.preferenceThemes"
 	messageOrganization = "errors.preferenceOrganization"
 	messageLocale       = "errors.validationFailed"
+	messageVersion      = "errors.releaseVersion"
 )
 
 var (
