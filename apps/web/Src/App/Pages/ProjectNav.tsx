@@ -5,7 +5,7 @@ import { SectionNav } from '@/Core/Ui/SectionNav';
 import { useT } from '@/I18n/useT';
 import { canReadIngested } from '@/Modules/Ingest/Types/IngestAccess';
 
-export type TProjectTab = 'runs' | 'environments' | 'ingest' | 'secrets' | 'settings';
+export type TProjectTab = 'runs' | 'environments' | 'ingest' | 'notifications' | 'secrets' | 'settings';
 
 export const ProjectNav = ({ projectId, current, role }: { projectId: string; current: TProjectTab; role?: TRole }) => {
   const t = useT();
@@ -45,6 +45,15 @@ export const ProjectNav = ({ projectId, current, role }: { projectId: string; cu
               },
             ]
           : []),
+        {
+          id: 'notifications',
+          label: t('projects.nav.notifications'),
+          href: `/projects/${projectId}/notifications`,
+          current: current === 'notifications',
+          onSelect: () => {
+            void navigate({ to: '/projects/$projectId/notifications', params: { projectId } });
+          },
+        },
         ...(canReadSecrets(role)
           ? [
               {

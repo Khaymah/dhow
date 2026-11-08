@@ -2,7 +2,7 @@
 
 # Notifications
 
-Dhow tells you when something needs you: a deployment failed, a deployment waits for approval, a pipeline run failed, a runner stopped answering, or something changed in the security of an account. It sends the message by email, to a signed webhook of your own, or to a chat in Slack, Discord or Telegram.
+Dhow tells you when something needs you: a deployment failed, a deployment waits for approval, a pipeline run failed, a runner stopped answering, or something changed in the security of an account. It sends the message by email, to a signed webhook of your own, to a chat in Slack, Discord or Telegram, or to the notification inbox inside Dhow itself.
 
 ## What is sent, and when
 
@@ -16,7 +16,7 @@ Dhow tells you when something needs you: a deployment failed, a deployment waits
 | `account.second_factor_changed` | A second factor or a passkey was added or removed, or recovery codes were made again | none |
 | `member.removed` and `member.role_changed` | A member was removed, or their role changed | none |
 
-The account events reach the channels of the **organization** (not the channels of a project). The first sign-in of an account is not announced. A user also gets an email about a sign-in from a new device, in their own language, whatever the channels say.
+The account events reach the channels of the **organization** (not the channels of a project). The first sign-in of an account is not announced. A user also gets an email about a sign-in from a new device, in their own language, whatever the channels say. The account events also reach the inbox of the member they concern (see "The notification inbox").
 
 A message carries names and numbers only: the project, the environment, the branch, the run number, the status, a short reason code and a link to the page in Dhow. It never carries log lines, variable values, tokens or a full IP address. For an account event it shows the browser and the system, and the network part of the address (`203.0.113.0/24`).
 
@@ -27,6 +27,7 @@ A channel belongs to a project, or to the organization. A channel of the organiz
 | Kind | What it needs | What members see |
 |---|---|---|
 | `email` | Nothing. The rule chooses the member roles that get the email | The email, in the language of the channel |
+| `inapp` | Nothing. The rule chooses the member roles that get the notification | The notification, in the inbox inside Dhow |
 | `webhook` | An https address that Dhow may reach | `Host` and `HasSecret`, never the address |
 | `slack` | `Url`: the address of an Incoming Webhook | `Host` and `HasSecret`, never the address |
 | `discord` | `Url`: the address of a Webhook | `Host` and `HasSecret`, never the address |
@@ -60,11 +61,32 @@ The message goes to a chat in the service itself. Each service has a fixed host 
 - **A token error does not leave.** The Telegram token is part of the request path. When the connection fails, Dhow logs the failure code and the error text after it removes the address and the token from it.
 - Answers of the service: `429` and `5xx` are tried again on the schedule below. `401`, `403` and `404` (a revoked token or a deleted webhook) are final at once, and the channel stops after 10 failures.
 
+## The notification inbox
+
+The notification inbox is a page in Dhow (`/notifications`) that gathers your notifications. The number of unread ones shows on the bell in the top bar and refreshes every minute.
+
+- **What reaches it.** A channel of the kind `inapp` puts the notification in the inbox of every member who holds a role the rule chose, the same way an email reaches them. The events of your own account reach your own inbox without a channel: a sign-in from a new device, a change of the second factor or of the passkeys, and a change of your role in the organization.
+- **What is in it.** A title that Dhow translates into the language of the interface, simple values such as the project, the environment, the branch and the run number, and a link to a page inside Dhow. It never carries a token, a secret, an IP address or log lines. These values are shown as text only, and Dhow never reads any of them as HTML.
+- **The mute does not touch it.** Muting the notifications in the preferences stops the channel emails only. The inbox stays as it is.
+- **Limits.** The inbox keeps the last 200 notifications of each user and drops the ones older than the retention days (30 days, `DHOW_NOTIFY_RETENTION_DAYS`). A member sees only the notifications of the organizations they still belong to, and the ones about their own account.
+- **The API.** `GET /me/notifications` reads the page, `GET /me/notifications/unread-count` counts the unread ones, `POST /me/notifications/{notificationId}/read` marks one as read, and `POST /me/notifications/read-all` marks them all. All of them belong to the owner of the session only.
+
+## Using the interface
+
+- **Where.** On the page of a project, the tab "Notifications" (`/projects/<id>/notifications`).
+- **A new channel.** The button "New channel" opens a panel: the kind, the name, the language and the address, then your second step. Only whoever manages the project sees the button (a Maintainer or above), and the server refuses the request from anyone else.
+- **The signing secret** shows once after you create the webhook, or after "New secret". Copy it before you press "I am done". After that it stays nowhere: not in the page, not in the address, not in the memory of the browser.
+- **The rules.** The button "Rules" in the row of a channel: the events, the statuses and the environments, and the member roles for the email and inbox channels.
+- **A test message.** The button "Send a test message" queues it, and it shows in the delivery log. After 5 messages in a minute the page shows the limit and a countdown.
+- **The delivery log.** The state of each message, how many times it tried and the last code, and a button "Try again" for the messages that failed for good. Only whoever manages channels sees it.
+- **The personal mute.** In the preferences page: "Stop channel emails to my address".
+- **Read only.** Whoever does not manage channels (a Developer or a Viewer) reads the channels and their rules and does not see the buttons that create, test or delete.
+
 ## Rules and mute
 
 A channel has one rule: the events, the environments (empty means all) and the statuses it wants. A new channel starts with `deployment.finished`, `deployment.approval.requested` and `run.finished` for the statuses `failed`, `rolled_back`, `rollback_failed` and `awaiting_approval`. A successful deployment is **not** in the default, because it is noise. Add `succeeded` to the rule if you want it. The account events are in no default rule.
 
-An email channel also lists the member roles that get the email. A member who muted the notifications in their preferences gets none of the channel emails. The security emails of the account are never muted. The mute is personal and concerns email only: a Slack, Discord or Telegram message goes to a shared chat, not to a person, so nobody mutes it.
+An email channel and an inbox channel also list the member roles that get the email or the notification. A member who muted the notifications in their preferences gets none of the channel emails. The security emails of the account are never muted. The mute is personal and concerns email only, and it does not touch the inbox: a Slack, Discord or Telegram message goes to a shared chat, not to a person, so nobody mutes it.
 
 ## The signed webhook
 

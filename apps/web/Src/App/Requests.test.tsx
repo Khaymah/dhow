@@ -21,7 +21,8 @@ configure({ asyncUtilTimeout: 5000 });
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 const OVERVIEW = 'GET /api/v1/organizations/{id}/overview';
-const SHELL = ['GET /api/v1/me', 'GET /api/v1/meta', 'GET /api/v1/me/preferences', 'GET /api/v1/health/ready', OVERVIEW];
+const UNREAD = 'GET /api/v1/me/notifications/unread-count';
+const SHELL = ['GET /api/v1/me', 'GET /api/v1/meta', 'GET /api/v1/me/preferences', 'GET /api/v1/health/ready', OVERVIEW, UNREAD];
 const ORG = 'GET /api/v1/organizations/{id}';
 const JOBS = 'GET /api/v1/organizations/{id}/jobs';
 const RUNNERS = 'GET /api/v1/organizations/{id}/runners';
@@ -106,9 +107,9 @@ const ROUTES: readonly [string, string, readonly string[]][] = [
       'GET /api/v1/me/api-tokens',
     ],
   ],
-  ['/account/preferences', Ar['shell.nav.preferences'], []],
+  ['/account/preferences', Ar['shell.nav.preferences'], ['GET /api/v1/me/notification-mute']],
   ['/organizations', Ar['organizations.title'], []],
-  ['/notifications', Ar['notifications.title'], []],
+  ['/notifications', Ar['notifications.title'], ['GET /api/v1/me/notifications']],
 ];
 
 afterEach(() => {

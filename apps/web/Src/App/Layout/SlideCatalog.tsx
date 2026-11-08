@@ -1,4 +1,5 @@
 import {
+  LazyChannelNewBody,
   LazyDecisionBody,
   LazyEnvironmentNewBody,
   LazyInviteBody,
@@ -177,6 +178,11 @@ const BUILDERS: Record<Exclude<TStaticSlideId, 'theme-edit'>, TBuilder> = {
     title: t('ingest.new.title'),
     subtitle: <span>{t('ingest.new.subtitle')}</span>,
     children: <LazyIngestTokenNewBody projectId={projectId} role={projectRole} active={projectActive} onDone={close} />,
+  }),
+  'notification-channel-new': ({ t, projectId, projectRole, projectActive, close }) => ({
+    title: t('notifications.new.title'),
+    subtitle: <span>{t('notifications.new.subtitle')}</span>,
+    children: <LazyChannelNewBody projectId={projectId} role={projectRole} active={projectActive} onDone={close} />,
   }),
   'account-token-new': ({ t, close }) => ({
     title: t('tokens.slide.title'),

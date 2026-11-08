@@ -27,6 +27,10 @@ export const SHELL_PAGES = {
     () => import('@/App/Pages/ProjectIngestPage').then((module) => module.ProjectIngestPage),
     member,
   ),
+  projectNotifications: lazyPage(
+    () => import('@/App/Pages/ProjectNotificationsPage').then((module) => module.ProjectNotificationsPage),
+    member,
+  ),
   environment: lazyPage(() => import('@/App/Pages/EnvironmentPage').then((module) => module.EnvironmentPage), member),
   target: lazyPage(() => import('@/App/Pages/TargetPage').then((module) => module.TargetPage), member),
   run: lazyPage(() => import('@/App/Pages/RunPage').then((module) => module.RunPage), member),
