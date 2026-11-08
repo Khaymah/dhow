@@ -24,7 +24,6 @@ type Hub struct {
 	seq   uint64
 	epoch int64
 	subs  map[uuid.UUID]map[chan struct{}]struct{}
-	now   func() time.Time
 	down  bool
 }
 
