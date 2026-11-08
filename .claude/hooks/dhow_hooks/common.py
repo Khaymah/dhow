@@ -5,6 +5,7 @@ TS_EXT = (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")
 GENERATED_PATH = re.compile(
     r"(^|/)(gen|sqlc)/|\.gen\.go$|_gen\.go$|"
     r"(^|/)apps/web/Src/Core/Api/Schema\.d\.ts$|(^|/)apps/web/Src/Styles/Tokens\.css$|"
+    r"(^|/)apps/web/Src/Core/Help/Generated/|"
     r"(^|/)(go\.sum|pnpm-lock\.yaml)$", re.IGNORECASE)
 
 

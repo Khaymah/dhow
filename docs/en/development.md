@@ -343,7 +343,7 @@ Both need cgroup v2, remove their containers and volumes at the end (`DHOW_DEMO_
 1. Under deployment branches, allow `main` only.
 2. Require a reviewer, so each run waits for approval before it gets the secrets.
 
-`make gen` regenerates the code from `packages/openapi/openapi.yaml` and the SQL queries, and `pnpm -C apps/web gen:api` regenerates the web API types. Never edit generated files by hand.
+`make gen` regenerates the code from `packages/openapi/openapi.yaml` and the SQL queries, `pnpm -C apps/web gen:api` regenerates the web API types, and `pnpm -C apps/web gen:help` regenerates the help content from `docs/faq.md`, `docs/releases/` and sections of the troubleshooting page. Never edit generated files by hand.
 
 ## The runner
 

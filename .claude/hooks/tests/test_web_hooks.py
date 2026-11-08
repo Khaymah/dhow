@@ -66,6 +66,21 @@ class WebGeneratedRules(unittest.TestCase):
         for rel in ("apps/web/Src/Core/Api/Schema.d.ts", "apps/web/Src/Styles/Tokens.css", "apps/web/pnpm-lock.yaml"):
             self.assertIn("generated", edit(rel, "x", exists=True), rel)
 
+    def test_generated_help_files_are_blocked(self):
+        for name in ("HelpContentAr.ts", "HelpContentEn.ts", "ReleaseMeta.ts"):
+            rel = "apps/web/Src/Core/Help/Generated/" + name
+            message = edit(rel, "export const A = 1;\n", exists=True)
+            self.assertIn("generated", message, rel)
+            self.assertIn("pnpm gen:help", message, rel)
+
+    def test_a_new_file_in_the_generated_help_folder_is_blocked_too(self):
+        self.assertIn("generated", edit("apps/web/Src/Core/Help/Generated/Other.ts", "export const A = 1;\n"))
+
+    def test_the_help_types_and_links_are_not_generated(self):
+        for rel in ("apps/web/Src/Core/Help/HelpTypes.ts", "apps/web/Src/Core/Help/DocLinks.ts",
+                    "apps/web/Src/Core/Help/DocsUrl.ts"):
+            self.assertIsNone(edit(rel, "export const A = 1;\n", exists=True), rel)
+
     def test_the_token_source_is_not_generated(self):
         self.assertIsNone(edit("apps/web/Src/Styles/Tokens.json", "{}\n", exists=True))
 

@@ -125,8 +125,8 @@ def is_go(path):
 def check_generated(rel, **_):
     if GENERATED_PATH.search(rel):
         return (f"{rel} is generated or a lockfile. Do not edit it by hand: change the source "
-                "(packages/openapi/openapi.yaml, packages/proto/**/*.proto, SQL queries, go.mod, package.json, apps/web/Src/Styles/Tokens.json) and run "
-                "`make gen`, `go mod tidy`, `pnpm install`, `pnpm gen:api` or `pnpm gen:tokens`.")
+                "(packages/openapi/openapi.yaml, packages/proto/**/*.proto, SQL queries, go.mod, package.json, apps/web/Src/Styles/Tokens.json, docs/faq.md, docs/en/faq.md, docs/releases/) and run "
+                "`make gen`, `go mod tidy`, `pnpm install`, `pnpm gen:api`, `pnpm gen:tokens` or `pnpm gen:help`.")
     return None
 
 
