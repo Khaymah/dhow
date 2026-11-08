@@ -63,6 +63,7 @@ type Querier interface {
 	CountNotificationChannels(ctx context.Context, arg CountNotificationChannelsParams) (int64, error)
 	CountNotificationConfigsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
 	CountNotificationDevices(ctx context.Context, userID uuid.UUID) (int64, error)
+	CountNotificationInbox(ctx context.Context, arg CountNotificationInboxParams) (int64, error)
 	CountNotificationOutboxByScope(ctx context.Context, arg CountNotificationOutboxByScopeParams) (int64, error)
 	CountNotificationTestsSince(ctx context.Context, arg CountNotificationTestsSinceParams) (int64, error)
 	CountOidcProviderSecretsUnder(ctx context.Context, dataKeys [][]byte) (int64, error)
@@ -240,6 +241,7 @@ type Querier interface {
 	GetVariableForUpdate(ctx context.Context, arg GetVariableForUpdateParams) (Variable, error)
 	GroupBlocked(ctx context.Context, arg GroupBlockedParams) (bool, error)
 	HasIdentityForProvider(ctx context.Context, arg HasIdentityForProviderParams) (bool, error)
+	HideNotificationInboxOfOrganization(ctx context.Context, arg HideNotificationInboxOfOrganizationParams) (int64, error)
 	HoldEnvironment(ctx context.Context, arg HoldEnvironmentParams) error
 	IngestTargetProject(ctx context.Context, arg IngestTargetProjectParams) (IngestTargetProjectRow, error)
 	IngestTokenBytes(ctx context.Context, tokenID uuid.UUID) (int64, error)
@@ -271,6 +273,7 @@ type Querier interface {
 	InsertLogChunks(ctx context.Context, arg InsertLogChunksParams) (int64, error)
 	InsertMembership(ctx context.Context, arg InsertMembershipParams) error
 	InsertNotificationChannel(ctx context.Context, arg InsertNotificationChannelParams) (NotificationChannel, error)
+	InsertNotificationInbox(ctx context.Context, arg InsertNotificationInboxParams) (int64, error)
 	InsertNotificationRule(ctx context.Context, arg InsertNotificationRuleParams) (NotificationRule, error)
 	InsertOidcFlow(ctx context.Context, arg InsertOidcFlowParams) (uuid.UUID, error)
 	InsertOidcProvider(ctx context.Context, arg InsertOidcProviderParams) (int64, error)
@@ -336,7 +339,6 @@ type Querier interface {
 	ListDeployments(ctx context.Context, arg ListDeploymentsParams) ([]Deployment, error)
 	ListDoneBackfills(ctx context.Context, names []string) ([]string, error)
 	ListDriftedRunJobs(ctx context.Context, arg ListDriftedRunJobsParams) ([]ListDriftedRunJobsRow, error)
-	ListEmailCandidates(ctx context.Context, arg ListEmailCandidatesParams) ([]ListEmailCandidatesRow, error)
 	ListEnvironmentReach(ctx context.Context, arg ListEnvironmentReachParams) ([]ListEnvironmentReachRow, error)
 	ListEnvironmentReviewers(ctx context.Context, arg ListEnvironmentReviewersParams) ([]ListEnvironmentReviewersRow, error)
 	ListEnvironments(ctx context.Context, arg ListEnvironmentsParams) ([]Environment, error)
@@ -360,6 +362,8 @@ type Querier interface {
 	ListMembers(ctx context.Context, arg ListMembersParams) ([]ListMembersRow, error)
 	ListNotificationChannels(ctx context.Context, arg ListNotificationChannelsParams) ([]NotificationChannel, error)
 	ListNotificationCreatorAccess(ctx context.Context, arg ListNotificationCreatorAccessParams) ([]ListNotificationCreatorAccessRow, error)
+	ListNotificationInbox(ctx context.Context, arg ListNotificationInboxParams) ([]ListNotificationInboxRow, error)
+	ListNotificationRecipients(ctx context.Context, arg ListNotificationRecipientsParams) ([]ListNotificationRecipientsRow, error)
 	ListNotificationRules(ctx context.Context, arg ListNotificationRulesParams) ([]NotificationRule, error)
 	ListOfflineRunners(ctx context.Context, before time.Time) ([]ListOfflineRunnersRow, error)
 	ListOidcProviders(ctx context.Context) ([]ListOidcProvidersRow, error)
@@ -464,6 +468,7 @@ type Querier interface {
 	LockUsersOfProvider(ctx context.Context, provider string) ([]uuid.UUID, error)
 	LockWebhookHook(ctx context.Context, arg LockWebhookHookParams) error
 	LogPartitionReady(ctx context.Context) (bool, error)
+	MarkAllNotificationInboxRead(ctx context.Context, arg MarkAllNotificationInboxReadParams) (int64, error)
 	MarkCommitStatusFailed(ctx context.Context, arg MarkCommitStatusFailedParams) error
 	MarkCommitStatusSent(ctx context.Context, arg MarkCommitStatusSentParams) error
 	MarkDataKeyUnreadable(ctx context.Context, id uuid.UUID) (int64, error)
@@ -476,6 +481,7 @@ type Querier interface {
 	MarkLateResultLogged(ctx context.Context, arg MarkLateResultLoggedParams) error
 	MarkMfaReset(ctx context.Context, arg MarkMfaResetParams) error
 	MarkMutationStarted(ctx context.Context, id uuid.UUID) error
+	MarkNotificationInboxRead(ctx context.Context, arg MarkNotificationInboxReadParams) (MarkNotificationInboxReadRow, error)
 	MarkReleaseDeploymentRunning(ctx context.Context, arg MarkReleaseDeploymentRunningParams) error
 	MarkReleaseHostsUnknown(ctx context.Context, arg MarkReleaseHostsUnknownParams) (int64, error)
 	MarkSetupTokenUsed(ctx context.Context, arg MarkSetupTokenUsedParams) error
@@ -517,6 +523,7 @@ type Querier interface {
 	PurgeAuthChallenges(ctx context.Context, arg PurgeAuthChallengesParams) (int64, error)
 	PurgeInvitations(ctx context.Context, arg PurgeInvitationsParams) (int64, error)
 	PurgeLoginThrottles(ctx context.Context, arg PurgeLoginThrottlesParams) (int64, error)
+	PurgeNotificationInbox(ctx context.Context, arg PurgeNotificationInboxParams) (int64, error)
 	PurgeNotificationOutbox(ctx context.Context, arg PurgeNotificationOutboxParams) (int64, error)
 	PurgeOidcFlows(ctx context.Context, arg PurgeOidcFlowsParams) (int64, error)
 	PurgeRateLimits(ctx context.Context, arg PurgeRateLimitsParams) (int64, error)
@@ -685,6 +692,7 @@ type Querier interface {
 	TouchSecretsUsed(ctx context.Context, arg TouchSecretsUsedParams) error
 	TouchServerInstance(ctx context.Context, id uuid.UUID) (int64, error)
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
+	TrimNotificationInbox(ctx context.Context, arg TrimNotificationInboxParams) (int64, error)
 	TrustedShaOnRef(ctx context.Context, arg TrustedShaOnRefParams) (bool, error)
 	TryBlobSweepLock(ctx context.Context, lockKey int64) (bool, error)
 	TryLockBackfill(ctx context.Context, name string) (bool, error)

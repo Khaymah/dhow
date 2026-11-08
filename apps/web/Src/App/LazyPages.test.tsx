@@ -6,6 +6,7 @@ import { approvalsRoute, newApprovalsState } from '@/Core/Testing/ApprovalsBacke
 import { auditFixture, startBackend, type TRouteHandler } from '@/Core/Testing/Backend';
 import { ENVIRONMENT_NAME, environmentsRoute, newEnvironmentsState } from '@/Core/Testing/EnvironmentsBackend';
 import { apiUp, envelope } from '@/Core/Testing/Fetch';
+import { newNotificationsState, notificationsRoute } from '@/Core/Testing/NotificationsBackend';
 import { newTargetsManageState, targetsManageRoute } from '@/Core/Testing/TargetsManageBackend';
 import { newTargetsState, targetsRoute } from '@/Core/Testing/TargetsBackend';
 import { ok, PROJECT_ID, projectFixture, projectsRoute } from '@/Core/Testing/ProjectsBackend';
@@ -39,6 +40,8 @@ const aboutRoutes = (): TRouteHandler[] => [
       : undefined,
 ];
 
+const notificationRoutes = (): TRouteHandler[] => [notificationsRoute(newNotificationsState())];
+
 const approvalRoutes = (): TRouteHandler[] => [approvalsRoute(newApprovalsState())];
 
 configure({ asyncUtilTimeout: 5000 });
@@ -56,7 +59,13 @@ const CASES: IPageCase[] = [
   { url: '/account/security', title: Ar['shell.nav.security'], body: (main) => within(main).findByText(Ar['account.sessions.title']) },
   { url: '/audit', title: Ar['audit.title'], body: (main) => within(main).findByRole('list', { name: Ar['audit.list.title'] }) },
   { url: '/org/members', title: Ar['shell.nav.members'], body: (main) => within(main).findByRole('list', { name: Ar['members.title'] }) },
-  { url: '/notifications', title: Ar['notifications.title'], body: (main) => within(main).findByText(Ar['notifications.empty']) },
+  { url: '/notifications', title: Ar['notifications.title'], body: (main) => within(main).findByRole('button', { name: Ar['notifications.inbox.markAll'] }), routes: notificationRoutes },
+  {
+    url: `/projects/${PROJECT_ID}/notifications`,
+    title: 'Web app',
+    body: (main) => within(main).findByRole('list', { name: Ar['notifications.channels.title'] }),
+    routes: () => [...notificationRoutes(), ...environmentRoutes()],
+  },
   {
     url: '/approvals',
     title: Ar['approvals.page.title'],

@@ -9,6 +9,7 @@ import { Button } from '@/Core/Ui/Button';
 import { IconButton } from '@/Core/Ui/IconButton';
 import { TopBar } from '@/Core/Ui/TopBar';
 import { otherLocale } from '@/I18n/Locale';
+import { useUnreadCount } from '@/Modules/Notifications/Hooks/useUnreadCount';
 import { useI18n } from '@/I18n/useI18n';
 
 export const ShellTopBar = () => {
@@ -16,6 +17,7 @@ export const ShellTopBar = () => {
   const navigate = useNavigate();
   const SetPaletteOpen = usePaletteStore((state) => state.SetOpen);
   const target = otherLocale(Locale);
+  const unread = useUnreadCount(true);
 
   return (
     <TopBar
@@ -41,7 +43,8 @@ export const ShellTopBar = () => {
       />
       <IconButton
         icon="bell"
-        label={t('shell.notifications')}
+        label={unread > 0 ? t('shell.notifications.unread') : t('shell.notifications')}
+        count={unread}
         onClick={() => {
           void navigate({ to: '/notifications' });
         }}

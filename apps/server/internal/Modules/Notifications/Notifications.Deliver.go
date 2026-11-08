@@ -135,6 +135,7 @@ func (s *Service) Settled(ctx context.Context, item outbox.Item, res outbox.Resu
 func (s *Service) Deliverers() map[outbox.Kind]outbox.Deliverer {
 	return map[outbox.Kind]outbox.Deliverer{
 		outbox.KindEmail:         emailDeliverer{s: s},
+		outbox.KindInApp:         inboxDeliverer{s: s},
 		outbox.KindWebhook:       webhookDeliverer{s: s},
 		outbox.KindInternalEmail: internalMailDeliverer{s: s},
 		outbox.KindSlack:         chatDeliverer{s: s, kind: models.KindSlack},
@@ -186,6 +187,8 @@ func (s *Service) Run(ctx context.Context) {
 func (s *Service) scanLoop(ctx context.Context) {
 	ticker := time.NewTicker(config.NotifyOfflineScanEvery)
 	defer ticker.Stop()
+	purge := time.NewTicker(config.NotifyInboxPurgeEvery)
+	defer purge.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -193,6 +196,10 @@ func (s *Service) scanLoop(ctx context.Context) {
 		case <-ticker.C:
 			if err := s.ScanRunners(ctx); err != nil {
 				s.log.WarnContext(ctx, "runner outage scan failed", "error", err)
+			}
+		case <-purge.C:
+			if err := s.PurgeInbox(ctx); err != nil {
+				s.log.WarnContext(ctx, "inbox cleanup failed", "error", err)
 			}
 		}
 	}

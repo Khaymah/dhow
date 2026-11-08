@@ -18,6 +18,16 @@ describe('IconButton', () => {
     expect(container.querySelector('i')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('puts the visible unread count in the accessible name, and caps it at 99', () => {
+    const { rerender } = renderUi(<IconButton icon="bell" label="Open notifications, unread:" count={3} />);
+    const button = screen.getByRole('button', { name: 'Open notifications, unread: 3' });
+    expect(button).not.toHaveAttribute('aria-label');
+    rerender(<IconButton icon="bell" label="Open notifications, unread:" count={250} />);
+    expect(screen.getByRole('button', { name: 'Open notifications, unread: 99+' })).toBeInTheDocument();
+    rerender(<IconButton icon="bell" label="Open notifications" count={0} />);
+    expect(screen.getByRole('button', { name: 'Open notifications' })).toHaveAttribute('aria-label', 'Open notifications');
+  });
+
   it('has a thin line, and drops it when plain', () => {
     renderUi(
       <>

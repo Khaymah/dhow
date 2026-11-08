@@ -8,6 +8,7 @@ import { HomeEn } from '@/I18n/Locales/Workspace/HomeEn';
 import { IngestEn } from '@/I18n/Locales/Workspace/IngestEn';
 import { JobsEn } from '@/I18n/Locales/Workspace/JobsEn';
 import { LogViewerEn } from '@/I18n/Locales/Workspace/LogViewerEn';
+import { NotificationsEn } from '@/I18n/Locales/Workspace/NotificationsEn';
 import { OrganizationEn } from '@/I18n/Locales/Workspace/OrganizationEn';
 import { OrgPagesEn } from '@/I18n/Locales/Workspace/OrgPagesEn';
 import { OidcSettingsEn } from '@/I18n/Locales/Workspace/OidcSettingsEn';
@@ -424,6 +425,7 @@ export const WorkspaceEn: TWorkspaceMessages = {
   ...ApprovalsEn,
   ...BoardsEn,
   ...ShellEn,
+  ...NotificationsEn,
   ...AboutEn,
   ...HelpEn,
 };

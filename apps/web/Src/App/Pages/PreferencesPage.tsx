@@ -8,6 +8,7 @@ import { LOCALES } from '@/I18n/Locale';
 import { useI18n } from '@/I18n/useI18n';
 import { AppearanceBody } from '@/Modules/Appearance/Components/AppearanceBody';
 import { AppearanceFooter } from '@/Modules/Appearance/Components/AppearanceFooter';
+import { MuteCard } from '@/Modules/Notifications/Components/MuteCard';
 
 const LanguageCard = () => {
   const { Locale, SetLocale, t } = useI18n();
@@ -45,6 +46,7 @@ export const PreferencesPage = () => {
       nav={<AccountNav />}
     >
       <LanguageCard />
+      <MuteCard />
       <AppearanceBody
         onEdit={(themeId) => {
           open(themeEditSlide(themeId));

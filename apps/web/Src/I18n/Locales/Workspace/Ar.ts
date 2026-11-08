@@ -8,6 +8,7 @@ import { HomeAr } from '@/I18n/Locales/Workspace/HomeAr';
 import { IngestAr } from '@/I18n/Locales/Workspace/IngestAr';
 import { JobsAr } from '@/I18n/Locales/Workspace/JobsAr';
 import { LogViewerAr } from '@/I18n/Locales/Workspace/LogViewerAr';
+import { NotificationsAr } from '@/I18n/Locales/Workspace/NotificationsAr';
 import { OrganizationAr } from '@/I18n/Locales/Workspace/OrganizationAr';
 import { OrgPagesAr } from '@/I18n/Locales/Workspace/OrgPagesAr';
 import { OidcSettingsAr } from '@/I18n/Locales/Workspace/OidcSettingsAr';
@@ -423,6 +424,7 @@ export const WorkspaceAr = {
   ...ApprovalsAr,
   ...BoardsAr,
   ...ShellAr,
+  ...NotificationsAr,
   ...AboutAr,
   ...HelpAr,
 } as const;

@@ -59,7 +59,7 @@ func validRule(kind string, r models.Rule) []apperrors.IErrorDetail {
 		details = append(details, invalid(fieldEnvironments))
 	}
 	badRole := slices.ContainsFunc(r.Roles, func(v string) bool { _, ok := policy.ParseRole(v); return !ok })
-	if len(r.Roles) > config.NotifyRolesMax || badRole || (kind == models.KindEmail) == (len(r.Roles) == 0) {
+	if len(r.Roles) > config.NotifyRolesMax || badRole || models.ByRole(kind) == (len(r.Roles) == 0) {
 		details = append(details, invalid(fieldRoles))
 	}
 	return details

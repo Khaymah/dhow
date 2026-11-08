@@ -12,6 +12,7 @@ const ENVIRONMENT = 'a11y-check';
 interface IPlace {
   Name: string;
   Path: string;
+  Slide?: boolean;
 }
 
 let owner: ISession;
@@ -32,14 +33,17 @@ const places = (): IPlace[] => [
   { Name: 'preferences', Path: '/account/preferences' },
   { Name: 'deploy board', Path: `/projects/${stack().ProjectId}/deploy` },
   { Name: 'about', Path: '/about' },
+  { Name: 'notifications', Path: '/notifications' },
+  { Name: 'channels', Path: `/projects/${stack().ProjectId}/notifications` },
+  { Name: 'new channel', Path: `/projects/${stack().ProjectId}/notifications?slide=notification-channel-new`, Slide: true },
   { Name: 'help', Path: '/help' },
 ];
 
 const describeFindings = (findings: IFinding[]): string[] =>
   findings.map((finding) => `${finding.Rule} (${finding.Impact}): ${finding.Help} -> ${finding.Targets.join(' | ')}`);
 
-const ready = async (page: Page): Promise<void> => {
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+const ready = async (page: Page, slide = false): Promise<void> => {
+  await expect(slide ? page.getByRole('dialog') : page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.waitForLoadState('networkidle');
 };
 
@@ -87,7 +91,7 @@ for (const lang of LANGS) {
       await signInPage(view, stack().Owner, owner);
       for (const place of places()) {
         await page.goto(place.Path);
-        await ready(page);
+        await ready(page, place.Slide === true);
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
         const result = await scan(page);
         blocking.push(...describeFindings(result.Blocking).map((line) => `${place.Name}: ${line}`));

@@ -276,7 +276,7 @@ func (s *Service) fanOut(ctx context.Context, q *sqlc.Queries, org uuid.UUID, pr
 			OrganizationID: org, ProjectID: r.ChannelProjectId, ChannelID: &channel, Kind: outbox.Kind(r.Kind),
 			EventID: n.EventID, EventName: n.Event, Payload: raw, NextAttemptAt: s.now(),
 		}
-		if r.Kind != models.KindEmail {
+		if !models.ByRole(r.Kind) {
 			if _, err := outbox.Enqueue(ctx, q, base); err != nil {
 				return err
 			}
@@ -291,8 +291,10 @@ func (s *Service) fanOut(ctx context.Context, q *sqlc.Queries, org uuid.UUID, pr
 	return nil
 }
 
-func (s *Service) mailRecipients(ctx context.Context, q *sqlc.Queries, org uuid.UUID, project *uuid.UUID, roles []string) ([]uuid.UUID, error) {
-	rows, err := q.ListEmailCandidates(ctx, sqlc.ListEmailCandidatesParams{OrganizationID: org, ProjectID: project})
+func (s *Service) mailRecipients(
+	ctx context.Context, q *sqlc.Queries, org uuid.UUID, project *uuid.UUID, roles []string, inApp bool,
+) ([]uuid.UUID, error) {
+	rows, err := q.ListNotificationRecipients(ctx, sqlc.ListNotificationRecipientsParams{OrganizationID: org, ProjectID: project, InApp: inApp})
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +320,8 @@ func (s *Service) mailRecipients(ctx context.Context, q *sqlc.Queries, org uuid.
 func (s *Service) enqueueMail(
 	ctx context.Context, q *sqlc.Queries, base outbox.Entry, project *uuid.UUID, roles []string, budget int,
 ) (int, error) {
-	recipients, err := s.mailRecipients(ctx, q, base.OrganizationID, project, roles)
+	inApp := base.Kind == outbox.KindInApp
+	recipients, err := s.mailRecipients(ctx, q, base.OrganizationID, project, roles, inApp)
 	if err != nil {
 		return 0, err
 	}
@@ -329,12 +332,14 @@ func (s *Service) enqueueMail(
 			s.log.WarnContext(ctx, "notification email recipients capped for one event", "event", base.EventName)
 			break
 		}
-		recent, err := q.CountRecentChannelEmails(ctx, sqlc.CountRecentChannelEmailsParams{UserID: &user, Since: since})
-		if err != nil {
-			return used, err
-		}
-		if recent >= config.NotifyEmailPerUserHour {
-			continue
+		if !inApp {
+			recent, err := q.CountRecentChannelEmails(ctx, sqlc.CountRecentChannelEmailsParams{UserID: &user, Since: since})
+			if err != nil {
+				return used, err
+			}
+			if recent >= config.NotifyEmailPerUserHour {
+				continue
+			}
 		}
 		entry := base
 		entry.RecipientUserID = &user

@@ -10,6 +10,7 @@ import {
 } from '@/Core/Auth/AuthTypes';
 import { isCustomThemeId } from '@/Core/Theme/ThemeIds';
 import { canManageIngest } from '@/Modules/Ingest/Types/IngestAccess';
+import { canManageNotifications } from '@/Modules/Notifications/Types/NotificationsAccess';
 import { canBypassDeployments } from '@/Modules/Approvals/Types/ApprovalAccess';
 import type { TDecision } from '@/Modules/Approvals/Types/Gate';
 import { canManageEnvironments } from '@/Modules/Environments/Types/EnvironmentAccess';
@@ -38,6 +39,7 @@ const STATIC_SLIDES = [
   'registry-new',
   'environment-new',
   'ingest-token-new',
+  'notification-channel-new',
 ] as const;
 const THEME_EDIT_PREFIX = 'theme-edit-';
 const OIDC_EDIT_PREFIX = 'oidc-edit-';
@@ -132,7 +134,7 @@ export const themeOf = (id: TSlideId): string | null =>
 
 export const isThemeEditSlide = (id: TSlideId): boolean => id === 'theme-edit' || id.startsWith(THEME_EDIT_PREFIX);
 
-const PROJECT_SLIDES: readonly TStaticSlideId[] = ['secret-new', 'variable-new', 'registry-new', 'environment-new', 'ingest-token-new'];
+const PROJECT_SLIDES: readonly TStaticSlideId[] = ['secret-new', 'variable-new', 'registry-new', 'environment-new', 'ingest-token-new', 'notification-channel-new'];
 
 export const isProjectSlide = (id: TSlideId): boolean => PROJECT_SLIDES.some((slide) => slide === id);
 
@@ -160,6 +162,7 @@ const SLIDE_GATES: Partial<Record<TStaticSlideId, (role: TRole | undefined) => b
   'organization-leave': (role) => role !== undefined,
   'environment-new': canManageEnvironments,
   'ingest-token-new': canManageIngest,
+  'notification-channel-new': canManageNotifications,
 };
 
 const isStaticSlide = (id: TSlideId): id is TStaticSlideId => STATIC_SLIDES.some((slide) => slide === id);
@@ -172,7 +175,7 @@ export const slideAllowed = (id: TSlideId, role: TRole | undefined, projectRole?
   const acting = scope === 'organization' ? role : (projectRole ?? role);
   if (SECRET_SLIDES.some((slide) => slide === id)) return SECRET_GATES[scope](acting);
   const gate = isStaticSlide(id) ? SLIDE_GATES[id] : undefined;
-  return gate === undefined || gate(id === 'ingest-token-new' ? (projectRole ?? role) : acting);
+  return gate === undefined || gate(id === 'ingest-token-new' || id === 'notification-channel-new' ? (projectRole ?? role) : acting);
 };
 
 const legacyStack = (raw: unknown): string | undefined => {

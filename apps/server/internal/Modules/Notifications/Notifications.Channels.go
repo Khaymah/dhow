@@ -231,7 +231,7 @@ func (s *Service) insertChannel(
 		return sqlc.NotificationChannel{}, err
 	}
 	roles := []string{}
-	if in.Kind == models.KindEmail {
+	if models.ByRole(in.Kind) {
 		roles = defaultRoles()
 	}
 	_, err = q.InsertNotificationRule(ctx, sqlc.InsertNotificationRuleParams{

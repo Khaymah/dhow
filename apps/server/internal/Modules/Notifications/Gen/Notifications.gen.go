@@ -99,6 +99,7 @@ func (e NotificationChannelLocale) Valid() bool {
 const (
 	Discord  NotificationChannelKind = "discord"
 	Email    NotificationChannelKind = "email"
+	Inapp    NotificationChannelKind = "inapp"
 	Slack    NotificationChannelKind = "slack"
 	Telegram NotificationChannelKind = "telegram"
 	Webhook  NotificationChannelKind = "webhook"
@@ -110,6 +111,8 @@ func (e NotificationChannelKind) Valid() bool {
 	case Discord:
 		return true
 	case Email:
+		return true
+	case Inapp:
 		return true
 	case Slack:
 		return true
@@ -440,6 +443,84 @@ type ErrorResponse struct {
 // FactorMethod defines model for FactorMethod.
 type FactorMethod string
 
+// InboxMarkedResponse defines model for InboxMarkedResponse.
+type InboxMarkedResponse struct {
+	Data *struct {
+		Marked int `json:"Marked"`
+	} `json:"Data,omitempty"`
+	Error *ErrorDetail `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// InboxNotification defines model for InboxNotification.
+type InboxNotification struct {
+	CreatedAt time.Time `json:"CreatedAt"`
+
+	// Event The kind of event, such as `deployment.finished` or `account.new_device_login`.
+	Event   string             `json:"Event"`
+	EventId openapi_types.UUID `json:"EventId"`
+	Id      openapi_types.UUID `json:"Id"`
+
+	// Link A path inside Dhow that starts with one slash, or empty.
+	Link *string `json:"Link,omitempty"`
+
+	// OrganizationId Empty for a notification about the account itself.
+	OrganizationId *openapi_types.UUID `json:"OrganizationId,omitempty"`
+	Params         map[string]string   `json:"Params"`
+	Read           bool                `json:"Read"`
+	ReadAt         *time.Time          `json:"ReadAt,omitempty"`
+
+	// TitleKey The key of the message the interface translates. Never text to show as it is.
+	TitleKey string `json:"TitleKey"`
+}
+
+// InboxNotificationListResponse defines model for InboxNotificationListResponse.
+type InboxNotificationListResponse struct {
+	Data  *[]InboxNotification `json:"Data,omitempty"`
+	Error *ErrorDetail         `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// InboxNotificationResponse defines model for InboxNotificationResponse.
+type InboxNotificationResponse struct {
+	Data  *InboxNotification `json:"Data,omitempty"`
+	Error *ErrorDetail       `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
+// InboxUnreadCountResponse defines model for InboxUnreadCountResponse.
+type InboxUnreadCountResponse struct {
+	Data *struct {
+		Unread int `json:"Unread"`
+	} `json:"Data,omitempty"`
+	Error *ErrorDetail `json:"Error,omitempty"`
+
+	// Message An i18n key such as `system.meta.loaded`. The client translates it.
+	//
+	// Example: system.meta.loaded
+	Message *string   `json:"Message,omitempty"`
+	Meta    *PageMeta `json:"Meta,omitempty"`
+	Success bool      `json:"Success"`
+}
+
 // NotificationAckResponse defines model for NotificationAckResponse.
 type NotificationAckResponse struct {
 	Data *struct {
@@ -598,7 +679,7 @@ type NotificationRuleInput struct {
 	Environments *[]string                     `json:"Environments,omitempty"`
 	Events       []NotificationRuleInputEvents `json:"Events"`
 
-	// Roles For an email channel, the member roles that get the email. Empty for a webhook.
+	// Roles For an email or in-app channel, the member roles that get the message. Empty for the other kinds.
 	Roles    *[]NotificationRuleInputRoles   `json:"Roles,omitempty"`
 	Statuses []NotificationRuleInputStatuses `json:"Statuses"`
 }
@@ -685,8 +766,14 @@ type DeliveryState = NotificationDeliveryState
 // Id defines model for Id.
 type Id = openapi_types.UUID
 
+// InboxUnread defines model for InboxUnread.
+type InboxUnread = bool
+
 // Limit defines model for Limit.
 type Limit = int
+
+// NotificationId defines model for NotificationId.
+type NotificationId = openapi_types.UUID
 
 // Page defines model for Page.
 type Page = int
@@ -696,6 +783,13 @@ type ProjectId = openapi_types.UUID
 
 // Error defines model for Error.
 type Error = ErrorResponse
+
+// ListInboxNotificationsParams defines parameters for ListInboxNotifications.
+type ListInboxNotificationsParams struct {
+	Page   *Page        `form:"Page,omitempty" json:"Page,omitempty"`
+	Limit  *Limit       `form:"Limit,omitempty" json:"Limit,omitempty"`
+	Unread *InboxUnread `form:"Unread,omitempty" json:"Unread,omitempty"`
+}
 
 // ListOrgNotificationChannelsParams defines parameters for ListOrgNotificationChannels.
 type ListOrgNotificationChannelsParams struct {
@@ -758,6 +852,18 @@ type ServerInterface interface {
 	// SetNotificationMute Mute or unmute the emails of notification channels
 	// (PUT /me/notification-mute)
 	SetNotificationMute(w http.ResponseWriter, r *http.Request)
+	// ListInboxNotifications List the notifications in the inbox of the signed-in user
+	// (GET /me/notifications)
+	ListInboxNotifications(w http.ResponseWriter, r *http.Request, params ListInboxNotificationsParams)
+	// MarkAllInboxNotificationsRead Mark every notification in the inbox as read
+	// (POST /me/notifications/read-all)
+	MarkAllInboxNotificationsRead(w http.ResponseWriter, r *http.Request)
+	// GetInboxUnreadCount Count the unread notifications in the inbox of the signed-in user
+	// (GET /me/notifications/unread-count)
+	GetInboxUnreadCount(w http.ResponseWriter, r *http.Request)
+	// MarkInboxNotificationRead Mark one notification in the inbox as read
+	// (POST /me/notifications/{notificationId}/read)
+	MarkInboxNotificationRead(w http.ResponseWriter, r *http.Request, notificationId NotificationId)
 	// ListOrgNotificationChannels List the notification channels of the organization
 	// (GET /organizations/{id}/notification-channels)
 	ListOrgNotificationChannels(w http.ResponseWriter, r *http.Request, id Id, params ListOrgNotificationChannelsParams)
@@ -833,6 +939,30 @@ func (_ Unimplemented) GetNotificationMute(w http.ResponseWriter, r *http.Reques
 // SetNotificationMute Mute or unmute the emails of notification channels
 // (PUT /me/notification-mute)
 func (_ Unimplemented) SetNotificationMute(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListInboxNotifications List the notifications in the inbox of the signed-in user
+// (GET /me/notifications)
+func (_ Unimplemented) ListInboxNotifications(w http.ResponseWriter, r *http.Request, params ListInboxNotificationsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// MarkAllInboxNotificationsRead Mark every notification in the inbox as read
+// (POST /me/notifications/read-all)
+func (_ Unimplemented) MarkAllInboxNotificationsRead(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetInboxUnreadCount Count the unread notifications in the inbox of the signed-in user
+// (GET /me/notifications/unread-count)
+func (_ Unimplemented) GetInboxUnreadCount(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// MarkInboxNotificationRead Mark one notification in the inbox as read
+// (POST /me/notifications/{notificationId}/read)
+func (_ Unimplemented) MarkInboxNotificationRead(w http.ResponseWriter, r *http.Request, notificationId NotificationId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -984,6 +1114,119 @@ func (siw *ServerInterfaceWrapper) SetNotificationMute(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetNotificationMute(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListInboxNotifications operation middleware
+func (siw *ServerInterfaceWrapper) ListInboxNotifications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListInboxNotificationsParams
+
+	// ------------- Optional query parameter "Page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "Page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "Page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "Limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "Limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "Limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "Unread" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "Unread", r.URL.Query(), &params.Unread, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "Unread"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Unread", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListInboxNotifications(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkAllInboxNotificationsRead operation middleware
+func (siw *ServerInterfaceWrapper) MarkAllInboxNotificationsRead(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkAllInboxNotificationsRead(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetInboxUnreadCount operation middleware
+func (siw *ServerInterfaceWrapper) GetInboxUnreadCount(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInboxUnreadCount(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkInboxNotificationRead operation middleware
+func (siw *ServerInterfaceWrapper) MarkInboxNotificationRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "notificationId" -------------
+	var notificationId NotificationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "notificationId", chi.URLParam(r, "notificationId"), &notificationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "notificationId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkInboxNotificationRead(w, r, notificationId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1955,6 +2198,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/me/notification-mute", wrapper.SetNotificationMute)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me/notifications", wrapper.ListInboxNotifications)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me/notifications/unread-count", wrapper.GetInboxUnreadCount)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/me/notifications/read-all", wrapper.MarkAllInboxNotificationsRead)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/me/notifications/{notificationId}/read", wrapper.MarkInboxNotificationRead)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/organizations/{id}/projects/{projectId}/notification-channels", wrapper.ListNotificationChannels)
 	})
 	r.Group(func(r chi.Router) {
@@ -2086,6 +2341,160 @@ type SetNotificationMutedefaultJSONResponse struct {
 }
 
 func (response SetNotificationMutedefaultJSONResponse) VisitSetNotificationMuteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInboxNotificationsRequestObject struct {
+	Params ListInboxNotificationsParams
+}
+
+type ListInboxNotificationsResponseObject interface {
+	VisitListInboxNotificationsResponse(w http.ResponseWriter) error
+}
+
+type ListInboxNotifications200JSONResponse InboxNotificationListResponse
+
+func (response ListInboxNotifications200JSONResponse) VisitListInboxNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInboxNotificationsdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response ListInboxNotificationsdefaultJSONResponse) VisitListInboxNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkAllInboxNotificationsReadRequestObject struct {
+}
+
+type MarkAllInboxNotificationsReadResponseObject interface {
+	VisitMarkAllInboxNotificationsReadResponse(w http.ResponseWriter) error
+}
+
+type MarkAllInboxNotificationsRead200JSONResponse InboxMarkedResponse
+
+func (response MarkAllInboxNotificationsRead200JSONResponse) VisitMarkAllInboxNotificationsReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkAllInboxNotificationsReaddefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response MarkAllInboxNotificationsReaddefaultJSONResponse) VisitMarkAllInboxNotificationsReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInboxUnreadCountRequestObject struct {
+}
+
+type GetInboxUnreadCountResponseObject interface {
+	VisitGetInboxUnreadCountResponse(w http.ResponseWriter) error
+}
+
+type GetInboxUnreadCount200JSONResponse InboxUnreadCountResponse
+
+func (response GetInboxUnreadCount200JSONResponse) VisitGetInboxUnreadCountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInboxUnreadCountdefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response GetInboxUnreadCountdefaultJSONResponse) VisitGetInboxUnreadCountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkInboxNotificationReadRequestObject struct {
+	NotificationId NotificationId `json:"notificationId"`
+}
+
+type MarkInboxNotificationReadResponseObject interface {
+	VisitMarkInboxNotificationReadResponse(w http.ResponseWriter) error
+}
+
+type MarkInboxNotificationRead200JSONResponse InboxNotificationResponse
+
+func (response MarkInboxNotificationRead200JSONResponse) VisitMarkInboxNotificationReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkInboxNotificationReaddefaultJSONResponse struct {
+	Body       ErrorResponse
+	StatusCode int
+}
+
+func (response MarkInboxNotificationReaddefaultJSONResponse) VisitMarkInboxNotificationReadResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -2917,6 +3326,18 @@ type StrictServerInterface interface {
 	// SetNotificationMute Mute or unmute the emails of notification channels
 	// (PUT /me/notification-mute)
 	SetNotificationMute(ctx context.Context, request SetNotificationMuteRequestObject) (SetNotificationMuteResponseObject, error)
+	// ListInboxNotifications List the notifications in the inbox of the signed-in user
+	// (GET /me/notifications)
+	ListInboxNotifications(ctx context.Context, request ListInboxNotificationsRequestObject) (ListInboxNotificationsResponseObject, error)
+	// MarkAllInboxNotificationsRead Mark every notification in the inbox as read
+	// (POST /me/notifications/read-all)
+	MarkAllInboxNotificationsRead(ctx context.Context, request MarkAllInboxNotificationsReadRequestObject) (MarkAllInboxNotificationsReadResponseObject, error)
+	// GetInboxUnreadCount Count the unread notifications in the inbox of the signed-in user
+	// (GET /me/notifications/unread-count)
+	GetInboxUnreadCount(ctx context.Context, request GetInboxUnreadCountRequestObject) (GetInboxUnreadCountResponseObject, error)
+	// MarkInboxNotificationRead Mark one notification in the inbox as read
+	// (POST /me/notifications/{notificationId}/read)
+	MarkInboxNotificationRead(ctx context.Context, request MarkInboxNotificationReadRequestObject) (MarkInboxNotificationReadResponseObject, error)
 	// ListOrgNotificationChannels List the notification channels of the organization
 	// (GET /organizations/{id}/notification-channels)
 	ListOrgNotificationChannels(ctx context.Context, request ListOrgNotificationChannelsRequestObject) (ListOrgNotificationChannelsResponseObject, error)
@@ -3066,6 +3487,106 @@ func (sh *strictHandler) SetNotificationMute(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetNotificationMuteResponseObject); ok {
 		if err := validResponse.VisitSetNotificationMuteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListInboxNotifications operation middleware
+func (sh *strictHandler) ListInboxNotifications(w http.ResponseWriter, r *http.Request, params ListInboxNotificationsParams) {
+	var request ListInboxNotificationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListInboxNotifications(ctx, request.(ListInboxNotificationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListInboxNotifications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListInboxNotificationsResponseObject); ok {
+		if err := validResponse.VisitListInboxNotificationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkAllInboxNotificationsRead operation middleware
+func (sh *strictHandler) MarkAllInboxNotificationsRead(w http.ResponseWriter, r *http.Request) {
+	var request MarkAllInboxNotificationsReadRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkAllInboxNotificationsRead(ctx, request.(MarkAllInboxNotificationsReadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkAllInboxNotificationsRead")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkAllInboxNotificationsReadResponseObject); ok {
+		if err := validResponse.VisitMarkAllInboxNotificationsReadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetInboxUnreadCount operation middleware
+func (sh *strictHandler) GetInboxUnreadCount(w http.ResponseWriter, r *http.Request) {
+	var request GetInboxUnreadCountRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInboxUnreadCount(ctx, request.(GetInboxUnreadCountRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInboxUnreadCount")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInboxUnreadCountResponseObject); ok {
+		if err := validResponse.VisitGetInboxUnreadCountResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkInboxNotificationRead operation middleware
+func (sh *strictHandler) MarkInboxNotificationRead(w http.ResponseWriter, r *http.Request, notificationId NotificationId) {
+	var request MarkInboxNotificationReadRequestObject
+
+	request.NotificationId = notificationId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkInboxNotificationRead(ctx, request.(MarkInboxNotificationReadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkInboxNotificationRead")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkInboxNotificationReadResponseObject); ok {
+		if err := validResponse.VisitMarkInboxNotificationReadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

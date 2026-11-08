@@ -17,6 +17,7 @@ const (
 	projectBase = "/organizations/{id}/projects/{projectId}"
 	orgBase     = "/organizations/{id}"
 	mutePath    = "/me/notification-mute"
+	inboxPath   = "/me/notifications"
 )
 
 type Deps struct {
@@ -72,6 +73,10 @@ func Policies() []policy.Rule {
 	return append(rules,
 		policy.Authenticated(http.MethodGet, mutePath, policy.SessionManageSelf),
 		policy.Authenticated(http.MethodPut, mutePath, policy.SessionManageSelf),
+		policy.Authenticated(http.MethodGet, inboxPath, policy.SessionManageSelf),
+		policy.Authenticated(http.MethodGet, inboxPath+"/unread-count", policy.SessionManageSelf),
+		policy.Authenticated(http.MethodPost, inboxPath+"/read-all", policy.SessionManageSelf),
+		policy.Authenticated(http.MethodPost, inboxPath+"/{notificationId}/read", policy.SessionManageSelf),
 	)
 }
 

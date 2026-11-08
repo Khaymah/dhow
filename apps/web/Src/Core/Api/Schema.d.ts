@@ -562,6 +562,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the notifications in the inbox of the signed-in user
+         * @description Newest first. The inbox keeps at most 200 notifications for each user and drops the ones older than the retention days. Only notifications of the organizations the user still belongs to are listed, plus the ones about the account itself. `TitleKey` names a message the interface translates and `Params` holds the plain values it fills in (a project, an environment, a status). `Params` never holds a secret, a token or a full network address. `Link` is a path inside Dhow or empty.
+         */
+        get: operations["listInboxNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count the unread notifications in the inbox of the signed-in user */
+        get: operations["getInboxUnreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark every notification in the inbox as read */
+        post: operations["markAllInboxNotificationsRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/notifications/{notificationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark one notification in the inbox as read
+         * @description Only the notifications of the signed-in user. Another user's notification is 404.
+         */
+        post: operations["markInboxNotificationRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/password": {
         parameters: {
             query?: never;
@@ -3035,7 +3109,7 @@ export interface paths {
         put?: never;
         /**
          * Make a notification channel
-         * @description Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Kind` is `email`, `webhook`, `slack`, `discord` or `telegram`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret of a webhook and shows it once in `Secret`. `slack` needs the `Url` of an incoming webhook (`https://hooks.slack.com/services/...`), `discord` the `Url` of a webhook (`https://discord.com/api/webhooks/...`, or `discordapp.com`), and `telegram` a `BotToken` and a `ChatId`. These three accept their own service hosts only and have no signing secret. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
+         * @description Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Kind` is `email`, `webhook`, `slack`, `discord`, `telegram` or `inapp`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret of a webhook and shows it once in `Secret`. `slack` needs the `Url` of an incoming webhook (`https://hooks.slack.com/services/...`), `discord` the `Url` of a webhook (`https://discord.com/api/webhooks/...`, or `discordapp.com`), and `telegram` a `BotToken` and a `ChatId`. These three accept their own service hosts only and have no signing secret. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
          */
         post: operations["createNotificationChannel"];
         delete?: never;
@@ -3117,7 +3191,7 @@ export interface paths {
         };
         /**
          * Read the notification rules of the project
-         * @description Needs `project.read` and a session. One rule for each channel: the events, the environments (empty means all), the statuses and, for an email channel, the member roles that get the email.
+         * @description Needs `project.read` and a session. One rule for each channel: the events, the environments (empty means all), the statuses and, for an email or in-app channel, the member roles that get the message.
          */
         get: operations["getNotificationRules"];
         /**
@@ -3187,7 +3261,7 @@ export interface paths {
         put?: never;
         /**
          * Make a notification channel
-         * @description Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Kind` is `email`, `webhook`, `slack`, `discord` or `telegram`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret of a webhook and shows it once in `Secret`. `slack` needs the `Url` of an incoming webhook (`https://hooks.slack.com/services/...`), `discord` the `Url` of a webhook (`https://discord.com/api/webhooks/...`, or `discordapp.com`), and `telegram` a `BotToken` and a `ChatId`. These three accept their own service hosts only and have no signing secret. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Kind` is `email`, `webhook`, `slack`, `discord`, `telegram` or `inapp`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret of a webhook and shows it once in `Secret`. `slack` needs the `Url` of an incoming webhook (`https://hooks.slack.com/services/...`), `discord` the `Url` of a webhook (`https://discord.com/api/webhooks/...`, or `discordapp.com`), and `telegram` a `BotToken` and a `ChatId`. These three accept their own service hosts only and have no signing secret. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
          */
         post: operations["createOrgNotificationChannel"];
         delete?: never;
@@ -3269,7 +3343,7 @@ export interface paths {
         };
         /**
          * Read the notification rules of the organization
-         * @description Needs `org.read` and a session. One rule for each channel: the events, the environments (empty means all), the statuses and, for an email channel, the member roles that get the email.
+         * @description Needs `org.read` and a session. One rule for each channel: the events, the environments (empty means all), the statuses and, for an email or in-app channel, the member roles that get the message.
          */
         get: operations["getOrgNotificationRules"];
         /**
@@ -5743,7 +5817,7 @@ export interface components {
             Data?: components["schemas"]["IngestToken"][];
         };
         /** @enum {string} */
-        NotificationChannelKind: "email" | "webhook" | "slack" | "telegram" | "discord";
+        NotificationChannelKind: "email" | "webhook" | "slack" | "telegram" | "discord" | "inapp";
         /** @enum {string} */
         NotificationDeliveryState: "pending" | "sending" | "sent" | "dead";
         NotificationChannel: {
@@ -5822,7 +5896,7 @@ export interface components {
             /** @description Environment names. Empty means all environments. */
             Environments?: string[];
             Statuses: ("succeeded" | "failed" | "canceled" | "rolled_back" | "rollback_failed" | "awaiting_approval")[];
-            /** @description For an email channel, the member roles that get the email. Empty for a webhook. */
+            /** @description For an email or in-app channel, the member roles that get the message. Empty for the other kinds. */
             Roles?: ("owner" | "admin" | "maintainer" | "developer" | "viewer")[];
         };
         NotificationRule: components["schemas"]["NotificationRuleInput"] & {
@@ -5888,6 +5962,47 @@ export interface components {
         NotificationAckResponse: components["schemas"]["Envelope"] & {
             Data?: {
                 Retried?: boolean;
+            };
+        };
+        InboxNotification: {
+            /** Format: uuid */
+            Id: string;
+            /**
+             * Format: uuid
+             * @description Empty for a notification about the account itself.
+             */
+            OrganizationId?: string;
+            /** Format: uuid */
+            EventId: string;
+            /** @description The kind of event, such as `deployment.finished` or `account.new_device_login`. */
+            Event: string;
+            /** @description The key of the message the interface translates. Never text to show as it is. */
+            TitleKey: string;
+            Params: {
+                [key: string]: string;
+            };
+            /** @description A path inside Dhow that starts with one slash, or empty. */
+            Link?: string;
+            Read: boolean;
+            /** Format: date-time */
+            ReadAt?: string;
+            /** Format: date-time */
+            CreatedAt: string;
+        };
+        InboxNotificationResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["InboxNotification"];
+        };
+        InboxNotificationListResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["InboxNotification"][];
+        };
+        InboxUnreadCountResponse: components["schemas"]["Envelope"] & {
+            Data?: {
+                Unread: number;
+            };
+        };
+        InboxMarkedResponse: components["schemas"]["Envelope"] & {
+            Data?: {
+                Marked: number;
             };
         };
         IngestedArtifact: {
@@ -6273,6 +6388,8 @@ export interface components {
         IngestTokenId: string;
         ChannelId: string;
         DeliveryId: string;
+        InboxUnread: boolean;
+        NotificationId: string;
         DeliveryState: components["schemas"]["NotificationDeliveryState"];
         SecretName: string;
         VariableName: string;
@@ -7046,6 +7163,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationMuteResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listInboxNotifications: {
+        parameters: {
+            query?: {
+                Page?: components["parameters"]["Page"];
+                Limit?: components["parameters"]["Limit"];
+                Unread?: components["parameters"]["InboxUnread"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of inbox notifications. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxNotificationListResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getInboxUnreadCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The number of unread notifications. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxUnreadCountResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    markAllInboxNotificationsRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many notifications were marked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxMarkedResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    markInboxNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: components["parameters"]["NotificationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The notification, marked as read. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxNotificationResponse"];
                 };
             };
             default: components["responses"]["Error"];

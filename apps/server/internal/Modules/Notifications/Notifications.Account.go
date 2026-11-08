@@ -79,6 +79,9 @@ func (s *Service) onLogin(ctx context.Context, ev eventbus.Event) error {
 	n.Payload.Browser, n.Payload.Network = label, alert.ApproximateIP(a.IP)
 	err = s.mailUser(ctx, q, *a.ActorUserID, n.EventID, changeNewDevice, meta.UserAgent, a.IP)
 	if err == nil {
+		err = s.inboxAccount(ctx, q, *a.ActorUserID, n)
+	}
+	if err == nil {
 		err = s.fanOutOrgs(ctx, q, a.OrganizationIDs, n)
 	}
 	return s.quiet(ctx, a, ev.Name, err)
@@ -111,7 +114,14 @@ func (s *Service) onSecondFactor(ctx context.Context, ev eventbus.Event) error {
 		return err
 	}
 	n := s.accountNotice(EventSecondFactor, secondFactorChange(ev.Name), s.now())
-	return s.quiet(ctx, a, ev.Name, s.fanOutOrgs(ctx, s.tx(a), a.OrganizationIDs, n))
+	q := s.tx(a)
+	if a.ActorUserID != nil {
+		err = s.inboxAccount(ctx, q, *a.ActorUserID, n)
+	}
+	if err == nil {
+		err = s.fanOutOrgs(ctx, q, a.OrganizationIDs, n)
+	}
+	return s.quiet(ctx, a, ev.Name, err)
 }
 
 func (s *Service) onMemberRemoved(ctx context.Context, ev eventbus.Event) error {
@@ -133,7 +143,12 @@ func (s *Service) onRoleChanged(ctx context.Context, ev eventbus.Event) error {
 	}
 	n := s.accountNotice(EventRoleChanged, "role_changed", s.now())
 	n.Payload.Reason = a.Data["To"]
-	return s.quiet(ctx, a, ev.Name, s.fanOutOrgs(ctx, s.tx(a), a.OrganizationIDs, n))
+	q := s.tx(a)
+	err = s.inboxRoleChange(ctx, q, a, n)
+	if err == nil {
+		err = s.fanOutOrgs(ctx, q, a.OrganizationIDs, n)
+	}
+	return s.quiet(ctx, a, ev.Name, err)
 }
 
 func (s *Service) onMemberGone(ctx context.Context, ev eventbus.Event) error {
@@ -148,7 +163,12 @@ func (s *Service) onMemberGone(ctx context.Context, ev eventbus.Event) error {
 	if !ok {
 		return nil
 	}
-	return s.quiet(ctx, a, ev.Name, s.disableCreatorChannels(ctx, s.tx(a), a.OrganizationIDs[0], user, a.IP))
+	q, org := s.tx(a), a.OrganizationIDs[0]
+	_, err = q.HideNotificationInboxOfOrganization(ctx, sqlc.HideNotificationInboxOfOrganizationParams{UserID: user, OrganizationID: &org})
+	if err == nil {
+		err = s.disableCreatorChannels(ctx, q, a.OrganizationIDs[0], user, a.IP)
+	}
+	return s.quiet(ctx, a, ev.Name, err)
 }
 
 func (s *Service) disableCreatorChannels(ctx context.Context, q *sqlc.Queries, org, user uuid.UUID, ip string) error {
