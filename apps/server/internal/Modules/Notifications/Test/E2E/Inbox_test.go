@@ -70,7 +70,7 @@ func TestAnInAppChannelFillsTheInboxOfTheMembersOfTheChosenRolesWithoutAnyAddres
 	require.Len(t, items, 1)
 	assert.Equal(t, "deployment.finished", items[0].Event)
 	assert.Equal(t, "inbox.deployment.finished.failed", items[0].TitleKey)
-	assert.Equal(t, "production", items[0].Params["environment"])
+	assert.Equal(t, "production", items[0].Params["Environment"])
 	assert.Equal(t, "/projects/"+w.project.String()+"/runs/1", items[0].Link)
 	assert.False(t, items[0].Read)
 	for _, v := range items[0].Params {
@@ -174,7 +174,7 @@ func TestAccountEventsLandInTheInboxOfTheMemberWithoutAnyAddressOrToken(t *testi
 	items, _ := inbox(t, w.owner, "")
 	require.Len(t, items, 1)
 	assert.Equal(t, "inbox.account.new_device_login.self", items[0].TitleKey)
-	assert.Equal(t, "Firefox · Linux", items[0].Params["browser"])
+	assert.Equal(t, "Firefox · Linux", items[0].Params["Browser"])
 	assert.Equal(t, "/?stack=account", items[0].Link)
 	raw := items[0].TitleKey + items[0].Link
 	for k, v := range items[0].Params {
@@ -195,7 +195,7 @@ func TestARoleChangeLandsInTheInboxOfTheMemberWhoseRoleChanged(t *testing.T) {
 	items, _ := inbox(t, admin, "")
 	require.Len(t, items, 1)
 	assert.Equal(t, "inbox.member.role_changed.self", items[0].TitleKey)
-	assert.Equal(t, "maintainer", items[0].Params["reason"])
+	assert.Equal(t, "maintainer", items[0].Params["Reason"])
 	other, _ := inbox(t, w.owner, "")
 	assert.Empty(t, other)
 }

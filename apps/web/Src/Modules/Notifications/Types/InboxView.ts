@@ -37,13 +37,13 @@ const ROLES = new Map<string, TMessageKey>([
 ]);
 
 const FIELDS: readonly (readonly [string, TMessageKey])[] = [
-  ['project', 'notifications.inbox.field.project'],
-  ['environment', 'notifications.inbox.field.environment'],
-  ['ref', 'notifications.inbox.field.ref'],
-  ['run', 'notifications.inbox.field.run'],
-  ['runner', 'notifications.inbox.field.runner'],
-  ['browser', 'notifications.inbox.field.browser'],
-  ['release', 'notifications.inbox.field.release'],
+  ['Project', 'notifications.inbox.field.project'],
+  ['Environment', 'notifications.inbox.field.environment'],
+  ['Ref', 'notifications.inbox.field.ref'],
+  ['Run', 'notifications.inbox.field.run'],
+  ['Runner', 'notifications.inbox.field.runner'],
+  ['Browser', 'notifications.inbox.field.browser'],
+  ['Release', 'notifications.inbox.field.release'],
 ];
 
 const SAFE_LINK = /^\/(?!\/)[A-Za-z0-9._~!$&'()*+,;=:@%/?#-]*$/;
@@ -68,9 +68,9 @@ export const detailsOf = (item: TInboxNotification): IInboxDetail[] => {
     const value = Object.hasOwn(item.Params, name) ? item.Params[name] : undefined;
     if (value !== undefined && value !== '') out.push({ Label: label, Value: value, Key: null });
   }
-  const change = Object.hasOwn(item.Params, 'change') ? CHANGES.get(item.Params.change ?? '') : undefined;
+  const change = Object.hasOwn(item.Params, 'Change') ? CHANGES.get(item.Params.Change ?? '') : undefined;
   if (change !== undefined) out.push({ Label: 'notifications.inbox.field.change', Value: '', Key: change });
-  const role = item.Event === 'member.role_changed' && Object.hasOwn(item.Params, 'reason') ? ROLES.get(item.Params.reason ?? '') : undefined;
+  const role = item.Event === 'member.role_changed' && Object.hasOwn(item.Params, 'Reason') ? ROLES.get(item.Params.Reason ?? '') : undefined;
   if (role !== undefined) out.push({ Label: 'notifications.inbox.field.role', Value: '', Key: role });
   return out;
 };

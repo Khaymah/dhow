@@ -53,32 +53,41 @@ func inboxTitleKey(p Payload, self bool) string {
 	return key
 }
 
-func clipBytes(v string, limit int) string {
+func clipValue(v string) string {
 	v = clip(v)
-	for len(v) > limit {
+	for len(v) > inboxValueBytes {
 		_, size := utf8.DecodeLastRuneInString(v)
 		v = v[:len(v)-size]
 	}
 	return v
 }
 
-func inboxParams(p Payload) map[string]string {
-	out := map[string]string{}
-	for k, v := range map[string]string{
-		"project": p.Project, "environment": p.Environment, "ref": p.Ref, "runner": p.Runner, "browser": p.Browser, "release": p.Release,
-	} {
-		if v != "" {
-			out[k] = clipBytes(v, inboxValueBytes)
-		}
+type inboxValues struct {
+	Project     string `json:"Project,omitempty"`
+	Environment string `json:"Environment,omitempty"`
+	Ref         string `json:"Ref,omitempty"`
+	Run         string `json:"Run,omitempty"`
+	Runner      string `json:"Runner,omitempty"`
+	Browser     string `json:"Browser,omitempty"`
+	Release     string `json:"Release,omitempty"`
+	Reason      string `json:"Reason,omitempty"`
+	Change      string `json:"Change,omitempty"`
+}
+
+func inboxParams(p Payload) inboxValues {
+	out := inboxValues{
+		Project: clipValue(p.Project), Environment: clipValue(p.Environment),
+		Ref: clipValue(p.Ref), Runner: clipValue(p.Runner),
+		Browser: clipValue(p.Browser), Release: clipValue(p.Release),
 	}
 	if p.Run > 0 {
-		out["run"] = strconv.FormatInt(p.Run, 10)
+		out.Run = strconv.FormatInt(p.Run, 10)
 	}
 	if inboxReason.MatchString(p.Reason) {
-		out["reason"] = p.Reason
+		out.Reason = p.Reason
 	}
 	if inboxReason.MatchString(p.Change) {
-		out["change"] = p.Change
+		out.Change = p.Change
 	}
 	return out
 }
@@ -118,8 +127,8 @@ func (s *Service) addInbox(ctx context.Context, q *sqlc.Queries, e inboxEntry) e
 	return err
 }
 
-func encodeInboxParams(values map[string]string) ([]byte, error) {
-	optional := []string{"release", "browser", "runner", "ref", "environment", "project"}
+func encodeInboxParams(values inboxValues) ([]byte, error) {
+	optional := []*string{&values.Release, &values.Browser, &values.Runner, &values.Ref, &values.Environment, &values.Project}
 	for {
 		raw, err := json.Marshal(values)
 		if err != nil {
@@ -128,7 +137,7 @@ func encodeInboxParams(values map[string]string) ([]byte, error) {
 		if len(raw) <= inboxParamsMax || len(optional) == 0 {
 			return raw, nil
 		}
-		delete(values, optional[0])
+		*optional[0] = ""
 		optional = optional[1:]
 	}
 }

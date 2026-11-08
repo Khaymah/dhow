@@ -85,7 +85,7 @@ describe('hostile inbox content', () => {
     state.inbox = [
       inboxFixture({
         TitleKey: 'inbox.deployment.finished.failed',
-        Params: { project: '<img src=x onerror=alert(1)>', ref: '<script>alert(1)</script>', environment: '<b>prod</b>' },
+        Params: { Project: '<img src=x onerror=alert(1)>', Ref: '<script>alert(1)</script>', Environment: '<b>prod</b>' },
         Link: undefined,
       }),
     ];
@@ -123,7 +123,7 @@ describe('hostile inbox content', () => {
   it('keeps unrelated parameters out of the page', async () => {
     const state = newNotificationsState();
     const stray = 'stray-value-9f3a2c';
-    state.inbox = [inboxFixture({ Params: { project: 'Web app', token: stray, network: '203.0.113.7' }, Link: undefined })];
+    state.inbox = [inboxFixture({ Params: { Project: 'Web app', Token: stray, Network: '203.0.113.7' }, Link: undefined })];
     mount(INBOX_URL, 'owner', state);
     const main = await findPage(Ar['notifications.title']);
     expect(await within(main).findByText(Ar['notifications.inbox.deployment.finished.failed'])).toBeInTheDocument();
@@ -139,7 +139,7 @@ describe('the second-step and role changes in the inbox', () => {
       inboxFixture({
         Event: 'account.second_factor_changed',
         TitleKey: 'inbox.account.second_factor_changed.self',
-        Params: { change: 'passkey_added' },
+        Params: { Change: 'passkey_added' },
         Link: '/?stack=account',
       }),
     ];
