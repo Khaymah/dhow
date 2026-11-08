@@ -11,6 +11,7 @@ import (
 const (
 	messageLoaded = "preferences.loaded"
 	messageSaved  = "preferences.saved"
+	messageSeen   = "preferences.releaseNotesSeen"
 )
 
 type Controller struct {
@@ -30,7 +31,7 @@ func toGen(p models.Preferences) *gen.Preferences {
 	}
 	return &gen.Preferences{
 		Locale: gen.Locale(p.Locale), ThemeId: p.ThemeID, CustomThemes: themes, OrganizationId: p.OrganizationID,
-		Saved: p.Saved, UpdatedAt: p.UpdatedAt,
+		Saved: p.Saved, UpdatedAt: p.UpdatedAt, ReleaseNotesSeen: p.ReleaseNotesSeen,
 	}
 }
 
@@ -58,4 +59,15 @@ func (c *Controller) SavePreferences(ctx context.Context, req gen.SavePreference
 		return nil, err
 	}
 	return gen.SavePreferences200JSONResponse{Success: true, Message: ptr(messageSaved), Data: toGen(p)}, nil
+}
+
+func (c *Controller) SaveReleaseNotesSeen(ctx context.Context, req gen.SaveReleaseNotesSeenRequestObject) (gen.SaveReleaseNotesSeenResponseObject, error) {
+	if req.Body == nil {
+		return nil, apperrors.BadRequest()
+	}
+	p, err := c.service.SaveReleaseNotesSeen(ctx, req.Body.Version)
+	if err != nil {
+		return nil, err
+	}
+	return gen.SaveReleaseNotesSeen200JSONResponse{Success: true, Message: ptr(messageSeen), Data: toGen(p)}, nil
 }

@@ -50,6 +50,19 @@ func (q *Queries) GetUserPreferences(ctx context.Context, userID uuid.UUID) (Get
 	return i, err
 }
 
+const getUserReleaseNotesSeen = `-- name: GetUserReleaseNotesSeen :one
+SELECT "SeenVersion"
+FROM "UserReleaseNotes"
+WHERE "UserId" = $1 AND NOT "IsDeleted"
+`
+
+func (q *Queries) GetUserReleaseNotesSeen(ctx context.Context, userID uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getUserReleaseNotesSeen, userID)
+	var SeenVersion string
+	err := row.Scan(&SeenVersion)
+	return SeenVersion, err
+}
+
 const isActiveMember = `-- name: IsActiveMember :one
 SELECT EXISTS (
     SELECT 1 FROM "Memberships" m
@@ -115,4 +128,25 @@ func (q *Queries) UpsertUserPreferences(ctx context.Context, arg UpsertUserPrefe
 	var UpdatedAt time.Time
 	err := row.Scan(&UpdatedAt)
 	return UpdatedAt, err
+}
+
+const upsertUserReleaseNotesSeen = `-- name: UpsertUserReleaseNotesSeen :one
+INSERT INTO "UserReleaseNotes" ("UserId", "SeenVersion", "CreatedAt", "UpdatedAt")
+VALUES ($1, $2, $3, $3)
+ON CONFLICT ("UserId") WHERE NOT "IsDeleted"
+DO UPDATE SET "SeenVersion" = EXCLUDED."SeenVersion", "UpdatedAt" = EXCLUDED."UpdatedAt"
+RETURNING "SeenVersion"
+`
+
+type UpsertUserReleaseNotesSeenParams struct {
+	UserID      uuid.UUID
+	SeenVersion string
+	Now         time.Time
+}
+
+func (q *Queries) UpsertUserReleaseNotesSeen(ctx context.Context, arg UpsertUserReleaseNotesSeenParams) (string, error) {
+	row := q.db.QueryRow(ctx, upsertUserReleaseNotesSeen, arg.UserID, arg.SeenVersion, arg.Now)
+	var SeenVersion string
+	err := row.Scan(&SeenVersion)
+	return SeenVersion, err
 }

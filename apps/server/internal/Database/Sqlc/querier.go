@@ -236,6 +236,7 @@ type Querier interface {
 	GetUserMfaState(ctx context.Context, id uuid.UUID) (GetUserMfaStateRow, error)
 	GetUserPasswordHash(ctx context.Context, id uuid.UUID) (string, error)
 	GetUserPreferences(ctx context.Context, userID uuid.UUID) (GetUserPreferencesRow, error)
+	GetUserReleaseNotesSeen(ctx context.Context, userID uuid.UUID) (string, error)
 	GetVariableForUpdate(ctx context.Context, arg GetVariableForUpdateParams) (Variable, error)
 	GroupBlocked(ctx context.Context, arg GroupBlockedParams) (bool, error)
 	HasIdentityForProvider(ctx context.Context, arg HasIdentityForProviderParams) (bool, error)
@@ -720,6 +721,7 @@ type Querier interface {
 	UpsertHostCheck(ctx context.Context, arg UpsertHostCheckParams) (uuid.UUID, error)
 	UpsertNotificationMute(ctx context.Context, arg UpsertNotificationMuteParams) error
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (time.Time, error)
+	UpsertUserReleaseNotesSeen(ctx context.Context, arg UpsertUserReleaseNotesSeenParams) (string, error)
 	UseMfaChallenge(ctx context.Context, arg UseMfaChallengeParams) (int64, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)
 	UserLogins(ctx context.Context, userID uuid.UUID) ([]UserLoginsRow, error)

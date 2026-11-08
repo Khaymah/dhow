@@ -786,6 +786,32 @@ paths:
                 $ref: "#/components/schemas/PreferencesResponse"
         default:
           $ref: "#/components/responses/Error"
+  /me/release-notes-seen:
+    put:
+      operationId: saveReleaseNotesSeen
+      tags: [preferences]
+      summary: Mark the release notes of a version as seen by the signed-in user
+      description: >-
+        Stores the newest version whose "What's new" card the user has dismissed, so the card shows once per user. It
+        returns the preferences, with `ReleaseNotesSeen` set. Saving does not mark the other preferences as saved.
+      security:
+        - SessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveReleaseNotesSeenRequest"
+      responses:
+        "200":
+          description: The preferences with the seen version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /me/notification-mute:
     get:
       operationId: getNotificationMute
@@ -8406,6 +8432,15 @@ components:
           type: string
           format: uuid
           nullable: true
+    SaveReleaseNotesSeenRequest:
+      type: object
+      additionalProperties: false
+      required: [Version]
+      properties:
+        Version:
+          type: string
+          maxLength: 32
+          pattern: '^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-rc\.[0-9]{1,6})?$'
     Preferences:
       type: object
       additionalProperties: false
@@ -8426,6 +8461,10 @@ components:
         Saved:
           type: boolean
           description: False until the first save.
+        ReleaseNotesSeen:
+          type: string
+          nullable: true
+          description: The newest release version whose "What's new" card the user dismissed, or null.
         UpdatedAt:
           type: string
           format: date-time

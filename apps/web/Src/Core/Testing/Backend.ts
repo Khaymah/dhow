@@ -1,3 +1,4 @@
+import { LATEST_RELEASE } from '@/Core/Help/Generated/ReleaseMeta';
 import { mfaReply, type IMfaFixture } from '@/Core/Testing/MfaBackend';
 import { envelope, META_BODY, meBody, ORG_ID, READY_BODY, SESSION_ID, stubFetch, UNAUTHENTICATED_BODY, USER_ID } from '@/Core/Testing/Fetch';
 
@@ -136,9 +137,17 @@ export interface IPreferencesFixture {
   CustomThemes: unknown[];
   OrganizationId: string | null;
   Saved: boolean;
+  ReleaseNotesSeen?: string | null;
 }
 
-export const defaultPreferences = (): IPreferencesFixture => ({ Locale: 'ar', ThemeId: 'sea', CustomThemes: [], OrganizationId: null, Saved: true });
+export const defaultPreferences = (): IPreferencesFixture => ({
+  Locale: 'ar',
+  ThemeId: 'sea',
+  CustomThemes: [],
+  OrganizationId: null,
+  Saved: true,
+  ReleaseNotesSeen: LATEST_RELEASE,
+});
 
 export interface IBackendOptions {
   role?: string;
@@ -241,10 +250,15 @@ const accessReply = async (request: Request, pathname: string, options: IBackend
   if (pathname.endsWith('/oidc/providers')) return envelope({ Success: true, Data: options.providers ?? [] });
   if (pathname.endsWith('/me/identities') && request.method === 'GET') return envelope({ Success: true, Data: options.identities ?? [] });
   if (pathname.endsWith('/me/api-tokens') && request.method === 'GET') return envelope({ Success: true, Data: options.tokens ?? [] });
+  if (pathname.endsWith('/me/release-notes-seen') && request.method === 'PUT') {
+    const body = (await request.clone().json()) as { Version: string };
+    state.preferences = { ...state.preferences, ReleaseNotesSeen: body.Version };
+    return envelope({ Success: true, Data: state.preferences });
+  }
   if (pathname.endsWith('/me/preferences')) {
     if (request.method === 'PUT') {
       const body = (await request.clone().json()) as Omit<IPreferencesFixture, 'Saved'>;
-      state.preferences = { ...body, Saved: true };
+      state.preferences = { ...body, Saved: true, ReleaseNotesSeen: state.preferences.ReleaseNotesSeen };
     }
     return envelope({ Success: true, Data: state.preferences });
   }

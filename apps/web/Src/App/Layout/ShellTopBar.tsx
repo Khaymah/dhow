@@ -33,6 +33,13 @@ export const ShellTopBar = () => {
     >
       <ServerStatusLink />
       <IconButton
+        icon="help"
+        label={t('shell.nav.help')}
+        onClick={() => {
+          void navigate({ to: '/help' });
+        }}
+      />
+      <IconButton
         icon="bell"
         label={t('shell.notifications')}
         onClick={() => {

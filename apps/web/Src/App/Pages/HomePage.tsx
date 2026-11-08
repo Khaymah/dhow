@@ -14,6 +14,7 @@ import { useT } from '@/I18n/useT';
 import { MyApprovalsCard } from '@/Modules/Approvals/Components/MyApprovalsCard';
 import { RecentEventsCard } from '@/Modules/Audit/Components/RecentEventsCard';
 import type { TJobState } from '@/Modules/Jobs/Api/JobsApi';
+import { WhatsNewCard } from '@/Modules/Help/Components/WhatsNewCard';
 import { RecentJobsCard } from '@/Modules/Jobs/Components/RecentJobsCard';
 import { AttentionCard } from '@/Modules/Overview/Components/AttentionCard';
 import { OverviewStats } from '@/Modules/Overview/Components/OverviewStats';
@@ -172,12 +173,18 @@ export const HomePage = () => {
   const me = useMe();
   const membership = useCurrentMembership();
   const homeless = me.data?.Memberships.length === 0;
+  const navigate = useNavigate();
 
   return (
     <Page
       title={t('home.title')}
       lead={membership ? t('home.lead', { organization: membership.OrganizationName }) : undefined}
     >
+      <WhatsNewCard
+        onOpenAll={() => {
+          void navigate({ to: '/help' });
+        }}
+      />
       {homeless ? (
         <Card title={t('organizations.none.title')} icon="building">
           <EmptyState icon="building" text={t('organizations.none.body')} />

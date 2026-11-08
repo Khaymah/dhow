@@ -10,3 +10,6 @@ export const getPreferences = (): Promise<TPreferences> => request(() => ApiClie
 
 export const savePreferences = (body: TSavePreferences): Promise<TPreferences> =>
   request(() => ApiClient.PUT('/me/preferences', { body }));
+
+export const saveReleaseNotesSeen = (Version: string): Promise<TPreferences> =>
+  request(() => ApiClient.PUT('/me/release-notes-seen', { body: { Version } }));

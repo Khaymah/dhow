@@ -17,7 +17,8 @@
     "test": "vitest run",
     "size": "node Scripts/CheckSize.mjs",
     "gen:api": "openapi-typescript ../../packages/openapi/openapi.yaml -o Src/Core/Api/Schema.d.ts",
-    "gen:tokens": "node Scripts/GenTokens.mjs"
+    "gen:tokens": "node Scripts/GenTokens.mjs",
+    "gen:help": "node Scripts/GenHelp.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.3.0",
