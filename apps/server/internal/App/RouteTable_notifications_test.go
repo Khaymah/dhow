@@ -26,7 +26,6 @@ func seedNotificationChannel(env *apptest.Env, org uuid.UUID, project *uuid.UUID
 }
 
 func notificationsPath(env *apptest.Env, path string, org uuid.UUID, project *uuid.UUID) string {
-	path = strings.ReplaceAll(path, "{notificationId}", uuid.NewString())
 	if !strings.Contains(path, "{channelId}") && !strings.Contains(path, "{deliveryId}") {
 		return path
 	}
@@ -61,4 +60,15 @@ func notificationsBody(env *apptest.Env, rule policy.Rule) any {
 		return map[string]any{"Muted": true}
 	}
 	return targetsBody(env, rule)
+}
+
+func inboxItemFor(c *apptest.Client) string {
+	if c.UserID == "" {
+		return "00000000-0000-7000-8000-000000000002"
+	}
+	var id string
+	require.NoError(c.Env.T, c.Env.Pool.QueryRow(context.Background(),
+		`INSERT INTO "NotificationInbox" ("UserId", "EventId", "EventName", "TitleKey")
+		 VALUES ($1, gen_random_uuid(), 'notification.test', 'inbox.notification.test') RETURNING "Id"::text`, c.UserID).Scan(&id))
+	return id
 }

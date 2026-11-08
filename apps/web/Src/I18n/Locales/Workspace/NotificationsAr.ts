@@ -59,7 +59,7 @@ export const NotificationsAr = {
   'notifications.state.creatorRemoved': 'توقفت لأن منشئها لم يعد يديرها',
 
   'notifications.rules.button': 'القواعد',
-  'notifications.rules.open': 'قواعد القناة {name}',
+  'notifications.rules.open': 'القواعد: {name}',
   'notifications.rules.title': 'قواعد القناة {name}',
   'notifications.rules.readOnly': 'لا تملك صلاحية تغيير القواعد.',
   'notifications.rules.events': 'الأحداث',
@@ -108,7 +108,7 @@ export const NotificationsAr = {
   'notifications.enable.confirm': 'نعم، فعّل القناة',
   'notifications.enable.done': 'عادت القناة {name} للعمل',
   'notifications.rotate.button': 'سر جديد',
-  'notifications.rotate.aria': 'اصنع سرًا جديدًا للقناة {name}',
+  'notifications.rotate.aria': 'سر جديد للقناة {name}',
   'notifications.rotate.question': 'سيصنع داو سر توقيع جديدًا للقناة {name}، ويتوقف السر القديم عن العمل. حدّث مستقبلك به.',
   'notifications.rotate.confirm': 'نعم، اصنع سرًا جديدًا',
   'notifications.rotate.done': 'صُنع سر جديد للقناة {name}',

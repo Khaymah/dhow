@@ -213,6 +213,9 @@ func requestFor(rule policy.Rule, fx fixture, c *apptest.Client) apptest.Request
 		!strings.Contains(rule.Path, "{jobId}") {
 		path = organizationPath(c.Env, fx, rule)
 	}
+	if strings.Contains(rule.Path, "{notificationId}") {
+		path = strings.ReplaceAll(path, "{notificationId}", inboxItemFor(c))
+	}
 	if rule.Path == "/sessions/{id}" {
 		path = "/sessions/00000000-0000-7000-8000-000000000001"
 		if c.UserID != "" {

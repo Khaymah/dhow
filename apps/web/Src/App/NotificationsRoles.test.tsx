@@ -26,7 +26,7 @@ describe.each(['developer', 'viewer'])('a %s on the notifications page', (role) 
     const view = mount(PAGE_URL, role);
     const main = await findPage(PROJECT_NAME);
     const row = await channelRow(main, 'ops-hook');
-    await view.user.click(within(row).getByRole('button', { name: /قواعد القناة/ }));
+    await view.user.click(within(row).getByRole('button', { name: /القواعد: / }));
     const form = await within(row).findByRole('form');
     expect(within(form).getByText(Ar['notifications.rules.readOnly'])).toBeInTheDocument();
     expect(within(form).queryByRole('button', { name: Ar['notifications.rules.save'] })).not.toBeInTheDocument();

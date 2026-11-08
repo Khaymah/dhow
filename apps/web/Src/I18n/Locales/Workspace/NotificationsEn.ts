@@ -107,7 +107,7 @@ export const NotificationsEn = {
   'notifications.enable.confirm': 'Yes, turn on the channel',
   'notifications.enable.done': 'Channel {name} works again',
   'notifications.rotate.button': 'New secret',
-  'notifications.rotate.aria': 'Make a new secret for channel {name}',
+  'notifications.rotate.aria': 'New secret for channel {name}',
   'notifications.rotate.question': 'Dhow makes a new signing secret for channel {name}, and the old secret stops working. Update your receiver with it.',
   'notifications.rotate.confirm': 'Yes, make a new secret',
   'notifications.rotate.done': 'Made a new secret for channel {name}',
