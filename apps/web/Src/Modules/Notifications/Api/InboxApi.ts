@@ -1,10 +1,10 @@
 import { ApiClient, request, requestPage, type IPage } from '@/Core/Api/Client';
 import type { components } from '@/Core/Api/Schema';
+import { INBOX_KEY } from '@/Modules/Notifications/Api/InboxKey';
 
 export type TInboxNotification = components['schemas']['InboxNotification'];
 
 export const INBOX_PAGE_SIZE = 20;
-export const INBOX_KEY = ['inbox'] as const;
 export const inboxListKey = (unreadOnly: boolean, page: number) => [...INBOX_KEY, 'list', unreadOnly, page] as const;
 
 export const listInbox = (page: number, unreadOnly: boolean): Promise<IPage<TInboxNotification>> =>

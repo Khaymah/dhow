@@ -1,5 +1,9 @@
 export const SettingsAr = {
   'settings.lead': 'إعدادات السيرفر كله. ما تحفظه هنا يعمل فورًا بدون إعادة تشغيل.',
+  'settings.toc': 'في هذه الصفحة',
+  'settings.page.projectNotifications': 'إشعارات المشروع',
+  'palette.setting': '{section} في {page}',
+  'palette.kind.setting': 'إعداد',
   'settings.loading': 'جارٍ تحميل الإعدادات',
   'settings.error': 'لم نتمكن من تحميل الإعدادات',
   'settings.retry': 'حاول مرة أخرى',

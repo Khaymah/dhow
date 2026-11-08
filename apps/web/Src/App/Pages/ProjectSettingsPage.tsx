@@ -2,8 +2,11 @@ import { useNavigate, useParams } from '@tanstack/react-router';
 
 import { NotFoundPage } from '@/App/Layout/NotFoundPage';
 import { Page } from '@/App/Layout/Page';
-import { PageGroup } from '@/App/Layout/PageGroup';
+import { AnchorTarget } from '@/App/Layout/AnchorTarget';
+import { SettingsGroup } from '@/App/Layout/SettingsGroup';
+import { SettingsToc } from '@/App/Layout/SettingsToc';
 import { useSlide } from '@/App/Navigation/useSlide';
+import { settingEntry } from '@/App/Navigation/SettingsRegistry';
 import { isUuid } from '@/App/Pages/Params';
 import { ProjectNav } from '@/App/Pages/ProjectNav';
 import { RegistryGroup } from '@/App/Pages/SecretsGroups';
@@ -34,10 +37,11 @@ export const ProjectSettingsPage = () => {
         const active = project.State === 'active';
         return (
           <Page title={project.Name} lead={t('projects.settings.lead')} nav={<ProjectNav projectId={projectId} current="settings" role={role} />}>
-            <PageGroup title={t('projects.group.general')} icon="settings">
+            <SettingsToc page="project" context={{ role, owner: false, projectActive: active }} />
+            <SettingsGroup setting="project.general">
               <ProjectSettingsCard organizationId={organizationId} project={project} manager={manager} allowAutomatic={canRunForksWithoutApproval(role)} />
-            </PageGroup>
-            <PageGroup title={t('projects.group.repository')} icon="layers">
+            </SettingsGroup>
+            <SettingsGroup setting="project.repository">
               <RepositoryCard
                 organizationId={organizationId}
                 projectId={projectId}
@@ -47,9 +51,9 @@ export const ProjectSettingsPage = () => {
                 onLink={() => { open('repository-link'); }}
               />
               {manager && active && project.RepositoryLinked ? <RepositoryActions organizationId={organizationId} projectId={projectId} /> : null}
-            </PageGroup>
+            </SettingsGroup>
             {canReadIngested(role) ? (
-              <PageGroup title={t('ingest.settings.title')} lead={t('ingest.settings.lead')} icon="download">
+              <SettingsGroup setting="project.ingest" lead={t('ingest.settings.lead')}>
                 <Card>
                   <Rows label={t('ingest.settings.title')}>
                     <LinkRow
@@ -63,15 +67,17 @@ export const ProjectSettingsPage = () => {
                     />
                   </Rows>
                 </Card>
-              </PageGroup>
+              </SettingsGroup>
             ) : null}
             {canReadSecrets(role) ? (
-              <RegistryGroup scope={{ OrganizationId: organizationId, ProjectId: projectId }} writable={canManageProjectSecrets(role) && active} />
+              <AnchorTarget anchor={settingEntry('project.registry').anchor ?? ''}>
+                <RegistryGroup scope={{ OrganizationId: organizationId, ProjectId: projectId }} writable={canManageProjectSecrets(role) && active} />
+              </AnchorTarget>
             ) : null}
             {manager && active ? (
-              <PageGroup title={t('projects.danger.title')} lead={t('projects.danger.lead')} icon="alert" danger>
+              <SettingsGroup setting="project.danger" lead={t('projects.danger.lead')} danger>
                 <ProjectDangerZone organizationId={organizationId} project={project} />
-              </PageGroup>
+              </SettingsGroup>
             ) : null}
           </Page>
         );

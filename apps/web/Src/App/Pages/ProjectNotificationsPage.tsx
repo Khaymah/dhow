@@ -2,7 +2,8 @@ import { useParams } from '@tanstack/react-router';
 
 import { NotFoundPage } from '@/App/Layout/NotFoundPage';
 import { Page } from '@/App/Layout/Page';
-import { PageGroup } from '@/App/Layout/PageGroup';
+import { SettingsGroup } from '@/App/Layout/SettingsGroup';
+import { SettingsToc } from '@/App/Layout/SettingsToc';
 import { useSlide } from '@/App/Navigation/useSlide';
 import { isUuid } from '@/App/Pages/Params';
 import { ProjectNav } from '@/App/Pages/ProjectNav';
@@ -26,9 +27,10 @@ export const ProjectNotificationsPage = () => {
         const active = project.State === 'active';
         return (
           <Page title={project.Name} lead={t('notifications.project.lead')} nav={<ProjectNav projectId={projectId} current="notifications" role={role} />}>
+            <SettingsToc page="projectNotifications" context={{ role, owner: false, projectActive: active }} />
             {active ? null : <InlineAlert accent="building" title={t('projects.archived.blocked')} />}
             {manage ? null : <InlineAlert accent="building" title={t('notifications.readOnly')} />}
-            <PageGroup title={t('notifications.channels.group')} icon="bell">
+            <SettingsGroup setting="project.channels">
               <ChannelsCard
                 organizationId={organizationId}
                 projectId={projectId}
@@ -38,11 +40,11 @@ export const ProjectNotificationsPage = () => {
                   open('notification-channel-new');
                 }}
               />
-            </PageGroup>
+            </SettingsGroup>
             {manage ? (
-              <PageGroup title={t('notifications.deliveries.group')} icon="file">
+              <SettingsGroup setting="project.deliveries">
                 <DeliveriesCard organizationId={organizationId} projectId={projectId} />
-              </PageGroup>
+              </SettingsGroup>
             ) : null}
           </Page>
         );

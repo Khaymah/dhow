@@ -2,6 +2,10 @@ import type { SettingsAr } from '@/I18n/Locales/Workspace/SettingsAr';
 
 export const SettingsEn: Record<keyof typeof SettingsAr, string> = {
   'settings.lead': 'Settings for the whole server. What you save here works at once, without a restart.',
+  'settings.toc': 'On this page',
+  'settings.page.projectNotifications': 'Project notifications',
+  'palette.setting': '{section} in {page}',
+  'palette.kind.setting': 'Setting',
   'settings.loading': 'Loading the settings',
   'settings.error': 'We could not load the settings',
   'settings.retry': 'Try again',

@@ -151,6 +151,7 @@ const (
 	NotificationChannelDisabled = "notification.channel_disabled"
 	NotificationRuleUpdated     = "notification.rule_updated"
 	NotificationTestSent        = "notification.test_sent"
+	NotificationInboxChanged    = "notification.inbox_changed"
 
 	RunFinished = "project.run_finished"
 )

@@ -23,6 +23,7 @@ const (
 	TypeTargetCheckRequested = "target.check_requested"
 	TypeTargetRollbackAsked  = "target.rollback_requested"
 	TypeOverviewChanged      = "overview.changed"
+	TypeInboxChanged         = "inbox.changed"
 	TypeCanary               = "canary"
 
 	NameChange = "change"
@@ -48,6 +49,7 @@ type Notice struct {
 	EnvironmentID *uuid.UUID `json:"EnvironmentId,omitempty"`
 	TargetID      *uuid.UUID `json:"TargetId,omitempty"`
 	SubjectID     *uuid.UUID `json:"SubjectId,omitempty"`
+	User          *uuid.UUID `json:"User,omitempty"`
 	At            time.Time  `json:"At"`
 }
 

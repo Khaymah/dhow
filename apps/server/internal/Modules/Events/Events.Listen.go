@@ -91,6 +91,10 @@ func (s *Service) receive(ctx context.Context, payload string) {
 		s.log.WarnContext(ctx, "a live event of an unknown kind was dropped")
 		return
 	}
+	if notice.Type == models.TypeInboxChanged && notice.User == nil {
+		s.log.WarnContext(ctx, "a live event for one user named no user and was dropped")
+		return
+	}
 	s.hub.Append(notice)
 }
 

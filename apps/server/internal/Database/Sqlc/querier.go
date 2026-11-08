@@ -161,6 +161,7 @@ type Querier interface {
 	FinishRun(ctx context.Context, arg FinishRunParams) error
 	FinishRunJob(ctx context.Context, arg FinishRunJobParams) (int64, error)
 	FinishUpload(ctx context.Context, arg FinishUploadParams) error
+	FirstNotificationUserOrganization(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
 	GetActiveDataKeyForOwner(ctx context.Context, arg GetActiveDataKeyForOwnerParams) (GetActiveDataKeyForOwnerRow, error)
 	GetActiveKeyEncryptionKey(ctx context.Context) (int32, error)
 	GetActiveKeyEncryptionKeyActivatedAt(ctx context.Context) (GetActiveKeyEncryptionKeyActivatedAtRow, error)
@@ -482,6 +483,7 @@ type Querier interface {
 	MarkMfaReset(ctx context.Context, arg MarkMfaResetParams) error
 	MarkMutationStarted(ctx context.Context, id uuid.UUID) error
 	MarkNotificationInboxRead(ctx context.Context, arg MarkNotificationInboxReadParams) (MarkNotificationInboxReadRow, error)
+	MarkNotificationInboxReadIfUnread(ctx context.Context, arg MarkNotificationInboxReadIfUnreadParams) (int64, error)
 	MarkReleaseDeploymentRunning(ctx context.Context, arg MarkReleaseDeploymentRunningParams) error
 	MarkReleaseHostsUnknown(ctx context.Context, arg MarkReleaseHostsUnknownParams) (int64, error)
 	MarkSetupTokenUsed(ctx context.Context, arg MarkSetupTokenUsedParams) error

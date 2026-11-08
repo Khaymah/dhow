@@ -14,6 +14,7 @@ import (
 
 type entry struct {
 	org    uuid.UUID
+	user   uuid.UUID
 	action policy.Action
 	event  models.Event
 }
@@ -40,17 +41,27 @@ func randomEpoch() int64 {
 }
 
 func (h *Hub) Append(n models.Notice) {
+	if n.Type == models.TypeInboxChanged && n.User == nil {
+		return
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.seq++
 	h.ring[h.seq%uint64(len(h.ring))] = entry{
-		org: n.Organization, action: ActionOf(n.Type),
+		org: n.Organization, user: recipientOf(n), action: ActionOf(n.Type),
 		event: models.Event{
 			Seq: h.seq, Type: n.Type, Status: n.Status, ProjectID: n.ProjectID, EnvironmentID: n.EnvironmentID,
 			TargetID: n.TargetID, SubjectID: n.SubjectID, At: n.At,
 		},
 	}
 	poke(h.subs[n.Organization])
+}
+
+func recipientOf(n models.Notice) uuid.UUID {
+	if n.Type != models.TypeInboxChanged || n.User == nil {
+		return uuid.Nil
+	}
+	return *n.User
 }
 
 func (h *Hub) SetHealthy(ok bool) {

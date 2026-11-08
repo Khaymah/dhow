@@ -33,6 +33,20 @@ func (q *Queries) CountNotificationInbox(ctx context.Context, arg CountNotificat
 	return column_1, err
 }
 
+const firstNotificationUserOrganization = `-- name: FirstNotificationUserOrganization :one
+SELECT m."OrganizationId" FROM "Memberships" m
+WHERE m."UserId" = $1 AND NOT m."IsDeleted"
+ORDER BY m."CreatedAt", m."OrganizationId"
+LIMIT 1
+`
+
+func (q *Queries) FirstNotificationUserOrganization(ctx context.Context, userID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, firstNotificationUserOrganization, userID)
+	var OrganizationId uuid.UUID
+	err := row.Scan(&OrganizationId)
+	return OrganizationId, err
+}
+
 const hideNotificationInboxOfOrganization = `-- name: HideNotificationInboxOfOrganization :execrows
 UPDATE "NotificationInbox" SET "IsDeleted" = true, "UpdatedAt" = now()
 WHERE "UserId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
@@ -214,6 +228,25 @@ func (q *Queries) MarkNotificationInboxRead(ctx context.Context, arg MarkNotific
 		&i.ReadAt,
 	)
 	return i, err
+}
+
+const markNotificationInboxReadIfUnread = `-- name: MarkNotificationInboxReadIfUnread :execrows
+UPDATE "NotificationInbox" SET "IsRead" = true, "ReadAt" = $1::timestamptz, "UpdatedAt" = now()
+WHERE "Id" = $2 AND "UserId" = $3 AND NOT "IsDeleted" AND NOT "IsRead"
+`
+
+type MarkNotificationInboxReadIfUnreadParams struct {
+	Now    time.Time
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) MarkNotificationInboxReadIfUnread(ctx context.Context, arg MarkNotificationInboxReadIfUnreadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markNotificationInboxReadIfUnread, arg.Now, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const purgeNotificationInbox = `-- name: PurgeNotificationInbox :execrows
