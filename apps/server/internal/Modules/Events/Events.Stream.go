@@ -38,6 +38,8 @@ type Stream struct {
 	cursor  Position
 	reset   bool
 	release func()
+	access  Access
+	checked time.Time
 }
 
 func ParseLastEventID(raw string) (*Position, error) {
@@ -118,7 +120,7 @@ func (st *Stream) Serve(w http.ResponseWriter) error {
 			return nil
 		case <-wake:
 		case <-tick.C:
-			if _, err := st.req.Access(st.ctx, st.req.Organization); err != nil {
+			if _, err := st.freshAccess(); err != nil {
 				return nil
 			}
 			if err := out.Comment(); err != nil {
@@ -165,8 +167,26 @@ func (st *Stream) drain(out *streams.Writer) error {
 	}
 }
 
-func (st *Stream) send(out *streams.Writer, entries []entry) error {
+func (st *Stream) currentAccess() (Access, error) {
+	now := time.Now()
+	if st.access != nil && st.service.ttl > 0 && now.Sub(st.checked) < st.service.ttl {
+		return st.access, nil
+	}
+	return st.freshAccess()
+}
+
+func (st *Stream) freshAccess() (Access, error) {
 	access, err := st.req.Access(st.ctx, st.req.Organization)
+	if err != nil {
+		st.access = nil
+		return nil, err
+	}
+	st.access, st.checked = access, time.Now()
+	return access, nil
+}
+
+func (st *Stream) send(out *streams.Writer, entries []entry) error {
+	access, err := st.currentAccess()
 	if err != nil {
 		return errEnded
 	}

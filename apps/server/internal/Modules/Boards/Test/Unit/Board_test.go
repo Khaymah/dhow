@@ -11,6 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
+	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
+	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	boards "github.com/Khaymah/dhow/apps/server/internal/Modules/Boards"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Boards/Models"
@@ -37,6 +41,8 @@ type store struct {
 	failOn    string
 	calls     []string
 	limit     int32
+	releaseBy []uuid.UUID
+	checkBy   []uuid.UUID
 }
 
 func (s *store) hit(name string) error {
@@ -56,7 +62,8 @@ func (s *store) ListBoardTargets(_ context.Context, arg sqlc.ListBoardTargetsPar
 	return s.targets, s.hit("targets")
 }
 
-func (s *store) ListBoardReleases(_ context.Context, _ sqlc.ListBoardReleasesParams) ([]sqlc.ListBoardReleasesRow, error) {
+func (s *store) ListBoardReleases(_ context.Context, arg sqlc.ListBoardReleasesParams) ([]sqlc.ListBoardReleasesRow, error) {
+	s.releaseBy = arg.TargetIds
 	return s.releases, s.hit("releases")
 }
 
@@ -64,7 +71,8 @@ func (s *store) ListBoardRunningHosts(_ context.Context, _ sqlc.ListBoardRunning
 	return s.running, s.hit("running")
 }
 
-func (s *store) ListBoardHostChecks(_ context.Context, _ sqlc.ListBoardHostChecksParams) ([]sqlc.ListBoardHostChecksRow, error) {
+func (s *store) ListBoardHostChecks(_ context.Context, arg sqlc.ListBoardHostChecksParams) ([]sqlc.ListBoardHostChecksRow, error) {
+	s.checkBy = arg.TargetIds
 	return s.checks, s.hit("checks")
 }
 
@@ -256,4 +264,48 @@ func TestAFailedQueryFailsTheBoard(t *testing.T) {
 	s.failOn = "running"
 	_, err := boards.NewService(boards.Options{Store: s}).Get(context.Background(), org, project)
 	require.ErrorIs(t, err, errDown)
+}
+
+func TestTheReleaseAndCheckQueriesAreBoundToTheRetainedTargetsOnly(t *testing.T) {
+	s := base()
+	s.targets = nil
+	for range boards.MaxTargets + 1 {
+		s.targets = append(s.targets, sqlc.ListBoardTargetsRow{Id: uuid.New(), EnvironmentId: env, Name: "t"})
+	}
+	_, err := boards.NewService(boards.Options{Store: s}).Get(context.Background(), org, project)
+	require.NoError(t, err)
+	assert.Len(t, s.releaseBy, boards.MaxTargets, "the extra target that was cut is not asked about")
+	assert.Equal(t, s.releaseBy, s.checkBy)
+	assert.NotContains(t, s.releaseBy, s.targets[boards.MaxTargets].Id)
+}
+
+type fakeLimiter struct {
+	allowed bool
+	took    int
+}
+
+func (f *fakeLimiter) Take(_ context.Context, l ratelimit.Limit, _ string) (ratelimit.Decision, error) {
+	f.took++
+	return ratelimit.Decision{Allowed: f.allowed, RetryAfter: l.Window}, nil
+}
+
+func TestTheBoardReadsAreRateLimitedPerUser(t *testing.T) {
+	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Subject: policy.Subject{UserID: uuid.New()}})
+	limiter := &fakeLimiter{allowed: true}
+	service := boards.NewService(boards.Options{Store: base(), Limiter: limiter})
+	_, err := service.Get(ctx, org, project)
+	require.NoError(t, err)
+	assert.Equal(t, 1, limiter.took)
+
+	limiter.allowed = false
+	s := base()
+	_, err = boards.NewService(boards.Options{Store: s, Limiter: limiter}).Get(ctx, org, project)
+	var ae *apperrors.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apperrors.CodeRateLimited, ae.Code)
+	assert.Empty(t, s.calls, "a refused read touches no table")
+
+	_, err = service.Get(context.Background(), org, project)
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apperrors.CodeUnauthenticated, ae.Code)
 }

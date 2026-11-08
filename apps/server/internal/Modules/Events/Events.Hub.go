@@ -1,6 +1,8 @@
 package events
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"sync"
 	"time"
 
@@ -26,8 +28,16 @@ type Hub struct {
 	down  bool
 }
 
-func NewHub(size int, now func() time.Time) *Hub {
-	return &Hub{ring: make([]entry, size), epoch: now().Unix(), subs: map[uuid.UUID]map[chan struct{}]struct{}{}, now: now}
+func NewHub(size int) *Hub {
+	return &Hub{ring: make([]entry, size), epoch: randomEpoch(), subs: map[uuid.UUID]map[chan struct{}]struct{}{}}
+}
+
+func randomEpoch() int64 {
+	var raw [8]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return time.Now().UnixNano()
+	}
+	return int64(binary.BigEndian.Uint64(raw[:]) >> 1)
 }
 
 func (h *Hub) Append(n models.Notice) {
@@ -62,7 +72,7 @@ func (h *Hub) Healthy() bool {
 func (h *Hub) Restart() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.epoch = max(h.epoch+1, h.now().Unix())
+	h.epoch = randomEpoch()
 	for _, chans := range h.subs {
 		poke(chans)
 	}

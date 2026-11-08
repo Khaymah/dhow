@@ -28,7 +28,7 @@ FROM (
         WHERE x."TargetId" = t."Id" AND x."OrganizationId" = t."OrganizationId" AND x."State" = 'succeeded' AND NOT x."IsDeleted"
         ORDER BY x."StartedAt" DESC, x."Id" DESC LIMIT 1
     ) r
-    WHERE t."OrganizationId" = @organization_id AND t."ProjectId" = @project_id AND NOT t."IsDeleted"
+    WHERE t."Id" = ANY (@target_ids::uuid[]) AND t."OrganizationId" = @organization_id AND t."ProjectId" = @project_id AND NOT t."IsDeleted"
     UNION ALL
     SELECT 'last', r."Id", r."TargetId", r."ReleaseId", r."Kind", r."State", r."RestoredReleaseId", r."RollbackReason",
            r."BatchSize", r."ArtifactDigest", r."StartedAt", r."FinishedAt"
@@ -38,7 +38,7 @@ FROM (
         WHERE x."TargetId" = t."Id" AND x."OrganizationId" = t."OrganizationId" AND x."State" <> 'running' AND NOT x."IsDeleted"
         ORDER BY x."StartedAt" DESC, x."Id" DESC LIMIT 1
     ) r
-    WHERE t."OrganizationId" = @organization_id AND t."ProjectId" = @project_id AND NOT t."IsDeleted"
+    WHERE t."Id" = ANY (@target_ids::uuid[]) AND t."OrganizationId" = @organization_id AND t."ProjectId" = @project_id AND NOT t."IsDeleted"
     UNION ALL
     SELECT 'running', r."Id", r."TargetId", r."ReleaseId", r."Kind", r."State", r."RestoredReleaseId", r."RollbackReason",
            r."BatchSize", r."ArtifactDigest", r."StartedAt", r."FinishedAt"
@@ -48,7 +48,7 @@ FROM (
         WHERE x."TargetId" = t."Id" AND x."OrganizationId" = t."OrganizationId" AND x."State" = 'running' AND NOT x."IsDeleted"
         ORDER BY x."StartedAt" DESC, x."Id" DESC LIMIT 1
     ) r
-    WHERE t."OrganizationId" = @organization_id AND t."ProjectId" = @project_id AND NOT t."IsDeleted"
+    WHERE t."Id" = ANY (@target_ids::uuid[]) AND t."OrganizationId" = @organization_id AND t."ProjectId" = @project_id AND NOT t."IsDeleted"
 ) s;
 
 -- name: ListBoardRunningHosts :many
@@ -61,11 +61,16 @@ WHERE h."ReleaseRowId" = ANY (@release_row_ids::uuid[]) AND h."OrganizationId" =
 GROUP BY h."ReleaseRowId";
 
 -- name: ListBoardHostChecks :many
-SELECT DISTINCT ON (c."TargetId", c."HostId") c."TargetId", c."HostId", c."CurrentReleaseId", c."CheckedAt"
-FROM "DeploymentHostChecks" c
-JOIN "DeployTargets" t ON t."Id" = c."TargetId" AND t."OrganizationId" = c."OrganizationId"
-WHERE t."OrganizationId" = @organization_id AND t."ProjectId" = @project_id AND NOT t."IsDeleted" AND NOT c."IsDeleted"
-ORDER BY c."TargetId", c."HostId", c."CheckedAt" DESC, c."Id" DESC;
+SELECT c."TargetId", c."HostId", c."CurrentReleaseId", c."CheckedAt"
+FROM "DeployTargetHosts" h
+CROSS JOIN LATERAL (
+    SELECT x."TargetId", x."HostId", x."CurrentReleaseId", x."CheckedAt"
+    FROM "DeploymentHostChecks" x
+    WHERE x."TargetId" = h."TargetId" AND x."HostId" = h."Id" AND x."OrganizationId" = h."OrganizationId" AND NOT x."IsDeleted"
+    ORDER BY x."CheckedAt" DESC, x."Id" DESC
+    LIMIT 1
+) c
+WHERE h."TargetId" = ANY (@target_ids::uuid[]) AND h."OrganizationId" = @organization_id AND NOT h."IsDeleted";
 
 -- name: CountBoardApprovals :many
 SELECT a."EnvironmentId", count(*)::integer AS "Pending"

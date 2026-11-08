@@ -23,6 +23,7 @@ const (
 	TypeTargetCheckRequested = "target.check_requested"
 	TypeTargetRollbackAsked  = "target.rollback_requested"
 	TypeOverviewChanged      = "overview.changed"
+	TypeCanary               = "canary"
 
 	NameChange = "change"
 	NameReset  = "reset"

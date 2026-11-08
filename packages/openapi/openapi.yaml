@@ -5842,7 +5842,7 @@ components:
       schema:
         type: string
         maxLength: 32
-        pattern: "^[0-9]{1,12}-[0-9]{1,19}$"
+        pattern: "^[0-9]{1,19}-[0-9]{1,19}$"
     IfNoneMatch:
       name: If-None-Match
       in: header

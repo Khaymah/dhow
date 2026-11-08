@@ -1,4 +1,4 @@
-import { OrgEventsConnection, type TSourceFactory } from '@/Core/Events/OrgEventsConnection';
+import { OrgEventsConnection, type TProbe, type TSourceFactory } from '@/Core/Events/OrgEventsConnection';
 
 export const CLOSE_GRACE_MS = 1000;
 
@@ -11,12 +11,15 @@ interface IEntry {
 export class OrgEventsRegistry {
   private readonly entries = new Map<string, IEntry>();
 
-  constructor(private readonly create?: TSourceFactory) {}
+  constructor(
+    private readonly create?: TSourceFactory,
+    private readonly probe?: TProbe,
+  ) {}
 
   readonly Acquire = (organizationId: string): { Connection: OrgEventsConnection; Release: () => void } => {
     let entry = this.entries.get(organizationId);
     if (entry === undefined) {
-      entry = { Connection: new OrgEventsConnection(organizationId, this.create), Users: 0, CloseTimer: null };
+      entry = { Connection: new OrgEventsConnection(organizationId, this.create, this.probe), Users: 0, CloseTimer: null };
       this.entries.set(organizationId, entry);
     }
     if (entry.CloseTimer !== null) clearTimeout(entry.CloseTimer);

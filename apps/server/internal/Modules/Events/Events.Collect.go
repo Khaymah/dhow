@@ -121,7 +121,7 @@ func (s *Service) noticeOf(ctx context.Context, q *sqlc.Queries, r rule, a event
 	org := a.OrganizationIDs[0]
 	n := models.Notice{Organization: org, Type: r.typ, Status: r.status, At: s.now().UTC()}
 	if r.field != "" {
-		n.Status = shortStatus(a.Data[r.field])
+		n.Status = safeStatus(a.Data[r.field])
 	}
 	switch r.scope {
 	case scopeData:
@@ -157,10 +157,23 @@ func idOf(raw string) *uuid.UUID {
 	return &id
 }
 
-func shortStatus(v string) string {
-	const longest = 32
-	if len(v) > longest {
-		return v[:longest]
+var allowedStatuses = map[string]bool{
+	"queued": true, "running": true, "succeeded": true, "failed": true, "canceled": true, "rolled_back": true, "rollback_failed": true,
+	"unknown": true, "ok": true, "host_key_mismatch": true, "unreachable": true, "auth_failed": true, "path_missing": true,
+	"current_not_symlink": true, "state_corrupt": true, "disk_low": true, "locked": true, "diverged": true,
+}
+
+func safeStatus(v string) string {
+	if allowedStatuses[v] {
+		return v
 	}
-	return v
+	return "unknown"
+}
+
+func knownTypes() map[string]bool {
+	out := map[string]bool{}
+	for _, r := range rules() {
+		out[r.typ] = true
+	}
+	return out
 }

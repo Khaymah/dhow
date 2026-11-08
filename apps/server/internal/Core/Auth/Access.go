@@ -43,7 +43,10 @@ func (a *Access) Can(ctx context.Context, action policy.Action, project uuid.UUI
 		}
 		resource.ProjectID, resource.ProjectBindings = project, bindings
 	}
-	return policy.Can(a.subject, action, resource), nil
+	if !policy.Can(a.subject, action, resource) {
+		return false, nil
+	}
+	return !policy.SecondFactorBlocks(a.subject, action, resource, a.guard.now()), nil
 }
 
 func (a *Access) bindingsOf(ctx context.Context, project uuid.UUID) ([]policy.Role, error) {

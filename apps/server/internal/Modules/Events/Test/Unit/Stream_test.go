@@ -27,9 +27,10 @@ import (
 const wait = 3 * time.Second
 
 type member struct {
-	mu   sync.Mutex
-	role policy.Role
-	gone bool
+	mu    sync.Mutex
+	role  policy.Role
+	gone  bool
+	asked int
 }
 
 func (m *member) set(role policy.Role, gone bool) {
@@ -41,6 +42,7 @@ func (m *member) set(role policy.Role, gone bool) {
 func (m *member) access(_ context.Context, _ uuid.UUID) (events.Access, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.asked++
 	if m.gone {
 		return nil, apperrors.NotFound()
 	}
@@ -119,6 +121,9 @@ func newRig(t *testing.T, o events.Options) *rig {
 	t.Helper()
 	if o.Log == nil {
 		o.Log = logging.New(&strings.Builder{}, slog.LevelDebug)
+	}
+	if o.AccessTTL == 0 {
+		o.AccessTTL = -1
 	}
 	if o.Now == nil {
 		o.Now = clock
@@ -357,4 +362,44 @@ func TestDrainEndsEveryStream(t *testing.T) {
 	require.Equal(t, http.StatusOK, c.status)
 	r.service.Drain()
 	assert.True(t, c.waitClosed())
+}
+
+func (m *member) times() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.asked
+}
+
+func TestABurstOfEventsOnOneStreamAsksForTheAccessOnceInsideTheTTL(t *testing.T) {
+	r := newRig(t, events.Options{AccessTTL: time.Hour})
+	c := r.open("")
+	require.Equal(t, http.StatusOK, c.status)
+	for range 20 {
+		r.publish(models.TypeOverviewChanged, "", nil)
+		c.next(t)
+	}
+	assert.Equal(t, 1, r.who.times(), "twenty events, one look at the session and the memberships")
+}
+
+func TestARoleLoweredIsSeenAfterTheTTLAndTheNextEvent(t *testing.T) {
+	r := newRig(t, events.Options{AccessTTL: 100 * time.Millisecond})
+	c := r.open("")
+	project := uuid.New()
+	r.publish(models.TypeApprovalRequested, "pending", &project)
+	assert.Equal(t, models.TypeApprovalRequested, decode(t, c.next(t)).Type)
+
+	r.who.set(policy.RoleViewer, false)
+	time.Sleep(150 * time.Millisecond)
+	r.publish(models.TypeApprovalRequested, "pending", &project)
+	r.publish(models.TypeApprovalDecided, "approved", &project)
+	assert.Equal(t, models.TypeApprovalDecided, decode(t, c.next(t)).Type)
+}
+
+func TestTheHeartbeatChecksTheMemberEvenInsideTheTTL(t *testing.T) {
+	r := newRig(t, events.Options{AccessTTL: time.Hour, Tick: 30 * time.Millisecond})
+	c := r.open("")
+	r.publish(models.TypeOverviewChanged, "", nil)
+	c.next(t)
+	r.who.set(policy.RoleDeveloper, true)
+	assert.True(t, c.waitClosed(), "a removal lands on the next heartbeat, never later")
 }

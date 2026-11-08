@@ -3,17 +3,21 @@ package e2e_test
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	eventbus "github.com/Khaymah/dhow/apps/server/internal/Core/EventBus"
+	events "github.com/Khaymah/dhow/apps/server/internal/Modules/Events"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Events/Models"
 )
 
@@ -115,6 +119,7 @@ func TestARemovedMemberStopsReceivingOnTheSameConnection(t *testing.T) {
 	notify(t, w, models.Notice{Organization: w.org, Type: models.TypeOverviewChanged, At: time.Now().UTC()})
 	assert.Equal(t, "change", next(t, s).Name)
 
+	time.Sleep(config.OrgEventsAccessTTL + 200*time.Millisecond)
 	_, err := w.env.Pool.Exec(context.Background(), `UPDATE "Memberships" SET "IsDeleted" = true WHERE "UserId" = $1 AND "OrganizationId" = $2`, devID, w.org)
 	require.NoError(t, err)
 	notify(t, w, models.Notice{Organization: w.org, Type: models.TypeDeploymentStarted, Status: "running", ProjectID: &w.project, At: time.Now().UTC()})
@@ -150,6 +155,7 @@ func TestAMemberWhoseRoleIsLoweredNoLongerGetsApprovalRequests(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(next(t, s).Data), &got))
 	assert.Equal(t, models.TypeApprovalRequested, got.Type, "a developer may decide, so the request arrives")
 
+	time.Sleep(config.OrgEventsAccessTTL + 200*time.Millisecond)
 	_, err := w.env.Pool.Exec(context.Background(), `UPDATE "Memberships" SET "Role" = 'viewer' WHERE "UserId" = $1 AND "OrganizationId" = $2`, devID, w.org)
 	require.NoError(t, err)
 	notify(t, w, models.Notice{Organization: w.org, Type: models.TypeApprovalRequested, Status: "pending", ProjectID: &w.project, At: time.Now().UTC()})
@@ -188,4 +194,94 @@ func TestAMalformedLastEventIDIsRefused(t *testing.T) {
 	srv := w.env.Serve()
 	s := w.owner.OpenStream(t, srv, w.path(), map[string]string{"Last-Event-ID": "not-an-id"})
 	assert.Equal(t, http.StatusUnprocessableEntity, s.Status)
+}
+
+func TestAReasonTheRunnerSuppliedNeverReachesTheStream(t *testing.T) {
+	w := newWorld(t)
+	target, _ := w.env.SeedDeployTarget(w.project, "production", "web")
+	srv := w.env.Serve()
+	s := w.owner.OpenStream(t, srv, w.path(), nil)
+	require.Equal(t, http.StatusOK, s.Status, s.Body)
+
+	for _, reason := range []string{"hunter2-the-runner-wrote-this", "ok"} {
+		require.NoError(t, w.env.Wired.Options.Events.Handle(context.Background(), eventbus.Event{
+			Name: eventbus.DeploymentTargetChecked,
+			Payload: eventbus.Audited{
+				OrganizationIDs: []uuid.UUID{w.org}, TargetType: "deployment_check", TargetID: target.String(),
+				Data: map[string]string{"Reason": reason},
+			},
+		}))
+	}
+	first, second := next(t, s), next(t, s)
+	assert.NotContains(t, first.Data, "hunter2")
+	assert.Contains(t, first.Data, `"Status":"unknown"`, "a value outside the fixed list becomes unknown")
+	assert.Contains(t, second.Data, `"Status":"ok"`)
+}
+
+func TestAForgedNotificationOfAnUnknownKindIsDropped(t *testing.T) {
+	w := newWorld(t)
+	srv := w.env.Serve()
+	s := w.owner.OpenStream(t, srv, w.path(), nil)
+	require.Equal(t, http.StatusOK, s.Status, s.Body)
+
+	notify(t, w, models.Notice{Organization: w.org, Type: "evil.type", Status: "x", At: time.Now().UTC()})
+	notify(t, w, models.Notice{Organization: uuid.Nil, Type: models.TypeOverviewChanged, At: time.Now().UTC()})
+	notify(t, w, models.Notice{Organization: w.org, Type: models.TypeOverviewChanged, At: time.Now().UTC()})
+	var got models.Event
+	require.NoError(t, json.Unmarshal([]byte(next(t, s).Data), &got))
+	assert.Equal(t, models.TypeOverviewChanged, got.Type)
+	assert.Equal(t, uint64(1), got.Seq, "the two forged ones never took a place in the ring")
+}
+
+func TestASilentListenerIsReplacedAndTheHubGoesUnhealthyMeanwhile(t *testing.T) {
+	env := apptest.New(t)
+	service := events.NewService(events.Options{
+		Listen: events.Listener(func(ctx context.Context) (*pgx.Conn, error) {
+			return pgx.ConnectConfig(ctx, env.Pool.Config().ConnConfig.Copy())
+		}),
+		SilenceLimit: 300 * time.Millisecond,
+		Log:          slog.New(slog.NewJSONHandler(io.Discard, nil)),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		service.Run(ctx)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+
+	require.Eventually(t, service.Hub().Healthy, wait, 20*time.Millisecond)
+	first := service.Hub().Now().Epoch
+	require.Eventually(t, func() bool { return service.Hub().Now().Epoch != first }, 10*time.Second, 50*time.Millisecond,
+		"with no canary and no event the connection is judged dead and a new one replaces it")
+}
+
+func TestTheCanaryKeepsAHealthyListenerAliveAndIsNeverAnEvent(t *testing.T) {
+	env := apptest.New(t)
+	service := events.NewService(events.Options{
+		DB: env.Pool,
+		Listen: events.Listener(func(ctx context.Context) (*pgx.Conn, error) {
+			return pgx.ConnectConfig(ctx, env.Pool.Config().ConnConfig.Copy())
+		}),
+		CanaryEvery: 50 * time.Millisecond, SilenceLimit: 400 * time.Millisecond,
+		Log: slog.New(slog.NewJSONHandler(io.Discard, nil)),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		service.Run(ctx)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+	require.Eventually(t, service.Hub().Healthy, wait, 20*time.Millisecond)
+	epoch := service.Hub().Now()
+	time.Sleep(1500 * time.Millisecond)
+	assert.True(t, service.Hub().Healthy())
+	assert.Equal(t, epoch, service.Hub().Now(), "no restart and no event: the canary only proves the line is alive")
 }

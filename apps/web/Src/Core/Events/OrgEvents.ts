@@ -9,9 +9,9 @@ export interface IOrgEvent {
   At: string;
 }
 
-export type TOrgSignal = { Kind: 'event'; Event: IOrgEvent } | { Kind: 'reset' } | { Kind: 'poll' };
+export type TOrgSignal = { Kind: 'event'; Event: IOrgEvent } | { Kind: 'reset' } | { Kind: 'poll' } | { Kind: 'auth' };
 
-export type TOrgEventsMode = 'connecting' | 'live' | 'polling';
+export type TOrgEventsMode = 'connecting' | 'live' | 'polling' | 'stopped';
 
 export type TOrgSignalListener = (signal: TOrgSignal) => void;
 

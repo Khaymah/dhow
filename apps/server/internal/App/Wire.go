@@ -200,7 +200,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Ingest:        ingestService,
 		Notifications: notificationsService,
 		Overview:      overview.NewService(overview.Options{Counter: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
-		Boards:        boards.NewService(boards.Options{Store: sqlc.New(in.Pool), Log: in.Log, Now: in.Now}),
+		Boards:        boards.NewService(boards.Options{Store: sqlc.New(in.Pool), Limiter: limiter, Log: in.Log, Now: in.Now}),
 		Events:        eventsFor(in, bus),
 		Tokens:        tokensService,
 		Prefs:         preferences.NewService(in.Pool, in.Log, in.Now),

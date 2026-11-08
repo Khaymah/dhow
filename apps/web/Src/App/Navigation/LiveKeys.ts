@@ -35,4 +35,4 @@ const keysOfEvent = (organizationId: string, event: IOrgEvent): QueryKey[] => {
 };
 
 export const queryKeysFor = (organizationId: string, signal: TOrgSignal): QueryKey[] =>
-  signal.Kind === 'event' ? keysOfEvent(organizationId, signal.Event) : everything(organizationId);
+  signal.Kind === 'event' ? keysOfEvent(organizationId, signal.Event) : signal.Kind === 'auth' ? [] : everything(organizationId);

@@ -15,6 +15,17 @@ const SOURCE_CLOSED = 2;
 
 export type TSourceFactory = (url: string) => EventSource | null;
 
+export type TProbe = (url: string) => Promise<number>;
+
+export const browserProbe: TProbe = async (url) => {
+  try {
+    const response = await fetch(url, { credentials: 'same-origin', headers: { 'Last-Event-ID': 'probe' } });
+    return response.status;
+  } catch {
+    return 0;
+  }
+};
+
 export const browserSource: TSourceFactory = (url) =>
   typeof EventSource === 'undefined' ? null : new EventSource(url, { withCredentials: true });
 
@@ -32,6 +43,7 @@ export class OrgEventsConnection {
   constructor(
     private readonly organizationId: string,
     private readonly create: TSourceFactory = browserSource,
+    private readonly probe: TProbe = browserProbe,
   ) {}
 
   readonly GetMode = (): TOrgEventsMode => this.mode;
@@ -53,6 +65,8 @@ export class OrgEventsConnection {
   Start(): void {
     if (this.running) return;
     this.running = true;
+    this.failures = 0;
+    this.setMode('connecting');
     document.addEventListener('visibilitychange', this.HandleVisibility);
     this.connect();
   }
@@ -137,6 +151,7 @@ export class OrgEventsConnection {
     if (this.source === null) return;
     if (this.source.readyState === SOURCE_CLOSED) {
       this.failStream();
+      this.checkTerminal();
       return;
     }
     if (this.mode === 'live') this.setMode('connecting');
@@ -151,6 +166,15 @@ export class OrgEventsConnection {
   private readonly HandleReset = (): void => {
     this.emit({ Kind: 'reset' });
   };
+
+  private checkTerminal(): void {
+    void this.probe(orgEventsUrl(this.organizationId)).then((status) => {
+      if (!this.running || (status !== 401 && status !== 403)) return;
+      this.Stop();
+      this.setMode('stopped');
+      this.emit({ Kind: 'auth' });
+    });
+  }
 
   private failStream(): void {
     this.closeSource();

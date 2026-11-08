@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -169,4 +170,35 @@ func TestAProjectThatIsGoneOrFailsToLoadIsNeverAllowed(t *testing.T) {
 	ok, err = access.Can(r.ctx, policy.RunRead, uuid.New())
 	require.Error(t, err)
 	assert.False(t, ok)
+}
+
+func TestAnApproverPastTheSecondFactorDeadlineStopsGettingWhatNeedsTheFactor(t *testing.T) {
+	r := newAccessRig(t)
+	project := uuid.New()
+	r.projects.bindings[project] = nil
+	resolved := func(due time.Time) *auth.Resolved {
+		return &auth.Resolved{
+			UserID: uuid.New(), SessionID: uuid.New(),
+			Memberships: []policy.Membership{{OrganizationID: r.org, Role: policy.RoleDeveloper, SecondFactorDue: due}},
+		}
+	}
+	for _, tt := range []struct {
+		name string
+		due  time.Time
+		want bool
+	}{
+		{"no deadline", time.Time{}, true},
+		{"a deadline ahead", time.Now().Add(time.Hour), true},
+		{"a deadline passed", time.Now().Add(-time.Hour), false},
+	} {
+		r.resolver.set(r.hash, resolved(tt.due), nil)
+		access, err := r.guard.AccessIn(r.ctx, r.org)
+		require.NoError(t, err, tt.name)
+		approve, err := access.Can(r.ctx, policy.DeploymentApprove, project)
+		require.NoError(t, err)
+		assert.Equal(t, tt.want, approve, tt.name)
+		read, err := access.Can(r.ctx, policy.RunRead, project)
+		require.NoError(t, err)
+		assert.True(t, read, "%s: reading is not a sensitive action", tt.name)
+	}
 }

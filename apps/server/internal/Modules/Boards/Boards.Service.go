@@ -8,6 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
+	auth "github.com/Khaymah/dhow/apps/server/internal/Core/Auth"
+	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
+	ratelimit "github.com/Khaymah/dhow/apps/server/internal/Core/RateLimit"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Boards/Models"
 )
@@ -30,15 +34,17 @@ type Store interface {
 }
 
 type Options struct {
-	Store Store
-	Log   *slog.Logger
-	Now   func() time.Time
+	Store   Store
+	Limiter ratelimit.Limiter
+	Log     *slog.Logger
+	Now     func() time.Time
 }
 
 type Service struct {
-	store Store
-	log   *slog.Logger
-	now   func() time.Time
+	store   Store
+	limiter ratelimit.Limiter
+	log     *slog.Logger
+	now     func() time.Time
 }
 
 func NewService(o Options) *Service {
@@ -46,7 +52,7 @@ func NewService(o Options) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{store: o.Store, log: o.Log, now: now}
+	return &Service{store: o.Store, limiter: o.Limiter, log: o.Log, now: now}
 }
 
 type snapshot struct {
@@ -59,7 +65,18 @@ type snapshot struct {
 	truncated bool
 }
 
+func (sn snapshot) targetIDs() []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(sn.targets))
+	for _, t := range sn.targets {
+		ids = append(ids, t.Id)
+	}
+	return ids
+}
+
 func (s *Service) Get(ctx context.Context, org, project uuid.UUID) (models.Board, error) {
+	if err := s.allow(ctx); err != nil {
+		return models.Board{}, err
+	}
 	snap, err := s.load(ctx, org, project)
 	if err != nil {
 		return models.Board{}, err
@@ -93,7 +110,7 @@ func (s *Service) load(ctx context.Context, org, project uuid.UUID) (snapshot, e
 }
 
 func (s *Service) loadReleases(ctx context.Context, org, project uuid.UUID, snap *snapshot) error {
-	rows, err := s.store.ListBoardReleases(ctx, sqlc.ListBoardReleasesParams{OrganizationID: org, ProjectID: project})
+	rows, err := s.store.ListBoardReleases(ctx, sqlc.ListBoardReleasesParams{OrganizationID: org, ProjectID: project, TargetIds: snap.targetIDs()})
 	if err != nil {
 		return fmt.Errorf("list the releases of the board: %w", err)
 	}
@@ -123,7 +140,7 @@ func (s *Service) loadReleases(ctx context.Context, org, project uuid.UUID, snap
 }
 
 func (s *Service) loadChecks(ctx context.Context, org, project uuid.UUID, snap *snapshot) error {
-	checks, err := s.store.ListBoardHostChecks(ctx, sqlc.ListBoardHostChecksParams{OrganizationID: org, ProjectID: project})
+	checks, err := s.store.ListBoardHostChecks(ctx, sqlc.ListBoardHostChecksParams{OrganizationID: org, TargetIds: snap.targetIDs()})
 	if err != nil {
 		return fmt.Errorf("list the checks of the board: %w", err)
 	}
@@ -140,4 +157,19 @@ func (s *Service) loadChecks(ctx context.Context, org, project uuid.UUID, snap *
 		snap.approvals[p.EnvironmentId] = int(p.Pending)
 	}
 	return nil
+}
+
+func (s *Service) allow(ctx context.Context) error {
+	if s.limiter == nil {
+		return nil
+	}
+	p, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return apperrors.Unauthenticated()
+	}
+	d, err := s.limiter.Take(ctx, ratelimit.Limit{Name: "board-read", Max: config.BoardReadsPerMinute, Window: time.Minute}, p.UserID.String())
+	if err != nil {
+		return fmt.Errorf("take the board read limit: %w", err)
+	}
+	return d.Err()
 }

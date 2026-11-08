@@ -18,4 +18,8 @@ const (
 	OrgEventsListenMax  = 30 * time.Second
 	OrgEventsTracked    = 10_000
 	OrgEventsMaxPayload = 7000
+	OrgEventsAccessTTL  = time.Second
+	OrgEventsCanary     = 10 * time.Second
+	OrgEventsSilence    = 35 * time.Second
+	BoardReadsPerMinute = 240
 )

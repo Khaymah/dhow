@@ -25,6 +25,9 @@ type Options struct {
 	Now           func() time.Time
 	RingSize      int
 	PerUserStream int
+	AccessTTL     time.Duration
+	CanaryEvery   time.Duration
+	SilenceLimit  time.Duration
 }
 
 type Service struct {
@@ -36,6 +39,10 @@ type Service struct {
 	openRate *streams.OpenRate
 	wait     time.Duration
 	tick     time.Duration
+	ttl      time.Duration
+	canary   time.Duration
+	silence  time.Duration
+	known    map[string]bool
 	log      *slog.Logger
 	now      func() time.Time
 	stop     chan struct{}
@@ -60,15 +67,24 @@ func NewService(o Options) *Service {
 		limits = config.DefaultLogs()
 	}
 	return &Service{
-		db: o.DB, listen: o.Listen, hub: NewHub(size, now), rules: rules(), log: o.Log, now: now,
+		db: o.DB, listen: o.Listen, hub: NewHub(size), rules: rules(), log: o.Log, now: now,
 		limiter: streams.NewLimiter(streams.Limits{
 			Total: limits.MaxStreams, PerUser: perUser, PerOrg: max(2*perUser, limits.MaxStreams/config.OrgEventsOrgShare),
 			RetryAfter: config.OrgEventsRetryAfter,
 		}),
 		openRate: streams.NewOpenRate(config.OrgEventsOpenBurst, config.OrgEventsOpenRefill, config.OrgEventsTracked),
 		wait:     durationOr(o.WriteWait, config.OrgEventsWriteWait), tick: durationOr(o.Tick, config.OrgEventsTick),
-		stop: make(chan struct{}),
+		ttl: ttlOf(o.AccessTTL), canary: durationOr(o.CanaryEvery, config.OrgEventsCanary), silence: durationOr(o.SilenceLimit, config.OrgEventsSilence),
+		known: knownTypes(),
+		stop:  make(chan struct{}),
 	}
+}
+
+func ttlOf(v time.Duration) time.Duration {
+	if v == 0 {
+		return config.OrgEventsAccessTTL
+	}
+	return max(v, 0)
 }
 
 func durationOr(v, fallback time.Duration) time.Duration {

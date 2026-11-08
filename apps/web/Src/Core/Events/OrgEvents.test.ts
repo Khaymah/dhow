@@ -16,7 +16,7 @@ const ORG = '0198a000-0000-7000-8000-0000000000a1';
 
 const make = () => {
   FakeEventSource.instances = [];
-  const connection = new OrgEventsConnection(ORG, (url) => new FakeEventSource(url, { withCredentials: true }) as unknown as EventSource);
+  const connection = new OrgEventsConnection(ORG, (url) => new FakeEventSource(url, { withCredentials: true }) as unknown as EventSource, () => Promise.resolve(0));
   const seen: TOrgSignal[] = [];
   connection.Subscribe((signal) => seen.push(signal));
   return { connection, seen };
@@ -157,7 +157,7 @@ describe('the fallback of the org event stream', () => {
   });
 
   it('goes straight to polling where the browser has no EventSource', () => {
-    const connection = new OrgEventsConnection(ORG, () => null);
+    const connection = new OrgEventsConnection(ORG, () => null, () => Promise.resolve(0));
     const seen: TOrgSignal[] = [];
     connection.Subscribe((signal) => seen.push(signal));
     connection.Start();
@@ -179,10 +179,52 @@ describe('the fallback of the org event stream', () => {
   });
 });
 
+describe('a stream the server refuses', () => {
+  const refused = (status: number) => {
+    FakeEventSource.instances = [];
+    const probe = vi.fn(() => Promise.resolve(status));
+    const connection = new OrgEventsConnection(ORG, (url) => new FakeEventSource(url) as unknown as EventSource, probe);
+    const seen: TOrgSignal[] = [];
+    connection.Subscribe((signal) => seen.push(signal));
+    connection.Start();
+    FakeEventSource.latest().fail(true);
+    return { connection, seen, probe };
+  };
+
+  it.each([401, 403])('stops for good on a %s and hands the sign-in to the normal auth flow', async (status) => {
+    const { connection, seen, probe } = refused(status);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(probe).toHaveBeenCalledWith(orgEventsUrl(ORG));
+    expect(connection.GetMode()).toBe('stopped');
+    expect(seen).toEqual([{ Kind: 'auth' }]);
+    await vi.advanceTimersByTimeAsync(RETRY_STREAM_MS * 3);
+    expect(FakeEventSource.instances).toHaveLength(1);
+    expect(seen.filter((signal) => signal.Kind === 'poll')).toEqual([]);
+  });
+
+  it.each([0, 404, 429, 500, 503])('keeps trying on a %s, which can pass', async (status) => {
+    const { connection, seen } = refused(status);
+    await vi.advanceTimersByTimeAsync(BACKOFF_MS[0]);
+    expect(connection.GetMode()).not.toBe('stopped');
+    expect(FakeEventSource.instances).toHaveLength(2);
+    expect(seen).toEqual([]);
+    connection.Stop();
+  });
+
+  it('starts again from a clean state when asked to start after it stopped', async () => {
+    const { connection } = refused(401);
+    await vi.advanceTimersByTimeAsync(0);
+    connection.Start();
+    expect(connection.GetMode()).toBe('connecting');
+    expect(FakeEventSource.instances).toHaveLength(2);
+    connection.Stop();
+  });
+});
+
 describe('the registry', () => {
   const registry = () => {
     FakeEventSource.instances = [];
-    return new OrgEventsRegistry((url) => new FakeEventSource(url) as unknown as EventSource);
+    return new OrgEventsRegistry((url) => new FakeEventSource(url) as unknown as EventSource, () => Promise.resolve(0));
   };
 
   it('shares one stream between every subscriber of an organization', () => {

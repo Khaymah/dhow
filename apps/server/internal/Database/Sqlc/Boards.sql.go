@@ -94,16 +94,21 @@ func (q *Queries) ListBoardEnvironments(ctx context.Context, arg ListBoardEnviro
 }
 
 const listBoardHostChecks = `-- name: ListBoardHostChecks :many
-SELECT DISTINCT ON (c."TargetId", c."HostId") c."TargetId", c."HostId", c."CurrentReleaseId", c."CheckedAt"
-FROM "DeploymentHostChecks" c
-JOIN "DeployTargets" t ON t."Id" = c."TargetId" AND t."OrganizationId" = c."OrganizationId"
-WHERE t."OrganizationId" = $1 AND t."ProjectId" = $2 AND NOT t."IsDeleted" AND NOT c."IsDeleted"
-ORDER BY c."TargetId", c."HostId", c."CheckedAt" DESC, c."Id" DESC
+SELECT c."TargetId", c."HostId", c."CurrentReleaseId", c."CheckedAt"
+FROM "DeployTargetHosts" h
+CROSS JOIN LATERAL (
+    SELECT x."TargetId", x."HostId", x."CurrentReleaseId", x."CheckedAt"
+    FROM "DeploymentHostChecks" x
+    WHERE x."TargetId" = h."TargetId" AND x."HostId" = h."Id" AND x."OrganizationId" = h."OrganizationId" AND NOT x."IsDeleted"
+    ORDER BY x."CheckedAt" DESC, x."Id" DESC
+    LIMIT 1
+) c
+WHERE h."TargetId" = ANY ($1::uuid[]) AND h."OrganizationId" = $2 AND NOT h."IsDeleted"
 `
 
 type ListBoardHostChecksParams struct {
+	TargetIds      []uuid.UUID
 	OrganizationID uuid.UUID
-	ProjectID      uuid.UUID
 }
 
 type ListBoardHostChecksRow struct {
@@ -114,7 +119,7 @@ type ListBoardHostChecksRow struct {
 }
 
 func (q *Queries) ListBoardHostChecks(ctx context.Context, arg ListBoardHostChecksParams) ([]ListBoardHostChecksRow, error) {
-	rows, err := q.db.Query(ctx, listBoardHostChecks, arg.OrganizationID, arg.ProjectID)
+	rows, err := q.db.Query(ctx, listBoardHostChecks, arg.TargetIds, arg.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +155,7 @@ FROM (
         WHERE x."TargetId" = t."Id" AND x."OrganizationId" = t."OrganizationId" AND x."State" = 'succeeded' AND NOT x."IsDeleted"
         ORDER BY x."StartedAt" DESC, x."Id" DESC LIMIT 1
     ) r
-    WHERE t."OrganizationId" = $1 AND t."ProjectId" = $2 AND NOT t."IsDeleted"
+    WHERE t."Id" = ANY ($1::uuid[]) AND t."OrganizationId" = $2 AND t."ProjectId" = $3 AND NOT t."IsDeleted"
     UNION ALL
     SELECT 'last', r."Id", r."TargetId", r."ReleaseId", r."Kind", r."State", r."RestoredReleaseId", r."RollbackReason",
            r."BatchSize", r."ArtifactDigest", r."StartedAt", r."FinishedAt"
@@ -160,7 +165,7 @@ FROM (
         WHERE x."TargetId" = t."Id" AND x."OrganizationId" = t."OrganizationId" AND x."State" <> 'running' AND NOT x."IsDeleted"
         ORDER BY x."StartedAt" DESC, x."Id" DESC LIMIT 1
     ) r
-    WHERE t."OrganizationId" = $1 AND t."ProjectId" = $2 AND NOT t."IsDeleted"
+    WHERE t."Id" = ANY ($1::uuid[]) AND t."OrganizationId" = $2 AND t."ProjectId" = $3 AND NOT t."IsDeleted"
     UNION ALL
     SELECT 'running', r."Id", r."TargetId", r."ReleaseId", r."Kind", r."State", r."RestoredReleaseId", r."RollbackReason",
            r."BatchSize", r."ArtifactDigest", r."StartedAt", r."FinishedAt"
@@ -170,11 +175,12 @@ FROM (
         WHERE x."TargetId" = t."Id" AND x."OrganizationId" = t."OrganizationId" AND x."State" = 'running' AND NOT x."IsDeleted"
         ORDER BY x."StartedAt" DESC, x."Id" DESC LIMIT 1
     ) r
-    WHERE t."OrganizationId" = $1 AND t."ProjectId" = $2 AND NOT t."IsDeleted"
+    WHERE t."Id" = ANY ($1::uuid[]) AND t."OrganizationId" = $2 AND t."ProjectId" = $3 AND NOT t."IsDeleted"
 ) s
 `
 
 type ListBoardReleasesParams struct {
+	TargetIds      []uuid.UUID
 	OrganizationID uuid.UUID
 	ProjectID      uuid.UUID
 }
@@ -195,7 +201,7 @@ type ListBoardReleasesRow struct {
 }
 
 func (q *Queries) ListBoardReleases(ctx context.Context, arg ListBoardReleasesParams) ([]ListBoardReleasesRow, error) {
-	rows, err := q.db.Query(ctx, listBoardReleases, arg.OrganizationID, arg.ProjectID)
+	rows, err := q.db.Query(ctx, listBoardReleases, arg.TargetIds, arg.OrganizationID, arg.ProjectID)
 	if err != nil {
 		return nil, err
 	}
