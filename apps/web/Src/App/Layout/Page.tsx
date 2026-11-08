@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { PageHelp } from '@/App/Layout/PageHelp';
 import { PageHeader } from '@/Core/Ui/PageHeader';
 
 export interface IPageProps {
@@ -13,7 +14,7 @@ export interface IPageProps {
 
 export const Page = ({ title, lead, action, help, nav, children }: IPageProps) => (
   <div className="grid max-w-[1200px] gap-block">
-    <PageHeader title={title} lead={lead} action={action} help={help} />
+    <PageHeader title={title} lead={lead} action={action} help={help ?? <PageHelp />} />
     {nav}
     <div className="grid gap-block pt-1">{children}</div>
   </div>
