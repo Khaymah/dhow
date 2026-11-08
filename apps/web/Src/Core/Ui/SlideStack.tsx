@@ -128,16 +128,36 @@ const useFocusFlow = (count: number, topId: string | undefined) => {
   };
 };
 
-const useGuarded = ({ onPop, onJump, onCloseAll, closeGuard }: Omit<ISlideStackProps, 'slides'>) => {
-  const guarded = (close: () => void) => () => {
-    if (closeGuard?.blocked === true) closeGuard.onBlocked();
-    else close();
+const NONE_RELEASED: ReadonlySet<string> = new Set();
+
+const useReleased = (slides: readonly ISlide[]) => {
+  const ids = slides.map((slide) => slide.id).join('\n');
+  const [Release, setRelease] = useState<{ ids: string; released: ReadonlySet<string> }>({ ids, released: NONE_RELEASED });
+  const Released = Release.ids === ids ? Release.released : NONE_RELEASED;
+  const release = (from: number) => {
+    setRelease({ ids, released: new Set(slides.slice(from).map((slide) => slide.id)) });
+  };
+  return { Released, release };
+};
+
+const useGuarded = (
+  { onPop, onJump, onCloseAll, closeGuard }: Omit<ISlideStackProps, 'slides'>,
+  total: number,
+  release: (from: number) => void,
+) => {
+  const guarded = (from: number, close: () => void) => () => {
+    if (closeGuard?.blocked === true) {
+      closeGuard.onBlocked();
+      return;
+    }
+    release(from);
+    close();
   };
   return {
-    onPop: guarded(onPop),
-    onCloseAll: guarded(onCloseAll),
+    onPop: guarded(total - 1, onPop),
+    onCloseAll: guarded(0, onCloseAll),
     onJump: (index: number, source: TJumpSource) => {
-      guarded(() => {
+      guarded(index + 1, () => {
         onJump(index, source);
       })();
     },
@@ -145,7 +165,8 @@ const useGuarded = ({ onPop, onJump, onCloseAll, closeGuard }: Omit<ISlideStackP
 };
 
 export const SlideStack = ({ slides, ...handlers }: ISlideStackProps) => {
-  const { onPop, onCloseAll, onJump } = useGuarded(handlers);
+  const { Released, release } = useReleased(slides);
+  const { onPop, onCloseAll, onJump } = useGuarded(handlers, slides.length, release);
   const reducedMotion = usePrefersReducedMotion();
   const ghosts = useGhosts(slides, reducedMotion);
   const { topRef, focusTop, takeOriginalOpener } = useFocusFlow(slides.length, slides[slides.length - 1]?.id);
@@ -197,7 +218,7 @@ export const SlideStack = ({ slides, ...handlers }: ISlideStackProps) => {
                 ...slides.map((slide, index) => (
                   <SlideView
                     key={slide.id}
-                    slide={slide}
+                    slide={Released.has(slide.id) ? { ...slide, children: null } : slide}
                     index={index}
                     total={total}
                     trail={slides.slice(0, index + 1).map((entry) => entry.title)}
