@@ -126,8 +126,7 @@ func (s *Service) addInbox(ctx context.Context, q *sqlc.Queries, e inboxEntry) e
 	if _, err = q.TrimNotificationInbox(ctx, sqlc.TrimNotificationInboxParams{UserID: e.user, IsAccount: e.self, Keep: keep}); err != nil {
 		return err
 	}
-	s.inboxChanged(ctx, q, e.user)
-	return nil
+	return s.inboxChanged(ctx, q, e.user, e.org)
 }
 
 func encodeInboxParams(values inboxValues) ([]byte, error) {
@@ -171,6 +170,10 @@ func (d inboxDeliverer) Deliver(ctx context.Context, item outbox.Item) outbox.Re
 		return outbox.Result{Code: CodeConfig, Permanent: true}
 	}
 	err = s.addInbox(ctx, q, inboxEntry{user: *item.RecipientUserID, org: item.OrganizationID, event: item.EventID, p: p, at: s.now()})
+	if errors.Is(err, errInboxSignal) {
+		s.log.WarnContext(ctx, "the live inbox signal was not sent", "delivery_id", item.ID.String())
+		return outbox.Result{}
+	}
 	if err != nil {
 		s.log.WarnContext(ctx, "inbox notification not saved", "delivery_id", item.ID.String())
 		return outbox.Result{Code: CodeConfig, Permanent: isCheckViolation(err)}
@@ -237,14 +240,24 @@ func (s *Service) MarkInboxRead(ctx context.Context, id uuid.UUID) (models.Inbox
 	if err != nil {
 		return models.InboxItem{}, err
 	}
-	r, err := s.queries().MarkNotificationInboxRead(ctx, sqlc.MarkNotificationInboxReadParams{Now: s.now(), ID: id, UserID: p.UserID})
+	if err := s.takeInboxWrite(ctx, p.UserID); err != nil {
+		return models.InboxItem{}, err
+	}
+	q := s.queries()
+	changed, err := q.MarkNotificationInboxReadIfUnread(ctx, sqlc.MarkNotificationInboxReadIfUnreadParams{Now: s.now(), ID: id, UserID: p.UserID})
+	if err != nil {
+		return models.InboxItem{}, err
+	}
+	r, err := q.MarkNotificationInboxRead(ctx, sqlc.MarkNotificationInboxReadParams{Now: s.now(), ID: id, UserID: p.UserID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return models.InboxItem{}, apperrors.NotFound()
 	}
 	if err != nil {
 		return models.InboxItem{}, err
 	}
-	s.inboxChanged(ctx, s.queries(), p.UserID)
+	if changed > 0 {
+		s.signalInbox(ctx, q, p.UserID, r.OrganizationId)
+	}
 	return inboxItemOf(r.Id, r.CreatedAt, r.OrganizationId, r.EventId, r.EventName, r.TitleKey, r.Params, r.Link, r.IsRead, r.ReadAt), nil
 }
 
@@ -253,9 +266,13 @@ func (s *Service) MarkAllInboxRead(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	n, err := s.queries().MarkAllNotificationInboxRead(ctx, sqlc.MarkAllNotificationInboxReadParams{Now: s.now(), UserID: p.UserID})
+	if err := s.takeInboxWrite(ctx, p.UserID); err != nil {
+		return 0, err
+	}
+	q := s.queries()
+	n, err := q.MarkAllNotificationInboxRead(ctx, sqlc.MarkAllNotificationInboxReadParams{Now: s.now(), UserID: p.UserID})
 	if err == nil && n > 0 {
-		s.inboxChanged(ctx, s.queries(), p.UserID)
+		s.signalInbox(ctx, q, p.UserID, nil)
 	}
 	return n, err
 }

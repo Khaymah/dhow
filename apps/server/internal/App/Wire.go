@@ -105,6 +105,7 @@ type Wired struct {
 	Alerts        *alerts.Service
 	Settings      *instancesettings.Store
 	Values        *keys.Values
+	Bus           *eventbus.Bus
 }
 
 func (w *Wired) Close() {
@@ -216,7 +217,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 	}
 	wired := &Wired{
 		Options: opts, Handler: NewRouter(opts), Identity: identityService, Jobs: jobsService, JobQueue: jobsService.Queue(),
-		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, Ingest: ingestService, Notifications: notificationsService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values,
+		Projects: opts.Projects, Sources: runs.sources, Pipelines: runs.pipelines, Artifacts: runs.artifacts, Ingest: ingestService, Notifications: notificationsService, LogPool: logPool, Settings: store, Alerts: alertsService, Values: values, Bus: bus,
 		Retention: retention.New(retention.Options{Pool: in.Pool, Log: in.Log, Now: in.Now, NotifyDays: in.Config.Notify.RetentionDays}),
 	}
 	if in.Config.RunnerPlaneSeparate() {
