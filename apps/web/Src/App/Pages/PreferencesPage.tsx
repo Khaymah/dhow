@@ -1,5 +1,7 @@
 import { Page } from '@/App/Layout/Page';
 import { AccountNav } from '@/App/Layout/SectionNavs';
+import { SettingsGroup } from '@/App/Layout/SettingsGroup';
+import { SettingsToc } from '@/App/Layout/SettingsToc';
 import { useSlide } from '@/App/Navigation/useSlide';
 import { themeEditSlide } from '@/App/Panels';
 import { Card } from '@/Core/Ui/Card';
@@ -43,15 +45,26 @@ export const PreferencesPage = () => {
           }}
         />
       }
-      nav={<AccountNav />}
+      nav={
+        <>
+          <AccountNav />
+          <SettingsToc page="preferences" context={{ role: undefined, owner: true, projectActive: true }} />
+        </>
+      }
     >
-      <LanguageCard />
-      <MuteCard />
-      <AppearanceBody
-        onEdit={(themeId) => {
-          open(themeEditSlide(themeId));
-        }}
-      />
+      <SettingsGroup setting="preferences.language">
+        <LanguageCard />
+      </SettingsGroup>
+      <SettingsGroup setting="preferences.notifications">
+        <MuteCard />
+      </SettingsGroup>
+      <SettingsGroup setting="preferences.appearance">
+        <AppearanceBody
+          onEdit={(themeId) => {
+            open(themeEditSlide(themeId));
+          }}
+        />
+      </SettingsGroup>
     </Page>
   );
 };

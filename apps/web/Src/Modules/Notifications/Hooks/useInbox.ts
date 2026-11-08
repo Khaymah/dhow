@@ -2,8 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient, type UseQueryR
 
 import type { ApiError } from '@/Core/Api/ApiError';
 import type { IPage } from '@/Core/Api/Client';
+import { INBOX_KEY } from '@/Modules/Notifications/Api/InboxKey';
 import {
-  INBOX_KEY,
   inboxListKey,
   listInbox,
   markAllInboxRead,

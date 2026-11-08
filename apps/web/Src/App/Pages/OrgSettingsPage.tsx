@@ -1,6 +1,7 @@
 import { Page } from '@/App/Layout/Page';
-import { PageGroup } from '@/App/Layout/PageGroup';
 import { OrgNav } from '@/App/Layout/SectionNavs';
+import { SettingsGroup } from '@/App/Layout/SettingsGroup';
+import { SettingsToc } from '@/App/Layout/SettingsToc';
 import { useSlide } from '@/App/Navigation/useSlide';
 import { OrganizationGate } from '@/App/Pages/OrganizationGate';
 import { canEditOrganization } from '@/Core/Auth/AuthTypes';
@@ -19,10 +20,11 @@ export const OrgSettingsPage = () => {
       <OrganizationGate>
         {(organization, membership) => (
           <>
-            <PageGroup title={t('orgSettings.group.general')} icon="building">
+            <SettingsToc page="org" context={{ role: membership.Role, owner: false, projectActive: true }} />
+            <SettingsGroup setting="org.general">
               <OrganizationCard organization={organization} editable={canEditOrganization(membership.Role)} />
-            </PageGroup>
-            <PageGroup title={t('orgSettings.group.security')} icon="shield">
+            </SettingsGroup>
+            <SettingsGroup setting="org.security">
               {membership.Role === 'owner' ? (
                 <SecondFactorCard organization={organization} />
               ) : (
@@ -33,8 +35,8 @@ export const OrgSettingsPage = () => {
               ) : (
                 <LogRetentionSummary organization={organization} />
               )}
-            </PageGroup>
-            <PageGroup title={t('orgSettings.group.danger')} lead={t('orgSettings.danger.lead')} icon="alert" danger>
+            </SettingsGroup>
+            <SettingsGroup setting="org.danger" lead={t('orgSettings.danger.lead')} danger>
               <DangerZone
                 organization={organization}
                 role={membership.Role}
@@ -45,7 +47,7 @@ export const OrgSettingsPage = () => {
                   open('organization-leave');
                 }}
               />
-            </PageGroup>
+            </SettingsGroup>
           </>
         )}
       </OrganizationGate>

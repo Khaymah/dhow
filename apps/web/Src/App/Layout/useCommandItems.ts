@@ -2,6 +2,7 @@ import { useNavigate } from '@tanstack/react-router';
 
 import type { TGate } from '@/App/Navigation/Gates';
 import { SECTIONS, type TSectionId, type TSectionPath } from '@/App/Navigation/Sections';
+import { useSettingsCommands } from '@/App/Layout/useSettingsCommands';
 import type { TSlideId } from '@/App/Panels';
 import { canCreateProjects, canManageMembers, canManageRunners, canManageTokens } from '@/Core/Auth/AuthTypes';
 import { useCurrentMembership, useMe } from '@/Core/Auth/useMe';
@@ -79,10 +80,12 @@ export const useCommandItems = (): ICommands => {
   const target = otherLocale(Locale);
   const pages = SECTIONS.filter((section) => section.allow(role, owner));
   const creates = CREATE_COMMANDS.filter((command) => command.allow === undefined || command.allow(role));
+  const settings = useSettingsCommands();
 
   const items: ICommandItem[] = [
     ...pages.map((section) => ({ id: `page:${section.id}`, icon: section.icon, label: t(PAGE_COMMANDS[section.id]), kind: t('palette.kind.page') })),
     ...creates.map((command) => ({ id: `create:${command.id}`, icon: command.icon, label: t(command.label), kind: t('palette.kind.action') })),
+    ...settings.items,
     { id: 'sign-out', icon: 'out', label: t('palette.command.signOut'), kind: t('palette.kind.action') },
     {
       id: 'language',
@@ -94,7 +97,8 @@ export const useCommandItems = (): ICommands => {
   const run = (item: ICommandItem) => {
     const page = pages.find((section) => `page:${section.id}` === item.id);
     const create = creates.find((command) => `create:${command.id}` === item.id);
-    if (page) void navigate({ to: page.path });
+    if (settings.owns(item)) settings.run(item);
+    else if (page) void navigate({ to: page.path });
     else if (create) void navigate({ to: create.path, search: { slide: create.slide } });
     else if (item.id === 'sign-out') void SignOut();
     else if (item.id === 'language') SetLocale(target);
