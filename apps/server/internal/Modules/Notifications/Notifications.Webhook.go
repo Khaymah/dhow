@@ -92,9 +92,15 @@ func (d webhookDeliverer) Deliver(ctx context.Context, item outbox.Item) outbox.
 	if err != nil {
 		return outbox.Result{Code: CodeBlocked, Permanent: true}
 	}
+	return s.send(ctx, ch.Id.String(), ch.Kind, item, req, cfg.sensitive())
+}
+
+func (s *Service) send(ctx context.Context, channel, kind string, item outbox.Item, req *http.Request, secrets []string) outbox.Result {
 	resp, err := s.httpClient().Do(req)
 	if err != nil {
 		code, permanent := transportCode(err)
+		s.log.WarnContext(ctx, "notification not delivered", "delivery_id", item.ID.String(), "channel_id", channel, "kind", kind,
+			"code", code, "error", RedactError(err, secrets...))
 		return outbox.Result{Code: code, Permanent: permanent}
 	}
 	defer func() { _ = resp.Body.Close() }()

@@ -148,6 +148,12 @@ func (c *Controller) channelCreate(ctx context.Context, scope models.Scope, b *g
 	if b.Url != nil {
 		in.URL = *b.Url
 	}
+	if b.BotToken != nil {
+		in.BotToken = *b.BotToken
+	}
+	if b.ChatId != nil {
+		in.ChatID = *b.ChatId
+	}
 	created, err := c.service.CreateChannel(ctx, scope, in, factorOf(b.CurrentFactor))
 	if err != nil {
 		return gen.CreatedNotificationChannelResponse{}, err
@@ -176,7 +182,7 @@ func (c *Controller) channelUpdate(ctx context.Context, scope models.Scope, id u
 	if b == nil {
 		return gen.CreatedNotificationChannelResponse{}, apperrors.BadRequest()
 	}
-	in := models.UpdateChannelInput{Name: b.Name, Locale: string(b.Locale), Version: b.Version, URL: b.Url}
+	in := models.UpdateChannelInput{Name: b.Name, Locale: string(b.Locale), Version: b.Version, URL: b.Url, BotToken: b.BotToken, ChatID: b.ChatId}
 	if b.RotateSecret != nil {
 		in.RotateSecret = *b.RotateSecret
 	}

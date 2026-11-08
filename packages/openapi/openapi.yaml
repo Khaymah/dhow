@@ -77,8 +77,8 @@ tags:
   - name: notifications
     description: >-
       Notification channels, their rules and the delivery log, for a project and for the organization (the defaults of
-      every project). Served by the Notifications module. A channel is an email list or a signed webhook. Its address and
-      secret are write-only: no response carries them, only `Host` and `HasSecret`.
+      every project). Served by the Notifications module. A channel is an email list, a signed webhook, or a Slack, Discord or
+      Telegram chat. Its address, token and secret are write-only: no response carries them, only `Host` and `HasSecret`.
   - name: secrets
     description: >-
       Secrets, variables and private registry credentials of an organization, a project or an environment. Served by
@@ -4787,9 +4787,11 @@ paths:
       tags: [notifications]
       summary: Make a notification channel
       description: >-
-        Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Kind` is `email` or `webhook`. A webhook needs `Url`: https, without a user name,
+        Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Kind` is `email`, `webhook`, `slack`, `discord` or `telegram`. A webhook needs `Url`: https, without a user name,
         and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed).
-        Dhow makes the signing secret and shows it once in `Secret`. A new channel starts with a rule for failed deployments,
+        Dhow makes the signing secret of a webhook and shows it once in `Secret`. `slack` needs the `Url` of an incoming webhook
+        (`https://hooks.slack.com/services/...`), `discord` the `Url` of a webhook (`https://discord.com/api/webhooks/...`, or
+        `discordapp.com`), and `telegram` a `BotToken` and a `ChatId`. These three accept their own service hosts only and have no signing secret. A new channel starts with a rule for failed deployments,
         rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
       security:
         - SessionCookie: []
@@ -4840,8 +4842,9 @@ paths:
       summary: Change a notification channel
       description: >-
         Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`.
-        `Url` replaces the address, `RotateSecret` makes a new signing secret (shown once in `Secret`), and `Enable` turns a stopped
-        channel on again and makes you its owner.
+        `Url` replaces the address of a webhook, Slack or Discord channel, `BotToken` and `ChatId` replace those of a Telegram channel
+        (send one or both), `RotateSecret` makes a new signing secret for a webhook (shown once in `Secret`), and `Enable` turns a stopped
+        channel on again and makes you its owner. A field that does not belong to the kind of the channel is 422.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -5042,9 +5045,11 @@ paths:
       tags: [notifications]
       summary: Make a notification channel
       description: >-
-        Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Kind` is `email` or `webhook`. A webhook needs `Url`: https, without a user name,
+        Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Kind` is `email`, `webhook`, `slack`, `discord` or `telegram`. A webhook needs `Url`: https, without a user name,
         and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed).
-        Dhow makes the signing secret and shows it once in `Secret`. A new channel starts with a rule for failed deployments,
+        Dhow makes the signing secret of a webhook and shows it once in `Secret`. `slack` needs the `Url` of an incoming webhook
+        (`https://hooks.slack.com/services/...`), `discord` the `Url` of a webhook (`https://discord.com/api/webhooks/...`, or
+        `discordapp.com`), and `telegram` a `BotToken` and a `ChatId`. These three accept their own service hosts only and have no signing secret. A new channel starts with a rule for failed deployments,
         rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
       security:
         - SessionCookie: []
@@ -5093,8 +5098,9 @@ paths:
       summary: Change a notification channel
       description: >-
         Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`.
-        `Url` replaces the address, `RotateSecret` makes a new signing secret (shown once in `Secret`), and `Enable` turns a stopped
-        channel on again and makes you its owner.
+        `Url` replaces the address of a webhook, Slack or Discord channel, `BotToken` and `ChatId` replace those of a Telegram channel
+        (send one or both), `RotateSecret` makes a new signing secret for a webhook (shown once in `Secret`), and `Enable` turns a stopped
+        channel on again and makes you its owner. A field that does not belong to the kind of the channel is 422.
       security:
         - SessionCookie: []
           CsrfToken: []
@@ -10271,7 +10277,7 @@ components:
                 $ref: "#/components/schemas/IngestToken"
     NotificationChannelKind:
       type: string
-      enum: [email, webhook]
+      enum: [email, webhook, slack, telegram, discord]
     NotificationDeliveryState:
       type: string
       enum: [pending, sending, sent, dead]
@@ -10304,11 +10310,11 @@ components:
         Host:
           type: string
           description: >-
-            The host of the webhook address, with its port when it is not the default. Never the path or the query. Only a
+            The host of the channel address, with its port when it is not the default (`hooks.slack.com`, `discord.com` or `api.telegram.org` for a chat channel). Never the path or the query. Only a
             caller who manages channels sees it; a reader gets name, kind and state only.
         HasSecret:
           type: boolean
-          description: True when the channel keeps an address and a signing secret. Neither is ever shown.
+          description: True when the channel keeps sealed settings (an address and a signing secret, or a bot token and a chat). None is ever shown.
         Version:
           type: integer
           format: int64
@@ -10341,7 +10347,18 @@ components:
         Url:
           type: string
           maxLength: 2048
-          description: The https address of a webhook. Required for a webhook and refused for an email channel.
+          description: >-
+            The https address of a webhook, a Slack incoming webhook or a Discord webhook. Required for those kinds and
+            refused for the others. Slack and Discord accept only their own hosts, otherwise 422 `CHANNEL_HOST_NOT_ALLOWED`.
+        BotToken:
+          type: string
+          maxLength: 128
+          writeOnly: true
+          description: The token of a Telegram bot. Required for `telegram` and refused for the other kinds. Never shown again.
+        ChatId:
+          type: string
+          maxLength: 64
+          description: The chat Telegram sends to, a number or `@channelname`. Required for `telegram` and refused for the other kinds.
         CurrentFactor:
           $ref: "#/components/schemas/CurrentFactor"
     UpdateNotificationChannelRequest:
@@ -10363,6 +10380,13 @@ components:
         Url:
           type: string
           maxLength: 2048
+        BotToken:
+          type: string
+          maxLength: 128
+          writeOnly: true
+        ChatId:
+          type: string
+          maxLength: 64
         RotateSecret:
           type: boolean
         Enable:
