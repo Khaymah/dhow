@@ -59,7 +59,7 @@ Decisions: ADR-0021 to ADR-0023, ADR-0034, ADR-0059 and ADR-0062.
 - **Phones** (below the `md` breakpoint): the side menu is hidden and a bottom bar shows five items, each with an icon and its name: Home, Jobs, Runners, Organization (opens Members, or the first organization page the role can open) and Account. Pages of the organization and of the account link to their sibling pages at the top.
 - **Slides are for create and confirm only:** invite a member, new team, new organization API key, new registration token, new personal API key, change the password, set up TOTP, transfer ownership, remove a member, leave the organization, new organization and edit a theme. They are 560px wide and open over the current page. The open slide is part of the URL (`?slide=<id>`), so a reload or a shared link opens it again, and the browser back button closes it.
 - **Old links keep working.** A link from before this change (`/?stack=…`) is replaced in the history with the matching page, and a create slide in it opens over that page.
-- **Command palette** (Ctrl K / ⌘K): every page the role can open, the create actions (each opens its slide over its page), sign out and the language switch.
+- **Command palette** (Ctrl K / ⌘K): every page the role can open, every setting the role allows (it opens the page at its section), the create actions (each opens its slide over its page), sign out and the language switch.
 - **Motion:** transitions are short slides of 150–250 ms with eased curves, and they respect `prefers-reduced-motion`.
 
 ## 3. Calm, low-density visual style

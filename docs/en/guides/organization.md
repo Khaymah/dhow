@@ -67,6 +67,15 @@ Every API key a member created in the organization, with its scopes, creator, cr
   - **Personal API tokens:** keys that act as you in one organization, never with more than your role.
 - **Preferences (`/account/preferences`):** the language and the theme. The theme editor opens in a slide.
 
+## Reaching any setting
+
+All the settings pages follow one order: **General** first, then the sections of the page itself, then **Security**, then **Notifications**, and **Danger zone** last. The section names are the same on every page. At the top of each page, a list called **On this page** takes you to the section you want.
+
+- Press Ctrl K or ⌘K and type the name of the setting, such as "Security" or "Language". Every setting your role allows is in the palette, and it opens the page at its section.
+- The settings and notifications of a project show in the palette while a project is open.
+- What your role does not allow does not show in the palette or in the list.
+- The notification bell updates by itself when a new notification arrives or when you read one in another tab. If the live stream drops, the bell asks once a minute.
+
 ## Names in mixed text
 
 Names, emails, team names and addresses are isolated from the text around them, so an Arabic name in the English interface (or an English one in Arabic) keeps the sentence in order, for example `صبري داود · 127.0.0.1 · 1 minute ago` in the audit log.
