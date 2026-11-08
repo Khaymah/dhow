@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	outbox "github.com/Khaymah/dhow/apps/server/internal/Core/Outbox"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	dbtest "github.com/Khaymah/dhow/apps/server/internal/Database/Testing"
@@ -386,7 +387,10 @@ func TestOnlyOneWorkerHoldsTheInstanceLock(t *testing.T) {
 	}, 20*time.Second, 20*time.Millisecond)
 	var holders int
 	require.NoError(t, w.pool.QueryRow(t.Context(),
-		`SELECT count(DISTINCT pid) FROM pg_locks WHERE locktype = 'advisory' AND granted`).Scan(&holders))
+		`SELECT count(DISTINCT pid) FROM pg_locks
+		WHERE locktype = 'advisory' AND granted AND objsubid = 1
+		  AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+		  AND ((classid::bigint << 32) | objid::bigint) = $1`, config.NotifyLockKey).Scan(&holders))
 	assert.Equal(t, 1, holders, "one connection holds the instance lock")
 	cancel()
 	wg.Wait()

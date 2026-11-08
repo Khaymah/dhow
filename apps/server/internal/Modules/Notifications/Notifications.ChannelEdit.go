@@ -17,13 +17,6 @@ import (
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications/Models"
 )
 
-type configChange struct {
-	cfg     channelConfig
-	host    string
-	secret  string
-	changed bool
-}
-
 func validateUpdate(in models.UpdateChannelInput) *apperrors.AppError {
 	var details []apperrors.IErrorDetail
 	if !auth.ValidDisplayName(in.Name, config.NotifyChannelNameMax) {
@@ -39,34 +32,6 @@ func validateUpdate(in models.UpdateChannelInput) *apperrors.AppError {
 		return apperrors.ValidationFailed(details...)
 	}
 	return nil
-}
-
-func (s *Service) planConfig(ctx context.Context, row sqlc.NotificationChannel, in models.UpdateChannelInput) (configChange, error) {
-	if row.Kind != models.KindWebhook || (in.URL == nil && !in.RotateSecret) {
-		if in.URL != nil || in.RotateSecret {
-			return configChange{}, apperrors.ValidationFailed(invalid(fieldURL))
-		}
-		return configChange{}, nil
-	}
-	cfg, err := s.openConfig(ctx, row)
-	if err != nil && in.URL == nil {
-		return configChange{}, err
-	}
-	out := configChange{cfg: cfg, host: row.Host, changed: true}
-	if in.URL != nil {
-		target, err := s.checkTarget(ctx, *in.URL)
-		if err != nil {
-			return configChange{}, err
-		}
-		out.cfg.URL, out.host = target.URL.String(), target.Display
-	}
-	if in.RotateSecret || !ValidSecret(out.cfg.Secret) {
-		if out.cfg.Secret, err = NewSecret(); err != nil {
-			return configChange{}, err
-		}
-		out.secret = out.cfg.Secret
-	}
-	return out, nil
 }
 
 func (s *Service) UpdateChannel(

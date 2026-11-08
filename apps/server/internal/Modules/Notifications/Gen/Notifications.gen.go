@@ -97,14 +97,23 @@ func (e NotificationChannelLocale) Valid() bool {
 
 // Defines values for NotificationChannelKind.
 const (
-	Email   NotificationChannelKind = "email"
-	Webhook NotificationChannelKind = "webhook"
+	Discord  NotificationChannelKind = "discord"
+	Email    NotificationChannelKind = "email"
+	Slack    NotificationChannelKind = "slack"
+	Telegram NotificationChannelKind = "telegram"
+	Webhook  NotificationChannelKind = "webhook"
 )
 
 // Valid indicates whether the value is a known member of the NotificationChannelKind enum.
 func (e NotificationChannelKind) Valid() bool {
 	switch e {
+	case Discord:
+		return true
 	case Email:
+		return true
+	case Slack:
+		return true
+	case Telegram:
 		return true
 	case Webhook:
 		return true
@@ -316,13 +325,19 @@ func (e UpdateNotificationChannelRequestLocale) Valid() bool {
 
 // CreateNotificationChannelRequest defines model for CreateNotificationChannelRequest.
 type CreateNotificationChannelRequest struct {
+	// BotToken The token of a Telegram bot. Required for `telegram` and refused for the other kinds. Never shown again.
+	BotToken *string `json:"BotToken,omitempty"`
+
+	// ChatId The chat Telegram sends to, a number or `@channelname`. Required for `telegram` and refused for the other kinds.
+	ChatId *string `json:"ChatId,omitempty"`
+
 	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
 	CurrentFactor CurrentFactor                           `json:"CurrentFactor"`
 	Kind          NotificationChannelKind                 `json:"Kind"`
 	Locale        *CreateNotificationChannelRequestLocale `json:"Locale,omitempty"`
 	Name          string                                  `json:"Name"`
 
-	// Url The https address of a webhook. Required for a webhook and refused for an email channel.
+	// Url The https address of a webhook, a Slack incoming webhook or a Discord webhook. Required for those kinds and refused for the others. Slack and Discord accept only their own hosts, otherwise 422 `CHANNEL_HOST_NOT_ALLOWED`.
 	Url *string `json:"Url,omitempty"`
 }
 
@@ -452,10 +467,10 @@ type NotificationChannel struct {
 	DisabledReason *NotificationChannelDisabledReason `json:"DisabledReason,omitempty"`
 	Enabled        bool                               `json:"Enabled"`
 
-	// HasSecret True when the channel keeps an address and a signing secret. Neither is ever shown.
+	// HasSecret True when the channel keeps sealed settings (an address and a signing secret, or a bot token and a chat). None is ever shown.
 	HasSecret bool `json:"HasSecret"`
 
-	// Host The host of the webhook address, with its port when it is not the default. Never the path or the query. Only a caller who manages channels sees it; a reader gets name, kind and state only.
+	// Host The host of the channel address, with its port when it is not the default (`hooks.slack.com`, `discord.com` or `api.telegram.org` for a chat channel). Never the path or the query. Only a caller who manages channels sees it; a reader gets name, kind and state only.
 	Host *string                 `json:"Host,omitempty"`
 	Id   openapi_types.UUID      `json:"Id"`
 	Kind NotificationChannelKind `json:"Kind"`
@@ -639,6 +654,9 @@ type PutNotificationRulesRequest struct {
 
 // UpdateNotificationChannelRequest defines model for UpdateNotificationChannelRequest.
 type UpdateNotificationChannelRequest struct {
+	BotToken *string `json:"BotToken,omitempty"`
+	ChatId   *string `json:"ChatId,omitempty"`
+
 	// CurrentFactor Proof of a factor the user already has. `password` is accepted only while the account has no second factor; afterwards one of `totp`, `recovery_code` or `passkey` is required. A wrong factor answers `INVALID_CURRENT_FACTOR` and is throttled like a sign-in attempt.
 	CurrentFactor CurrentFactor                          `json:"CurrentFactor"`
 	Enable        *bool                                  `json:"Enable,omitempty"`

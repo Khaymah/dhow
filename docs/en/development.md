@@ -345,6 +345,18 @@ Both need cgroup v2, remove their containers and volumes at the end (`DHOW_DEMO_
 
 `make gen` regenerates the code from `packages/openapi/openapi.yaml` and the SQL queries, `pnpm -C apps/web gen:api` regenerates the web API types, and `pnpm -C apps/web gen:help` regenerates the help content from `docs/faq.md`, `docs/releases/` and sections of the troubleshooting page. Never edit generated files by hand.
 
+### Testing notification channels
+
+The channel tests in CI never touch the internet. They run `deploy/e2e-targets/notify-receiver`, a small Go server that imitates the Slack, Discord and Telegram APIs with their rules: the message length, the HTML format of Telegram and the `allowed_mentions` field of Discord. Its own tests run with `go test -race -count=1 ./deploy/e2e-targets/notify-receiver/...`. The tests of `Modules/Notifications` reach it through the test settings that redirect the connection (`NotifyDial`, `NotifyLookup` and `NotifyTLS`), so no setting in the runtime environment changes the accepted hosts. To try it by hand, `make notify-receiver` runs it over TLS and writes the certificate of the signing authority to `NOTIFY_RECEIVER_CA`.
+
+The live test sends one Arabic and one English message to each real service, together with a branch name that holds `<!channel>` and `@everyone`. It does not run in CI. Run it by hand before a merge:
+
+```sh
+make notify-live
+```
+
+It reads `SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_MY_ID` from the environment, and needs `DHOW_TEST_DATABASE_URL`. A service whose variables are empty is skipped. The test prints the state and the HTTP code of each channel only, and no value of the variables. Do not write these values in a file, a command or a PR description.
+
 ## The runner
 
 What you can do depends on your system:

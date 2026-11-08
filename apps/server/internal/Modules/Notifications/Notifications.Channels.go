@@ -33,11 +33,6 @@ const (
 	resolveTimeout = 5 * time.Second
 )
 
-type channelConfig struct {
-	URL    string `json:"Url"`
-	Secret string `json:"Secret"`
-}
-
 func invalid(field string) apperrors.IErrorDetail {
 	return apperrors.IErrorDetail{Field: field, Message: messageInvalid}
 }
@@ -50,25 +45,6 @@ func (s *Service) policy() netguard.Policy { return netguard.Policy{Allowed: s.c
 
 func (s *Service) dialer() netguard.Dialer {
 	return netguard.Dialer{Policy: s.policy(), Lookup: s.lookup, Timeout: config.NotifyRequestTimeout}
-}
-
-func (s *Service) checkTarget(ctx context.Context, raw string) (Target, error) {
-	target, err := ParseTarget(raw, false)
-	switch {
-	case errors.Is(err, ErrURLScheme), errors.Is(err, ErrURLUserinfo), errors.Is(err, ErrURLHost), errors.Is(err, ErrURLNumeric):
-		return Target{}, apperrors.ChannelHostNotAllowed()
-	case err != nil:
-		return Target{}, apperrors.ValidationFailed(invalid(fieldURL))
-	}
-	ctx, cancel := context.WithTimeout(ctx, resolveTimeout)
-	defer cancel()
-	if _, err := s.dialer().Resolve(ctx, target.Hostname); err != nil {
-		if errors.Is(err, netguard.ErrBlocked) {
-			return Target{}, apperrors.ChannelHostBlocked()
-		}
-		return Target{}, apperrors.ValidationFailed(invalid(fieldURL))
-	}
-	return target, nil
 }
 
 func validateCreate(in models.CreateChannelInput) (string, *apperrors.AppError) {
@@ -86,8 +62,8 @@ func validateCreate(in models.CreateChannelInput) (string, *apperrors.AppError) 
 	if locale != string(i18n.Ar) && locale != string(i18n.En) {
 		details = append(details, invalid(fieldLocale))
 	}
-	if (in.Kind == models.KindWebhook) == (in.URL == "") {
-		details = append(details, invalid(fieldURL))
+	if slices.Contains(models.Kinds(), in.Kind) {
+		details = append(details, validInputs(in.Kind, in.URL, in.BotToken, in.ChatID)...)
 	}
 	if len(details) > 0 {
 		return "", apperrors.ValidationFailed(details...)
@@ -150,7 +126,7 @@ func (s *Service) openConfig(ctx context.Context, row sqlc.NotificationChannel) 
 	if err != nil {
 		return cfg, fmt.Errorf("open the settings of a notification channel: %w", err)
 	}
-	if err := json.Unmarshal(raw, &cfg); err != nil || cfg.URL == "" || !ValidSecret(cfg.Secret) {
+	if err := json.Unmarshal(raw, &cfg); err != nil || !validConfig(row.Kind, cfg) {
 		return channelConfig{}, apperrors.ChannelSecretInvalid()
 	}
 	return cfg, nil
@@ -181,16 +157,9 @@ func (s *Service) CreateChannel(
 	if ae != nil {
 		return models.CreatedChannel{}, ae
 	}
-	host, cfg, secret := "", channelConfig{}, ""
-	if in.Kind == models.KindWebhook {
-		target, err := s.checkTarget(ctx, in.URL)
-		if err != nil {
-			return models.CreatedChannel{}, err
-		}
-		if secret, err = NewSecret(); err != nil {
-			return models.CreatedChannel{}, err
-		}
-		host, cfg = target.Display, channelConfig{URL: target.URL.String(), Secret: secret}
+	change, err := s.newConfig(ctx, in)
+	if err != nil {
+		return models.CreatedChannel{}, err
 	}
 	if p, err = s.confirmed(ctx, factor); err != nil {
 		return models.CreatedChannel{}, err
@@ -201,7 +170,7 @@ func (s *Service) CreateChannel(
 	}
 	var row sqlc.NotificationChannel
 	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
-		row, err = s.insertChannel(ctx, q, scope, id, in, locale, host, cfg, p.UserID)
+		row, err = s.insertChannel(ctx, q, scope, id, in, locale, change, p.UserID)
 		if err != nil {
 			return err
 		}
@@ -214,7 +183,7 @@ func (s *Service) CreateChannel(
 	if err != nil {
 		return models.CreatedChannel{}, err
 	}
-	return models.CreatedChannel{Channel: channelOf(row), Secret: secret}, nil
+	return models.CreatedChannel{Channel: channelOf(row), Secret: change.secret}, nil
 }
 
 func (s *Service) channelAudit(row sqlc.NotificationChannel, scope models.Scope) map[string]string {
@@ -230,7 +199,7 @@ func (s *Service) channelAudit(row sqlc.NotificationChannel, scope models.Scope)
 
 func (s *Service) insertChannel(
 	ctx context.Context, q *sqlc.Queries, scope models.Scope, id uuid.UUID, in models.CreateChannelInput,
-	locale, host string, cfg channelConfig, creator uuid.UUID,
+	locale string, change configChange, creator uuid.UUID,
 ) (sqlc.NotificationChannel, error) {
 	if err := q.LockNotificationScope(ctx, scopeKey(scope)); err != nil {
 		return sqlc.NotificationChannel{}, err
@@ -246,13 +215,13 @@ func (s *Service) insertChannel(
 		return sqlc.NotificationChannel{}, apperrors.ValidationFailed(invalid(fieldKind))
 	}
 	var sealed []byte
-	if in.Kind == models.KindWebhook {
-		if sealed, err = s.sealConfig(ctx, q, scope, id, cfg); err != nil {
+	if change.changed {
+		if sealed, err = s.sealConfig(ctx, q, scope, id, change.cfg); err != nil {
 			return sqlc.NotificationChannel{}, err
 		}
 	}
 	row, err := q.InsertNotificationChannel(ctx, sqlc.InsertNotificationChannelParams{
-		ID: id, OrganizationID: scope.OrganizationID, ProjectID: scope.ProjectID, Kind: in.Kind, Name: in.Name, Locale: locale, Host: host,
+		ID: id, OrganizationID: scope.OrganizationID, ProjectID: scope.ProjectID, Kind: in.Kind, Name: in.Name, Locale: locale, Host: change.host,
 		ConfigSealed: sealed, CreatedByUserID: creator,
 	})
 	if isUnique(err) {

@@ -21,13 +21,6 @@ type emailDeliverer struct{ s *Service }
 
 type internalMailDeliverer struct{ s *Service }
 
-func line(locale i18n.Locale, field, value string) string {
-	if value == "" {
-		return ""
-	}
-	return i18n.Translate(locale, "notify.field."+field) + ": " + value + "\n"
-}
-
 func titleKey(p Payload) string {
 	if p.Event == EventDeploymentFinished {
 		return "notify.title." + p.Event + "." + p.Status
@@ -35,12 +28,13 @@ func titleKey(p Payload) string {
 	return "notify.title." + p.Event
 }
 
-func RenderMail(locale i18n.Locale, p Payload) (string, string) {
+type Line struct {
+	Label string
+	Value string
+}
+
+func Parts(locale i18n.Locale, p Payload) (string, []Line) {
 	title := i18n.Translate(locale, titleKey(p))
-	subject := strings.NewReplacer("{title}", title).Replace(i18n.Translate(locale, "notify.mail.subject"))
-	if p.Project != "" {
-		subject += " · " + p.Project
-	}
 	status := ""
 	if p.Status != "" {
 		status = i18n.Translate(locale, "notify.status."+p.Status)
@@ -49,8 +43,7 @@ func RenderMail(locale i18n.Locale, p Payload) (string, string) {
 	if p.Run > 0 {
 		run = strconv.FormatInt(p.Run, 10)
 	}
-	var b strings.Builder
-	b.WriteString(title + "\n\n")
+	var lines []Line
 	for _, f := range [][2]string{
 		{"status", status},
 		{"project", p.Project},
@@ -62,7 +55,23 @@ func RenderMail(locale i18n.Locale, p Payload) (string, string) {
 		{"network", p.Network},
 		{"time", p.Time},
 	} {
-		b.WriteString(line(locale, f[0], f[1]))
+		if f[1] != "" {
+			lines = append(lines, Line{Label: i18n.Translate(locale, "notify.field."+f[0]), Value: f[1]})
+		}
+	}
+	return title, lines
+}
+
+func RenderMail(locale i18n.Locale, p Payload) (string, string) {
+	title, lines := Parts(locale, p)
+	subject := strings.NewReplacer("{title}", title).Replace(i18n.Translate(locale, "notify.mail.subject"))
+	if p.Project != "" {
+		subject += " · " + p.Project
+	}
+	var b strings.Builder
+	b.WriteString(title + "\n\n")
+	for _, l := range lines {
+		b.WriteString(l.Label + ": " + l.Value + "\n")
 	}
 	if p.URL != "" {
 		b.WriteString("\n" + p.URL + "\n")

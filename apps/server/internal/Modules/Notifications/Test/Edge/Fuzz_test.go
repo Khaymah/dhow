@@ -9,6 +9,7 @@ import (
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	notifications "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications"
+	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications/Models"
 	"github.com/Khaymah/dhow/internal/netguard"
 )
 
@@ -50,6 +51,37 @@ func FuzzNotifyURL(f *testing.F) {
 		require.False(t, strings.ContainsAny(target.Hostname, "%\\ "), "a host name is a plain name")
 		if _, err := netip.ParseAddr(target.Hostname); err == nil {
 			t.Fatalf("an IP address was taken for a name: %q", target.Hostname)
+		}
+	})
+}
+
+func FuzzChatURL(f *testing.F) {
+	for _, seed := range []string{
+		"https://hooks.slack.com/services/T/B/X", "https://discord.com/api/webhooks/1/a", "https://discordapp.com/api/webhooks/1/a",
+		"https://hooks.slack.com.evil.example/services/T/B/X", "https://hooks.slack.com@evil.example/services/T/B/X",
+		"https://hooks.slack.com/services/../x/y", "https://discord.com/api/webhooks/1/a?wait=true", "https://api.telegram.org/bot1:a/sendMessage",
+		"https://hooks.slack.com:8443/services/T/B/X", "https://hooks.slack.com/services/%2e%2e/B/X", "",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, raw string) {
+		target, err := notifications.ParseTarget(raw, false)
+		if err != nil {
+			return
+		}
+		for _, kind := range []string{models.KindSlack, models.KindDiscord, models.KindTelegram, models.KindWebhook} {
+			u, err := notifications.ChatURL(kind, target)
+			if err != nil {
+				continue
+			}
+			require.Contains(t, notifications.ChatHosts(kind), u.Host, "the address is on a host of the service")
+			require.Equal(t, "https", u.Scheme)
+			require.Empty(t, u.RawQuery)
+			require.Empty(t, u.Fragment)
+			require.Empty(t, u.User)
+			require.NotContains(t, u.Path, "..")
+			require.NotContains(t, u.Path, "//")
+			require.Empty(t, u.Port())
 		}
 	})
 }

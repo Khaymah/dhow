@@ -7,8 +7,11 @@ import (
 )
 
 const (
-	KindEmail   = "email"
-	KindWebhook = "webhook"
+	KindEmail    = "email"
+	KindWebhook  = "webhook"
+	KindSlack    = "slack"
+	KindTelegram = "telegram"
+	KindDiscord  = "discord"
 
 	ReasonCreatorRemoved = "creator-removed"
 	ReasonFailures       = "failures"
@@ -19,7 +22,13 @@ const (
 	StateDead    = "dead"
 )
 
-func Kinds() []string { return []string{KindEmail, KindWebhook} }
+func Kinds() []string {
+	return []string{KindEmail, KindWebhook, KindSlack, KindTelegram, KindDiscord}
+}
+
+func Chat(kind string) bool {
+	return kind == KindSlack || kind == KindTelegram || kind == KindDiscord
+}
 
 type Scope struct {
 	OrganizationID uuid.UUID
@@ -50,10 +59,12 @@ type ChannelPage struct {
 }
 
 type CreateChannelInput struct {
-	Kind   string
-	Name   string
-	Locale string
-	URL    string
+	Kind     string
+	Name     string
+	Locale   string
+	URL      string
+	BotToken string
+	ChatID   string
 }
 
 type UpdateChannelInput struct {
@@ -61,6 +72,8 @@ type UpdateChannelInput struct {
 	Locale       string
 	Version      int64
 	URL          *string
+	BotToken     *string
+	ChatID       *string
 	RotateSecret bool
 	Enable       bool
 }
