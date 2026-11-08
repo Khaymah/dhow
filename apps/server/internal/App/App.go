@@ -19,7 +19,9 @@ import (
 	runnerauth "github.com/Khaymah/dhow/apps/server/internal/Core/RunnerAuth"
 	artifacts "github.com/Khaymah/dhow/apps/server/internal/Modules/Artifacts"
 	audit "github.com/Khaymah/dhow/apps/server/internal/Modules/Audit"
+	boards "github.com/Khaymah/dhow/apps/server/internal/Modules/Boards"
 	environments "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments"
+	events "github.com/Khaymah/dhow/apps/server/internal/Modules/Events"
 	identity "github.com/Khaymah/dhow/apps/server/internal/Modules/Identity"
 	ingest "github.com/Khaymah/dhow/apps/server/internal/Modules/Ingest"
 	jobs "github.com/Khaymah/dhow/apps/server/internal/Modules/Jobs"
@@ -55,6 +57,8 @@ type Options struct {
 	Ingest        *ingest.Service
 	Notifications *notifications.Service
 	Overview      *overview.Service
+	Boards        *boards.Service
+	Events        *events.Service
 	Tokens        *tokens.Service
 	Prefs         *preferences.Service
 	Gate          *runnerauth.Gate
@@ -85,6 +89,8 @@ func Policies() []policy.Rule {
 	rules = append(rules, ingest.Policies()...)
 	rules = append(rules, notifications.Policies()...)
 	rules = append(rules, overview.Policies()...)
+	rules = append(rules, boards.Policies()...)
+	rules = append(rules, events.Policies()...)
 	rules = append(rules, tokens.Policies()...)
 	rules = append(rules, preferences.Policies()...)
 	rules = append(rules, settings.Policies()...)
@@ -206,12 +212,18 @@ func publicRouter(o Options) chi.Router {
 			if o.Overview != nil {
 				overview.Routes(timed, overview.Deps{Service: o.Overview, Guard: guard, Log: o.Log})
 			}
+			if o.Boards != nil {
+				boards.Routes(timed, boards.Deps{Service: o.Boards, Guard: guard, Log: o.Log})
+			}
 			if o.Settings != nil {
 				settings.Routes(timed, settings.Deps{Service: o.Settings, Guard: guard, Log: o.Log})
 			}
 		})
 		if o.Jobs != nil {
 			jobs.Routes(api, jobs.Deps{Service: o.Jobs, Guard: guard, Log: o.Log})
+		}
+		if o.Events != nil {
+			events.Routes(api, events.Deps{Service: o.Events, Guard: guard, Log: o.Log})
 		}
 		if o.Artifacts != nil {
 			artifacts.Routes(api, artifacts.Deps{Service: o.Artifacts, Guard: guard, Log: o.Log})

@@ -11,6 +11,7 @@ import { EmptyState } from '@/Core/Ui/EmptyState';
 import { InlineAlert } from '@/Core/Ui/InlineAlert';
 import { Skeleton } from '@/Core/Ui/Skeleton';
 import { useT } from '@/I18n/useT';
+import { MyApprovalsCard } from '@/Modules/Approvals/Components/MyApprovalsCard';
 import { RecentEventsCard } from '@/Modules/Audit/Components/RecentEventsCard';
 import type { TJobState } from '@/Modules/Jobs/Api/JobsApi';
 import { WhatsNewCard } from '@/Modules/Help/Components/WhatsNewCard';
@@ -24,7 +25,7 @@ import { RunnersSummaryCard } from '@/Modules/Runners/Components/RunnersSummaryC
 import { ServerStatusCard } from '@/Modules/System/Components/ServerStatusCard';
 import { useReadiness } from '@/Modules/System/Hooks/useReadiness';
 
-type TTargetPath = '/approvals' | '/jobs' | '/runners' | '/runners/tokens' | '/org/invitations' | '/system';
+type TTargetPath = '/approvals' | '/jobs' | '/projects' | '/runners' | '/runners/tokens' | '/org/invitations' | '/org/settings' | '/system';
 
 const TARGETS: Record<TOverviewTarget, { to: TTargetPath; states?: readonly TJobState[] }> = {
   running: { to: '/jobs', states: ['running'] },
@@ -37,6 +38,10 @@ const TARGETS: Record<TOverviewTarget, { to: TTargetPath; states?: readonly TJob
   approvals: { to: '/approvals' },
   checks: { to: '/system' },
   addRunner: { to: '/runners/tokens' },
+  deploys: { to: '/projects' },
+  rollbackFailed: { to: '/projects' },
+  failedDeploys: { to: '/projects' },
+  deadNotifications: { to: '/org/settings' },
 };
 
 const useLinks = (): IOverviewLinks => {
@@ -92,6 +97,16 @@ const HomeContent = ({ membership }: { membership: TMembership }) => {
     <>
       <StuckBanner jobs={overview.data?.Jobs ?? null} canAddRunner={canManageRunners(role)} links={links} />
       <HomeStats organizationId={organizationId} links={links} />
+      {(overview.data?.Approvals?.Pending ?? 0) > 0 ? (
+        <MyApprovalsCard
+          organizationId={organizationId}
+          hideWhenEmpty
+          hrefFor={(approval) => `/projects/${approval.ProjectId}/runs/${approval.RunId}`}
+          onOpen={(approval) => {
+            void navigate({ to: '/projects/$projectId/runs/$runId', params: { projectId: approval.ProjectId, runId: approval.RunId } });
+          }}
+        />
+      ) : null}
       <div className="grid gap-block lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
         <div className="contents lg:grid lg:gap-block">
           <RecentJobsCard

@@ -9,6 +9,8 @@ import { createAppRouter } from '@/App/Router';
 import { createQueryClient } from '@/Core/Api/QueryClient';
 import { approvalsRoute, gatedJob, newApprovalsState } from '@/Core/Testing/ApprovalsBackend';
 import { auditFixture, startBackend } from '@/Core/Testing/Backend';
+import { boardEnvironmentFixture, boardFixture, boardRoute, boardTargetFixture, boardUrl, newBoardState, runningFixture } from '@/Core/Testing/BoardsBackend';
+import { FakeEventSource } from '@/Core/Testing/FakeEventSource';
 import { ENVIRONMENT_NAME, environmentsRoute, newEnvironmentsState } from '@/Core/Testing/EnvironmentsBackend';
 import { detailFixture, ok, PROJECT_ID, projectFixture, projectsRoute, RUN_ID, runFixture } from '@/Core/Testing/ProjectsBackend';
 import { settingsFixture, settingsRoute } from '@/Core/Testing/SettingsBackend';
@@ -300,5 +302,53 @@ describe('API requests of the run page with a deploy waiting for approval', () =
 
     expect(repeated(view.calls)).toEqual([]);
     expect([...new Set(view.calls.map(endpointOf))].sort()).toEqual([...expected].sort());
+  });
+});
+
+describe('API requests of the deploy tab', () => {
+  const PROJECT = 'GET /api/v1/organizations/{id}/projects/{id}';
+  const BOARD = `${PROJECT}/deploy-board`;
+  const APPROVALS = 'GET /api/v1/organizations/{id}/deployment-approvals';
+
+  const mountBoard = (role: string, state = newBoardState()) => {
+    const backend = startBackend({
+      role,
+      routes: [boardRoute(state), approvalsRoute(newApprovalsState()), projectsRoute({ project: () => ok(projectFixture({ CallerRole: role })) })],
+    });
+    const router = createAppRouter(createMemoryHistory({ initialEntries: [boardUrl()] }));
+    const client = createQueryClient({ retry: false });
+    render(<App router={router} queryClient={client} />);
+    return { ...backend, client, state };
+  };
+
+  it.each(['owner', 'maintainer', 'viewer'] as const)('opens the deploy tab cold as a %s with each request once', async (role) => {
+    const view = mountBoard(role);
+    await screen.findByText(arText('boards.deployed'));
+    const expected = [...SHELL, PROJECT, BOARD, APPROVALS];
+    await settle(view.client, view.calls, expected);
+
+    expect(repeated(view.calls)).toEqual([]);
+    expect([...new Set(view.calls.map(endpointOf))].sort()).toEqual([...expected].sort());
+  });
+
+  it('asks for the board once for a burst of events, and for nothing else of the board', async () => {
+    const view = mountBoard('owner');
+    await screen.findByText(arText('boards.deployed'));
+    await settle(view.client, view.calls, [BOARD]);
+    const source = [...FakeEventSource.instances].reverse().find((candidate) => candidate.url.endsWith('/events'));
+    if (source === undefined) throw new Error('the shell opened no organization stream');
+    source.open();
+
+    view.state.board = boardFixture([boardEnvironmentFixture({}, [boardTargetFixture({ Running: runningFixture() })])]);
+    view.state.etag = '"v2"';
+    for (let seq = 1; seq <= 20; seq += 1) {
+      source.emit('change', { Seq: seq, Type: 'release.switched', Status: 'running', ProjectId: PROJECT_ID, At: '2026-11-07T10:00:00Z' }, `1-${String(seq)}`);
+    }
+    await screen.findByRole('progressbar');
+    await settle(view.client, view.calls, [BOARD]);
+
+    expect(view.calls.filter((call) => endpointOf(call) === BOARD)).toHaveLength(2);
+    expect(view.calls.filter((call) => endpointOf(call) === APPROVALS)).toHaveLength(1);
+    expect(view.calls.filter((call) => endpointOf(call) === PROJECT)).toHaveLength(1);
   });
 });

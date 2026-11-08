@@ -13,6 +13,8 @@ const FULL: TOverview = {
   Runners: { Online: 2, Offline: 1, Paused: 0 },
   Invitations: { Pending: 2 },
   Approvals: { Pending: 0 },
+  Deployments: null,
+  Notifications: null,
 };
 
 const mount = (overview: TOverview) => {
@@ -38,7 +40,7 @@ describe('OverviewStats', () => {
   });
 
   it('shows zeros as zeros, without notes', () => {
-    mount({ Jobs: { Running: 0, Queued: 0, QueuedNoRunner: 0, FailedLast24h: 0 }, Runners: { Online: 0, Offline: 0, Paused: 0 }, Invitations: null, Approvals: null });
+    mount({ Jobs: { Running: 0, Queued: 0, QueuedNoRunner: 0, FailedLast24h: 0 }, Runners: { Online: 0, Offline: 0, Paused: 0 }, Invitations: null, Approvals: null, Deployments: null, Notifications: null });
     expect(screen.getAllByRole('link').map((tile) => tile.querySelector('b')?.textContent)).toEqual(['0', '0', '0', '0']);
     expect(screen.queryByText(/بلا جهاز مناسب|غير متصل/)).not.toBeInTheDocument();
   });
@@ -47,5 +49,18 @@ describe('OverviewStats', () => {
     mount({ ...FULL, Runners: null, Invitations: null });
     expect(screen.getAllByRole('link')).toHaveLength(3);
     expect(screen.queryByText(Ar['home.stat.online'])).not.toBeInTheDocument();
+  });
+
+  it('adds a tile for the deploys running now, with the failed ones as its note', async () => {
+    const { links, user } = mount({ ...FULL, Deployments: { Running: 2, FailedLast24h: 3, RollbackFailed: 0, Pending: 0 } });
+    const tiles = screen.getAllByRole('link');
+    expect(tiles).toHaveLength(5);
+    const deploys = tiles.at(-1);
+    if (deploys === undefined) throw new Error('no deploys tile');
+    expect(deploys).toHaveAttribute('href', '/go/deploys');
+    expect(deploys.querySelector('b')?.textContent).toBe('2');
+    expect(deploys).toHaveTextContent(Ar['home.stat.deploys.failed'].replace('{count}', isolate('3')));
+    await user.click(deploys);
+    expect(links.open).toHaveBeenCalledWith('deploys');
   });
 });

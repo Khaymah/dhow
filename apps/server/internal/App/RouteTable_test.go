@@ -16,6 +16,7 @@ import (
 	apptest "github.com/Khaymah/dhow/apps/server/internal/App/Testing"
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	policy "github.com/Khaymah/dhow/apps/server/internal/Core/Policy"
+	events "github.com/Khaymah/dhow/apps/server/internal/Modules/Events"
 )
 
 type route struct {
@@ -257,6 +258,9 @@ func requestFor(rule policy.Rule, fx fixture, c *apptest.Client) apptest.Request
 	}
 	if body := organizationBody(c.Env, fx, rule); body != nil {
 		req.Body = body
+	}
+	if rule.Path == events.StreamPath {
+		req.Headers = map[string]string{"Last-Event-ID": "refused-before-it-streams"}
 	}
 	return req
 }

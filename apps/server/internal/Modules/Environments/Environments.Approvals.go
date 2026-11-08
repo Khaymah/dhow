@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	response "github.com/Khaymah/dhow/apps/server/internal/Core/Response"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	gen "github.com/Khaymah/dhow/apps/server/internal/Modules/Environments/Gen"
 )
@@ -150,7 +151,17 @@ func (c *Controller) ListPendingApprovals(ctx context.Context, req gen.ListPendi
 		return nil, err
 	}
 	items := approvalsToGen(list)
-	return gen.ListPendingApprovals200JSONResponse{Success: true, Message: ptrOf(messageApprovalsListed), Data: &items}, nil
+	etag, err := response.ETagOf(items)
+	if err != nil {
+		return nil, err
+	}
+	if response.ETagMatches(req.Params.IfNoneMatch, etag) {
+		return gen.ListPendingApprovals304Response{}, nil
+	}
+	return gen.ListPendingApprovals200JSONResponse{
+		Body:    gen.DeploymentApprovalListResponse{Success: true, Message: ptrOf(messageApprovalsListed), Data: &items},
+		Headers: gen.ListPendingApprovals200ResponseHeaders{ETag: &etag},
+	}, nil
 }
 
 func (c *Controller) ApproveDeployment(ctx context.Context, req gen.ApproveDeploymentRequestObject) (gen.ApproveDeploymentResponseObject, error) {

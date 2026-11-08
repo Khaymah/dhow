@@ -1,5 +1,6 @@
 import { AboutAr } from '@/I18n/Locales/Workspace/AboutAr';
 import { ApprovalsAr } from '@/I18n/Locales/Workspace/ApprovalsAr';
+import { BoardsAr } from '@/I18n/Locales/Workspace/BoardsAr';
 import { AuditAr } from '@/I18n/Locales/Workspace/AuditAr';
 import { EnvironmentsAr } from '@/I18n/Locales/Workspace/EnvironmentsAr';
 import { HelpAr } from '@/I18n/Locales/Workspace/HelpAr';
@@ -421,6 +422,7 @@ export const WorkspaceAr = {
   ...IngestAr,
   ...TargetsManageAr,
   ...ApprovalsAr,
+  ...BoardsAr,
   ...ShellAr,
   ...NotificationsAr,
   ...AboutAr,

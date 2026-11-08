@@ -1,11 +1,13 @@
 import { Outlet } from '@tanstack/react-router';
 
 import { AccountBanners } from '@/App/Layout/AccountBanners';
+import { LiveBanner } from '@/App/Layout/LiveBanner';
 import { LazyCommandPalette, LazySlideHost, preloadShellParts } from '@/App/Layout/ShellParts';
 import { ShellBottomBar } from '@/App/Layout/ShellBottomBar';
 import { ShellMenu } from '@/App/Layout/ShellMenu';
 import { ShellTopBar } from '@/App/Layout/ShellTopBar';
 import { useCommandItems } from '@/App/Layout/useCommandItems';
+import { useLiveSync } from '@/App/Layout/useLiveSync';
 import { useSlide } from '@/App/Navigation/useSlide';
 import { useMe } from '@/Core/Auth/useMe';
 import { useHotkey } from '@/Core/Hooks/useHotkey';
@@ -25,6 +27,7 @@ export const AppShell = () => {
   const TogglePalette = usePaletteStore((state) => state.Toggle);
 
   const me = useMe();
+  useLiveSync();
   usePreferencesSync(me.data?.Memberships.map((membership) => membership.OrganizationId) ?? []);
   const { slide, invalid } = useSlide();
   const slidesWanted = useLatch(slide !== null || invalid);
@@ -52,6 +55,7 @@ export const AppShell = () => {
           <main id="main" tabIndex={-1} className="flex-1 scroll-pb-24 overflow-auto px-gutter pt-4 pb-24 md:pt-7 md:pb-12">
             <SystemBanners />
             <AccountBanners />
+            <LiveBanner />
             <Outlet />
           </main>
         </div>

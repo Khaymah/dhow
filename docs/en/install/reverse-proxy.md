@@ -15,7 +15,7 @@ Every configuration on this page is the exact file that `make proxy-check` runs 
 | `Host` and `Origin` passed through unchanged | Every request that is not `GET`, `HEAD` or `OPTIONS` must carry an `Origin` equal to `DHOW_PUBLIC_URL`, or Dhow answers `403 CSRF_FAILED`. A proxy that drops or rewrites `Origin` breaks setup, sign-in and every change. |
 | `X-Forwarded-For` with the client address appended, and `X-Forwarded-Proto` | Dhow records the client address in the access log and the audit log, and throttles sign-in attempts per address. It reads `X-Forwarded-For` only from the proxies listed in `DHOW_TRUSTED_PROXIES`. |
 | A request body limit a little above 1 MiB | Dhow rejects bodies over 1 MiB with `413 PAYLOAD_TOO_LARGE`. The configurations below stop anything over 2 MB at the proxy and leave the exact error to Dhow. |
-| No response buffering and a long read timeout on the log stream | Live job logs stream from `/api/v1/organizations/<id>/jobs/<jobId>/logs/stream` as server-sent events. A buffering proxy holds events back until its buffer fills, so logs arrive late and in bursts. Dhow sends a comment every 15 seconds, but a quiet build step can still outlast a short read timeout, so the stream path gets one hour. Dhow also sends `X-Accel-Buffering: no` on the stream, which nginx honors on its own. If a proxy still cuts the stream, the log in the web app shows a "Use a fallback connection" button that reads the log every two seconds with ordinary requests. |
+| No response buffering and a long read timeout on the live streams | Two streams are server-sent events: the live job log at `/api/v1/organizations/<id>/jobs/<jobId>/logs/stream`, and the live updates of an organization at `/api/v1/organizations/<id>/events`. A proxy that buffers the response holds the events until the buffer is full, so logs arrive late and all at once, and the boards do not update. Dhow sends a comment every 15 seconds, but a quiet build step can last longer than a short read timeout, so the stream paths get one hour. Dhow also sends `X-Accel-Buffering: no` on the streams, which nginx obeys by itself. If a middlebox cuts the stream anyway, the log viewer offers a "Use a fallback connection" button that reads the log every two seconds with plain requests, and the boards fall back to one request every 5 seconds with a notice. See [Turn off buffering for live streams](#turn-off-buffering-for-live-streams). |
 | A read timeout above 25 seconds on `/runner-api/` | Runners wait for work with long polls that hold a request open for up to 25 seconds, and send log batches of up to 1 MiB. The configurations below give the runner plane 90 seconds. |
 | HSTS | Dhow sends `Strict-Transport-Security` itself. The proxies below also set it, so it is present on responses the proxy makes on its own, such as redirects and errors while Dhow restarts, and they replace Dhow's copy so the header appears exactly once. |
 
@@ -88,7 +88,7 @@ server {
         proxy_pass http://127.0.0.1:8080;
     }
 
-    location ~ ^/api/v1/organizations/[^/]+/jobs/[^/]+/logs/stream$ {
+    location ~ ^/api/v1/organizations/[^/]+/(jobs/[^/]+/logs/stream|events)$ {
         proxy_pass http://127.0.0.1:8080;
         proxy_buffering off;
         proxy_cache off;
@@ -171,7 +171,7 @@ dhow.example.com {
 			max_size 2MB
 		}
 
-		@logstream path_regexp ^/api/v1/organizations/[^/]+/jobs/[^/]+/logs/stream$
+		@logstream path_regexp ^/api/v1/organizations/[^/]+/(jobs/[^/]+/logs/stream|events)$
 		reverse_proxy @logstream 127.0.0.1:8080 {
 			flush_interval -1
 			transport http {
@@ -196,7 +196,7 @@ What the configuration does:
 - `reverse_proxy` forwards `Host`, `Origin` and cookies unchanged and sets `X-Forwarded-For` and `X-Forwarded-Proto` itself. It replaces any `X-Forwarded-For` that a client sends, unless you list that client in Caddy's own `trusted_proxies` option.
 - `request_body` stops bodies over 2 MB.
 - The `/ingest/` path has its own `handle` with a 1 GB `request_body` and a 10 minute `read_timeout`, for artifact uploads from an outside CI. Keep that size at or above `DHOW_INGEST_MAX_BYTES`.
-- The `@logstream` matcher sends the log stream through its own `reverse_proxy` with `flush_interval -1`, which writes every event to the browser at once, and `read_timeout 1h`, which keeps a quiet stream open.
+- The `@logstream` matcher sends the log stream and the organization stream through its own `reverse_proxy` with `flush_interval -1`, which writes every event to the browser at once, and `read_timeout 1h`, which keeps a quiet stream open.
 - Every other request goes through the second `reverse_proxy`, whose `read_timeout 90s` covers runner long polls of up to 25 seconds on `/runner-api/`.
 - `header >Strict-Transport-Security` sets HSTS after the response comes back from Dhow, so it replaces Dhow's copy instead of adding a second one.
 
@@ -287,6 +287,31 @@ What the configuration does:
 - `ACME_CA_SERVER` defaults to Let's Encrypt production. To try the setup first, set `ACME_CA_SERVER=https://acme-staging-v02.api.letsencrypt.org/directory` in `.env`. When it works, remove that line, run `docker compose down`, delete the `dhow_letsencrypt` volume so the staging certificate is gone, and start again.
 - Traefik reads the Docker socket to find the labels. Access to that socket is root access to the host, so keep the Traefik image pinned and up to date. Pin it by digest the same way as [the Dhow image](compose.md#verify-an-image).
 
+## Turn off buffering for live streams
+
+Dhow keeps two kinds of connection open for a long time. Both are server-sent events over plain HTTP, so the proxy needs no special feature. It only has to pass each event on as soon as it arrives.
+
+| Path | What it carries |
+|---|---|
+| `/api/v1/organizations/<id>/jobs/<jobId>/logs/stream` | The log of one attempt of a job. |
+| `/api/v1/organizations/<id>/events` | Small hints (an id, a type and a status) that tell the browser which board, approval or counter to fetch again. It carries no data. |
+
+- The nginx and Caddy configurations on this page turn buffering off for both paths: `proxy_buffering off` and a one hour timeout in nginx, and `flush_interval -1` in Caddy. Traefik does not buffer responses by default.
+- Do not add a layer that collects the response before sending it, such as `proxy_cache` or `gzip` on these two paths.
+- A browser allows 6 connections per host over HTTP/1.1, and the log stream and the organization stream both count. Serve the site over HTTP/2 (`http2 on` in nginx, already set above) so the browser shares one connection between tabs and never reaches that limit.
+- One user may hold 5 organization streams on an instance, and one organization a tenth of `DHOW_SSE_MAX_STREAMS` (at least 10). Above a limit the browser gets `429 TOO_MANY_STREAMS` with `Retry-After`, and the interface falls back to plain requests.
+- When the stream does not arrive, the interface tries again with a wait that grows from 1 to 15 seconds. After three failed tries it falls back to one request every 5 seconds with `If-None-Match`, so Dhow answers `304` with no body when nothing changed, and the interface shows the notice "Live updates are off. The page refreshes every 5 seconds." It tries the stream again every minute. The requests stop while the tab is not visible.
+- The stream is closed, and new ones are refused with `503`, while Dhow has no connection to the database from which it receives the events. This is not a proxy fault.
+
+To check that the proxy does not buffer, open the stream with a direct request. Replace `$SESSION` with the value of the session cookie from the browser (developer tools, then Application), and `$ORG_ID` with the organization id:
+
+```bash
+curl --no-buffer --silent --max-time 20 --cookie "__Host-dhow_session=$SESSION" \
+  "https://dhow.example.com/api/v1/organizations/$ORG_ID/events"
+```
+
+With a correct setup the line `retry: 3000` appears at once, and the comment `: keep-alive` appears after 15 seconds. If nothing appears until the command ends after 20 seconds, the proxy or a middlebox before it buffers the response.
+
 ## Trusted proxies
 
 Dhow takes the client address from the TCP connection. When that connection comes from an address in `DHOW_TRUSTED_PROXIES`, Dhow reads `X-Forwarded-For` from right to left and takes the first address that is not trusted. The value is a comma-separated list of IP addresses and CIDR ranges.
@@ -361,6 +386,6 @@ Caddy and Traefik replace the `X-Forwarded-For` they receive from untrusted send
 - The `Host`, `Origin`, `X-Forwarded-For` and `X-Forwarded-Proto` headers as they reach Dhow's socket, captured with `tcpdump` next to Dhow.
 - The client address in Dhow's access log and in the audit event of a sign-in, with a forged `X-Forwarded-For` in the request.
 - The `__Host-dhow_session` cookie attributes, the cookie reaching Dhow, a 3 MiB body refused with `413`, and a 3 MiB upload on `/ingest/` that reaches Dhow.
-- The runner plane answering through the proxy on `/runner-api/`, and the log stream path reaching Dhow with the session cookie.
+- The runner plane answering through the proxy on `/runner-api/`, and the log stream and organization stream paths reaching Dhow with the session cookie.
 
 A Go test in `deploy/proxy-check` fails if a configuration on this page differs from the file the script runs. The check does not run certbot, Let's Encrypt or Cloudflare, and it runs without IPv6.

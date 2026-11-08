@@ -67,4 +67,23 @@ describe('AttentionCard', () => {
     expect(within(list).queryByText(Ar['home.attention.offline.title'])).not.toBeInTheDocument();
     expect(within(list).queryByText(Ar['home.attention.invitations.title'])).not.toBeInTheDocument();
   });
+
+  it('shows the deploys that need a person: a failed rollback first, then failed deploys and dead notifications for an owner', async () => {
+    const { links, user } = mount(overviewFixture({ Deployments: { RollbackFailed: 2, FailedLast24h: 3 }, Dead: 4 }));
+    const list = await screen.findByRole('list', { name: Ar['home.attention.title'] });
+    expect(within(list).getAllByRole('listitem').map((row) => row.textContent)).toEqual([
+      expect.stringContaining(Ar['home.attention.rollbackFailed.title']),
+      expect.stringContaining(Ar['home.attention.failedDeploys.title']),
+      expect.stringContaining(Ar['home.attention.deadNotifications.title']),
+    ]);
+    await user.click(within(list).getByRole('button', { name: new RegExp(Ar['home.attention.rollbackFailed.title']) }));
+    expect(links.open).toHaveBeenCalledWith('rollbackFailed');
+  });
+
+  it('does not show dead notifications to a role that cannot manage them', async () => {
+    mount(overviewFixture({ Deployments: { FailedLast24h: 1 }, Dead: 4 }), { role: 'maintainer' });
+    const list = await screen.findByRole('list', { name: Ar['home.attention.title'] });
+    expect(within(list).queryByText(Ar['home.attention.deadNotifications.title'])).not.toBeInTheDocument();
+    expect(within(list).getByText(Ar['home.attention.failedDeploys.title'])).toBeInTheDocument();
+  });
 });

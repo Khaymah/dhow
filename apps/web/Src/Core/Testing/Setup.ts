@@ -3,6 +3,8 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
+import { orgEventsRegistry } from '@/Core/Events/OrgEventsRegistry';
+import { FakeEventSource } from '@/Core/Testing/FakeEventSource';
 import { DEFAULT_THEME_ID } from '@/Core/Theme/ThemeTokens';
 import { useCsrfStore } from '@/Core/Store/useCsrfStore';
 import { useThemeStore } from '@/Core/Theme/useThemeStore';
@@ -24,6 +26,8 @@ class ResizeObserverStub {
 }
 
 beforeEach(() => {
+  FakeEventSource.instances = [];
+  vi.stubGlobal('EventSource', FakeEventSource);
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   vi.stubGlobal(
     'matchMedia',
@@ -42,6 +46,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  orgEventsRegistry.Reset();
   vi.unstubAllGlobals();
   window.localStorage.clear();
   useCsrfStore.getState().Clear();

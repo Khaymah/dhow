@@ -53,6 +53,22 @@ func (f *fakeCounter) CountOverviewApprovals(_ context.Context, _ sqlc.CountOver
 	return 0, f.fail("approvals")
 }
 
+func (f *fakeCounter) CountOverviewDeployments(_ context.Context, _ sqlc.CountOverviewDeploymentsParams) (sqlc.CountOverviewDeploymentsRow, error) {
+	return sqlc.CountOverviewDeploymentsRow{}, f.fail("deployments")
+}
+
+func (f *fakeCounter) CountOverviewRollbackFailed(_ context.Context, _ uuid.UUID) (int64, error) {
+	return 0, f.fail("rollback_failed")
+}
+
+func (f *fakeCounter) CountOverviewPendingApprovals(_ context.Context, _ sqlc.CountOverviewPendingApprovalsParams) (int64, error) {
+	return 0, f.fail("pending_deployments")
+}
+
+func (f *fakeCounter) CountOverviewDeadNotifications(_ context.Context, _ *uuid.UUID) (int64, error) {
+	return 0, f.fail("dead_notifications")
+}
+
 func (f *fakeCounter) CountOverviewInvitations(_ context.Context, arg sqlc.CountOverviewInvitationsParams) (int64, error) {
 	f.invites = arg
 	return f.pendingRow, f.fail("invitations")
@@ -78,11 +94,11 @@ func TestEachBlockFollowsThePermissionOfItsList(t *testing.T) {
 		role  policy.Role
 		calls []string
 	}{
-		{policy.RoleOwner, []string{"jobs", "runners", "invitations", "approvals"}},
-		{policy.RoleAdmin, []string{"jobs", "runners", "invitations", "approvals"}},
-		{policy.RoleMaintainer, []string{"jobs", "runners", "approvals"}},
-		{policy.RoleDeveloper, []string{"jobs", "runners", "approvals"}},
-		{policy.RoleViewer, []string{"jobs", "approvals"}},
+		{policy.RoleOwner, []string{"jobs", "runners", "invitations", "approvals", "deployments", "rollback_failed", "pending_deployments", "dead_notifications"}},
+		{policy.RoleAdmin, []string{"jobs", "runners", "invitations", "approvals", "deployments", "rollback_failed", "pending_deployments", "dead_notifications"}},
+		{policy.RoleMaintainer, []string{"jobs", "runners", "approvals", "deployments", "rollback_failed", "pending_deployments"}},
+		{policy.RoleDeveloper, []string{"jobs", "runners", "approvals", "deployments", "rollback_failed", "pending_deployments"}},
+		{policy.RoleViewer, []string{"jobs", "approvals", "deployments", "rollback_failed", "pending_deployments"}},
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.role), func(t *testing.T) {
@@ -97,6 +113,8 @@ func TestEachBlockFollowsThePermissionOfItsList(t *testing.T) {
 			assert.Equal(t, &models.Jobs{Running: 1, Queued: 3, QueuedNoRunner: 2, FailedLast24h: 4}, got.Jobs)
 			assert.Equal(t, policy.Allows(tt.role, policy.RunnerRead), got.Runners != nil)
 			assert.Equal(t, policy.Allows(tt.role, policy.MemberManage), got.Invitations != nil)
+			assert.NotNil(t, got.Deployments, "every role that reads runs sees the deploy counters")
+			assert.Equal(t, policy.Allows(tt.role, policy.OrgNotificationManage), got.Notifications != nil, "dead notifications are for Owner and Admin only")
 			if got.Runners != nil {
 				assert.Equal(t, models.Runners{Online: 2, Offline: 1, Paused: 1}, *got.Runners)
 			}
@@ -140,7 +158,7 @@ func TestAnotherOrganizationGetsNoBlock(t *testing.T) {
 }
 
 func TestAFailedCountFailsTheRequest(t *testing.T) {
-	for _, block := range []string{"jobs", "runners", "invitations"} {
+	for _, block := range []string{"jobs", "runners", "invitations", "deployments", "rollback_failed", "pending_deployments", "dead_notifications"} {
 		t.Run(block, func(t *testing.T) {
 			_, err := newService(&fakeCounter{failOn: block}).Get(asRole(policy.RoleOwner), org)
 			require.ErrorIs(t, err, errDown)

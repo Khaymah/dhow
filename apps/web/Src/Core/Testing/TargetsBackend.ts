@@ -104,7 +104,7 @@ export const newTargetsState = (): ITargetsState => ({
   failCheck: null,
 });
 
-const PATH = /^\/api\/v1\/organizations\/[^/]+\/projects\/[^/]+\/environments\/[^/]+\/targets(?:\/([^/]+)\/(check|releases|rollback))?$/;
+const PATH = /^\/api\/v1\/organizations\/[^/]+\/projects\/[^/]+\/environments\/[^/]+\/targets(?:\/([^/]+)(?:\/(check|releases|rollback))?)?$/;
 
 const ok = (data: unknown, status = 200): Response => envelope({ Success: true, Data: data }, status);
 
@@ -124,6 +124,10 @@ export const targetsRoute =
     const [, name, action] = match;
     if (request.method === 'GET') {
       if (name === undefined) return envelope({ Success: true, Data: state.targets, Meta: { Page: 1, Limit: 100, Total: state.targets.length } });
+      if (action === undefined) {
+        const found = state.targets.find((target) => target.Name === name);
+        return found === undefined ? backendFailure('NOT_FOUND', 'x', 404) : ok(found);
+      }
       return ok(action === 'check' ? state.check : state.releases);
     }
     return bodyOf(request).then((body) => {
