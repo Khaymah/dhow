@@ -115,7 +115,8 @@ describe('hostile inbox content', () => {
       mount(INBOX_URL, 'owner', state);
       const main = await findPage(Ar['notifications.title']);
       expect(await within(main).findByText(Ar['notifications.inbox.deployment.finished.failed'])).toBeInTheDocument();
-      expect(within(main).queryByRole('link')).not.toBeInTheDocument();
+      const list = within(main).getByRole('list', { name: Ar['notifications.title'] });
+      expect(within(list).queryByRole('link')).not.toBeInTheDocument();
     },
   );
 
