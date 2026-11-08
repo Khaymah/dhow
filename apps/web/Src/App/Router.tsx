@@ -80,6 +80,7 @@ const auditEventRoute = page('audit/$eventId', SHELL_PAGES.auditEvent);
 const systemRoute = page('system', SHELL_PAGES.system);
 const checkRoute = page('system/checks/$check', SHELL_PAGES.check);
 const systemSettingsRoute = page('system/settings', SHELL_PAGES.systemSettings);
+const aboutRoute = page('about', SHELL_PAGES.about);
 const profileRoute = page('account/profile', SHELL_PAGES.profile);
 const securityRoute = page('account/security', SHELL_PAGES.security);
 const preferencesRoute = page('account/preferences', SHELL_PAGES.preferences);
@@ -159,6 +160,7 @@ const routeTree = rootRoute.addChildren([
     systemRoute,
     checkRoute,
     systemSettingsRoute,
+    aboutRoute,
     profileRoute,
     securityRoute,
     preferencesRoute,

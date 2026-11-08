@@ -112,6 +112,7 @@ func (s *MetaService) Get(ctx context.Context) (models.Meta, error) {
 	return models.Meta{
 		Version:       s.build.Version,
 		Commit:        s.build.Commit,
+		Build:         buildOf(s.build),
 		SetupRequired: inst.SetupRequired(),
 	}, nil
 }

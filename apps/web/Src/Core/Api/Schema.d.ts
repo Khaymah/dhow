@@ -84,6 +84,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/doctor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Server version, health and the checks that run inside the server
+         * @description Any signed-in user gets `ServerBuild` and `Health`. The instance owner (`instance.settings.manage`) also gets `Checks`: the database, the schema, the settings reload, the keyring, the log partitions, the free disk space of the data folder, the clock against the database, and the kernel MPTCP setting. Each check has a `Status` and, when it is not `ok`, the same `Fix` sentence that `dhow-server doctor` prints, in the language of `Accept-Language`. No setting value, secret or file path comes back. Checks that need root on the host (the update timer, file ownership) stay in the command line tool.
+         */
+        get: operations["getDoctor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/setup": {
         parameters: {
             query?: never;
@@ -3903,8 +3923,39 @@ export interface components {
             Version: string;
             /** @example 2e39188 */
             Commit: string;
+            ServerBuild?: components["schemas"]["ServerBuild"];
             /** @description True until the first owner completes setup. */
             SetupRequired: boolean;
+        };
+        ServerBuild: {
+            /** @example v0.1.0 */
+            Version: string;
+            /** @example 2e39188 */
+            Commit: string;
+            /**
+             * Format: date-time
+             * @description The time of the commit the binary was built from. Absent when the binary carries no version control data.
+             */
+            BuiltAt?: string;
+        };
+        /** @enum {string} */
+        DoctorStatus: "ok" | "info" | "warn" | "fail";
+        DoctorCheck: {
+            /** @description A stable name such as `database`, `disk` or `mptcp`. */
+            Code: string;
+            Status: components["schemas"]["DoctorStatus"];
+            /** @description What was checked, in the language of `Accept-Language`. */
+            Title: string;
+            /** @description What to do, the same sentence as `dhow-server doctor`. Absent when the status is `ok` or `info`. */
+            Fix?: string;
+        };
+        DoctorReport: {
+            ServerBuild: components["schemas"]["ServerBuild"];
+            Health: components["schemas"]["HealthStatus"];
+            Checks?: components["schemas"]["DoctorCheck"][];
+        };
+        DoctorResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DoctorReport"];
         };
         SetupRequest: {
             SetupToken: string;
@@ -6182,6 +6233,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KeyringStatusResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getDoctor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. `Checks` is absent unless the caller is the instance owner. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorResponse"];
                 };
             };
             default: components["responses"]["Error"];

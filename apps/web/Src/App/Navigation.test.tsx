@@ -33,12 +33,12 @@ afterEach(() => {
 const ADMIN_MENU = {
   run: [Ar['shell.nav.projects'], Ar['shell.nav.jobs'], Ar['shell.nav.approvals'], Ar['shell.nav.runners']],
   org: [Ar['shell.nav.members'], Ar['shell.nav.teams'], Ar['shell.nav.invitations'], Ar['shell.nav.apiKeys'], Ar['shell.nav.secrets'], Ar['shell.nav.orgSettings']],
-  watch: [Ar['shell.nav.audit'], Ar['shell.nav.system']],
+  watch: [Ar['shell.nav.audit'], Ar['shell.nav.system'], Ar['shell.nav.about']],
 };
 const BUILDER_MENU = {
   run: [Ar['shell.nav.projects'], Ar['shell.nav.jobs'], Ar['shell.nav.approvals'], Ar['shell.nav.runners']],
   org: [Ar['shell.nav.members'], Ar['shell.nav.teams'], Ar['shell.nav.secrets'], Ar['shell.nav.orgSettings']],
-  watch: [Ar['shell.nav.system']],
+  watch: [Ar['shell.nav.system'], Ar['shell.nav.about']],
 };
 
 describe('the side menu', () => {
@@ -47,7 +47,7 @@ describe('the side menu', () => {
     ['admin', ADMIN_MENU],
     ['maintainer', BUILDER_MENU],
     ['developer', BUILDER_MENU],
-    ['viewer', { run: [Ar['shell.nav.projects'], Ar['shell.nav.jobs']], org: [Ar['shell.nav.orgSettings']], watch: [Ar['shell.nav.system']] }],
+    ['viewer', { run: [Ar['shell.nav.projects'], Ar['shell.nav.jobs']], org: [Ar['shell.nav.orgSettings']], watch: [Ar['shell.nav.system'], Ar['shell.nav.about']] }],
   ])('groups the sections for a %s and hides what the role cannot open', async (role, menu) => {
     const { nav } = await mount(role);
     expect(groupLinks(nav, Ar['shell.group.run'])).toEqual(menu.run);

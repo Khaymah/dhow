@@ -187,6 +187,29 @@ paths:
                 $ref: "#/components/schemas/KeyringStatusResponse"
         default:
           $ref: "#/components/responses/Error"
+  /system/doctor:
+    get:
+      operationId: getDoctor
+      tags: [system]
+      summary: Server version, health and the checks that run inside the server
+      description: >-
+        Any signed-in user gets `ServerBuild` and `Health`. The instance owner (`instance.settings.manage`) also gets
+        `Checks`: the database, the schema, the settings reload, the keyring, the log partitions, the free disk space
+        of the data folder, the clock against the database, and the kernel MPTCP setting. Each check has a `Status`
+        and, when it is not `ok`, the same `Fix` sentence that `dhow-server doctor` prints, in the language of
+        `Accept-Language`. No setting value, secret or file path comes back. Checks that need root on the host
+        (the update timer, file ownership) stay in the command line tool.
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: The report. `Checks` is absent unless the caller is the instance owner.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorResponse"
+        default:
+          $ref: "#/components/responses/Error"
   /setup:
     post:
       operationId: setupInstance
@@ -6612,9 +6635,65 @@ components:
         Commit:
           type: string
           example: 2e39188
+        ServerBuild:
+          $ref: "#/components/schemas/ServerBuild"
         SetupRequired:
           type: boolean
           description: True until the first owner completes setup.
+    ServerBuild:
+      type: object
+      additionalProperties: false
+      required: [Version, Commit]
+      properties:
+        Version:
+          type: string
+          example: v0.1.0
+        Commit:
+          type: string
+          example: 2e39188
+        BuiltAt:
+          type: string
+          format: date-time
+          description: The time of the commit the binary was built from. Absent when the binary carries no version control data.
+    DoctorStatus:
+      type: string
+      enum: [ok, info, warn, fail]
+    DoctorCheck:
+      type: object
+      additionalProperties: false
+      required: [Code, Status, Title]
+      properties:
+        Code:
+          type: string
+          description: A stable name such as `database`, `disk` or `mptcp`.
+        Status:
+          $ref: "#/components/schemas/DoctorStatus"
+        Title:
+          type: string
+          description: What was checked, in the language of `Accept-Language`.
+        Fix:
+          type: string
+          description: What to do, the same sentence as `dhow-server doctor`. Absent when the status is `ok` or `info`.
+    DoctorReport:
+      type: object
+      additionalProperties: false
+      required: [ServerBuild, Health]
+      properties:
+        ServerBuild:
+          $ref: "#/components/schemas/ServerBuild"
+        Health:
+          $ref: "#/components/schemas/HealthStatus"
+        Checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DoctorCheck"
+    DoctorResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            Data:
+              $ref: "#/components/schemas/DoctorReport"
     SetupRequest:
       type: object
       additionalProperties: false

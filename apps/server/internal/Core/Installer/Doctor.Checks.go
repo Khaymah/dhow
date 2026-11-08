@@ -179,14 +179,10 @@ func (d Doctor) health(ctx context.Context) []Finding {
 	}
 	var out []Finding
 	for _, c := range data.Checks {
-		title := d.M.T(KeyCheckNamed, c.Name)
+		f := ReadinessFinding(d.M, c.Name, c.Ok)
 		if c.Ok {
-			out = append(out, ok(title))
+			out = append(out, f)
 			continue
-		}
-		f := Finding{Severity: SeverityFail, Title: title, Advice: d.M.T(KeyAdviceLogs)}
-		if c.Name == readyCheckSettings {
-			f.Advice = d.M.T(KeyAdviceSettings)
 		}
 		if c.Name == "database" && d.A.Mode == ModeNative && d.A.Database.Mode == DatabaseInstall {
 			svc := d.Det.Distro.PostgresService()
@@ -299,17 +295,7 @@ func (d Doctor) disk() []Finding {
 	var out []Finding
 	for _, p := range paths {
 		free, err := d.Sys.FreeBytes(p)
-		title := d.M.T(KeyCheckDisk, p)
-		switch {
-		case err != nil:
-			out = append(out, Finding{Severity: SeverityInfo, Title: title, Detail: err.Error()})
-		case free < diskFailFree:
-			out = append(out, Finding{Severity: SeverityFail, Title: title, Detail: d.M.T(KeyDiskFree, free/(1<<20)), Advice: d.M.T(KeyAdviceDisk)})
-		case free < diskWarnFree:
-			out = append(out, Finding{Severity: SeverityWarn, Title: title, Detail: d.M.T(KeyDiskFree, free/(1<<20)), Advice: d.M.T(KeyAdviceDisk)})
-		default:
-			out = append(out, ok(title))
-		}
+		out = append(out, DiskFinding(d.M, d.M.T(KeyCheckDisk, p), free, err))
 	}
 	return out
 }

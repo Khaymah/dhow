@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { approvalsRoute, newApprovalsState } from '@/Core/Testing/ApprovalsBackend';
 import { auditFixture, startBackend, type TRouteHandler } from '@/Core/Testing/Backend';
 import { ENVIRONMENT_NAME, environmentsRoute, newEnvironmentsState } from '@/Core/Testing/EnvironmentsBackend';
-import { apiUp } from '@/Core/Testing/Fetch';
+import { apiUp, envelope } from '@/Core/Testing/Fetch';
 import { newTargetsManageState, targetsManageRoute } from '@/Core/Testing/TargetsManageBackend';
 import { newTargetsState, targetsRoute } from '@/Core/Testing/TargetsBackend';
 import { ok, PROJECT_ID, projectFixture, projectsRoute } from '@/Core/Testing/ProjectsBackend';
@@ -29,6 +29,16 @@ const targetRoutes = (): TRouteHandler[] => [
   ...environmentRoutes(),
 ];
 
+const aboutRoutes = (): TRouteHandler[] => [
+  (_request, url) =>
+    url.pathname.endsWith('/system/doctor')
+      ? envelope({
+          Success: true,
+          Data: { ServerBuild: { Version: 'v1.4.0', Commit: '9f3c2ab' }, Health: { Status: 'ok', Checks: [] } },
+        })
+      : undefined,
+];
+
 const approvalRoutes = (): TRouteHandler[] => [approvalsRoute(newApprovalsState())];
 
 configure({ asyncUtilTimeout: 5000 });
@@ -40,6 +50,7 @@ const CASES: IPageCase[] = [
     title: Ar['status.check.database'],
     body: (main) => within(main).findByText(Ar['checkDetail.database.means']),
   },
+  { url: '/about', title: Ar['shell.nav.about'], body: (main) => within(main).findByText('v1.4.0'), routes: aboutRoutes },
   { url: '/account/preferences', title: Ar['shell.nav.preferences'], body: (main) => within(main).findByText(Ar['appearance.system']) },
   { url: '/account/profile', title: Ar['shell.nav.profile'], body: (main) => within(main).findByText(Ar['account.profile.readOnly']) },
   { url: '/account/security', title: Ar['shell.nav.security'], body: (main) => within(main).findByText(Ar['account.sessions.title']) },

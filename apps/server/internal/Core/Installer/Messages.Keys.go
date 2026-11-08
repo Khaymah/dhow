@@ -2,6 +2,7 @@ package installer
 
 const (
 	KeyAborted                 Key = "aborted"
+	KeyAdviceClock             Key = "advice.clock"
 	KeyAdviceDisk              Key = "advice.disk"
 	KeyAdviceForwarded         Key = "advice.forwarded"
 	KeyAdviceKeyring           Key = "advice.keyring"
@@ -45,7 +46,9 @@ const (
 	KeyCertDays                Key = "cert.days"
 	KeyCheckCPUs               Key = "check.cpus"
 	KeyCheckCertificate        Key = "check.certificate"
+	KeyCheckClock              Key = "check.clock"
 	KeyCheckDisk               Key = "check.disk"
+	KeyCheckStateDisk          Key = "check.state.disk"
 	KeyCheckForwarded          Key = "check.forwarded"
 	KeyCheckHealth             Key = "check.health"
 	KeyCheckInstalled          Key = "check.installed"

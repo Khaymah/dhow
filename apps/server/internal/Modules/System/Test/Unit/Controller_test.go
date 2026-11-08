@@ -72,7 +72,7 @@ func TestControllerMeta(t *testing.T) {
 		body, ok := res.(gen.GetMeta200JSONResponse)
 		require.True(t, ok)
 		require.NotNil(t, body.Data)
-		assert.Equal(t, gen.Meta{Version: "v1", Commit: "c1", SetupRequired: true}, *body.Data)
+		assert.Equal(t, gen.Meta{Version: "v1", Commit: "c1", ServerBuild: &gen.ServerBuild{Version: "v1", Commit: "c1"}, SetupRequired: true}, *body.Data)
 		require.NotNil(t, body.Message)
 		assert.Equal(t, "system.meta.loaded", *body.Message)
 	})
