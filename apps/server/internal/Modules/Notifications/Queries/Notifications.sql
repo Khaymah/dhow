@@ -138,7 +138,7 @@ WHERE r."OrganizationId" = @organization_id AND NOT r."IsDeleted" AND NOT c."IsD
   AND (c."ProjectId" IS NULL OR c."ProjectId" = sqlc.narg('project_id')::uuid)
 ORDER BY r."CreatedAt", r."Id";
 
--- name: ListEmailCandidates :many
+-- name: ListNotificationRecipients :many
 SELECT u."Id" AS "UserId", m."Role",
        ARRAY(SELECT r."Role" FROM "OrganizationTeamRoles" r
              WHERE r."UserId" = u."Id" AND r."OrganizationId" = m."OrganizationId")::text[] AS "TeamRoles",
@@ -156,7 +156,8 @@ FROM "Users" u
 JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = @organization_id AND NOT m."IsDeleted"
 JOIN "Organizations" o ON o."Id" = m."OrganizationId" AND NOT o."IsDeleted"
 LEFT JOIN "NotificationMutes" mu ON mu."UserId" = u."Id" AND NOT mu."IsDeleted"
-WHERE NOT u."IsDeleted" AND NOT u."Disabled" AND u."Email" <> '' AND COALESCE(NOT mu."Muted", true)
+WHERE NOT u."IsDeleted" AND NOT u."Disabled"
+  AND (@in_app::boolean OR (u."Email" <> '' AND COALESCE(NOT mu."Muted", true)))
 ORDER BY u."Id";
 
 -- name: CountRecentChannelEmails :one

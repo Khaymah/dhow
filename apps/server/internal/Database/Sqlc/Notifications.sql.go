@@ -544,65 +544,6 @@ func (q *Queries) InsertNotificationRule(ctx context.Context, arg InsertNotifica
 	return i, err
 }
 
-const listEmailCandidates = `-- name: ListEmailCandidates :many
-SELECT u."Id" AS "UserId", m."Role",
-       ARRAY(SELECT r."Role" FROM "OrganizationTeamRoles" r
-             WHERE r."UserId" = u."Id" AND r."OrganizationId" = m."OrganizationId")::text[] AS "TeamRoles",
-       ARRAY(SELECT rb."Role"
-             FROM "RoleBindings" rb
-             WHERE rb."OrganizationId" = m."OrganizationId" AND rb."Scope" = 'project' AND rb."ProjectId" = $1::uuid
-               AND NOT rb."IsDeleted"
-               AND (rb."UserId" = u."Id"
-                    OR EXISTS (SELECT 1
-                               FROM "TeamMembers" tm
-                               JOIN "Teams" t ON t."Id" = tm."TeamId" AND t."OrganizationId" = tm."OrganizationId" AND NOT t."IsDeleted"
-                               WHERE tm."TeamId" = rb."TeamId" AND tm."OrganizationId" = rb."OrganizationId"
-                                 AND tm."UserId" = u."Id" AND NOT tm."IsDeleted")))::text[] AS "Bindings"
-FROM "Users" u
-JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = $2 AND NOT m."IsDeleted"
-JOIN "Organizations" o ON o."Id" = m."OrganizationId" AND NOT o."IsDeleted"
-LEFT JOIN "NotificationMutes" mu ON mu."UserId" = u."Id" AND NOT mu."IsDeleted"
-WHERE NOT u."IsDeleted" AND NOT u."Disabled" AND u."Email" <> '' AND COALESCE(NOT mu."Muted", true)
-ORDER BY u."Id"
-`
-
-type ListEmailCandidatesParams struct {
-	ProjectID      *uuid.UUID
-	OrganizationID uuid.UUID
-}
-
-type ListEmailCandidatesRow struct {
-	UserId    uuid.UUID
-	Role      string
-	TeamRoles []string
-	Bindings  []string
-}
-
-func (q *Queries) ListEmailCandidates(ctx context.Context, arg ListEmailCandidatesParams) ([]ListEmailCandidatesRow, error) {
-	rows, err := q.db.Query(ctx, listEmailCandidates, arg.ProjectID, arg.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListEmailCandidatesRow{}
-	for rows.Next() {
-		var i ListEmailCandidatesRow
-		if err := rows.Scan(
-			&i.UserId,
-			&i.Role,
-			&i.TeamRoles,
-			&i.Bindings,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listNotificationChannels = `-- name: ListNotificationChannels :many
 SELECT "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Kind", "Name", "Locale", "Enabled", "DisabledReason", "ConsecutiveFailures", "Host", "ConfigSealed", "Version", "CreatedByUserId" FROM "NotificationChannels"
 WHERE "OrganizationId" = $1 AND "ProjectId" IS NOT DISTINCT FROM $2::uuid AND NOT "IsDeleted"
@@ -701,6 +642,67 @@ func (q *Queries) ListNotificationCreatorAccess(ctx context.Context, arg ListNot
 	items := []ListNotificationCreatorAccessRow{}
 	for rows.Next() {
 		var i ListNotificationCreatorAccessRow
+		if err := rows.Scan(
+			&i.UserId,
+			&i.Role,
+			&i.TeamRoles,
+			&i.Bindings,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNotificationRecipients = `-- name: ListNotificationRecipients :many
+SELECT u."Id" AS "UserId", m."Role",
+       ARRAY(SELECT r."Role" FROM "OrganizationTeamRoles" r
+             WHERE r."UserId" = u."Id" AND r."OrganizationId" = m."OrganizationId")::text[] AS "TeamRoles",
+       ARRAY(SELECT rb."Role"
+             FROM "RoleBindings" rb
+             WHERE rb."OrganizationId" = m."OrganizationId" AND rb."Scope" = 'project' AND rb."ProjectId" = $1::uuid
+               AND NOT rb."IsDeleted"
+               AND (rb."UserId" = u."Id"
+                    OR EXISTS (SELECT 1
+                               FROM "TeamMembers" tm
+                               JOIN "Teams" t ON t."Id" = tm."TeamId" AND t."OrganizationId" = tm."OrganizationId" AND NOT t."IsDeleted"
+                               WHERE tm."TeamId" = rb."TeamId" AND tm."OrganizationId" = rb."OrganizationId"
+                                 AND tm."UserId" = u."Id" AND NOT tm."IsDeleted")))::text[] AS "Bindings"
+FROM "Users" u
+JOIN "Memberships" m ON m."UserId" = u."Id" AND m."OrganizationId" = $2 AND NOT m."IsDeleted"
+JOIN "Organizations" o ON o."Id" = m."OrganizationId" AND NOT o."IsDeleted"
+LEFT JOIN "NotificationMutes" mu ON mu."UserId" = u."Id" AND NOT mu."IsDeleted"
+WHERE NOT u."IsDeleted" AND NOT u."Disabled"
+  AND ($3::boolean OR (u."Email" <> '' AND COALESCE(NOT mu."Muted", true)))
+ORDER BY u."Id"
+`
+
+type ListNotificationRecipientsParams struct {
+	ProjectID      *uuid.UUID
+	OrganizationID uuid.UUID
+	InApp          bool
+}
+
+type ListNotificationRecipientsRow struct {
+	UserId    uuid.UUID
+	Role      string
+	TeamRoles []string
+	Bindings  []string
+}
+
+func (q *Queries) ListNotificationRecipients(ctx context.Context, arg ListNotificationRecipientsParams) ([]ListNotificationRecipientsRow, error) {
+	rows, err := q.db.Query(ctx, listNotificationRecipients, arg.ProjectID, arg.OrganizationID, arg.InApp)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNotificationRecipientsRow{}
+	for rows.Next() {
+		var i ListNotificationRecipientsRow
 		if err := rows.Scan(
 			&i.UserId,
 			&i.Role,

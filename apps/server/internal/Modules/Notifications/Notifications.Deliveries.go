@@ -157,7 +157,7 @@ func (s *Service) enqueueTest(ctx context.Context, q *sqlc.Queries, ch sqlc.Noti
 		OrganizationID: ch.OrganizationId, ProjectID: ch.ProjectId, ChannelID: &ch.Id, Kind: outbox.Kind(ch.Kind), EventID: event,
 		EventName: EventTest, Payload: raw, NextAttemptAt: now,
 	}
-	if ch.Kind == models.KindEmail {
+	if models.ByRole(ch.Kind) {
 		entry.RecipientUserID = &actor
 	}
 	_, err = outbox.Enqueue(ctx, q, entry)

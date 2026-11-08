@@ -655,6 +655,22 @@ type NotificationDevice struct {
 	LastSeenAt  time.Time
 }
 
+type NotificationInbox struct {
+	Id             uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	IsDeleted      bool
+	UserId         uuid.UUID
+	OrganizationId *uuid.UUID
+	EventId        uuid.UUID
+	EventName      string
+	TitleKey       string
+	Params         []byte
+	Link           string
+	IsRead         bool
+	ReadAt         *time.Time
+}
+
 type NotificationMute struct {
 	Id        uuid.UUID
 	CreatedAt time.Time

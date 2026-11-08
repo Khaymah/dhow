@@ -48,6 +48,9 @@ const (
 	NotifyEmailWindow        = time.Hour
 	NotifyTestPerUser        = 10
 	NotifyTestPerOrg         = 20
+	NotifyInboxPerUser       = 200
+	NotifyInboxLinkMax       = 512
+	NotifyInboxPurgeEvery    = time.Hour
 )
 
 func NotifyRetrySchedule() []time.Duration {

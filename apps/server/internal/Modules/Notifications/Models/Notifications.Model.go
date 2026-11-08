@@ -12,6 +12,7 @@ const (
 	KindSlack    = "slack"
 	KindTelegram = "telegram"
 	KindDiscord  = "discord"
+	KindInApp    = "inapp"
 
 	ReasonCreatorRemoved = "creator-removed"
 	ReasonFailures       = "failures"
@@ -23,7 +24,11 @@ const (
 )
 
 func Kinds() []string {
-	return []string{KindEmail, KindWebhook, KindSlack, KindTelegram, KindDiscord}
+	return []string{KindEmail, KindWebhook, KindSlack, KindTelegram, KindDiscord, KindInApp}
+}
+
+func ByRole(kind string) bool {
+	return kind == KindEmail || kind == KindInApp
 }
 
 func Chat(kind string) bool {
@@ -107,6 +112,25 @@ type Delivery struct {
 	LastError     string
 	LastStatus    *int
 	CreatedAt     time.Time
+}
+
+type InboxItem struct {
+	ID             uuid.UUID
+	OrganizationID *uuid.UUID
+	EventID        uuid.UUID
+	Event          string
+	TitleKey       string
+	Params         map[string]string
+	Link           string
+	Read           bool
+	ReadAt         *time.Time
+	CreatedAt      time.Time
+}
+
+type InboxPage struct {
+	Items  []InboxItem
+	Total  int64
+	Unread int64
 }
 
 type DeliveryPage struct {

@@ -26,6 +26,7 @@ func seedNotificationChannel(env *apptest.Env, org uuid.UUID, project *uuid.UUID
 }
 
 func notificationsPath(env *apptest.Env, path string, org uuid.UUID, project *uuid.UUID) string {
+	path = strings.ReplaceAll(path, "{notificationId}", uuid.NewString())
 	if !strings.Contains(path, "{channelId}") && !strings.Contains(path, "{deliveryId}") {
 		return path
 	}
