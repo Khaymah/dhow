@@ -33,8 +33,8 @@ describe('the inbox page', () => {
   it('shows the unread count in the shell and lowers it when a notification is read', async () => {
     const view = mount(INBOX_URL);
     const main = await findPage(Ar['notifications.title']);
-    const bell = await screen.findByRole('button', { name: /افتح الإشعارات، إشعار واحد غير مقروء/ });
-    expect(bell).toHaveTextContent('1');
+    const bell = await screen.findByRole('button', { name: `${Ar['shell.notifications.unread']} 1` });
+    expect(bell).not.toHaveAttribute('aria-label');
 
     await view.user.click(await within(main).findByRole('button', { name: /مقروء: / }));
     await waitFor(() => {

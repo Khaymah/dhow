@@ -70,13 +70,14 @@ test('a developer reads the channels and has no button to create one, and the se
   await expect(page.getByRole('button', { name: T['notifications.channels.new'] })).toHaveCount(0);
   await expect(page.getByText(T['notifications.readOnly'])).toBeVisible();
 
-  const refused = await call(
-    'POST',
-    `/organizations/${stack().OrgId}/projects/${stack().ProjectId}/notification-channels`,
-    { Kind: 'inapp', Name: 'dev-try', CurrentFactor: { Method: 'password', Password: developer.Password } },
-    session,
-  );
-  expect(refused.Status).toBe(403);
+  await expect(
+    call(
+      'POST',
+      `/organizations/${stack().OrgId}/projects/${stack().ProjectId}/notification-channels`,
+      { Kind: 'inapp', Name: 'dev-try', CurrentFactor: { Method: 'password', Password: developer.Password } },
+      session,
+    ),
+  ).rejects.toThrow(/answered 403: .*"Code":"FORBIDDEN"/);
   await close(view);
 });
 

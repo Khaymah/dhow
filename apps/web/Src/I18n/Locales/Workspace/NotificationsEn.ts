@@ -1,6 +1,6 @@
 export const NotificationsEn = {
   'projects.nav.notifications': 'Notifications',
-  'shell.notifications.unread': '{count, plural, one {Open notifications, {count} unread} other {Open notifications, {count} unread}}',
+  'shell.notifications.unread': 'Open notifications, unread:',
 
   'notifications.project.lead': 'Channels that carry the events of this project to your team: deployments, approvals and account events. Each channel has rules that decide what reaches it.',
   'notifications.readOnly': 'You can read the channels and their rules here. Whoever manages the project creates and changes channels.',

@@ -1,7 +1,6 @@
 export const NotificationsAr = {
   'projects.nav.notifications': 'الإشعارات',
-  'shell.notifications.unread':
-    '{count, plural, one {افتح الإشعارات، إشعار واحد غير مقروء} two {افتح الإشعارات، إشعاران غير مقروءين} few {افتح الإشعارات، {count} إشعارات غير مقروءة} many {افتح الإشعارات، {count} إشعارًا غير مقروء} other {افتح الإشعارات، {count} إشعار غير مقروء}}',
+  'shell.notifications.unread': 'افتح الإشعارات، وغير المقروء:',
 
   'notifications.project.lead': 'قنوات تصل بها أحداث هذا المشروع إلى فريقك: النشر والموافقات وأحداث الحساب. لكل قناة قواعد تحدد ما يصل إليها.',
   'notifications.readOnly': 'تقرأ هنا القنوات وقواعدها فقط. من يدير المشروع ينشئ القنوات ويغيّرها.',

@@ -43,7 +43,7 @@ export const ShellTopBar = () => {
       />
       <IconButton
         icon="bell"
-        label={unread > 0 ? t('shell.notifications.unread', { count: unread }) : t('shell.notifications')}
+        label={unread > 0 ? t('shell.notifications.unread') : t('shell.notifications')}
         count={unread}
         onClick={() => {
           void navigate({ to: '/notifications' });
