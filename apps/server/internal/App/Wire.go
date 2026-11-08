@@ -184,7 +184,7 @@ func Build(ctx context.Context, in Infra) (*Wired, error) {
 		Log:    in.Log,
 		System: system.Deps{
 			DB: in.Pool, Migrations: in.Migrations, Queries: sqlc.New(in.Pool), Build: in.Build, Log: in.Log,
-			Checks: readinessChecks(jobsService, store, in.Keys), Keys: keyringReader(in.Keys),
+			Checks: readinessChecks(jobsService, store, in.Keys), Keys: keyringReader(in.Keys), Doctor: doctorFor(in),
 		},
 		Identity:      identityService,
 		Session:       sessionService,

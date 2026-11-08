@@ -31,7 +31,7 @@ describe('the server settings page', () => {
     const links = within(watch)
       .getAllByRole('link')
       .map((link) => link.textContent);
-    expect(links).toEqual([Ar['shell.nav.audit'], Ar['shell.nav.system'], Ar['shell.nav.systemSettings']]);
+    expect(links).toEqual([Ar['shell.nav.audit'], Ar['shell.nav.system'], Ar['shell.nav.systemSettings'], Ar['shell.nav.about']]);
     await user.click(within(watch).getByRole('link', { name: Ar['shell.nav.systemSettings'] }));
     expect(await screen.findByRole('heading', { level: 1, name: Ar['shell.nav.systemSettings'] })).toBeInTheDocument();
   });

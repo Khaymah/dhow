@@ -261,7 +261,7 @@ FUZZ_TARGETS := \
 	Modules/Pipelines/Test/Edge:FuzzDefinitionProof Core/Blob:FuzzParseDigest Modules/Artifacts/Test/Edge:FuzzDownloadName \
 	Core/Keys:FuzzKeyring Core/Keys:FuzzOpen Modules/Environments/Test/Edge:FuzzAllowedRefs Modules/Environments/Test/Edge:FuzzDeployPath \
 	Modules/Environments/Test/Edge:FuzzKeySecretName Modules/Secrets/Test/Edge:FuzzSecretName Modules/Ingest/Test/Edge:FuzzIngestHeaders \
-	Modules/Ingest/Test/Edge:FuzzIngestArchive Modules/Environments/Test/Edge:FuzzDeployReport Modules/Notifications/Test/Edge:FuzzNotifyURL) \
+	Modules/Ingest/Test/Edge:FuzzIngestArchive Modules/Environments/Test/Edge:FuzzDeployReport Modules/Notifications/Test/Edge:FuzzNotifyURL Modules/Notifications/Test/Edge:FuzzChatURL) \
 	internal/gitref:FuzzRef internal/gitsource:FuzzCloneUrl internal/jobspec:FuzzAllowlist internal/jobspec:FuzzPrepare internal/jobspec:FuzzHealthEndpoints internal/jobspec:FuzzParseEndpoint \
 	internal/pipelinespec:FuzzParse internal/pipelinespec:FuzzCEL internal/pipelinespec:FuzzMatrix \
 	internal/cachekey:FuzzRender internal/pathglob:FuzzMatchPattern internal/archive:FuzzUnpack internal/archive:FuzzWalk \
@@ -312,6 +312,8 @@ test-runner: ## Run the runner tests with the fake sandbox driver (dhowtest buil
 
 ISOLATION_DIR     ?= $(abspath bin/isolation)
 ISOLATION_BUSYBOX ?= /bin/busybox
+NOTIFY_RECEIVER_CA     ?= /tmp/dhow-notify-receiver-ca.pem
+NOTIFY_RECEIVER_LISTEN ?= 127.0.0.1:8443
 ISOLATION_RUN     ?=
 ISOLATION_GIT_ARCHIVE ?=
 ISOLATION_SSHD    ?=
@@ -319,6 +321,14 @@ ISOLATION_SSHD    ?=
 .PHONY: deploy-e2e
 deploy-e2e: ## Deploy real releases to a real sshd with dhow-deploy-ssh and Compose projects to Docker in Docker hosts with dhow-deploy-compose (health check, rollback, policy, host key; DHOW_E2E_SKIP_COMPOSE=1 skips the privileged hosts); replays the reports into the server when DHOW_TEST_DATABASE_URL is set
 	bash deploy/e2e-targets/run.sh
+
+.PHONY: notify-live
+notify-live: ## Send one Arabic and one English message to the real Slack, Discord and Telegram (needs DHOW_TEST_DATABASE_URL and SLACK_WEBHOOK_URL, DISCORD_WEBHOOK_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_MY_ID; a service whose variables are empty is skipped)
+	$(GO) test -tags live -count=1 -v -run TestLive ./apps/server/internal/Modules/Notifications/Test/E2E/
+
+.PHONY: notify-receiver
+notify-receiver: ## Run the local Slack, Discord and Telegram stand-in over TLS (NOTIFY_RECEIVER_CA=/tmp/notify-ca.pem NOTIFY_RECEIVER_LISTEN=127.0.0.1:8443)
+	$(GO) run ./deploy/e2e-targets/notify-receiver -ca-file $(NOTIFY_RECEIVER_CA) -listen $(NOTIFY_RECEIVER_LISTEN)
 
 .PHONY: deploy-ssh-image
 deploy-ssh-image: ## Build the dhow-deploy-ssh plugin image locally (DEPLOY_SSH_IMAGE=dhow-deploy-ssh:dev)

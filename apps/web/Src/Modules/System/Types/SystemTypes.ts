@@ -5,6 +5,10 @@ export type TMeta = components['schemas']['Meta'];
 export type THealthStatus = components['schemas']['HealthStatus'];
 export type THealthCheck = components['schemas']['HealthCheck'];
 export type TCheckName = THealthCheck['Name'];
+export type TServerBuild = components['schemas']['ServerBuild'];
+export type TDoctorReport = components['schemas']['DoctorReport'];
+export type TDoctorCheck = components['schemas']['DoctorCheck'];
+export type TDoctorStatus = components['schemas']['DoctorStatus'];
 
 export const CHECK_NAMES = ['database', 'migrations', 'log_partitions', 'settings', 'keyring'] as const satisfies readonly TCheckName[];
 

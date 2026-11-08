@@ -122,7 +122,7 @@ var enFixes = map[string]string{ //nolint:gosec // This is a message catalog, no
 	"ENVIRONMENT_PAUSED":                   "Ask an admin to resume the environment, then try again.",
 	"TARGET_KEY_NEEDS_FACTOR":              "Enter your password or a code from your app when Dhow asks, then save again.",
 	"CHANNEL_EXISTS":                       "Choose another name for the channel, or open the existing channel and edit it.",
-	"CHANNEL_HOST_NOT_ALLOWED":             "Use an https address without a user name or a password, and write the server as a name or a plain IP address.",
+	"CHANNEL_HOST_NOT_ALLOWED":             "Use an https address with no user name. For Slack use an address on hooks.slack.com, for Discord one on discord.com or discordapp.com.",
 	"CHANNEL_HOST_BLOCKED":                 "Ask your server admin to add the network range to DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS, or use a public address.",
 	"CHANNEL_SECRET_INVALID":               "Enter the webhook address again, then save the channel.",
 	"CHANNEL_VERSION_CONFLICT":             "Reload the page, check the change someone else made, then save again.",

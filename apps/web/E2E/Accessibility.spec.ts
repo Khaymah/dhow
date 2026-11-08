@@ -31,6 +31,7 @@ const places = (): IPlace[] => [
   { Name: 'project settings', Path: `/projects/${stack().ProjectId}/settings` },
   { Name: 'preferences', Path: '/account/preferences' },
   { Name: 'deploy board', Path: `/projects/${stack().ProjectId}/deploy` },
+  { Name: 'about', Path: '/about' },
 ];
 
 const describeFindings = (findings: IFinding[]): string[] =>

@@ -71,6 +71,7 @@ export const SHELL_PAGES = {
     () => import('@/App/Pages/SystemSettingsPage').then((module) => module.SystemSettingsPage),
     instanceOwner,
   ),
+  about: lazyPage(() => import('@/App/Pages/AboutPage').then((module) => module.AboutPage)),
   check: lazyPage(() => import('@/App/Pages/CheckPage').then((module) => module.CheckPage)),
   profile: lazyPage(() => import('@/App/Pages/ProfilePage').then((module) => module.ProfilePage)),
   security: lazyPage(() => import('@/App/Pages/SecurityPage').then((module) => module.SecurityPage)),

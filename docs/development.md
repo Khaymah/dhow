@@ -345,6 +345,18 @@ pnpm -C apps/web size
 
 `make gen` يعيد توليد الكود من `packages/openapi/openapi.yaml` واستعلامات SQL، و`pnpm -C apps/web gen:api` يعيد توليد أنواع الـ API في الواجهة. لا تعدّل الملفات المولَّدة يدويًا أبدًا.
 
+### اختبار قنوات الإشعارات
+
+اختبارات القنوات في CI لا تتصل بالإنترنت. تشغّل `deploy/e2e-targets/notify-receiver` وهو خادم Go صغير يقلّد واجهات Slack وDiscord وTelegram بقواعدها: طول الرسالة، وصيغة HTML في Telegram، وحقل `allowed_mentions` في Discord. اختباراته تعمل بـ `go test -race -count=1 ./deploy/e2e-targets/notify-receiver/...`. وتصل اختبارات `Modules/Notifications` إليه من خلال إعدادات الاختبار التي تحوّل الاتصال (`NotifyDial` و`NotifyLookup` و`NotifyTLS`)، فلا يوجد أي إعداد في بيئة التشغيل يغيّر المضيفات المقبولة. ولتجربته يدويًا: `make notify-receiver` يشغّله على TLS ويكتب شهادة الجهة الموقِّعة في `NOTIFY_RECEIVER_CA`.
+
+والاختبار الحي يرسل رسالة عربية وأخرى إنجليزية إلى كل خدمة حقيقية، ومعهما اسم فرع فيه `<!channel>` و`@everyone`. لا يعمل في CI، ويشغَّل يدويًا قبل الدمج:
+
+```sh
+make notify-live
+```
+
+يقرأ `SLACK_WEBHOOK_URL` و`DISCORD_WEBHOOK_URL` و`TELEGRAM_BOT_TOKEN` و`TELEGRAM_MY_ID` من البيئة، ويحتاج `DHOW_TEST_DATABASE_URL`. الخدمة التي متغيراتها فارغة تُتخطى. يطبع الاختبار حالة الإرسال ورمز HTTP لكل قناة فقط، ولا يطبع أي قيمة من المتغيرات. لا تكتب هذه القيم في ملف ولا في أمر ولا في وصف PR.
+
 ## جهاز التشغيل
 
 ما تستطيع فعله يعتمد على نظامك:

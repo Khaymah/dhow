@@ -171,6 +171,7 @@ type Querier interface {
 	GetCheckoutRepository(ctx context.Context, arg GetCheckoutRepositoryParams) (GetCheckoutRepositoryRow, error)
 	GetConfirmedTotp(ctx context.Context, userID uuid.UUID) (GetConfirmedTotpRow, error)
 	GetDataKey(ctx context.Context, id uuid.UUID) (GetDataKeyRow, error)
+	GetDatabaseTime(ctx context.Context) (time.Time, error)
 	GetDeployTarget(ctx context.Context, arg GetDeployTargetParams) (DeployTarget, error)
 	GetDeployTargetByID(ctx context.Context, arg GetDeployTargetByIDParams) (DeployTarget, error)
 	GetEnvironment(ctx context.Context, arg GetEnvironmentParams) (Environment, error)

@@ -137,6 +137,9 @@ func (s *Service) Deliverers() map[outbox.Kind]outbox.Deliverer {
 		outbox.KindEmail:         emailDeliverer{s: s},
 		outbox.KindWebhook:       webhookDeliverer{s: s},
 		outbox.KindInternalEmail: internalMailDeliverer{s: s},
+		outbox.KindSlack:         chatDeliverer{s: s, kind: models.KindSlack},
+		outbox.KindDiscord:       chatDeliverer{s: s, kind: models.KindDiscord},
+		outbox.KindTelegram:      chatDeliverer{s: s, kind: models.KindTelegram},
 	}
 }
 

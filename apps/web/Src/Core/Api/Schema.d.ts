@@ -84,6 +84,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/doctor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Server version, health and the checks that run inside the server
+         * @description Any signed-in user gets `ServerBuild` and `Health`. The instance owner (`instance.settings.manage`) also gets `Checks`: the database, the schema, the settings reload, the keyring, the log partitions, the free disk space of the data folder, the clock against the database, and the kernel MPTCP setting. Each check has a `Status` and, when it is not `ok`, the same `Fix` sentence that `dhow-server doctor` prints, in the language of `Accept-Language`. No setting value, secret or file path comes back. Checks that need root on the host (the update timer, file ownership) stay in the command line tool.
+         */
+        get: operations["getDoctor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/setup": {
         parameters: {
             query?: never;
@@ -2995,7 +3015,7 @@ export interface paths {
         put?: never;
         /**
          * Make a notification channel
-         * @description Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Kind` is `email` or `webhook`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret and shows it once in `Secret`. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
+         * @description Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Kind` is `email`, `webhook`, `slack`, `discord` or `telegram`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret of a webhook and shows it once in `Secret`. `slack` needs the `Url` of an incoming webhook (`https://hooks.slack.com/services/...`), `discord` the `Url` of a webhook (`https://discord.com/api/webhooks/...`, or `discordapp.com`), and `telegram` a `BotToken` and a `ChatId`. These three accept their own service hosts only and have no signing secret. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
          */
         post: operations["createNotificationChannel"];
         delete?: never;
@@ -3018,7 +3038,7 @@ export interface paths {
         get: operations["getNotificationChannel"];
         /**
          * Change a notification channel
-         * @description Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`. `Url` replaces the address, `RotateSecret` makes a new signing secret (shown once in `Secret`), and `Enable` turns a stopped channel on again and makes you its owner.
+         * @description Needs `notification.manage` on the project (Maintainer and above) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`. `Url` replaces the address of a webhook, Slack or Discord channel, `BotToken` and `ChatId` replace those of a Telegram channel (send one or both), `RotateSecret` makes a new signing secret for a webhook (shown once in `Secret`), and `Enable` turns a stopped channel on again and makes you its owner. A field that does not belong to the kind of the channel is 422.
          */
         put: operations["updateNotificationChannel"];
         post?: never;
@@ -3147,7 +3167,7 @@ export interface paths {
         put?: never;
         /**
          * Make a notification channel
-         * @description Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Kind` is `email` or `webhook`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret and shows it once in `Secret`. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Kind` is `email`, `webhook`, `slack`, `discord` or `telegram`. A webhook needs `Url`: https, without a user name, and a host Dhow may reach (`DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS` lists the private ranges the operator allowed). Dhow makes the signing secret of a webhook and shows it once in `Secret`. `slack` needs the `Url` of an incoming webhook (`https://hooks.slack.com/services/...`), `discord` the `Url` of a webhook (`https://discord.com/api/webhooks/...`, or `discordapp.com`), and `telegram` a `BotToken` and a `ChatId`. These three accept their own service hosts only and have no signing secret. A new channel starts with a rule for failed deployments, rollbacks, approvals and failed runs. 409 `CHANNEL_EXISTS`, 422 `CHANNEL_HOST_NOT_ALLOWED` or `CHANNEL_HOST_BLOCKED`.
          */
         post: operations["createOrgNotificationChannel"];
         delete?: never;
@@ -3170,7 +3190,7 @@ export interface paths {
         get: operations["getOrgNotificationChannel"];
         /**
          * Change a notification channel
-         * @description Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`. `Url` replaces the address, `RotateSecret` makes a new signing secret (shown once in `Secret`), and `Enable` turns a stopped channel on again and makes you its owner.
+         * @description Needs `org.notification.manage` on the organization (Owner and Admin) and a fresh `CurrentFactor`. `Version` must be the one you read, otherwise 409 `CHANNEL_VERSION_CONFLICT`. `Url` replaces the address of a webhook, Slack or Discord channel, `BotToken` and `ChatId` replace those of a Telegram channel (send one or both), `RotateSecret` makes a new signing secret for a webhook (shown once in `Secret`), and `Enable` turns a stopped channel on again and makes you its owner. A field that does not belong to the kind of the channel is 422.
          */
         put: operations["updateOrgNotificationChannel"];
         post?: never;
@@ -3943,8 +3963,39 @@ export interface components {
             Version: string;
             /** @example 2e39188 */
             Commit: string;
+            ServerBuild?: components["schemas"]["ServerBuild"];
             /** @description True until the first owner completes setup. */
             SetupRequired: boolean;
+        };
+        ServerBuild: {
+            /** @example v0.1.0 */
+            Version: string;
+            /** @example 2e39188 */
+            Commit: string;
+            /**
+             * Format: date-time
+             * @description The time of the commit the binary was built from. Absent when the binary carries no version control data.
+             */
+            BuiltAt?: string;
+        };
+        /** @enum {string} */
+        DoctorStatus: "ok" | "info" | "warn" | "fail";
+        DoctorCheck: {
+            /** @description A stable name such as `database`, `disk` or `mptcp`. */
+            Code: string;
+            Status: components["schemas"]["DoctorStatus"];
+            /** @description What was checked, in the language of `Accept-Language`. */
+            Title: string;
+            /** @description What to do, the same sentence as `dhow-server doctor`. Absent when the status is `ok` or `info`. */
+            Fix?: string;
+        };
+        DoctorReport: {
+            ServerBuild: components["schemas"]["ServerBuild"];
+            Health: components["schemas"]["HealthStatus"];
+            Checks?: components["schemas"]["DoctorCheck"][];
+        };
+        DoctorResponse: components["schemas"]["Envelope"] & {
+            Data?: components["schemas"]["DoctorReport"];
         };
         SetupRequest: {
             SetupToken: string;
@@ -5667,7 +5718,7 @@ export interface components {
             Data?: components["schemas"]["IngestToken"][];
         };
         /** @enum {string} */
-        NotificationChannelKind: "email" | "webhook";
+        NotificationChannelKind: "email" | "webhook" | "slack" | "telegram" | "discord";
         /** @enum {string} */
         NotificationDeliveryState: "pending" | "sending" | "sent" | "dead";
         NotificationChannel: {
@@ -5691,9 +5742,9 @@ export interface components {
              * @enum {string}
              */
             DisabledReason?: "creator-removed" | "failures";
-            /** @description The host of the webhook address, with its port when it is not the default. Never the path or the query. Only a caller who manages channels sees it; a reader gets name, kind and state only. */
+            /** @description The host of the channel address, with its port when it is not the default (`hooks.slack.com`, `discord.com` or `api.telegram.org` for a chat channel). Never the path or the query. Only a caller who manages channels sees it; a reader gets name, kind and state only. */
             Host?: string;
-            /** @description True when the channel keeps an address and a signing secret. Neither is ever shown. */
+            /** @description True when the channel keeps sealed settings (an address and a signing secret, or a bot token and a chat). None is ever shown. */
             HasSecret: boolean;
             /** Format: int64 */
             Version: number;
@@ -5713,8 +5764,12 @@ export interface components {
             Name: string;
             /** @enum {string} */
             Locale?: "ar" | "en";
-            /** @description The https address of a webhook. Required for a webhook and refused for an email channel. */
+            /** @description The https address of a webhook, a Slack incoming webhook or a Discord webhook. Required for those kinds and refused for the others. Slack and Discord accept only their own hosts, otherwise 422 `CHANNEL_HOST_NOT_ALLOWED`. */
             Url?: string;
+            /** @description The token of a Telegram bot. Required for `telegram` and refused for the other kinds. Never shown again. */
+            BotToken?: string;
+            /** @description The chat Telegram sends to, a number or `@channelname`. Required for `telegram` and refused for the other kinds. */
+            ChatId?: string;
             CurrentFactor: components["schemas"]["CurrentFactor"];
         };
         UpdateNotificationChannelRequest: {
@@ -5724,6 +5779,8 @@ export interface components {
             /** Format: int64 */
             Version: number;
             Url?: string;
+            BotToken?: string;
+            ChatId?: string;
             RotateSecret?: boolean;
             Enable?: boolean;
             CurrentFactor: components["schemas"]["CurrentFactor"];
@@ -6299,6 +6356,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KeyringStatusResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getDoctor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. `Checks` is absent unless the caller is the instance owner. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorResponse"];
                 };
             };
             default: components["responses"]["Error"];

@@ -19,3 +19,24 @@ func TestPgDump() string {
 }
 
 func RunningInCI() bool { return os.Getenv(envCI) != "" }
+
+const (
+	EnvLiveSlackWebhook   = "SLACK_WEBHOOK_URL"
+	EnvLiveDiscordWebhook = "DISCORD_WEBHOOK_URL"
+	EnvLiveTelegramBot    = "TELEGRAM_BOT_TOKEN"
+	EnvLiveTelegramChat   = "TELEGRAM_MY_ID"
+)
+
+type LiveNotify struct {
+	Slack         string
+	Discord       string
+	TelegramToken string
+	TelegramChat  string
+}
+
+func LiveNotifyFromEnv() LiveNotify {
+	return LiveNotify{
+		Slack: os.Getenv(EnvLiveSlackWebhook), Discord: os.Getenv(EnvLiveDiscordWebhook),
+		TelegramToken: os.Getenv(EnvLiveTelegramBot), TelegramChat: os.Getenv(EnvLiveTelegramChat),
+	}
+}

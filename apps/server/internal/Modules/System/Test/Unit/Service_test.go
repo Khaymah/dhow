@@ -134,8 +134,8 @@ func TestMetaGet(t *testing.T) {
 		want     models.Meta
 		wantCode string
 	}{
-		{"setup required", support.FakeQueries{}, models.Meta{Version: "v0.1.0", Commit: "abc123", SetupRequired: true}, ""},
-		{"setup done", support.FakeQueries{Instance: done}, models.Meta{Version: "v0.1.0", Commit: "abc123"}, ""},
+		{"setup required", support.FakeQueries{}, models.Meta{Version: "v0.1.0", Commit: "abc123", Build: models.Build{Version: "v0.1.0", Commit: "abc123"}, SetupRequired: true}, ""},
+		{"setup done", support.FakeQueries{Instance: done}, models.Meta{Version: "v0.1.0", Commit: "abc123", Build: models.Build{Version: "v0.1.0", Commit: "abc123"}}, ""},
 		{"query error becomes internal", support.FakeQueries{Err: errors.New(`relation "Instance" does not exist`)}, models.Meta{}, apperrors.CodeInternal},
 	}
 	for _, tt := range tests {
