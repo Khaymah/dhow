@@ -73,6 +73,8 @@ A host needs at least 1 CPU core, 2 GiB of memory and 5 GiB of free disk (2 core
 | [Your organization and your account](docs/en/guides/organization.md) | Members and teams beside their details, invitations, API keys, organization settings, and your profile and security |
 | [Server settings](docs/en/guides/instance-settings.md) | Mail, organization creation, the breached-password check, rate limits and log limits from the dashboard, and how the environment locks them |
 | [About Dhow and the server checks](docs/en/guides/about-and-doctor.md) | The version, build and license, the server checks for the instance owner, and the reload bar after an update |
+| [Help inside Dhow](docs/en/guides/help-and-faq.md) | The Help button on every page, the Help page with search that works offline, the What's new card, and where the content comes from |
+| [Frequently asked questions](docs/en/faq.md) | The most common questions about getting started, signing in, runs, secrets, and notifications |
 | [Roadmap](docs/en/roadmap.md) | Milestones toward v1.0 |
 | [ADRs](Plan/ADR/) | Every architectural and product decision, with alternatives |
 

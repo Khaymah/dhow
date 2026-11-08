@@ -246,6 +246,8 @@ func requestFor(rule policy.Rule, fx fixture, c *apptest.Client) apptest.Request
 		req.Body = map[string]string{"SetupToken": "x", "OwnerName": "x", "Email": "x@example.com", "Password": "x", "OrganizationName": "x", "OrganizationSlug": "x"}
 	case rule.Method == http.MethodPut && rule.Path == "/me/password":
 		req.Body = map[string]string{"CurrentPassword": "not the current one", "NewPassword": "a brand new passphrase"}
+	case rule.Method == http.MethodPut && rule.Path == "/me/release-notes-seen":
+		req.Body = map[string]string{"Version": "1.0.0"}
 	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/runner-registration-tokens":
 		req.Body = map[string]any{}
 	case rule.Method == http.MethodPost && rule.Path == "/organizations/{id}/jobs":

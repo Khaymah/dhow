@@ -13,10 +13,11 @@ type CustomTheme struct {
 }
 
 type Preferences struct {
-	Locale         string
-	ThemeID        string
-	CustomThemes   []CustomTheme
-	OrganizationID *uuid.UUID
-	Saved          bool
-	UpdatedAt      *time.Time
+	Locale           string
+	ThemeID          string
+	CustomThemes     []CustomTheme
+	OrganizationID   *uuid.UUID
+	Saved            bool
+	ReleaseNotesSeen *string
+	UpdatedAt        *time.Time
 }

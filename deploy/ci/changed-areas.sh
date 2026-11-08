@@ -21,7 +21,10 @@ while IFS= read -r file; do
       ;;
   esac
   case $file in
-    docs/* | Plan/* | .claude/* | .github/ISSUE_TEMPLATE/* | .github/*.md | *.md) ;;
+    docs/*)
+      web=true
+      ;;
+    Plan/* | .claude/* | .github/ISSUE_TEMPLATE/* | .github/*.md | *.md) ;;
     apps/web/*) web=true ;;
     packages/openapi/*)
       web=true

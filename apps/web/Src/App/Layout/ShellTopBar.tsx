@@ -35,6 +35,13 @@ export const ShellTopBar = () => {
     >
       <ServerStatusLink />
       <IconButton
+        icon="help"
+        label={t('shell.nav.help')}
+        onClick={() => {
+          void navigate({ to: '/help' });
+        }}
+      />
+      <IconButton
         icon="bell"
         label={unread > 0 ? t('shell.notifications.unread', { count: unread }) : t('shell.notifications')}
         count={unread}

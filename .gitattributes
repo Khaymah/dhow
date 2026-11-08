@@ -8,4 +8,5 @@
 **/Sqlc/** linguist-generated=true
 apps/web/Src/Core/Api/Schema.d.ts linguist-generated=true
 apps/web/Src/Styles/Tokens.css linguist-generated=true
+apps/web/Src/Core/Help/Generated/** linguist-generated=true
 apps/web/pnpm-lock.yaml linguist-generated=true

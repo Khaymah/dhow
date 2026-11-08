@@ -360,4 +360,21 @@ describe('SlideStack close guard', () => {
     expect(onClose).toHaveBeenCalledOnce();
     expect(onBlocked).not.toHaveBeenCalled();
   });
+
+  it('drops the body of a closing slide at once, before the owner removes it', async () => {
+    const onClose = vi.fn();
+    renderWithProviders(<Guarded blocked={false} onBlocked={vi.fn()} onClose={onClose} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha' });
+    expect(screen.getByText('Body a')).toBeInTheDocument();
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByText('Body a')).toBeNull();
+  });
+
+  it('keeps the body while the guard holds the slide open', async () => {
+    renderWithProviders(<Guarded blocked onBlocked={vi.fn()} onClose={vi.fn()} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha' });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.getByText('Body a')).toBeInTheDocument();
+  });
 });

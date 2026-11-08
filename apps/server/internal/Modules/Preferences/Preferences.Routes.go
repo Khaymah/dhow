@@ -23,6 +23,7 @@ func Policies() []policy.Rule {
 	return []policy.Rule{
 		policy.Authenticated(http.MethodGet, "/me/preferences", policy.SessionManageSelf),
 		policy.Authenticated(http.MethodPut, "/me/preferences", policy.SessionManageSelf),
+		policy.Authenticated(http.MethodPut, "/me/release-notes-seen", policy.SessionManageSelf),
 	}
 }
 

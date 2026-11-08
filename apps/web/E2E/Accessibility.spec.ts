@@ -34,6 +34,7 @@ const places = (): IPlace[] => [
   { Name: 'notifications', Path: '/notifications' },
   { Name: 'channels', Path: `/projects/${stack().ProjectId}/notifications` },
   { Name: 'new channel', Path: `/projects/${stack().ProjectId}/notifications?slide=notification-channel-new` },
+  { Name: 'help', Path: '/help' },
 ];
 
 const describeFindings = (findings: IFinding[]): string[] =>
