@@ -16,6 +16,7 @@ const (
 	fieldThemeID      = "ThemeId"
 	fieldCustomThemes = "CustomThemes"
 	fieldOrganization = "OrganizationId"
+	fieldVersion      = "Version"
 
 	messageTheme        = "errors.preferenceTheme"
 	messageThemes       = "errors.preferenceThemes"
@@ -26,6 +27,7 @@ const (
 var (
 	themeIDPattern = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
 	colorPattern   = regexp.MustCompile(`^#[0-9a-f]{6}$`)
+	versionPattern = regexp.MustCompile(`^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-rc\.[0-9]{1,6})?$`)
 	locales        = []string{"ar", "en"}
 )
 

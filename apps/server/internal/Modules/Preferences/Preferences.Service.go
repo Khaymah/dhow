@@ -53,6 +53,22 @@ func (s *Service) Get(ctx context.Context) (models.Preferences, error) {
 }
 
 func (s *Service) load(ctx context.Context, q *sqlc.Queries, p auth.Principal) (models.Preferences, error) {
+	out, err := s.loadDisplay(ctx, q, p)
+	if err != nil {
+		return models.Preferences{}, err
+	}
+	seen, err := q.GetUserReleaseNotesSeen(ctx, p.UserID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return out, nil
+	}
+	if err != nil {
+		return models.Preferences{}, err
+	}
+	out.ReleaseNotesSeen = &seen
+	return out, nil
+}
+
+func (s *Service) loadDisplay(ctx context.Context, q *sqlc.Queries, p auth.Principal) (models.Preferences, error) {
 	locale, err := q.GetUserLocale(ctx, p.UserID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return models.Preferences{}, apperrors.Unauthenticated()
@@ -117,6 +133,27 @@ func (s *Service) Save(ctx context.Context, in models.Preferences) (models.Prefe
 		}
 		if _, err := q.UpsertUserPreferences(ctx, sqlc.UpsertUserPreferencesParams{
 			UserID: p.UserID, ThemeID: in.ThemeID, CustomThemes: themes, OrganizationID: in.OrganizationID, Now: now,
+		}); err != nil {
+			return err
+		}
+		out, err = s.load(ctx, q, p)
+		return err
+	})
+	return out, err
+}
+
+func (s *Service) SaveReleaseNotesSeen(ctx context.Context, version string) (models.Preferences, error) {
+	p, err := principal(ctx)
+	if err != nil {
+		return models.Preferences{}, err
+	}
+	if !versionPattern.MatchString(version) {
+		return models.Preferences{}, apperrors.ValidationFailed(apperrors.IErrorDetail{Field: fieldVersion, Message: messageLocale})
+	}
+	var out models.Preferences
+	err = dbtx.Run(ctx, s.db, func(q *sqlc.Queries) error {
+		if _, err := q.UpsertUserReleaseNotesSeen(ctx, sqlc.UpsertUserReleaseNotesSeenParams{
+			UserID: p.UserID, SeenVersion: version, Now: s.now(),
 		}); err != nil {
 			return err
 		}
