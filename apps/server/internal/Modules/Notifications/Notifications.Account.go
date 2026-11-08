@@ -163,7 +163,12 @@ func (s *Service) onMemberGone(ctx context.Context, ev eventbus.Event) error {
 	if !ok {
 		return nil
 	}
-	return s.quiet(ctx, a, ev.Name, s.disableCreatorChannels(ctx, s.tx(a), a.OrganizationIDs[0], user, a.IP))
+	q, org := s.tx(a), a.OrganizationIDs[0]
+	_, err = q.HideNotificationInboxOfOrganization(ctx, sqlc.HideNotificationInboxOfOrganizationParams{UserID: user, OrganizationID: &org})
+	if err == nil {
+		err = s.disableCreatorChannels(ctx, q, a.OrganizationIDs[0], user, a.IP)
+	}
+	return s.quiet(ctx, a, ev.Name, err)
 }
 
 func (s *Service) disableCreatorChannels(ctx context.Context, q *sqlc.Queries, org, user uuid.UUID, ip string) error {

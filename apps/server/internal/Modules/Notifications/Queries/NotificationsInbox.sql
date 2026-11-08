@@ -1,20 +1,28 @@
 -- name: InsertNotificationInbox :execrows
-INSERT INTO "NotificationInbox" ("UserId", "OrganizationId", "EventId", "EventName", "TitleKey", "Params", "Link", "CreatedAt")
-VALUES (@user_id, sqlc.narg('organization_id'), @event_id, @event_name, @title_key, @params, @link, @created_at)
+INSERT INTO "NotificationInbox" ("UserId", "OrganizationId", "EventId", "EventName", "TitleKey", "Params", "Link", "IsAccount", "CreatedAt")
+VALUES (@user_id, sqlc.narg('organization_id'), @event_id, @event_name, @title_key, @params, @link, @is_account, @created_at)
 ON CONFLICT ("UserId", "EventId") DO NOTHING;
 
 -- name: TrimNotificationInbox :execrows
 UPDATE "NotificationInbox" SET "IsDeleted" = true, "UpdatedAt" = now()
 WHERE "Id" IN (
     SELECT n."Id" FROM "NotificationInbox" n
-    WHERE n."UserId" = @user_id AND NOT n."IsDeleted"
+    WHERE n."UserId" = @user_id AND NOT n."IsDeleted" AND n."IsAccount" = @is_account
     ORDER BY n."CreatedAt" DESC, n."Id" DESC
     OFFSET @keep::integer
 );
 
 -- name: PurgeNotificationInbox :execrows
 UPDATE "NotificationInbox" SET "IsDeleted" = true, "UpdatedAt" = now()
-WHERE NOT "IsDeleted" AND "CreatedAt" < @before::timestamptz;
+WHERE "Id" IN (
+    SELECT n."Id" FROM "NotificationInbox" n
+    WHERE NOT n."IsDeleted" AND n."CreatedAt" < @before::timestamptz
+    LIMIT @batch::integer
+);
+
+-- name: HideNotificationInboxOfOrganization :execrows
+UPDATE "NotificationInbox" SET "IsDeleted" = true, "UpdatedAt" = now()
+WHERE "UserId" = @user_id AND "OrganizationId" = @organization_id AND NOT "IsDeleted";
 
 -- name: CountNotificationInbox :one
 SELECT count(*)::bigint FROM "NotificationInbox" n

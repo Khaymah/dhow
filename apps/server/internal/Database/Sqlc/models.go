@@ -667,6 +667,7 @@ type NotificationInbox struct {
 	TitleKey       string
 	Params         []byte
 	Link           string
+	IsAccount      bool
 	IsRead         bool
 	ReadAt         *time.Time
 }

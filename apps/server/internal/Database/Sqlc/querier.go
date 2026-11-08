@@ -234,6 +234,7 @@ type Querier interface {
 	GetVariableForUpdate(ctx context.Context, arg GetVariableForUpdateParams) (Variable, error)
 	GroupBlocked(ctx context.Context, arg GroupBlockedParams) (bool, error)
 	HasIdentityForProvider(ctx context.Context, arg HasIdentityForProviderParams) (bool, error)
+	HideNotificationInboxOfOrganization(ctx context.Context, arg HideNotificationInboxOfOrganizationParams) (int64, error)
 	HoldEnvironment(ctx context.Context, arg HoldEnvironmentParams) error
 	IngestTargetProject(ctx context.Context, arg IngestTargetProjectParams) (IngestTargetProjectRow, error)
 	IngestTokenBytes(ctx context.Context, tokenID uuid.UUID) (int64, error)
@@ -508,7 +509,7 @@ type Querier interface {
 	PurgeAuthChallenges(ctx context.Context, arg PurgeAuthChallengesParams) (int64, error)
 	PurgeInvitations(ctx context.Context, arg PurgeInvitationsParams) (int64, error)
 	PurgeLoginThrottles(ctx context.Context, arg PurgeLoginThrottlesParams) (int64, error)
-	PurgeNotificationInbox(ctx context.Context, before time.Time) (int64, error)
+	PurgeNotificationInbox(ctx context.Context, arg PurgeNotificationInboxParams) (int64, error)
 	PurgeNotificationOutbox(ctx context.Context, arg PurgeNotificationOutboxParams) (int64, error)
 	PurgeOidcFlows(ctx context.Context, arg PurgeOidcFlowsParams) (int64, error)
 	PurgeRateLimits(ctx context.Context, arg PurgeRateLimitsParams) (int64, error)

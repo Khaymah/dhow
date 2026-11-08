@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -22,7 +23,11 @@ import (
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications/Models"
 )
 
-const inboxKeyPrefix = "inbox."
+const (
+	inboxKeyPrefix  = "inbox."
+	inboxValueBytes = 120
+	inboxParamsMax  = 1800
+)
 
 var inboxReason = regexp.MustCompile(`^[a-z0-9_.-]{1,64}$`)
 
@@ -48,13 +53,22 @@ func inboxTitleKey(p Payload, self bool) string {
 	return key
 }
 
+func clipBytes(v string, limit int) string {
+	v = clip(v)
+	for len(v) > limit {
+		_, size := utf8.DecodeLastRuneInString(v)
+		v = v[:len(v)-size]
+	}
+	return v
+}
+
 func inboxParams(p Payload) map[string]string {
 	out := map[string]string{}
 	for k, v := range map[string]string{
 		"project": p.Project, "environment": p.Environment, "ref": p.Ref, "runner": p.Runner, "browser": p.Browser, "release": p.Release,
 	} {
 		if v != "" {
-			out[k] = clip(v)
+			out[k] = clipBytes(v, inboxValueBytes)
 		}
 	}
 	if p.Run > 0 {
@@ -85,19 +99,43 @@ func inboxLinkOf(raw string) string {
 }
 
 func (s *Service) addInbox(ctx context.Context, q *sqlc.Queries, e inboxEntry) error {
-	raw, err := json.Marshal(inboxParams(e.p))
+	raw, err := encodeInboxParams(inboxParams(e.p))
 	if err != nil {
-		return fmt.Errorf("encode the values of an inbox notification: %w", err)
+		return err
 	}
 	added, err := q.InsertNotificationInbox(ctx, sqlc.InsertNotificationInboxParams{
 		UserID: e.user, OrganizationID: e.org, EventID: e.event, EventName: e.p.Event, TitleKey: inboxTitleKey(e.p, e.self), Params: raw,
-		Link: inboxLinkOf(e.p.URL), CreatedAt: e.at,
+		Link: inboxLinkOf(e.p.URL), IsAccount: e.self, CreatedAt: e.at,
 	})
 	if err != nil || added == 0 {
 		return err
 	}
-	_, err = q.TrimNotificationInbox(ctx, sqlc.TrimNotificationInboxParams{UserID: e.user, Keep: config.NotifyInboxPerUser})
+	keep := int32(config.NotifyInboxPerUser)
+	if e.self {
+		keep = config.NotifyInboxAccountPerUser
+	}
+	_, err = q.TrimNotificationInbox(ctx, sqlc.TrimNotificationInboxParams{UserID: e.user, IsAccount: e.self, Keep: keep})
 	return err
+}
+
+func encodeInboxParams(values map[string]string) ([]byte, error) {
+	optional := []string{"release", "browser", "runner", "ref", "environment", "project"}
+	for {
+		raw, err := json.Marshal(values)
+		if err != nil {
+			return nil, fmt.Errorf("encode the values of an inbox notification: %w", err)
+		}
+		if len(raw) <= inboxParamsMax || len(optional) == 0 {
+			return raw, nil
+		}
+		delete(values, optional[0])
+		optional = optional[1:]
+	}
+}
+
+func isCheckViolation(err error) bool {
+	var pe interface{ SQLState() string }
+	return errors.As(err, &pe) && pe.SQLState() == "23514"
 }
 
 func (d inboxDeliverer) Deliver(ctx context.Context, item outbox.Item) outbox.Result {
@@ -123,7 +161,7 @@ func (d inboxDeliverer) Deliver(ctx context.Context, item outbox.Item) outbox.Re
 	err = s.addInbox(ctx, q, inboxEntry{user: *item.RecipientUserID, org: item.OrganizationID, event: item.EventID, p: p, at: s.now()})
 	if err != nil {
 		s.log.WarnContext(ctx, "inbox notification not saved", "delivery_id", item.ID.String())
-		return outbox.Result{Code: CodeConfig}
+		return outbox.Result{Code: CodeConfig, Permanent: isCheckViolation(err)}
 	}
 	return outbox.Result{}
 }
@@ -207,8 +245,13 @@ func (s *Service) MarkAllInboxRead(ctx context.Context) (int64, error) {
 
 func (s *Service) PurgeInbox(ctx context.Context) error {
 	before := s.now().AddDate(0, 0, -s.cfg.RetentionDays)
-	if _, err := s.queries().PurgeNotificationInbox(ctx, before); err != nil {
-		return fmt.Errorf("drop the old inbox notifications: %w", err)
+	for {
+		n, err := s.queries().PurgeNotificationInbox(ctx, sqlc.PurgeNotificationInboxParams{Before: before, Batch: config.NotifyInboxPurgeBatch})
+		if err != nil {
+			return fmt.Errorf("drop the old inbox notifications: %w", err)
+		}
+		if n == 0 {
+			return nil
+		}
 	}
-	return nil
 }

@@ -12,6 +12,7 @@ CREATE TABLE "NotificationInbox" (
     "TitleKey"       TEXT NOT NULL CHECK ("TitleKey" ~ '^[a-z][a-zA-Z0-9_.]{0,127}$'),
     "Params"         jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof("Params") = 'object' AND octet_length("Params"::text) <= 2048),
     "Link"           TEXT NOT NULL DEFAULT '' CHECK (char_length("Link") <= 512 AND ("Link" = '' OR ("Link" LIKE '/%' AND "Link" NOT LIKE '//%'))),
+    "IsAccount"      boolean NOT NULL DEFAULT false,
     "IsRead"         boolean NOT NULL DEFAULT false,
     "ReadAt"         timestamptz,
     CHECK ("IsRead" = ("ReadAt" IS NOT NULL))

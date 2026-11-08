@@ -33,9 +33,27 @@ func (q *Queries) CountNotificationInbox(ctx context.Context, arg CountNotificat
 	return column_1, err
 }
 
+const hideNotificationInboxOfOrganization = `-- name: HideNotificationInboxOfOrganization :execrows
+UPDATE "NotificationInbox" SET "IsDeleted" = true, "UpdatedAt" = now()
+WHERE "UserId" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
+`
+
+type HideNotificationInboxOfOrganizationParams struct {
+	UserID         uuid.UUID
+	OrganizationID *uuid.UUID
+}
+
+func (q *Queries) HideNotificationInboxOfOrganization(ctx context.Context, arg HideNotificationInboxOfOrganizationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, hideNotificationInboxOfOrganization, arg.UserID, arg.OrganizationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertNotificationInbox = `-- name: InsertNotificationInbox :execrows
-INSERT INTO "NotificationInbox" ("UserId", "OrganizationId", "EventId", "EventName", "TitleKey", "Params", "Link", "CreatedAt")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO "NotificationInbox" ("UserId", "OrganizationId", "EventId", "EventName", "TitleKey", "Params", "Link", "IsAccount", "CreatedAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT ("UserId", "EventId") DO NOTHING
 `
 
@@ -47,6 +65,7 @@ type InsertNotificationInboxParams struct {
 	TitleKey       string
 	Params         []byte
 	Link           string
+	IsAccount      bool
 	CreatedAt      time.Time
 }
 
@@ -59,6 +78,7 @@ func (q *Queries) InsertNotificationInbox(ctx context.Context, arg InsertNotific
 		arg.TitleKey,
 		arg.Params,
 		arg.Link,
+		arg.IsAccount,
 		arg.CreatedAt,
 	)
 	if err != nil {
@@ -198,11 +218,20 @@ func (q *Queries) MarkNotificationInboxRead(ctx context.Context, arg MarkNotific
 
 const purgeNotificationInbox = `-- name: PurgeNotificationInbox :execrows
 UPDATE "NotificationInbox" SET "IsDeleted" = true, "UpdatedAt" = now()
-WHERE NOT "IsDeleted" AND "CreatedAt" < $1::timestamptz
+WHERE "Id" IN (
+    SELECT n."Id" FROM "NotificationInbox" n
+    WHERE NOT n."IsDeleted" AND n."CreatedAt" < $1::timestamptz
+    LIMIT $2::integer
+)
 `
 
-func (q *Queries) PurgeNotificationInbox(ctx context.Context, before time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, purgeNotificationInbox, before)
+type PurgeNotificationInboxParams struct {
+	Before time.Time
+	Batch  int32
+}
+
+func (q *Queries) PurgeNotificationInbox(ctx context.Context, arg PurgeNotificationInboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeNotificationInbox, arg.Before, arg.Batch)
 	if err != nil {
 		return 0, err
 	}
@@ -213,19 +242,20 @@ const trimNotificationInbox = `-- name: TrimNotificationInbox :execrows
 UPDATE "NotificationInbox" SET "IsDeleted" = true, "UpdatedAt" = now()
 WHERE "Id" IN (
     SELECT n."Id" FROM "NotificationInbox" n
-    WHERE n."UserId" = $1 AND NOT n."IsDeleted"
+    WHERE n."UserId" = $1 AND NOT n."IsDeleted" AND n."IsAccount" = $2
     ORDER BY n."CreatedAt" DESC, n."Id" DESC
-    OFFSET $2::integer
+    OFFSET $3::integer
 )
 `
 
 type TrimNotificationInboxParams struct {
-	UserID uuid.UUID
-	Keep   int32
+	UserID    uuid.UUID
+	IsAccount bool
+	Keep      int32
 }
 
 func (q *Queries) TrimNotificationInbox(ctx context.Context, arg TrimNotificationInboxParams) (int64, error) {
-	result, err := q.db.Exec(ctx, trimNotificationInbox, arg.UserID, arg.Keep)
+	result, err := q.db.Exec(ctx, trimNotificationInbox, arg.UserID, arg.IsAccount, arg.Keep)
 	if err != nil {
 		return 0, err
 	}
