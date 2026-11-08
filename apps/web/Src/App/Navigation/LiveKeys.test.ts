@@ -34,9 +34,13 @@ describe('which queries a live signal refreshes', () => {
     expect(prefixes(queryKeysFor(ORG, event('release.succeeded', null)))).toEqual([`overview/${ORG}`, `boards/${ORG}`, `environments/${ORG}`]);
   });
 
-  it('refreshes everything after a reset or a poll', () => {
-    for (const kind of ['reset', 'poll'] as const) {
-      expect(prefixes(queryKeysFor(ORG, { Kind: kind }))).toEqual([`overview/${ORG}`, `approvals/${ORG}`, `boards/${ORG}`, `environments/${ORG}`]);
-    }
+  it('refreshes only the inbox for an inbox event', () => {
+    expect(prefixes(queryKeysFor(ORG, event('inbox.changed', null)))).toEqual(['inbox']);
+  });
+
+  it('refreshes everything and the inbox after a reset, and everything but the inbox after a poll', () => {
+    const boards = [`overview/${ORG}`, `approvals/${ORG}`, `boards/${ORG}`, `environments/${ORG}`];
+    expect(prefixes(queryKeysFor(ORG, { Kind: 'reset' }))).toEqual([...boards, 'inbox']);
+    expect(prefixes(queryKeysFor(ORG, { Kind: 'poll' }))).toEqual(boards);
   });
 });
