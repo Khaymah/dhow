@@ -151,7 +151,11 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 	if len(left) > 0 {
 		r.log.Warn("some attempts from the last run could not be reported yet; the runner keeps trying while it works", "count", len(left))
-		go r.exec.RecoverLater(ctx, left)
+		var later sync.WaitGroup
+		defer later.Wait()
+		laterCtx, stopLater := context.WithCancel(ctx)
+		defer stopLater()
+		later.Go(func() { r.exec.RecoverLater(laterCtx, left) })
 	}
 	r.log.Info("the runner is ready", "capacity", r.cfg.Capacity, "driver", r.driver.Name())
 	return r.loop(ctx)
