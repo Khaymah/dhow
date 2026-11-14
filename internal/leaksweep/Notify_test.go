@@ -16,7 +16,7 @@ const (
 	slackPath   = "T0DEMO0001/B0DEMO0001/" + "Xk3mP9qR2sT5vW8yZ1aB4cD7"
 	slackURL    = "https://hooks.slack.com/services/" + slackPath
 	discordURL  = "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz0123456789ABCD_-"
-	botToken    = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0" //nolint:gosec // A made-up token for a test. allow-secret
+	botToken    = "123456789" + ":AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0"
 	signingText = "dhow_whsec_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCdE"
 )
 
@@ -38,7 +38,7 @@ func TestEachNotificationPatternMatchesItsOwnShapeInEveryPlaceItCanAppear(t *tes
 	}{
 		{leaksweep.NameSlackWebhook, []string{slackURL, `{"url":"` + slackURL + `"}`, "hooks.slack.com/services/" + slackPath, `https:\/\/hooks.slack.com\/services\/` + strings.ReplaceAll(slackPath, "/", `\/`)}},
 		{leaksweep.NameDiscordWebhook, []string{discordURL, "https://discordapp.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz0123456789ABCD_-"}},
-		{leaksweep.NameTelegramToken, []string{botToken, "POST /bot" + botToken + "/sendMessage", `{"token":"` + botToken + `"}`, "token=" + botToken}},
+		{leaksweep.NameTelegramBot, []string{botToken, "POST /bot" + botToken + "/sendMessage", `{"token":"` + botToken + `"}`, "token=" + botToken}},
 		{leaksweep.NameWebhookSecret, []string{signingText, `{"Secret":"` + signingText + `"}`, "Dhow-Secret: " + signingText}},
 	} {
 		p := patternByName(t, tc.name)

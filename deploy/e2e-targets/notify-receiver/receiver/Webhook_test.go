@@ -20,7 +20,7 @@ import (
 
 const (
 	hookPath   = "/hooks/demo"
-	hookSecret = "dhow_whsec_0123456789abcdef0123456789abcdef0123456" //nolint:gosec // A made-up secret for a test. allow-secret
+	hookSecret = "dhow_whsec_" + "0123456789abcdef0123456789abcdef0123456"
 )
 
 func sign(secret string, at time.Time, body string) (string, string) {

@@ -48,5 +48,5 @@ func TestTheSweepRecognisesAnAddressAndATokenTheServerAccepts(t *testing.T) {
 
 	token := "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0"
 	require.True(t, notifications.ValidBotToken(token), "the server accepts this token")
-	assert.True(t, sweepPattern(t, leaksweep.NameTelegramToken).Re.MatchString("/bot"+token+"/sendMessage"))
+	assert.True(t, sweepPattern(t, leaksweep.NameTelegramBot).Re.MatchString("/bot"+token+"/sendMessage"))
 }

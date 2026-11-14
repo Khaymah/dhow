@@ -36,7 +36,7 @@ func (f filter) matches(m Message) bool {
 	if f.signed && !m.Signed {
 		return false
 	}
-	if f.noMention && !(m.HasMentions && len(m.MentionsParse) == 0) {
+	if f.noMention && (!m.HasMentions || len(m.MentionsParse) != 0) {
 		return false
 	}
 	for _, c := range f.contains {

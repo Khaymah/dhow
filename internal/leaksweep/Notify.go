@@ -9,21 +9,21 @@ import (
 )
 
 const (
-	NameSlackWebhook    = "Slack incoming webhook URL"
-	NameDiscordWebhook  = "Discord webhook URL"
-	NameTelegramToken   = "Telegram bot token"
-	NameWebhookSecret   = "webhook signing secret"
-	webhookSecretPrefix = "dhow_whsec_"
-	webhookSecretBody   = 43
-	slash               = `\\?/`
-	tokenSet            = `[A-Za-z0-9_-]`
+	NameSlackWebhook   = "Slack incoming webhook URL"
+	NameDiscordWebhook = "Discord webhook URL"
+	NameTelegramBot    = "Telegram bot token"
+	NameWebhookSecret  = "webhook signing secret"
+	signingPrefix      = "dhow_whsec_"
+	webhookSecretBody  = 43
+	slash              = `\\?/`
+	charSet            = `[A-Za-z0-9_-]`
 )
 
 var (
 	slackWebhook = regexp.MustCompile(`hooks\.slack\.com` + slash + `services` + slash + `T[A-Z0-9]{8,}` + slash + `B[A-Z0-9]{8,}` + slash + `[A-Za-z0-9]{20,}`)
-	discordHook  = regexp.MustCompile(`discord(?:app)?\.com` + slash + `api` + slash + `webhooks` + slash + `[0-9]{15,}` + slash + tokenSet + `{40,}`)
-	telegramBot  = regexp.MustCompile(`(?:^|[^0-9])[0-9]{8,10}:` + tokenSet + `{35}(?:$|[^A-Za-z0-9_-])`)
-	signingToken = regexp.MustCompile(webhookSecretPrefix + tokenSet + `{` + fmt.Sprint(webhookSecretBody) + `}`)
+	discordHook  = regexp.MustCompile(`discord(?:app)?\.com` + slash + `api` + slash + `webhooks` + slash + `[0-9]{15,}` + slash + charSet + `{40,}`)
+	telegramBot  = regexp.MustCompile(`(?:^|[^0-9])[0-9]{8,10}:` + charSet + `{35}(?:$|[^A-Za-z0-9_-])`)
+	signingToken = regexp.MustCompile(signingPrefix + charSet + `{` + fmt.Sprint(webhookSecretBody) + `}`)
 )
 
 type ChannelSecrets struct {
@@ -36,7 +36,7 @@ func NotifyPatterns() []Pattern {
 	return []Pattern{
 		{Name: NameSlackWebhook, Re: slackWebhook},
 		{Name: NameDiscordWebhook, Re: discordHook},
-		{Name: NameTelegramToken, Re: telegramBot},
+		{Name: NameTelegramBot, Re: telegramBot},
 		{Name: NameWebhookSecret, Re: signingToken},
 	}
 }
