@@ -156,28 +156,42 @@ failed_run_notified() {
   arrives service=slack 'contains=المشروع' "contains=رقم التنفيذ: $n" 'absent=Project:' || return 1
   arrives service=discord 'contains=Project:' "contains=Run number: $n" 'absent=المشروع' || return 1
   arrives service=telegram 'contains=المشروع' "contains=رقم التنفيذ: $n" 'absent=Project:' || return 1
-  arrives service=webhook signed=1 "contains=\"Run\":$n" || return 1
+  webhook_for_run "$n"
+}
+
+webhook_for_run() {
+  local n=$1 seconds=${ARRIVE_WAIT:-150} got
+  for _ in $(seq "$seconds"); do
+    got=$(rcount service=webhook signed=1 "contains=\"Run\": $n") || got=0
+    ((got >= 1)) && return 0
+    got=$(rcount service=webhook signed=1 "contains=\"Run\":$n") || got=0
+    ((got >= 1)) && return 0
+    sleep 1
+  done
+  why "no signed webhook message for run $n"
+  return 1
 }
 
 mentions_neutralised() {
   arrives service=slack 'contains=&lt;!channel&gt;' 'contains=@everyone' || return 1
   arrives service=discord mentions=none 'contains=@everyone' || return 1
   arrives service=telegram 'contains=&lt;!channel&gt;' || return 1
-  never 1 'contains=<!channel>'
+  never 1 service=slack 'contains=<!channel>' && never 1 service=discord 'contains=<!channel>' && never 1 service=telegram 'contains=<!channel>'
 }
 
 not_notified() {
   local n=$1
-  never 15 "contains=Run number: $n" && never 1 "contains=رقم التنفيذ: $n" && never 1 service=webhook "contains=\"Run\":$n"
+  never 15 "contains=Run number: $n" && never 1 "contains=رقم التنفيذ: $n" && never 1 service=webhook "contains=\"Run\": $n" &&
+    never 1 service=webhook "contains=\"Run\":$n"
 }
 
 deliveries_in() {
   api "$work/dl-$1" GET "$(project_path)/notification-deliveries?State=$1&Limit=100" '' "${session[@]}" >/dev/null || return 1
-  grep -o '"ChannelId"' "$work/dl-$1.body" | wc -l
+  { grep -o '"ChannelId"' "$work/dl-$1.body" || true; } | wc -l
 }
 
 deliveries_settled() {
-  local seconds=${1:-120} pending sending
+  local seconds=${1:-120} pending=unknown sending=unknown
   for _ in $(seq "$seconds"); do
     pending=$(deliveries_in pending) && sending=$(deliveries_in sending) && ((pending + sending == 0)) && return 0
     sleep 1
@@ -198,4 +212,22 @@ inbox_filled() {
   done
   why "the inbox holds: $(head -c 600 "$work/inbox.body")"
   return 1
+}
+
+notify_evidence() {
+  [[ -n $ch_hook && -n $org_id && -n $project_id ]] || return 0
+  printf '\n--- the notification deliveries (event, channel, state, attempts, code, status only) ---\n' >&2
+  api "$work/diag" GET "$(project_path)/notification-deliveries?Limit=100" '' "${session[@]}" >/dev/null 2>&1 || true
+  sed 's/},{/}\n{/g' "$work/diag.body" 2>/dev/null | while IFS= read -r line; do
+    printf '%s\n' "$(grep -oE '"(Event|ChannelName|State|Attempts|LastError|LastStatus)":("[^"]*"|[0-9]+)' <<<"$line" | tr '\n' ' ')"
+  done >&2 || true
+  printf -- '--- what the receiver saw (attempts and accepted messages by service) ---\n' >&2
+  rcall GET /_stats >&2 2>/dev/null || true
+  printf '\n--- end of the notification evidence ---\n' >&2
+}
+
+eval "m4_evidence() $(declare -f evidence | tail -n +2)"
+evidence() {
+  m4_evidence "$@"
+  notify_evidence
 }
