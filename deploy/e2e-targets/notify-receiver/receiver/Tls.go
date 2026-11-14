@@ -20,7 +20,7 @@ const (
 )
 
 func ServiceHosts() []string {
-	return []string{"hooks.slack.com", "discord.com", "discordapp.com", "api.telegram.org", "localhost"}
+	return []string{"hooks.slack.com", "discord.com", "discordapp.com", "api.telegram.org", HostWebhook, "localhost"}
 }
 
 func NewTLS(now time.Time) (*tls.Config, []byte, error) {

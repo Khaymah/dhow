@@ -94,12 +94,13 @@ const (
 )
 
 const (
-	InvitationTTL        = 7 * 24 * time.Hour
-	InvitationTokenBytes = 32
-	InvitationListLimit  = 200
-	MailTimeout          = 10 * time.Second
-	AlertMaxPending      = 32
-	TeamDescriptionMax   = 500
+	InvitationTTL          = 7 * 24 * time.Hour
+	InvitationTokenBytes   = 32
+	InvitationListLimit    = 200
+	MailTimeout            = 10 * time.Second
+	AlertMaxPendingPerUser = 32
+	AccountMailMaxPending  = 8
+	TeamDescriptionMax     = 500
 )
 
 const (

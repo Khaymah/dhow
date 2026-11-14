@@ -11,16 +11,29 @@ import (
 	"github.com/google/uuid"
 )
 
-const countPendingInternalEmails = `-- name: CountPendingInternalEmails :one
-SELECT count(*)::bigint FROM "NotificationOutbox"
-WHERE "Kind" = 'internal-email' AND "State" IN ('pending', 'sending') AND NOT "IsDeleted"
+const dropOldestPendingAlerts = `-- name: DropOldestPendingAlerts :execrows
+UPDATE "NotificationOutbox" AS target
+SET "IsDeleted" = true, "UpdatedAt" = now()
+WHERE target."Id" IN (
+    SELECT o."Id" FROM "NotificationOutbox" AS o
+    WHERE o."Kind" = 'internal-email' AND o."RecipientUserId" = $1 AND o."State" = 'pending' AND NOT o."IsDeleted"
+      AND o."EventName" NOT LIKE 'account.%' AND o."EventName" NOT LIKE 'notification.%'
+    ORDER BY o."CreatedAt" DESC, o."Id" DESC
+    OFFSET $2::int
+)
 `
 
-func (q *Queries) CountPendingInternalEmails(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countPendingInternalEmails)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+type DropOldestPendingAlertsParams struct {
+	UserID *uuid.UUID
+	Keep   int32
+}
+
+func (q *Queries) DropOldestPendingAlerts(ctx context.Context, arg DropOldestPendingAlertsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, dropOldestPendingAlerts, arg.UserID, arg.Keep)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getAlertRecipient = `-- name: GetAlertRecipient :one

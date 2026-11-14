@@ -7,7 +7,6 @@ import (
 	apperrors "github.com/Khaymah/dhow/apps/server/internal/Core/Errors"
 	sqlc "github.com/Khaymah/dhow/apps/server/internal/Database/Sqlc"
 	models "github.com/Khaymah/dhow/apps/server/internal/Modules/Notifications/Models"
-	"github.com/Khaymah/dhow/internal/netguard"
 )
 
 const (
@@ -66,10 +65,7 @@ func (s *Service) resolveHost(ctx context.Context, hostname string) error {
 	ctx, cancel := context.WithTimeout(ctx, resolveTimeout)
 	defer cancel()
 	if _, err := s.dialer().Resolve(ctx, hostname); err != nil {
-		if errors.Is(err, netguard.ErrBlocked) {
-			return apperrors.ChannelHostBlocked()
-		}
-		return apperrors.ValidationFailed(invalid(fieldURL))
+		return apperrors.ChannelHostBlocked()
 	}
 	return nil
 }

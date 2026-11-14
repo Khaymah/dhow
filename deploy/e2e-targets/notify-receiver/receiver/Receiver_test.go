@@ -200,7 +200,7 @@ func TestTheCertificateCoversTheThreeServiceHostsAndOnlyTheIssuedCaTrustsIt(t *t
 	pool := x509.NewCertPool()
 	require.True(t, pool.AppendCertsFromPEM(caPEM))
 	target := srv.Listener.Addr().String()
-	for _, host := range []string{"hooks.slack.com", "discord.com", "discordapp.com", "api.telegram.org"} {
+	for _, host := range []string{"hooks.slack.com", "discord.com", "discordapp.com", "api.telegram.org", receiver.HostWebhook} {
 		client := &http.Client{Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12},
 			DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {

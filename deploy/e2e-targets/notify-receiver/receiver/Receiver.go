@@ -7,16 +7,22 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
 	ServiceSlack    = "slack"
 	ServiceDiscord  = "discord"
 	ServiceTelegram = "telegram"
+	ServiceWebhook  = "webhook"
 
 	pathSlack    = "/services/"
 	pathDiscord  = "/api/webhooks/"
 	pathTelegram = "/bot"
+	pathWebhook  = "/hooks/"
+	pathSecret   = "/_secret"
+	pathHold     = "/_hold"
+	pathStats    = "/_stats"
 	pathMessages = "/_messages"
 	pathScript   = "/_script"
 	pathHealth   = "/_health"
@@ -31,6 +37,10 @@ type Message struct {
 	ParseMode     string
 	MentionsParse []string
 	HasMentions   bool
+	Event         string
+	Delivery      string
+	Idempotency   string
+	Signed        bool
 }
 
 type Receiver struct {
@@ -38,10 +48,30 @@ type Receiver struct {
 	messages []Message
 	script   map[string][]int
 	attempts map[string]int
+	holds    map[string]time.Duration
+	secret   string
 }
 
 func New() *Receiver {
-	return &Receiver{script: map[string][]int{}, attempts: map[string]int{}}
+	return &Receiver{script: map[string][]int{}, attempts: map[string]int{}, holds: map[string]time.Duration{}}
+}
+
+func (r *Receiver) Hold(service string, d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.holds[service] = d
+}
+
+func (r *Receiver) Secret(secret string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.secret = secret
+}
+
+func (r *Receiver) signingSecret() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.secret
 }
 
 func (r *Receiver) Messages() []Message {
@@ -65,13 +95,14 @@ func (r *Receiver) Script(service string, statuses ...int) {
 func (r *Receiver) Reset() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.messages, r.script, r.attempts = nil, map[string][]int{}, map[string]int{}
+	r.messages, r.script, r.attempts, r.holds = nil, map[string][]int{}, map[string]int{}, map[string]time.Duration{}
 }
 
 func (r *Receiver) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc(pathSlack, r.serve(ServiceSlack, slackAPI{}))
 	mux.HandleFunc(pathDiscord, r.serve(ServiceDiscord, discordAPI{}))
+	mux.HandleFunc(pathWebhook, r.serve(ServiceWebhook, webhookAPI{secret: r.signingSecret}))
 	telegram := r.serve(ServiceTelegram, telegramAPI{})
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		if strings.HasPrefix(req.URL.Path, pathTelegram) {
@@ -82,6 +113,10 @@ func (r *Receiver) Handler() http.Handler {
 	})
 	mux.HandleFunc(pathMessages, r.control)
 	mux.HandleFunc(pathScript, r.setScript)
+	mux.HandleFunc(pathSecret, r.setSecret)
+	mux.HandleFunc(pathHold, r.setHold)
+	mux.HandleFunc(pathStats, r.stats)
+	mux.HandleFunc(pathCount, r.count)
 	mux.HandleFunc(pathHealth, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	return mux
 }
@@ -111,7 +146,11 @@ func (r *Receiver) serve(service string, a api) http.HandlerFunc {
 		r.mu.Lock()
 		r.attempts[service]++
 		scripted, ok := r.popScript(service)
+		hold := r.holds[service]
 		r.mu.Unlock()
+		if hold > 0 {
+			time.Sleep(hold)
+		}
 		if ok {
 			write(w, failure(service, scripted))
 			return
@@ -150,6 +189,8 @@ func failure(service string, status int) reply {
 		return reply{Status: status, Body: "server_error", Type: "text/plain"}
 	case ServiceDiscord:
 		return reply{Status: status, Body: `{"message":"scripted failure","code":0}`, Type: "application/json"}
+	case ServiceWebhook:
+		return reply{Status: status, Body: "scripted failure", Type: "text/plain"}
 	default:
 		return reply{
 			Status: status, Type: "application/json",
@@ -159,12 +200,16 @@ func failure(service string, status int) reply {
 }
 
 type view struct {
-	Service       string
-	Text          string
-	ChatId        string
-	ParseMode     string
-	MentionsParse []string
-	HasMentions   bool
+	Service        string
+	Text           string
+	ChatId         string
+	ParseMode      string
+	MentionsParse  []string
+	HasMentions    bool
+	Event          string
+	Delivery       string
+	IdempotencyKey string
+	SignatureValid bool
 }
 
 func (r *Receiver) control(w http.ResponseWriter, req *http.Request) {
@@ -174,6 +219,7 @@ func (r *Receiver) control(w http.ResponseWriter, req *http.Request) {
 		for _, m := range r.Messages() {
 			out = append(out, view{
 				Service: m.Service, Text: m.Text, ChatId: m.ChatID, ParseMode: m.ParseMode, MentionsParse: m.MentionsParse, HasMentions: m.HasMentions,
+				Event: m.Event, Delivery: m.Delivery, IdempotencyKey: m.Idempotency, SignatureValid: m.Signed,
 			})
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -194,7 +240,7 @@ func (r *Receiver) setScript(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	service := req.URL.Query().Get("service")
-	if service != ServiceSlack && service != ServiceDiscord && service != ServiceTelegram {
+	if !knownService(service) {
 		http.Error(w, "unknown service", http.StatusBadRequest)
 		return
 	}

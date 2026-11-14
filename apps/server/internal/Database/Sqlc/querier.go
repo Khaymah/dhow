@@ -78,7 +78,7 @@ type Querier interface {
 	CountOverviewPendingApprovals(ctx context.Context, arg CountOverviewPendingApprovalsParams) (int64, error)
 	CountOverviewRollbackFailed(ctx context.Context, organizationID uuid.UUID) (int64, error)
 	CountOverviewRunners(ctx context.Context, arg CountOverviewRunnersParams) (CountOverviewRunnersRow, error)
-	CountPendingInternalEmails(ctx context.Context) (int64, error)
+	CountPendingAccountMail(ctx context.Context, arg CountPendingAccountMailParams) (int64, error)
 	CountProjects(ctx context.Context, arg CountProjectsParams) (int64, error)
 	CountQueuedJobs(ctx context.Context, arg CountQueuedJobsParams) (int64, error)
 	CountRecentChannelEmails(ctx context.Context, arg CountRecentChannelEmailsParams) (int64, error)
@@ -114,6 +114,7 @@ type Querier interface {
 	DiscoveryLog(ctx context.Context, jobID uuid.UUID) ([][]byte, error)
 	DowngradeRelease(ctx context.Context, arg DowngradeReleaseParams) error
 	DropLogPartitions(ctx context.Context, retentionDays int32) (int32, error)
+	DropOldestPendingAlerts(ctx context.Context, arg DropOldestPendingAlertsParams) (int64, error)
 	DropWebhookPartitions(ctx context.Context, retentionDays int32) (int32, error)
 	EnableNotificationChannel(ctx context.Context, arg EnableNotificationChannelParams) (NotificationChannel, error)
 	EndAttemptStep(ctx context.Context, arg EndAttemptStepParams) (int64, error)

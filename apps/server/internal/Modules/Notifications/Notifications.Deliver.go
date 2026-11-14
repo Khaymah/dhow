@@ -145,12 +145,14 @@ func (s *Service) Deliverers() map[outbox.Kind]outbox.Deliverer {
 }
 
 func (s *Service) Worker() (*outbox.Worker, error) {
-	if s.worker != nil {
-		return s.worker, nil
-	}
 	if s.pool == nil {
 		return nil, ErrNoPool
 	}
+	s.workerOnce.Do(func() { s.worker, s.workerErr = s.buildWorker() })
+	return s.worker, s.workerErr
+}
+
+func (s *Service) buildWorker() (*outbox.Worker, error) {
 	w, err := outbox.NewWorker(outbox.Options{
 		Pool: s.pool, Log: s.log, Now: s.now, Deliverers: s.Deliverers(), Observer: s,
 		Global: config.NotifyGlobalConcurrency, PerChannel: config.NotifyChannelConcurrency, PerOrg: config.NotifyOrgConcurrency,
@@ -159,7 +161,6 @@ func (s *Service) Worker() (*outbox.Worker, error) {
 	if err != nil {
 		return nil, fmt.Errorf("build the notification worker: %w", err)
 	}
-	s.worker = w
 	return w, nil
 }
 
