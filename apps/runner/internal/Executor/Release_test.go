@@ -3,6 +3,7 @@ package executor
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	runnerv1 "github.com/Khaymah/dhow/packages/proto/gen/go/dhow/runner/v1"
 )
@@ -46,8 +47,13 @@ func FuzzReportLine(f *testing.F) {
 		if ev.GetKind() == runnerv1.DeployEventKind_DEPLOY_EVENT_KIND_UNSPECIFIED {
 			t.Fatalf("an accepted line has no kind: %q", raw)
 		}
-		if len(ev.GetMessage())+len(ev.GetHostId())+len(ev.GetReason()) > len(raw) {
-			t.Fatalf("an event is larger than the line it came from: %q", raw)
+		for _, field := range []string{ev.GetMessage(), ev.GetHostId(), ev.GetReason()} {
+			if !utf8.ValidString(field) {
+				t.Fatalf("an event field is not valid UTF-8: %q", raw)
+			}
+		}
+		if len(ev.GetMessage())+len(ev.GetHostId())+len(ev.GetReason()) > utf8.UTFMax*len(raw) {
+			t.Fatalf("an event is more than %d times larger than the line it came from: %q", utf8.UTFMax, raw)
 		}
 	})
 }

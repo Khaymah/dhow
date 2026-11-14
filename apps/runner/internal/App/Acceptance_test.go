@@ -279,4 +279,19 @@ func TestAnUnreportableOldAttemptDoesNotStopTheRunnerFromWorking(t *testing.T) {
 		got, _ := srv.Lease(old.ID)
 		return len(got.Completes) > 0
 	}, "the old attempt to be reported in the background")
+	require.NoError(t, second.Stop())
+	before := stateListing(t, r.StateDir)
+	time.Sleep(400 * time.Millisecond)
+	assert.Equal(t, before, stateListing(t, r.StateDir), "a stopped runner has no background writer left in its state directory")
+}
+
+func stateListing(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
 }
