@@ -27,7 +27,7 @@ func ValidPattern(p string) bool {
 }
 
 func MatchPattern(pattern, name string) bool {
-	if !ValidPattern(pattern) {
+	if !ValidPattern(pattern) || !utf8.ValidString(name) {
 		return false
 	}
 	ps := strings.Split(pattern, "/")
