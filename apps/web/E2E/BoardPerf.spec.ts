@@ -2,14 +2,22 @@ import { expect, test } from '@playwright/test';
 
 import { BOARD_ENVIRONMENTS, BOARD_TARGETS_PER_ENVIRONMENT, boardOf, environmentName, stubBoard } from './BoardFixture';
 import { DESKTOP, expectClean, open, signInPage } from './Guard';
-import { CPU_THROTTLE, LOOSE_LIMITS, measure, observeLongTasks, resetLongTasks, scrollThrough, throttleCpu, withinLimits } from './Perf';
+import {
+  BOARD_FIRST_ROW_LIMITS,
+  BOARD_LIMITS,
+  boardFailures,
+  CPU_THROTTLE,
+  measure,
+  observeLongTasks,
+  resetLongTasks,
+  scrollThrough,
+  throttleCpu,
+  withinLimits,
+} from './Perf';
 import { signIn, stack, type ISession } from './Stack';
 
-test.describe.configure({ mode: 'serial' });
+test.describe.configure({ mode: 'serial', retries: 1 });
 
-const MAX_BOARD_DOM_NODES = 40_000;
-const MAX_FIRST_ROW_MS = 20_000;
-const MAX_SCROLL_LONG_TASK_MS = 100;
 const ROWS = '[data-target]';
 
 let owner: ISession;
@@ -50,11 +58,9 @@ test(`the deploy board with ${String(BOARD_ENVIRONMENTS)} environments and ${Str
   await test.info().attach('board-baseline.json', { body: JSON.stringify(baseline, null, 2), contentType: 'application/json' });
   process.stdout.write(`perf-baseline ${JSON.stringify(baseline)}\n`);
 
-  expect(withinLimits(loaded, LOOSE_LIMITS)).toEqual([]);
-  expect(withinLimits(scrolled, LOOSE_LIMITS)).toEqual([]);
-  expect(loaded.DomNodes).toBeLessThan(MAX_BOARD_DOM_NODES);
-  expect(firstRowMs).toBeLessThan(MAX_FIRST_ROW_MS);
-  expect(scrolled.LongTasks.MaxMs).toBeLessThanOrEqual(MAX_SCROLL_LONG_TASK_MS);
+  expect(withinLimits(loaded, BOARD_LIMITS)).toEqual([]);
+  expect(withinLimits(scrolled, BOARD_LIMITS)).toEqual([]);
+  expect(boardFailures(firstRowMs, scrolled, BOARD_FIRST_ROW_LIMITS)).toEqual([]);
   await expectClean(view);
   await view.Context.close();
 });

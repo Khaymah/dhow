@@ -163,7 +163,7 @@ func publicRouter(o Options) chi.Router {
 		middleware.Lang,
 		middleware.AccessLog(o.Log),
 		middleware.Recover(o.Log),
-		middleware.SecurityHeaders(middleware.SecurityOptions{HSTS: o.Config.PublicURL.Scheme == "https", ReportTrustedTypes: o.Config.Dev}),
+		middleware.SecurityHeaders(middleware.SecurityOptions{HSTS: o.Config.PublicURL.Scheme == "https"}),
 		middleware.BodyLimit(config.MaxBodyBytes),
 	)
 	r.MethodNotAllowed(methodNotAllowed)

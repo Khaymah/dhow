@@ -30,7 +30,7 @@ We want everyone to be able to use Dhow: with the keyboard only, with a screen r
 
 ## How we check
 
-- **Automated check on every change:** the test `E2E/Accessibility.spec.ts` runs the axe-core library in the browser on the sign-in, home, projects, run, environment, members and settings pages. It checks them in Arabic and English and in the four system themes, and fails on any serious or critical violation. Moderate and minor violations are recorded in the test report and do not fail it.
+- **Automated check on every change:** the test `E2E/Accessibility.spec.ts` runs the axe-core library in the browser on every page in the sidebar, the project pages, the deploy board, the log viewer and every slide that holds a form. It checks them in Arabic and English and in the four system themes on a desktop, and in Arabic and English on a phone, and fails on any serious or critical violation. A unit test fails if a page or slide is added without a place in the check. Moderate and minor violations are recorded in the test report and do not fail it.
 - **Unit tests:** they check button names, checkbox size, that the focus outline stays, and the Tab order in the core components.
 - **Manual review before the first release:** an automated check does not catch everything, such as focus order and what a screen reader says. So a person runs a manual checklist and signs it with their name, project and date, and the first release does not ship before that. The checklist is in `Plan/A11y-Manual-Checklist.md`.
 
