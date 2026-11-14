@@ -28,6 +28,6 @@ export interface IPrivateKey {
 
 export const newPrivateKey = (): IPrivateKey => {
   const { privateKey } = generateKeyPairSync('ed25519');
-  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
   return { Pem: pem, Body: pem.split('\n')[1] ?? '' };
 };
