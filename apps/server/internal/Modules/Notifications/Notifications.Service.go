@@ -87,6 +87,8 @@ type Service struct {
 	log        *slog.Logger
 	now        func() time.Time
 	worker     *outbox.Worker
+	workerOnce sync.Once
+	workerErr  error
 }
 
 func NewService(o Options) (*Service, error) {

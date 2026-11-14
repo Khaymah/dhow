@@ -79,6 +79,24 @@ func (q *Queries) CountNotificationTestsSince(ctx context.Context, arg CountNoti
 	return count, err
 }
 
+const countPendingAccountMail = `-- name: CountPendingAccountMail :one
+SELECT count(*)::bigint FROM "NotificationOutbox"
+WHERE "Kind" = 'internal-email' AND "RecipientUserId" = $1 AND "EventName" = $2
+  AND "State" IN ('pending', 'sending') AND NOT "IsDeleted"
+`
+
+type CountPendingAccountMailParams struct {
+	UserID    *uuid.UUID
+	EventName string
+}
+
+func (q *Queries) CountPendingAccountMail(ctx context.Context, arg CountPendingAccountMailParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingAccountMail, arg.UserID, arg.EventName)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countRecentChannelEmails = `-- name: CountRecentChannelEmails :one
 SELECT count(*)::bigint FROM "NotificationOutbox"
 WHERE "RecipientUserId" = $1 AND "Kind" = 'email' AND "EventName" <> 'notification.test' AND "NextAttemptAt" > $2::timestamptz
@@ -1142,7 +1160,7 @@ func (q *Queries) RecordNotificationSuccess(ctx context.Context, id uuid.UUID) e
 
 const removeNotificationChannel = `-- name: RemoveNotificationChannel :one
 UPDATE "NotificationChannels"
-SET "IsDeleted" = true, "UpdatedAt" = now()
+SET "IsDeleted" = true, "ConfigSealed" = NULL, "UpdatedAt" = now()
 WHERE "Id" = $1 AND "OrganizationId" = $2 AND NOT "IsDeleted"
 RETURNING "Id", "CreatedAt", "UpdatedAt", "IsDeleted", "OrganizationId", "ProjectId", "Kind", "Name", "Locale", "Enabled", "DisabledReason", "ConsecutiveFailures", "Host", "ConfigSealed", "Version", "CreatedByUserId"
 `

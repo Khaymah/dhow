@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	config "github.com/Khaymah/dhow/apps/server/internal/Config"
 	alert "github.com/Khaymah/dhow/apps/server/internal/Core/Alert"
@@ -92,8 +94,21 @@ func (s *Service) mailUser(ctx context.Context, q *sqlc.Queries, user, event uui
 		return nil
 	}
 	u, err := q.GetNotificationUser(ctx, user)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read the user of an account mail: %w", err)
+	}
+	if change == changeNewDevice {
+		pending, err := q.CountPendingAccountMail(ctx, sqlc.CountPendingAccountMailParams{UserID: &user, EventName: "account." + change})
+		if err != nil {
+			return fmt.Errorf("count the pending account mail: %w", err)
+		}
+		if pending >= config.AccountMailMaxPending {
+			s.log.WarnContext(ctx, "account mail not queued: too many pending", "user_id", user.String(), "change", change)
+			return nil
+		}
 	}
 	msg := alert.Message(i18n.Locale(u.Locale), alert.Details{
 		To: u.Email, Name: u.Name, Change: change, At: s.now(), IP: ip, UserAgent: userAgent, Link: s.link(config.AccountSecurityPath),
