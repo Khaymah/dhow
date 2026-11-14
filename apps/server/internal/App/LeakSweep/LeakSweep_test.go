@@ -95,6 +95,11 @@ func plainNeedles(t *testing.T, spec keys.Spec, name string, plain []byte) []lea
 		out, err := leaksweep.PEMKey(name, plain)
 		require.NoError(t, err)
 		return out
+	case config.NotifyConfigSealLabel:
+		out := []leaksweep.Needle{checked{t}.needle(leaksweep.Encoded(name, plain))}
+		channel, err := leaksweep.ChannelNeedles(name, plain)
+		require.NoError(t, err)
+		return append(out, channel...)
 	case config.TotpSealLabel:
 		return []leaksweep.Needle{
 			checked{t}.needle(leaksweep.Encoded(name, plain)),
@@ -303,6 +308,10 @@ func runnerKeys(t *testing.T, path string) []leaksweep.Needle {
 }
 
 func patterns() []leaksweep.Pattern {
+	return append(basePatterns(), leaksweep.NotifyPatterns()...)
+}
+
+func basePatterns() []leaksweep.Pattern {
 	return []leaksweep.Pattern{
 		{Name: "API token", Re: regexp.MustCompile(config.APITokenPrefix + tokenChars + `{20,}`)},
 		{Name: "ingest token", Re: regexp.MustCompile(config.IngestTokenPrefix + tokenChars + `{20,}`)},
