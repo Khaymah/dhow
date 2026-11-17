@@ -23,7 +23,7 @@ export const HelpAr = {
   'help.docs.all': 'افتح الأسئلة الشائعة في الوثائق',
   'help.button': 'مساعدة',
   'help.hint.home': 'ملخص ما يعمل وما يحتاج إلى انتباهك.',
-  'help.hint.projects': 'مشاريعك وبيئاتها وتشغيلاتها.',
+  'help.hint.projects': 'مشاريعك وبيئاتها وتنفيذاتها.',
   'help.hint.jobs': 'تابع التشغيلات وسجلاتها.',
   'help.hint.approvals': 'وافق على النشر أو ارفضه.',
   'help.hint.runners': 'أجهزة التشغيل المسجلة وحالتها.',

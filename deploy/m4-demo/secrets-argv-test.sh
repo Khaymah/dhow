@@ -47,7 +47,8 @@ check "the body reaches curl from a file" grep -qF '"Password":"password-value-0
 check "the body file is removed after the call" test ! -e "$work/call.req"
 check "a quote in a header cannot break out of the curl config" test "$(curl_quote 'a"b\c')" = 'a\"b\\c'
 for script in deploy/m4-demo/run.sh deploy/m4-demo/project.sh deploy/e2e/run.sh deploy/e2e/push.sh deploy/m5-demo/run.sh deploy/m5-demo/lib.sh \
-  deploy/m6-demo/run.sh deploy/m6-demo/lib.sh deploy/m6-demo/pipeline.sh deploy/m6-demo/compose-target.sh; do
+  deploy/m6-demo/run.sh deploy/m6-demo/lib.sh deploy/m6-demo/pipeline.sh deploy/m6-demo/compose-target.sh \
+  deploy/m7-demo/run.sh deploy/m7-demo/notify.sh deploy/m7-demo/scenario.sh; do
   for pattern in '--user ' 'extraHeader' '-hmac ' '--password '; do
     check "$script passes no secret with $pattern" absent "$pattern" "$root/$script"
   done
@@ -55,6 +56,8 @@ done
 check "the TOTP helper takes only a state file as an argument and the secret on stdin" grep -qF 'len(args) != 1' "$root/deploy/m5-demo/totp/main.go"
 check "the keys commands of the M5 demo read the database URL from a file" grep -qF 'DHOW_DATABASE_URL_FILE=' "$root/deploy/m5-demo/lib.sh"
 check "the Forgejo password reaches curl on stdin" grep -qF 'curl --config - ' "$root/deploy/m4-demo/project.sh"
+check "the session cookie of the event stream of the M7 demo reaches curl on stdin" grep -qF 'curl --config - ' "$root/deploy/m7-demo/scenario.sh"
+check "the webhook secret reaches the M7 receiver from a file" grep -qF -- '--data-binary "@$work/hook-secret"' "$root/deploy/m7-demo/notify.sh"
 check "git reads the Forgejo password through GIT_ASKPASS" grep -qF 'GIT_ASKPASS="$work/askpass"' "$root/deploy/m4-demo/project.sh"
 
 if ((failures > 0)); then

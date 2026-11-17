@@ -24,7 +24,7 @@ const PublicKey = ({ value }: { value: string }) => {
   return (
     <div className="grid gap-2">
       <p className="m-0 text-body-sm text-secondary">{t('targets.key.public')}</p>
-      <pre className="m-0 overflow-x-auto rounded-md border border-line bg-wash p-3 text-body-sm">
+      <pre className="m-0 rounded-md border border-line bg-wash p-3 text-body-sm whitespace-pre-wrap break-all">
         <bdi dir="ltr" className="font-mono break-all whitespace-pre-wrap">
           {value}
         </bdi>

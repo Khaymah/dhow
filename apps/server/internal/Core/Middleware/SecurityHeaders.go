@@ -3,13 +3,11 @@ package middleware
 import "net/http"
 
 const ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
-	"font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'"
-
-const TrustedTypesReportOnly = "require-trusted-types-for 'script'"
+	"font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'; " +
+	"require-trusted-types-for 'script'; trusted-types 'none'"
 
 type SecurityOptions struct {
-	HSTS               bool
-	ReportTrustedTypes bool
+	HSTS bool
 }
 
 func SecurityHeaders(o SecurityOptions) func(http.Handler) http.Handler {
@@ -23,9 +21,6 @@ func SecurityHeaders(o SecurityOptions) func(http.Handler) http.Handler {
 			h.Set("Cross-Origin-Resource-Policy", "same-origin")
 			h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()")
 			h.Set("X-Frame-Options", "DENY")
-			if o.ReportTrustedTypes {
-				h.Set("Content-Security-Policy-Report-Only", TrustedTypesReportOnly)
-			}
 			if o.HSTS {
 				h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 			}

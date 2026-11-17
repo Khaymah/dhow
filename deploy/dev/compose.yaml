@@ -44,7 +44,7 @@ services:
       start_period: 30s
 
   init:
-    image: ${DHOW_DEV_GO_IMAGE:-golang:1.27.3-bookworm}
+    image: ${DHOW_DEV_GO_IMAGE:-golang:1.27.4-bookworm}
     working_dir: /src
     entrypoint: ["bash", "/src/deploy/dev/stack/init.sh"]
     environment:
@@ -53,7 +53,7 @@ services:
       - *repo
 
   server:
-    image: ${DHOW_DEV_GO_IMAGE:-golang:1.27.3-bookworm}
+    image: ${DHOW_DEV_GO_IMAGE:-golang:1.27.4-bookworm}
     init: true
     working_dir: /src
     entrypoint: ["bash", "/src/deploy/dev/stack/server.sh"]

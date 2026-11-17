@@ -66,8 +66,12 @@ func NewService(o Options) *Service {
 	if limits.MaxStreams < 1 {
 		limits = config.DefaultLogs()
 	}
+	hub := NewHub(size)
+	if o.Listen != nil {
+		hub.SetHealthy(false)
+	}
 	return &Service{
-		db: o.DB, listen: o.Listen, hub: NewHub(size), rules: rules(), log: o.Log, now: now,
+		db: o.DB, listen: o.Listen, hub: hub, rules: rules(), log: o.Log, now: now,
 		limiter: streams.NewLimiter(streams.Limits{
 			Total: limits.MaxStreams, PerUser: perUser, PerOrg: max(2*perUser, limits.MaxStreams/config.OrgEventsOrgShare),
 			RetryAfter: config.OrgEventsRetryAfter,

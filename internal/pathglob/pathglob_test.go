@@ -22,6 +22,9 @@ func FuzzMatchPattern(f *testing.F) {
 		{"${{ x }}", "x"},
 		{strings.Repeat("*", 64), strings.Repeat("a", 256)},
 		{"**/**/**/x", "x"},
+		{"\uFFFD", "\xbd"},
+		{"?", "\xff"},
+		{"*", "a/\xc0"},
 	} {
 		f.Add(seed[0], seed[1])
 	}
@@ -34,6 +37,9 @@ func FuzzMatchPattern(f *testing.F) {
 			return
 		}
 		if !utf8.ValidString(name) {
+			if got {
+				t.Fatalf("the pattern %q matched the name %q that is not valid UTF-8", pattern, name)
+			}
 			return
 		}
 		if !strings.ContainsAny(pattern, "*?") && got != (pattern == name) {

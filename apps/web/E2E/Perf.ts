@@ -18,19 +18,37 @@ export interface IPerfLimits {
   MaxHeapBytes: number;
 }
 
-export const LOOSE_LIMITS: IPerfLimits = {
-  MaxDomNodes: 250_000,
-  MaxLongTaskMs: 15_000,
-  MaxHeapBytes: 1_500_000_000,
+export const LOG_LIMITS: IPerfLimits = {
+  MaxDomNodes: 3_000,
+  MaxLongTaskMs: 1_000,
+  MaxHeapBytes: 100_000_000,
+};
+
+export const BOARD_LIMITS: IPerfLimits = {
+  MaxDomNodes: 20_000,
+  MaxLongTaskMs: 2_000,
+  MaxHeapBytes: 100_000_000,
 };
 
 export interface IViewerLimits {
   MaxRows: number;
   MaxScrollLongTaskMs: number;
+  MaxFirstRowMs: number;
 }
 
 export const VIEWER_LIMITS: IViewerLimits = {
   MaxRows: 300,
+  MaxScrollLongTaskMs: 100,
+  MaxFirstRowMs: 4_000,
+};
+
+export interface IBoardLimits {
+  MaxFirstRowMs: number;
+  MaxScrollLongTaskMs: number;
+}
+
+export const BOARD_FIRST_ROW_LIMITS: IBoardLimits = {
+  MaxFirstRowMs: 5_000,
   MaxScrollLongTaskMs: 100,
 };
 
@@ -97,9 +115,19 @@ export const withinLimits = (sample: IPerfSample, limits: IPerfLimits): string[]
   return failures;
 };
 
-export const viewerFailures = (rows: number, scrolled: IPerfSample, limits: IViewerLimits): string[] => {
+export const viewerFailures = (rows: number, firstRowMs: number, scrolled: IPerfSample, limits: IViewerLimits): string[] => {
   const failures: string[] = [];
+  if (firstRowMs > limits.MaxFirstRowMs) failures.push(`first log row after ${firstRowMs}ms > ${limits.MaxFirstRowMs}ms`);
   if (rows >= limits.MaxRows) failures.push(`log rows in the DOM ${rows} >= ${limits.MaxRows}`);
+  if (scrolled.LongTasks.MaxMs > limits.MaxScrollLongTaskMs) {
+    failures.push(`longest task while scrolling ${scrolled.LongTasks.MaxMs}ms > ${limits.MaxScrollLongTaskMs}ms`);
+  }
+  return failures;
+};
+
+export const boardFailures = (firstRowMs: number, scrolled: IPerfSample, limits: IBoardLimits): string[] => {
+  const failures: string[] = [];
+  if (firstRowMs > limits.MaxFirstRowMs) failures.push(`first board row after ${firstRowMs}ms > ${limits.MaxFirstRowMs}ms`);
   if (scrolled.LongTasks.MaxMs > limits.MaxScrollLongTaskMs) {
     failures.push(`longest task while scrolling ${scrolled.LongTasks.MaxMs}ms > ${limits.MaxScrollLongTaskMs}ms`);
   }

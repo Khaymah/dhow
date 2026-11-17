@@ -61,9 +61,14 @@ RETURNING *;
 
 -- name: RemoveNotificationChannel :one
 UPDATE "NotificationChannels"
-SET "IsDeleted" = true, "UpdatedAt" = now()
+SET "IsDeleted" = true, "ConfigSealed" = NULL, "UpdatedAt" = now()
 WHERE "Id" = @id AND "OrganizationId" = @organization_id AND NOT "IsDeleted"
 RETURNING *;
+
+-- name: CountPendingAccountMail :one
+SELECT count(*)::bigint FROM "NotificationOutbox"
+WHERE "Kind" = 'internal-email' AND "RecipientUserId" = @user_id AND "EventName" = @event_name
+  AND "State" IN ('pending', 'sending') AND NOT "IsDeleted";
 
 -- name: RemoveNotificationRulesOfChannel :exec
 UPDATE "NotificationRules" SET "IsDeleted" = true, "UpdatedAt" = now() WHERE "ChannelId" = @channel_id AND NOT "IsDeleted";

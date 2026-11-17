@@ -1,19 +1,19 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 
 import { focusCovered, scan, THEMES, type IFinding, type TThemeId } from './Axe';
+import { boardOf, stubBoard } from './BoardFixture';
 import { DESKTOP, expectClean, open, PHONE, signInPage, type TLang } from './Guard';
+import { lineText, stubLog } from './LogFixture';
+import { pagePlaces, slidePlaces, type IPlace, type IPlaceContext, type TStub } from './Places';
 import { call, field, list, push, runOn, setTheme, signIn, stack, text, type ISession } from './Stack';
 
 test.describe.configure({ mode: 'serial' });
 
 const LANGS: TLang[] = ['ar', 'en'];
 const ENVIRONMENT = 'a11y-check';
-
-interface IPlace {
-  Name: string;
-  Path: string;
-  Slide?: boolean;
-}
+const LOG_LINES = 20;
+const SWEEP_TIMEOUT_MS = 900_000;
+const PHONE_THEME: TThemeId = THEMES[0];
 
 let owner: ISession;
 let environment = ENVIRONMENT;
@@ -21,29 +21,18 @@ let runId = '';
 
 const projectBase = () => `/organizations/${stack().OrgId}/projects/${stack().ProjectId}`;
 
-const places = (): IPlace[] => [
-  { Name: 'home', Path: '/' },
-  { Name: 'projects', Path: '/projects' },
-  { Name: 'project', Path: `/projects/${stack().ProjectId}` },
-  { Name: 'run', Path: `/projects/${stack().ProjectId}/runs/${runId}` },
-  { Name: 'environment', Path: `/projects/${stack().ProjectId}/environments/${environment}` },
-  { Name: 'members', Path: '/org/members' },
-  { Name: 'organization settings', Path: '/org/settings' },
-  { Name: 'project settings', Path: `/projects/${stack().ProjectId}/settings` },
-  { Name: 'preferences', Path: '/account/preferences' },
-  { Name: 'deploy board', Path: `/projects/${stack().ProjectId}/deploy` },
-  { Name: 'about', Path: '/about' },
-  { Name: 'notifications', Path: '/notifications' },
-  { Name: 'channels', Path: `/projects/${stack().ProjectId}/notifications` },
-  { Name: 'new channel', Path: `/projects/${stack().ProjectId}/notifications?slide=notification-channel-new`, Slide: true },
-  { Name: 'help', Path: '/help' },
-];
+const context = (): IPlaceContext => ({ ProjectId: stack().ProjectId, Environment: environment, RunId: runId });
+
+const GROUPS = ['pages', 'slides'] as const;
+type TGroup = (typeof GROUPS)[number];
+
+const placesOf = (group: TGroup): IPlace[] => (group === 'pages' ? pagePlaces(context()) : slidePlaces(context()));
 
 const describeFindings = (findings: IFinding[]): string[] =>
   findings.map((finding) => `${finding.Rule} (${finding.Impact}): ${finding.Help} -> ${finding.Targets.join(' | ')}`);
 
 const ready = async (page: Page, slide = false): Promise<void> => {
-  await expect(slide ? page.getByRole('dialog') : page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(slide ? page.getByRole('dialog') : page.getByRole('heading', { level: 1 }).first()).toBeVisible();
   await page.waitForLoadState('networkidle');
 };
 
@@ -69,39 +58,73 @@ test.beforeAll(async () => {
   expect(text({ Id: runId }, 'Id')).not.toBe('');
 });
 
+const visit = async (page: Page, place: IPlace, applied: Set<TStub>): Promise<void> => {
+  if (place.Stub === 'board' && !applied.has('board')) {
+    await stubBoard(page, stack().OrgId, boardOf(6, 3));
+    applied.add('board');
+  }
+  if (place.Stub === 'log' && !applied.has('log')) {
+    await stubLog(page, stack().OrgId, LOG_LINES);
+    applied.add('log');
+  }
+  await page.goto(place.Path);
+  await ready(page, place.Slide === true);
+  if (place.Stub === 'board') await expect(page.locator('[data-target]').first()).toBeVisible();
+  if (place.Stub === 'log') await expect(page.locator('[role="log"]')).toContainText(lineText(LOG_LINES));
+};
+
+const sweep = async (browser: Browser, lang: TLang, viewport: { width: number; height: number }, theme: TThemeId, group: TGroup): Promise<void> => {
+  const view = await open(browser, lang, viewport);
+  await view.Context.addInitScript((value: TThemeId) => {
+    window.localStorage.setItem('dhow.theme', value);
+  }, theme);
+  const { Page: page } = view;
+  const blocking: string[] = [];
+  const report: Record<string, IFinding[]> = {};
+  const applied = new Set<TStub>();
+
+  await setTheme(owner, theme);
+  if (group === 'pages') {
+    await page.goto('/login');
+    await ready(page);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    const login = await scan(page);
+    blocking.push(...describeFindings(login.Blocking).map((line) => `login: ${line}`));
+    report.login = login.Report;
+  }
+
+  await signInPage(view, stack().Owner, owner);
+  for (const place of placesOf(group)) {
+    await visit(page, place, applied);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    const result = await scan(page);
+    blocking.push(...describeFindings(result.Blocking).map((line) => `${place.Name} (${place.Path}): ${line}`));
+    report[place.Name] = result.Report;
+  }
+
+  const label = `${group}-${lang}-${theme}-${String(viewport.width)}`;
+  await test.info().attach(`axe-report-${label}.json`, { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
+  expect(blocking).toEqual([]);
+  await expectClean(view);
+  await view.Context.close();
+};
+
 for (const lang of LANGS) {
   for (const theme of THEMES) {
-    test(`axe finds nothing serious or critical in ${lang} with the ${theme} theme`, async ({ browser }) => {
-      const view = await open(browser, lang, DESKTOP);
-      await view.Context.addInitScript((value: TThemeId) => {
-        window.localStorage.setItem('dhow.theme', value);
-      }, theme);
-      const { Page: page } = view;
-      const blocking: string[] = [];
-      const report: Record<string, IFinding[]> = {};
+    for (const group of GROUPS) {
+      test(`axe finds nothing serious or critical on the ${group} in ${lang} with the ${theme} theme`, async ({ browser }) => {
+        test.setTimeout(SWEEP_TIMEOUT_MS);
+        await sweep(browser, lang, DESKTOP, theme, group);
+      });
+    }
+  }
+}
 
-      await setTheme(owner, theme);
-      await page.goto('/login');
-      await ready(page);
-      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-      const login = await scan(page);
-      blocking.push(...describeFindings(login.Blocking).map((line) => `login: ${line}`));
-      report.login = login.Report;
-
-      await signInPage(view, stack().Owner, owner);
-      for (const place of places()) {
-        await page.goto(place.Path);
-        await ready(page, place.Slide === true);
-        await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-        const result = await scan(page);
-        blocking.push(...describeFindings(result.Blocking).map((line) => `${place.Name}: ${line}`));
-        report[place.Name] = result.Report;
-      }
-
-      await test.info().attach(`axe-report-${lang}-${theme}.json`, { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
-      expect(blocking).toEqual([]);
-      await expectClean(view);
-      await view.Context.close();
+for (const lang of LANGS) {
+  for (const group of GROUPS) {
+    test(`axe finds nothing serious or critical on the ${group} in ${lang} on a phone`, async ({ browser }) => {
+      test.setTimeout(SWEEP_TIMEOUT_MS);
+      await sweep(browser, lang, PHONE, PHONE_THEME, group);
     });
   }
 }
@@ -112,7 +135,7 @@ for (const lang of LANGS) {
     const { Page: page } = view;
     await signInPage(view, stack().Owner, owner);
     const covered: string[] = [];
-    for (const place of places().slice(0, 5)) {
+    for (const place of pagePlaces(context()).filter((entry) => entry.Core === true)) {
       await page.goto(place.Path);
       await ready(page);
       covered.push(...(await focusCovered(page, 30)).map((line) => `${place.Name}: ${line}`));

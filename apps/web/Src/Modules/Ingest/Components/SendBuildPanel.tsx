@@ -18,7 +18,7 @@ const Snippet = ({ id, title, value }: ISnippetProps) => {
   return (
     <div className="grid min-w-0 gap-2">
       <span className="text-label">{title}</span>
-      <pre dir="ltr" className="m-0 overflow-x-auto rounded-md border border-line bg-surface-inset px-3 py-2.5 text-code">
+      <pre dir="ltr" className="m-0 rounded-md border border-line bg-surface-inset px-3 py-2.5 text-code whitespace-pre-wrap break-all">
         <code>{value}</code>
       </pre>
       <Button
