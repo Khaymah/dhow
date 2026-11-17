@@ -157,11 +157,11 @@ func (s *Service) CreateChannel(
 	if ae != nil {
 		return models.CreatedChannel{}, ae
 	}
-	change, err := s.newConfig(ctx, in)
-	if err != nil {
+	if p, err = s.confirmed(ctx, factor); err != nil {
 		return models.CreatedChannel{}, err
 	}
-	if p, err = s.confirmed(ctx, factor); err != nil {
+	change, err := s.newConfig(ctx, in)
+	if err != nil {
 		return models.CreatedChannel{}, err
 	}
 	id, err := uuid.NewV7()

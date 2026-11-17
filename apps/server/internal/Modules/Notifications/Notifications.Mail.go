@@ -147,8 +147,11 @@ func (s *Service) mailCreatorDisabled(ctx context.Context, q *sqlc.Queries, ch s
 		return nil
 	}
 	u, err := q.GetNotificationUser(ctx, ch.CreatedByUserId)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read the creator of a stopped channel: %w", err)
 	}
 	locale := i18n.Locale(u.Locale)
 	replacer := strings.NewReplacer("{name}", u.Name, "{channel}", ch.Name, "{count}", strconv.Itoa(failures), "{link}", s.link("/"))

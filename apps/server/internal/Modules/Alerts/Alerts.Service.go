@@ -99,15 +99,6 @@ func (s *Service) Handle(ctx context.Context, ev eventbus.Event) error {
 }
 
 func (s *Service) queue(ctx context.Context, q *sqlc.Queries, event string, a eventbus.Audited, user uuid.UUID, msg mailer.Message) {
-	pending, err := q.CountPendingInternalEmails(ctx)
-	if err != nil {
-		s.log.WarnContext(ctx, "credential alert not sent: the queue cannot be read", "event", event, "user_id", user.String(), "error", err)
-		return
-	}
-	if pending >= config.AlertMaxPending {
-		s.log.WarnContext(ctx, "credential alert not sent: too many pending", "event", event, "user_id", user.String())
-		return
-	}
 	raw, err := json.Marshal(mailBody{Subject: msg.Subject, Body: msg.Body})
 	if err != nil {
 		s.log.WarnContext(ctx, "credential alert not sent: the message cannot be encoded", "event", event, "user_id", user.String(), "error", err)
@@ -121,6 +112,15 @@ func (s *Service) queue(ctx context.Context, q *sqlc.Queries, event string, a ev
 	}
 	if _, err := outbox.Enqueue(ctx, q, entry); err != nil {
 		s.log.WarnContext(ctx, "credential alert not sent", "event", event, "user_id", user.String(), "error", err)
+		return
+	}
+	dropped, err := q.DropOldestPendingAlerts(ctx, sqlc.DropOldestPendingAlertsParams{UserID: &user, Keep: config.AlertMaxPendingPerUser})
+	if err != nil {
+		s.log.WarnContext(ctx, "credential alerts could not be coalesced", "event", event, "user_id", user.String(), "error", err)
+		return
+	}
+	if dropped > 0 {
+		s.log.WarnContext(ctx, "older pending credential alerts of the user were replaced by newer ones", "user_id", user.String(), "count", dropped)
 	}
 }
 

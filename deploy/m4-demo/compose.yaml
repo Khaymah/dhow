@@ -75,7 +75,7 @@ services:
         aliases: [registry.dhow-demo.test]
 
   tools:
-    image: ${DHOW_DEV_GO_IMAGE:-golang:1.27.3-bookworm}
+    image: ${DHOW_DEV_GO_IMAGE:-golang:1.27.4-bookworm}
     init: true
     working_dir: /src
     entrypoint: ["sleep", "infinity"]

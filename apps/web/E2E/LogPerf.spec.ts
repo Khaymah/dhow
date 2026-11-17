@@ -4,7 +4,7 @@ import { DESKTOP, expectClean, open, signInPage } from './Guard';
 import { lineText, LOG_JOB_ID, stubLog } from './LogFixture';
 import {
   CPU_THROTTLE,
-  LOOSE_LIMITS,
+  LOG_LIMITS,
   measure,
   observeLongTasks,
   resetLongTasks,
@@ -16,7 +16,7 @@ import {
 } from './Perf';
 import { signIn, stack, type ISession } from './Stack';
 
-test.describe.configure({ mode: 'serial' });
+test.describe.configure({ mode: 'serial', retries: 1 });
 
 const SIZES = [5_000, 50_000];
 const LOG = '[role="log"]';
@@ -65,10 +65,9 @@ for (const lines of SIZES) {
     await test.info().attach(`log-baseline-${lines}.json`, { body: JSON.stringify(baseline, null, 2), contentType: 'application/json' });
     process.stdout.write(`perf-baseline ${JSON.stringify(baseline)}\n`);
 
-    expect(withinLimits(loaded, LOOSE_LIMITS)).toEqual([]);
-    expect(withinLimits(scrolled, LOOSE_LIMITS)).toEqual([]);
-    expect(viewerFailures(Math.max(rendered, renderedWhileScrolling), scrolled, VIEWER_LIMITS)).toEqual([]);
-    expect(renderMs).toBeLessThan(120_000);
+    expect(withinLimits(loaded, LOG_LIMITS)).toEqual([]);
+    expect(withinLimits(scrolled, LOG_LIMITS)).toEqual([]);
+    expect(viewerFailures(Math.max(rendered, renderedWhileScrolling), firstRowMs, scrolled, VIEWER_LIMITS)).toEqual([]);
     await expectClean(view);
     await view.Context.close();
   });

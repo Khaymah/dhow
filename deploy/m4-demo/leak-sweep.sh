@@ -17,7 +17,10 @@ usage() {
   printf 'key secret (in every form, even on one line), a pending host key and its known_hosts line (allowed in the\n' >&2
   printf 'DeployTargetHosts row only), and any ingest token by its shape or from the needles file (ingest token=...).\n' >&2
   printf 'DHOW_DEMO_SWEEP_EXTRA is a colon separated list of folders (API responses, event captures) swept as well, and\n' >&2
-  printf 'DHOW_DEMO_EXPECT_TARGETS=1 fails the sweep when the stack has no deploy target with a key. Not covered: the\n' >&2
+  printf 'DHOW_DEMO_EXPECT_TARGETS=1 fails the sweep when the stack has no deploy target with a key. DHOW_DEMO_EXPECT_NOTIFY=1 adds\n' >&2
+  printf 'the secrets of the notification channels (a Slack or Discord address, a Telegram bot token, a webhook signing secret: every\n' >&2
+  printf 'one opened from the sealed settings, and any one by its shape), fails when the stack has no such channel, and plants each\n' >&2
+  printf 'in a log, an API answer, an event stream, a database dump and an inbox to see that exactly that file is found. Not covered: the\n' >&2
   printf 'setup token, which the server prints on purpose, Forgejo and its password, the container images of Docker\n' >&2
   printf 'itself, and memory. deploy/m4-demo/run.sh runs it at the end; to run it alone, keep a stack with\n' >&2
   printf 'DHOW_DEMO_KEEP=1 and set DHOW_DEMO_WORK to its folder.\n' >&2
@@ -42,6 +45,7 @@ sweep_test() {
     -e DHOW_LEAK_SWEEP_NEEDLES="$work/needles" \
     -e DHOW_LEAK_SWEEP_RUNNER_IDENTITY=/sweep/runner-state/identity \
     -e DHOW_LEAK_SWEEP_EXPECT_TARGETS="${DHOW_DEMO_EXPECT_TARGETS:-}" \
+    -e DHOW_LEAK_SWEEP_EXPECT_NOTIFY="${DHOW_DEMO_EXPECT_NOTIFY:-}" \
     -e DHOW_LEAK_SWEEP_DIRS="$where" \
     tools go test -tags leaksweep -count=1 -v -run "^${only}\$" "$package" </dev/null
 }
@@ -99,6 +103,35 @@ caught() {
   printf '    caught: %s\n' "$expect"
 }
 
+needle_value() { grep -m1 "^$1=" "$work/needles" | cut -d= -f2-; }
+
+plant_notify() {
+  local slack token hook place
+  slack=$(needle_value 'slack webhook url')
+  token=$(needle_value 'telegram bot token')
+  hook=$(needle_value 'webhook signing secret')
+  [[ -n $slack && -n $token && -n $hook ]] || return 1
+  for place in n-log n-api n-events n-dump/pg_dump n-inbox; do
+    install -d -m 0700 "$canary/$place"
+    printf '{"msg":"delivered","kind":"slack","host":"hooks.slack.com","state":"sent"}\n' >"$canary/$place/clean.txt"
+  done
+  printf '{"msg":"sent","url":"%s"}\n' "$slack" >"$canary/n-log/server.log"
+  printf '{"Data":{"BotToken":"%s"}}\n' "$token" >"$canary/n-api/channels.json"
+  printf 'id: 1-9\nevent: change\ndata: {"Secret":"%s"}\n\n' "$hook" >"$canary/n-events/events.txt"
+  printf '0198f5d2\t%s\n' "$slack" >"$canary/n-dump/pg_dump/NotificationDeliveries.sql"
+  printf '{"Data":[{"TitleKey":"inbox.deployment.finished.failed","Params":{"Project":"%s"}}]}\n' "$token" >"$canary/n-inbox/notifications.json"
+}
+
+caught_only() {
+  local case=$1 file=$2 expect=$3 files
+  caught "$case" "$expect"
+  files=$(sed -n 's/^.*found the .* in clear in //p' "$work/canary-$case.out" | sort -u)
+  if [[ $files != "$file" ]]; then
+    printf '    the sweep found more than the one planted file in %s: %s\n' "$case" "$files" >&2
+    return 1
+  fi
+}
+
 say "Collecting pg_dump, the logs, the journal, the runner state and the blob store"
 collect
 say "Checking that the sweep catches credentials planted on purpose"
@@ -127,6 +160,25 @@ else
   printf '    caught: the private key of a deploy target and a pending host key planted by the test\n'
 fi
 caught shape "found the runner access token in clear in $canary/shape/runner.log"
+if [[ -n ${DHOW_DEMO_EXPECT_NOTIFY:-} ]]; then
+  say "Checking that each channel secret is found in the place it was planted, and in no other"
+  plant_notify
+  caught_only n-log "$canary/n-log/server.log" "found the slack webhook url in clear in $canary/n-log/server.log"
+  caught_only n-api "$canary/n-api/channels.json" "found the telegram bot token in clear in $canary/n-api/channels.json"
+  caught_only n-events "$canary/n-events/events.txt" "found the webhook signing secret in clear in $canary/n-events/events.txt"
+  caught_only n-dump "$canary/n-dump/pg_dump/NotificationDeliveries.sql" "found the slack webhook url in clear in $canary/n-dump/pg_dump/NotificationDeliveries.sql"
+  caught_only n-inbox "$canary/n-inbox/notifications.json" "found the telegram bot token in clear in $canary/n-inbox/notifications.json"
+  if ! sweep_test "$work" TestEachNotificationSecretPlantedInAPlaceIsFoundThereAndNothingElseIs >"$work/canary-notify.out" 2>&1; then
+    printf '    the sweep did not find exactly the channel secrets planted by the test:\n' >&2
+    tail -n 30 "$work/canary-notify.out" >&2
+    exit 1
+  fi
+  if grep -q -- '--- SKIP' "$work/canary-notify.out"; then
+    printf '    the test skipped: the stack has no notification channel\n' >&2
+    exit 1
+  fi
+  printf '    caught: each channel secret planted by the test, in a log, an API answer, an event stream, a dump and an inbox, and nothing else\n'
+fi
 say "Sweeping"
 sweep_test "$dirs" | tee "$work/sweep.out"
 grep -q '^ok ' "$work/sweep.out"

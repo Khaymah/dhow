@@ -1,0 +1,23 @@
+services:
+  server:
+    environment:
+      DHOW_NOTIFY_ALLOW_PRIVATE_CIDRS: ${DHOW_M7_NOTIFY_IP}/32
+      SSL_CERT_FILE: /etc/dhow-notify/ca.pem
+    volumes:
+      - type: bind
+        source: ${DHOW_DEMO_WORK}/notify
+        target: /etc/dhow-notify
+        read_only: true
+
+  notify:
+    image: ${DHOW_DEV_GO_IMAGE:-golang:1.27.4-bookworm}
+    init: true
+    entrypoint: ["/work/notify-receiver", "-listen", "0.0.0.0:443", "-ca-file", "/work/ca.pem"]
+    volumes:
+      - type: bind
+        source: ${DHOW_DEMO_WORK}/notify
+        target: /work
+    networks:
+      default:
+        ipv4_address: ${DHOW_M7_NOTIFY_IP}
+        aliases: [hooks.slack.com, discord.com, discordapp.com, api.telegram.org, webhook.notify.test]

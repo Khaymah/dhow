@@ -3,6 +3,7 @@ package edge_test
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 
@@ -26,6 +27,7 @@ func FuzzAllowedRefs(f *testing.F) {
 	f.Add("release/?", "release/", false, false)
 	f.Add("**", "a/b/c", false, false)
 	f.Add("a/**/b", "a/b", true, false)
+	f.Add("\uFFFD", "\xbd", false, false)
 	f.Fuzz(func(t *testing.T, pattern, name string, tag, pullRequest bool) {
 		kind := models.RefBranch
 		other := models.RefTag
@@ -46,7 +48,10 @@ func FuzzAllowedRefs(f *testing.F) {
 		if !pullRequest {
 			assert.False(t, environments.RefAllowed(refs, true, other, name, false), "a %s rule does not allow a %s", kind, other)
 		}
-		if pathglob.ValidPattern(pattern) && name != "" && !pullRequest && len(pattern) <= 32 && len(name) <= 64 {
+		if !utf8.ValidString(name) {
+			assert.False(t, allowed, "a name that is not valid UTF-8 is never allowed: pattern %q name %q", pattern, name)
+		}
+		if pathglob.ValidPattern(pattern) && utf8.ValidString(name) && name != "" && !pullRequest && len(pattern) <= 32 && len(name) <= 64 {
 			want := oracleMatch(strings.Split(pattern, "/"), strings.Split(name, "/"))
 			assert.Equal(t, want, allowed, "pattern %q name %q: the matcher and an independent backtracking one disagree", pattern, name)
 		}

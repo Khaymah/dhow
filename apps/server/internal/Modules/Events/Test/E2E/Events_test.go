@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -230,7 +231,10 @@ func TestAForgedNotificationOfAnUnknownKindIsDropped(t *testing.T) {
 	var got models.Event
 	require.NoError(t, json.Unmarshal([]byte(next(t, s).Data), &got))
 	assert.Equal(t, models.TypeOverviewChanged, got.Type)
-	assert.Equal(t, uint64(1), got.Seq, "the two forged ones never took a place in the ring")
+	hub := w.env.Wired.Options.Events.Hub()
+	start := events.Position{Epoch: hub.Now().Epoch}
+	assert.Len(t, hub.Since(w.org, start, 10).Events(), 1, "the forged one of this organization never took a place in the ring")
+	assert.Empty(t, hub.Since(uuid.Nil, start, 10).Events(), "the forged one without an organization never took a place in the ring")
 }
 
 func TestASilentListenerIsReplacedAndTheHubGoesUnhealthyMeanwhile(t *testing.T) {
@@ -266,7 +270,7 @@ func TestTheCanaryKeepsAHealthyListenerAliveAndIsNeverAnEvent(t *testing.T) {
 		Listen: events.Listener(func(ctx context.Context) (*pgx.Conn, error) {
 			return pgx.ConnectConfig(ctx, env.Pool.Config().ConnConfig.Copy())
 		}),
-		CanaryEvery: 50 * time.Millisecond, SilenceLimit: 400 * time.Millisecond,
+		CanaryEvery: 50 * time.Millisecond, SilenceLimit: 600 * time.Millisecond,
 		Log: slog.New(slog.NewJSONHandler(io.Discard, nil)),
 	})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -280,8 +284,19 @@ func TestTheCanaryKeepsAHealthyListenerAliveAndIsNeverAnEvent(t *testing.T) {
 		<-done
 	})
 	require.Eventually(t, service.Hub().Healthy, wait, 20*time.Millisecond)
-	epoch := service.Hub().Now()
+	epoch := service.Hub().Now().Epoch
 	time.Sleep(1500 * time.Millisecond)
 	assert.True(t, service.Hub().Healthy())
-	assert.Equal(t, epoch, service.Hub().Now(), "no restart and no event: the canary only proves the line is alive")
+	assert.Equal(t, epoch, service.Hub().Now().Epoch, "no restart: the canary keeps the line alive")
+	canaries := service.Hub().Since(uuid.Nil, events.Position{Epoch: epoch}, 1000)
+	assert.False(t, canaries.Lost)
+	assert.Empty(t, canaries.Events(), "the canary only proves the line is alive and is never an event")
+}
+
+func TestAServiceWithAListenerIsNotHealthyUntilItsFirstConnection(t *testing.T) {
+	service := events.NewService(events.Options{
+		Listen: events.Listener(func(context.Context) (*pgx.Conn, error) { return nil, errors.New("not connected") }),
+		Log:    slog.New(slog.NewJSONHandler(io.Discard, nil)),
+	})
+	assert.False(t, service.Hub().Healthy(), "before Run connects, nothing listens, so the hub must not claim to be healthy")
 }

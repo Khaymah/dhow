@@ -81,7 +81,7 @@ func TestRenderMailIsInTheLanguageOfTheChannelAndLeavesNoPlaceholder(t *testing.
 	assert.Contains(t, subject, "فشل النشر")
 	assert.Contains(t, subject, "shop")
 	assert.Contains(t, body, "الحالة: فشل")
-	assert.Contains(t, body, "رقم التشغيل: 12")
+	assert.Contains(t, body, "رقم التنفيذ: 12")
 	subject, body = notifications.RenderMail(i18n.En, p)
 	assert.Contains(t, subject, "Deployment failed")
 	assert.Contains(t, body, "Environment: production")

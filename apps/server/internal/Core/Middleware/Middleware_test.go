@@ -53,15 +53,12 @@ func serve(h http.Handler, req *http.Request) *httptest.ResponseRecorder {
 
 func TestSecurityHeaders(t *testing.T) {
 	tests := []struct {
-		name       string
-		options    middleware.SecurityOptions
-		wantHSTS   bool
-		wantReport bool
+		name     string
+		options  middleware.SecurityOptions
+		wantHSTS bool
 	}{
-		{"https", middleware.SecurityOptions{HSTS: true}, true, false},
-		{"http", middleware.SecurityOptions{}, false, false},
-		{"dev reports trusted types", middleware.SecurityOptions{ReportTrustedTypes: true}, false, true},
-		{"https with the report", middleware.SecurityOptions{HSTS: true, ReportTrustedTypes: true}, true, true},
+		{"https", middleware.SecurityOptions{HSTS: true}, true},
+		{"http", middleware.SecurityOptions{}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,13 +79,9 @@ func TestSecurityHeaders(t *testing.T) {
 				assert.Contains(t, rec.Header().Get("Content-Security-Policy"), d)
 			}
 			assert.Equal(t, tt.wantHSTS, rec.Header().Get("Strict-Transport-Security") != "")
-			assert.NotContains(t, rec.Header().Get("Content-Security-Policy"), "trusted-types")
-			report := rec.Header().Get("Content-Security-Policy-Report-Only")
-			if tt.wantReport {
-				assert.Equal(t, "require-trusted-types-for 'script'", report)
-			} else {
-				assert.Empty(t, report)
-			}
+			assert.Contains(t, rec.Header().Get("Content-Security-Policy"), "require-trusted-types-for 'script'")
+			assert.Contains(t, rec.Header().Get("Content-Security-Policy"), "trusted-types 'none'")
+			assert.Empty(t, rec.Header().Get("Content-Security-Policy-Report-Only"))
 			assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"), "CORS header must never be set")
 		})
 	}

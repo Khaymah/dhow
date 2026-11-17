@@ -144,7 +144,7 @@ All routes are under `/api/v1`. Per-network limits count only requests that pass
 | V7.1 to V7.3 Logging | Met | No credentials in logs or audit data, security events audited, tamper-evident chain |
 | V8.3.1 Sensitive data in URLs | Met | Tokens in bodies, cookies or fragments only |
 | V11.1.4 Anti-automation | Met | Per-network limits on public routes after the Origin check, invitation caps |
-| V14.4 HTTP security headers | Partial | CSP without Trusted Types (finding F9) |
+| V14.4 HTTP security headers | Partial | CSP with Trusted Types (finding F9 fixed in M7.10) |
 
 ## 5. Findings of the internal review
 
@@ -158,7 +158,7 @@ All routes are under `/api/v1`. Per-network limits count only requests that pass
 | F6 | Low | A role change that read the target as non-owner could demote someone promoted to Owner in parallel without the factor. | Fixed: the change answers `409 CONFLICT` when the role moved under it. |
 | F7 | Low | Throttle, challenge, flow and counter rows were never deleted. | Fixed in T3: `Database/Retention` |
 | F8 | Low | `POST /setup` had no per-address limit. | Fixed: per client network. `App/RateLimit_test.go` |
-| F9 | Medium | The CSP has no `require-trusted-types-for 'script'`, although the security model listed Trusted Types. | Not fixed. The web has no `innerHTML` sinks (a hook forbids them), and turning the directive on needs a browser test over every screen, which M7 brings. The security model now says it is planned. |
+| F9 | Medium | The CSP has no `require-trusted-types-for 'script'`, although the security model listed Trusted Types. | Fixed in M7.10 ([ADR-0115](../../../Plan/ADR/0115-trusted-types-enforced.md)). The CSP now carries `require-trusted-types-for 'script'; trusted-types 'none'` in every mode, after the browser tests passed over every screen with no violation. |
 | F10 | Medium | Sessions last up to 14 days (12 hours idle); ASVS 3.3.2 asks for re-authentication after 12 hours. | Fixed in M2.6 (ADR-0054): 7 days absolute, also for sessions opened before, and 4 hours idle for anyone who is an Owner or Admin in any organization, from the current role. `SessionPolicy_test.go` |
 | F11 | Medium | Owners and admins are not required to use a second factor (ASVS 4.3.1). | Fixed in M2.6 (ADR-0054): the `RequireSecondFactor` organization setting with a 7-day grace period, then `403 SECOND_FACTOR_REQUIRED` on sensitive actions. `RouteTable_secondfactor_test.go`, `Modules/Identity/Test/E2E/SecondFactor_test.go` |
 | F12 | Medium | No email to the user after a password, factor or token change (ASVS 2.2.3). | Fixed in M2.6 (ADR-0054): `Modules/Alerts` emails the user after each of 10 credential events when SMTP is configured, in the background and without any secret. `Modules/Alerts/Test` |

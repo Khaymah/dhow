@@ -23,7 +23,7 @@ func attemptParam(v *int) (*int, error) {
 	return v, nil
 }
 
-func parseLastEvent(v *string) (*EventRef, error) {
+func ParseLastEvent(v *string) (*EventRef, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -118,7 +118,7 @@ func (c *Controller) StreamJobLogs(ctx context.Context, req gen.StreamJobLogsReq
 	if err != nil {
 		return nil, err
 	}
-	last, err := parseLastEvent(req.Params.LastEventID)
+	last, err := ParseLastEvent(req.Params.LastEventID)
 	if err != nil {
 		return nil, err
 	}

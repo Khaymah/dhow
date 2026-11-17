@@ -82,6 +82,7 @@ Decisions: ADR-0021 to ADR-0023, ADR-0034, ADR-0059 and ADR-0062.
 | LCP on a typical VPS-hosted install | < 1.5 s |
 | Log viewer | Virtualized; smooth at 100k+ lines; follow-tail toggle |
 | Live updates | Patch caches incrementally from SSE events; no refetch storms |
+| Limits the browser test enforces (CPU slowed 4x) | Log with 50k lines: under 300 rows in the DOM, the first line within 4 seconds, and no task longer than 100 ms while scrolling. Deploy board with 400 targets: the first row within 5 seconds ([ADR-0116](../../Plan/ADR/0116-m7-final-review-limits-and-axe-coverage.md)) |
 
 ## 5. Stack (ADR-0023)
 

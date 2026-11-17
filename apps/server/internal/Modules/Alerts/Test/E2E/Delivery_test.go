@@ -58,20 +58,48 @@ func TestTheAlertIsSentEvenWhenTheRequestIsGone(t *testing.T) {
 	assert.Len(t, env.SentMail(mail), 1, "a client that drops the connection after the commit cannot skip the alert")
 }
 
-func TestPendingAlertsAreCapped(t *testing.T) {
+func fillMail(t *testing.T, env *apptest.Env, user uuid.UUID, event string, n int) {
+	t.Helper()
+	for range n {
+		_, err := env.Pool.Exec(context.Background(), `INSERT INTO "NotificationOutbox" ("Kind", "RecipientUserId", "EventId", "EventName", "Payload")
+			VALUES ('internal-email', $1, $2, $3, '{"Subject":"s","Body":"b"}')`, user, uuid.New(), event)
+		require.NoError(t, err)
+	}
+}
+
+func pendingOf(t *testing.T, env *apptest.Env, user uuid.UUID, like string) int {
+	t.Helper()
+	var n int
+	require.NoError(t, env.Pool.QueryRow(context.Background(), `SELECT count(*) FROM "NotificationOutbox"
+		WHERE "Kind" = 'internal-email' AND "RecipientUserId" = $1 AND "EventName" LIKE $2 AND "State" = 'pending' AND NOT "IsDeleted"`, user, like).Scan(&n))
+	return n
+}
+
+func TestACredentialAlertIsQueuedWhateverElseIsPending(t *testing.T) {
 	held := &heldMailer{release: make(chan struct{})}
 	env := apptest.NewWithOptions(t, apptest.Options{Mailer: held})
 	user := ownerID(t, env)
 
-	const limit = config.AlertMaxPending
+	fillMail(t, env, user, "account.new_device_login", 40)
+	fillMail(t, env, user, "notification.channel_disabled", 40)
+	before := pendingOf(t, env, user, "auth.%")
+	require.NoError(t, env.Wired.Alerts.Handle(context.Background(), passwordChanged(user)))
+	assert.Equal(t, before+1, pendingOf(t, env, user, "auth.%"), "80 other mails waiting do not stop a credential alert")
+	assert.NotContains(t, env.Logs.String(), "credential alert not sent")
+}
+
+func TestPendingCredentialAlertsOfOneUserKeepTheNewestAndNeverDropTheLatest(t *testing.T) {
+	held := &heldMailer{release: make(chan struct{})}
+	env := apptest.NewWithOptions(t, apptest.Options{Mailer: held})
+	user := ownerID(t, env)
+
+	const limit = config.AlertMaxPendingPerUser
 	held.started.Add(limit)
 	for range limit + 5 {
 		require.NoError(t, env.Wired.Alerts.Handle(context.Background(), passwordChanged(user)))
 	}
-	assert.Contains(t, env.Logs.String(), "credential alert not sent: too many pending")
-	var queued int
-	require.NoError(t, env.Pool.QueryRow(context.Background(), `SELECT count(*) FROM "NotificationOutbox" WHERE "Kind" = 'internal-email'`).Scan(&queued))
-	assert.Equal(t, limit, queued, "the queue holds no more than the cap, and nothing was sent yet")
+	assert.Equal(t, limit, pendingOf(t, env, user, "auth.%"), "one user keeps the newest alerts, and the latest is always among them")
+	assert.Contains(t, env.Logs.String(), "older pending credential alerts of the user were replaced by newer ones")
 	close(held.release)
 	env.Wired.Alerts.Wait()
 	assert.Equal(t, int32(limit), held.sent.Load())
