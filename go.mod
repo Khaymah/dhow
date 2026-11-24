@@ -16,7 +16,7 @@ require (
 	github.com/google/cel-go v0.30.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.13.0
-	github.com/oapi-codegen/runtime v1.9.0
+	github.com/oapi-codegen/runtime v1.9.1
 	github.com/pkg/sftp v1.13.12
 	github.com/pressly/goose/v3 v3.30.1
 	github.com/stretchr/testify v1.12.1
